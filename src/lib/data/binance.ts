@@ -1,4 +1,6 @@
 import type { Candle, SymbolInfo, TickerQuote, Timeframe } from "@/lib/types";
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
+import { join } from "path";
 
 /** Market data via Binance Vision — api.binance.com returns 451 in some regions. */
 const REST = process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision";
@@ -19,27 +21,79 @@ const TF_MAP: Record<Timeframe, string> = {
   "1w": "1w",
 };
 
+const CACHE_DIR = join(process.cwd(), "data", "cache");
+const SYMBOLS_CACHE = join(CACHE_DIR, "binance_usdt_symbols.json");
+
+let memSymbols: { ts: number; symbols: SymbolInfo[] } | null = null;
+const MEM_TTL = 60 * 60 * 1000; // 1h
+const FILE_TTL = 24 * 60 * 60 * 1000; // 24h
+
+function readFileCache(): SymbolInfo[] | null {
+  try {
+    if (!existsSync(SYMBOLS_CACHE)) return null;
+    const raw = JSON.parse(readFileSync(SYMBOLS_CACHE, "utf8"));
+    if (!Array.isArray(raw?.symbols) || !raw.symbols.length) return null;
+    if (Date.now() - Number(raw.ts || 0) > FILE_TTL) return null;
+    return raw.symbols as SymbolInfo[];
+  } catch {
+    return null;
+  }
+}
+
+function writeFileCache(symbols: SymbolInfo[]) {
+  try {
+    mkdirSync(CACHE_DIR, { recursive: true });
+    writeFileSync(
+      SYMBOLS_CACHE,
+      JSON.stringify({ ts: Date.now(), symbols }),
+      "utf8"
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export class BinanceProvider {
   static async getUsdtSymbols(): Promise<SymbolInfo[]> {
-    const res = await fetch(`${REST}/api/v3/exchangeInfo`, {
-      next: { revalidate: 3600 },
-    });
-    if (!res.ok) throw new Error(`Binance exchangeInfo ${res.status}`);
-    const data = await res.json();
-    return (data.symbols as Array<Record<string, unknown>>)
-      .filter(
-        (s) =>
-          s.status === "TRADING" &&
-          s.quoteAsset === "USDT" &&
-          s.isSpotTradingAllowed !== false
-      )
-      .map((s) => ({
-        symbol: String(s.symbol),
-        exchange: "binance" as const,
-        base: String(s.baseAsset),
-        quote: String(s.quoteAsset),
-      }))
-      .sort((a, b) => a.symbol.localeCompare(b.symbol));
+    if (memSymbols && Date.now() - memSymbols.ts < MEM_TTL) {
+      return memSymbols.symbols;
+    }
+    const fileCached = readFileCache();
+    if (fileCached?.length) {
+      memSymbols = { ts: Date.now(), symbols: fileCached };
+      // refresh in background if stale-ish
+    }
+    try {
+      const res = await fetch(`${REST}/api/v3/exchangeInfo`, {
+        next: { revalidate: 3600 },
+      });
+      if (!res.ok) {
+        if (fileCached?.length) return fileCached;
+        throw new Error(`Binance exchangeInfo ${res.status}`);
+      }
+      const data = await res.json();
+      const symbols = (data.symbols as Array<Record<string, unknown>>)
+        .filter(
+          (s) =>
+            s.status === "TRADING" &&
+            s.quoteAsset === "USDT" &&
+            s.isSpotTradingAllowed !== false
+        )
+        .map((s) => ({
+          symbol: String(s.symbol),
+          exchange: "binance" as const,
+          base: String(s.baseAsset),
+          quote: String(s.quoteAsset),
+        }))
+        .sort((a, b) => a.symbol.localeCompare(b.symbol));
+      memSymbols = { ts: Date.now(), symbols };
+      writeFileCache(symbols);
+      return symbols;
+    } catch (e) {
+      if (fileCached?.length) return fileCached;
+      if (memSymbols?.symbols?.length) return memSymbols.symbols;
+      throw e;
+    }
   }
 
   static async getKlines(

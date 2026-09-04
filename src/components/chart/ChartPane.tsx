@@ -11,10 +11,11 @@ import {
 } from "lightweight-charts";
 import type { PaneConfig } from "@/lib/types";
 import { useKlines } from "@/lib/hooks/useKlines";
-import { computeBuiltin } from "@/lib/indicators/registry";
+import { computeAllIndicators } from "@/lib/indicators/registry";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 import { SymbolSearch } from "@/components/chart/SymbolSearch";
+import { IndicatorMenu } from "@/components/indicators/IndicatorMenu";
 import { Badge } from "@/components/ui/Badge";
 import { usePatternOverlay } from "@/components/chart/PatternOverlay";
 import { detectPatterns } from "@/lib/patterns/detect";
@@ -188,6 +189,17 @@ export function ChartPane({ pane, compact }: Props) {
   const plots = useMemo(() => {
     if (!candles.length) return [];
     const all = [];
+    // Builtins with nesting (parents before children)
+    const builtinPlots = computeAllIndicators(pane.indicators, candles);
+    for (const s of builtinPlots) {
+      all.push({
+        ...s,
+        data: s.data.map((d) => ({
+          time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
+          value: d.value,
+        })),
+      });
+    }
     for (const ind of pane.indicators) {
       if (!ind.visible) continue;
       if (ind.type === "custom" && ind.scriptId) {
@@ -211,16 +223,6 @@ export function ChartPane({ pane, compact }: Props) {
             title: p.title ?? ind.name,
           });
         }
-      } else {
-        all.push(
-          ...computeBuiltin(ind, candles).map((s) => ({
-            ...s,
-            data: s.data.map((d) => ({
-              time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
-              value: d.value,
-            })),
-          }))
-        );
       }
     }
     return all;
@@ -360,6 +362,7 @@ export function ChartPane({ pane, compact }: Props) {
             updatePane(pane.id, { symbol, exchange })
           }
         />
+        <ChartIndicatorsButton paneId={pane.id} />
         <select
           className="input w-auto py-1"
           value={pane.timeframe}
@@ -407,5 +410,17 @@ export function ChartPane({ pane, compact }: Props) {
         <div ref={subContainerRef} className="flex-1 min-h-[60px] border-t border-desk-border" />
       </div>
     </div>
+  );
+}
+
+function ChartIndicatorsButton({ paneId }: { paneId: string }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button type="button" className="btn px-2 text-2xs" title="Göstergeler" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+        ☰
+      </button>
+      <IndicatorMenu open={open} onClose={() => setOpen(false)} paneId={paneId} />
+    </>
   );
 }

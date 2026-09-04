@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useDeskStore } from "@/store/desk";
-import type { TickerQuote } from "@/lib/types";
+import type { Exchange, SymbolInfo, TickerQuote } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
 import clsx from "clsx";
 
@@ -13,9 +13,14 @@ export function WatchlistPanel() {
     setActiveWatchlist,
     openSymbolInActive,
     removeWatchlistSymbol,
+    addWatchlistSymbol,
   } = useDeskStore();
   const list = watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
   const [quotes, setQuotes] = useState<Record<string, TickerQuote>>({});
+  const [browse, setBrowse] = useState<"off" | "binance" | "bist">("off");
+  const [browseQ, setBrowseQ] = useState("");
+  const [universe, setUniverse] = useState<SymbolInfo[]>([]);
+  const [univTotal, setUnivTotal] = useState(0);
 
   useEffect(() => {
     if (!list) return;
@@ -50,6 +55,25 @@ export function WatchlistPanel() {
     };
   }, [list]);
 
+  useEffect(() => {
+    if (browse === "off") return;
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const params = new URLSearchParams({ exchange: browse, limit: "5000" });
+      if (browseQ) params.set("q", browseQ);
+      const res = await fetch(`/api/symbols?${params}`);
+      const json = await res.json();
+      if (!cancelled) {
+        setUniverse(json.symbols ?? []);
+        setUnivTotal(Number(json.total ?? 0));
+      }
+    }, 150);
+    return () => {
+      cancelled = true;
+      clearTimeout(t);
+    };
+  }, [browse, browseQ]);
+
   if (!list) {
     return <div className="p-3 text-xs text-desk-muted">İzleme listesi yok</div>;
   }
@@ -71,62 +95,171 @@ export function WatchlistPanel() {
           </button>
         ))}
       </div>
-      <div className="flex-1 overflow-y-auto">
-        <table className="w-full text-xs">
-          <thead className="sticky top-0 bg-desk-panel text-desk-muted text-2xs">
-            <tr>
-              <th className="text-left px-2 py-1.5 font-medium">Sembol</th>
-              <th className="text-right px-2 py-1.5 font-medium">Fiyat</th>
-              <th className="text-right px-2 py-1.5 font-medium">%Δ</th>
-              <th className="w-6" />
-            </tr>
-          </thead>
-          <tbody>
-            {list.symbols.map((s) => {
-              const q = quotes[`${s.exchange}:${s.symbol}`];
-              return (
-                <tr
-                  key={`${s.exchange}-${s.symbol}`}
-                  className="hover:bg-desk-elevated cursor-pointer border-t border-desk-border/50"
-                  onClick={() => openSymbolInActive(s.symbol, s.exchange)}
-                >
-                  <td className="px-2 py-1.5">
-                    <div className="font-medium">{s.symbol}</div>
-                    <div className="text-2xs text-desk-muted">
-                      {s.exchange}
-                      {q?.delayed && (
-                        <Badge tone="warn"> gecikmeli</Badge>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-2 py-1.5 text-right font-mono">
-                    {q ? q.last.toLocaleString(undefined, { maximumFractionDigits: 6 }) : "—"}
-                  </td>
-                  <td
-                    className={clsx(
-                      "px-2 py-1.5 text-right font-mono",
-                      (q?.changePct ?? 0) >= 0 ? "text-desk-up" : "text-desk-down"
-                    )}
+      <div className="flex gap-1 px-2 py-1 border-b border-desk-border">
+        <button
+          type="button"
+          className={clsx("btn text-2xs", browse === "binance" && "btn-accent")}
+          onClick={() => setBrowse(browse === "binance" ? "off" : "binance")}
+        >
+          Tüm USDT
+        </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", browse === "bist" && "btn-accent")}
+          onClick={() => setBrowse(browse === "bist" ? "off" : "bist")}
+        >
+          Tüm BIST
+        </button>
+      </div>
+      {browse !== "off" ? (
+        <UniverseBrowser
+          exchange={browse}
+          q={browseQ}
+          setQ={setBrowseQ}
+          symbols={universe}
+          total={univTotal}
+          onOpen={(sym, ex) => openSymbolInActive(sym, ex)}
+          onAdd={(sym, ex) => addWatchlistSymbol(list.id, sym, ex)}
+        />
+      ) : (
+        <div className="flex-1 overflow-y-auto">
+          <table className="w-full text-xs">
+            <thead className="sticky top-0 bg-desk-panel text-desk-muted text-2xs">
+              <tr>
+                <th className="text-left px-2 py-1.5 font-medium">Sembol</th>
+                <th className="text-right px-2 py-1.5 font-medium">Fiyat</th>
+                <th className="text-right px-2 py-1.5 font-medium">%Δ</th>
+                <th className="w-6" />
+              </tr>
+            </thead>
+            <tbody>
+              {list.symbols.map((s) => {
+                const q = quotes[`${s.exchange}:${s.symbol}`];
+                return (
+                  <tr
+                    key={`${s.exchange}-${s.symbol}`}
+                    className="border-t border-desk-border/60 hover:bg-desk-elevated cursor-pointer"
+                    onClick={() => openSymbolInActive(s.symbol, s.exchange)}
                   >
-                    {q ? `${q.changePct >= 0 ? "+" : ""}${q.changePct.toFixed(2)}%` : "—"}
-                  </td>
-                  <td className="pr-1">
-                    <button
-                      type="button"
-                      className="text-desk-muted hover:text-desk-down text-2xs"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeWatchlistSymbol(list.id, s.symbol);
-                      }}
+                    <td className="px-2 py-1.5">
+                      <span className="font-medium">{s.symbol}</span>
+                      {s.exchange === "bist" && (
+                        <span className="ml-1"><Badge tone="warn">BIST</Badge></span>
+                      )}
+                    </td>
+                    <td className="px-2 py-1.5 text-right font-mono">
+                      {q ? q.last.toLocaleString(undefined, { maximumFractionDigits: 6 }) : "—"}
+                    </td>
+                    <td
+                      className={clsx(
+                        "px-2 py-1.5 text-right font-mono",
+                        q && q.changePct >= 0 ? "text-desk-up" : "text-desk-down"
+                      )}
                     >
-                      ×
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                      {q ? `${q.changePct.toFixed(2)}%` : "—"}
+                    </td>
+                    <td className="px-1">
+                      <button
+                        type="button"
+                        className="text-desk-muted hover:text-desk-down text-2xs"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeWatchlistSymbol(list.id, s.symbol);
+                        }}
+                      >
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function UniverseBrowser({
+  exchange,
+  q,
+  setQ,
+  symbols,
+  total,
+  onOpen,
+  onAdd,
+}: {
+  exchange: Exchange;
+  q: string;
+  setQ: (v: string) => void;
+  symbols: SymbolInfo[];
+  total: number;
+  onOpen: (s: string, e: Exchange) => void;
+  onAdd: (s: string, e: Exchange) => void;
+}) {
+  const parentRef = useRef<HTMLDivElement>(null);
+  const [scrollTop, setScrollTop] = useState(0);
+  const rowH = 28;
+  const filtered = useMemo(() => symbols, [symbols]);
+  const visible = 18;
+  const start = Math.max(0, Math.floor(scrollTop / rowH) - 2);
+  const end = Math.min(filtered.length, start + visible + 4);
+  const slice = filtered.slice(start, end);
+
+  return (
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="p-2 border-b border-desk-border">
+        <input
+          className="input"
+          placeholder={exchange === "binance" ? "USDT ara (aio, btc…)" : "BIST ara…"}
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+        />
+        <div className="text-2xs text-desk-muted mt-1">
+          {total} sembol · {exchange === "binance" ? "Binance USDT spot" : "BIST"}
+        </div>
+      </div>
+      <div
+        ref={parentRef}
+        className="flex-1 overflow-y-auto"
+        onScroll={(e) => setScrollTop((e.target as HTMLDivElement).scrollTop)}
+      >
+        <div style={{ height: filtered.length * rowH, position: "relative" }}>
+          {slice.map((s, i) => {
+            const idx = start + i;
+            return (
+              <div
+                key={s.symbol}
+                className="absolute left-0 right-0 flex items-center px-2 text-xs hover:bg-desk-elevated"
+                style={{ top: idx * rowH, height: rowH }}
+              >
+                <button
+                  type="button"
+                  className="flex-1 text-left font-medium truncate"
+                  onClick={() => onOpen(s.symbol, exchange)}
+                >
+                  {s.symbol}
+                  <span className="text-desk-muted text-2xs ml-2">
+                    {s.name || s.base || ""}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="btn text-2xs"
+                  onClick={() => onAdd(s.symbol, exchange)}
+                >
+                  +
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        {!filtered.length && (
+          <div className="text-2xs text-desk-muted p-3">
+            Sonuç yok — sembol listede olmayabilir.
+          </div>
+        )}
       </div>
     </div>
   );

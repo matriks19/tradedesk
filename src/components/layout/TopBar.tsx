@@ -1,10 +1,14 @@
 "use client";
 
+import { useState } from "react";
 import { LAYOUT_OPTIONS, useDeskStore } from "@/store/desk";
+import { IndicatorMenu } from "@/components/indicators/IndicatorMenu";
 import clsx from "clsx";
 
 export function TopBar() {
-  const { layoutMode, setLayoutMode } = useDeskStore();
+  const { layoutMode, setLayoutMode, setSidebarTab } = useDeskStore();
+  const [menuOpen, setMenuOpen] = useState(false);
+
   return (
     <header className="h-11 shrink-0 flex items-center gap-3 px-3 border-b border-desk-border bg-desk-panel">
       <div className="flex items-center gap-2">
@@ -17,6 +21,17 @@ export function TopBar() {
         </div>
       </div>
       <div className="h-5 w-px bg-desk-border" />
+      <button
+        type="button"
+        className="btn btn-accent px-2"
+        title="Göstergeler"
+        onClick={() => {
+          setSidebarTab("indicators");
+          setMenuOpen(true);
+        }}
+      >
+        ☰ Göstergeler
+      </button>
       <div className="flex items-center gap-1">
         <span className="text-2xs text-desk-muted mr-1">Düzen</span>
         {LAYOUT_OPTIONS.map((m) => (
@@ -35,6 +50,7 @@ export function TopBar() {
         <span className="hidden sm:inline">Canlı Binance WS · BIST gecikmeli</span>
         <span className="w-1.5 h-1.5 rounded-full bg-desk-up animate-pulse" />
       </div>
+      <IndicatorMenu open={menuOpen} onClose={() => setMenuOpen(false)} />
     </header>
   );
 }

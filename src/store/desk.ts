@@ -7,6 +7,7 @@ import type {
   CustomScript,
   Exchange,
   IndicatorInstance,
+  IndicatorSource,
   LayoutMode,
   PaneConfig,
   PatternSettings,
@@ -15,7 +16,7 @@ import type {
   Watchlist,
 } from "@/lib/types";
 import type { PatternHit } from "@/lib/patterns/types";
-import { BUILTIN_META } from "@/lib/indicators/registry";
+import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
 
 function uid(prefix = "id"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -61,6 +62,8 @@ interface DeskState {
   bistBannerDismissed: boolean;
   patternSettings: PatternSettings;
   overlayPattern: PatternHit | null;
+  favoriteIndicators: BuiltinIndicatorId[];
+  indicatorMenuOpen: boolean;
   setLayoutMode: (mode: LayoutMode) => void;
   setActivePane: (id: string) => void;
   updatePane: (id: string, patch: Partial<PaneConfig>) => void;
@@ -74,8 +77,22 @@ interface DeskState {
   ) => void;
   removeWatchlistSymbol: (listId: string, symbol: string) => void;
   openSymbolInActive: (symbol: string, exchange: Exchange) => void;
-  addIndicator: (paneId: string, type: BuiltinIndicatorId) => void;
+  addIndicator: (
+    paneId: string,
+    type: BuiltinIndicatorId,
+    source?: IndicatorSource,
+    parentId?: string
+  ) => void;
   removeIndicator: (paneId: string, indicatorId: string) => void;
+  updateIndicatorParams: (
+    paneId: string,
+    indId: string,
+    params: Record<string, number | string>
+  ) => void;
+  toggleIndicatorVisible: (paneId: string, indId: string) => void;
+  setIndicatorColor: (paneId: string, indId: string, color: string) => void;
+  toggleFavoriteIndicator: (type: BuiltinIndicatorId) => void;
+  setIndicatorMenuOpen: (open: boolean) => void;
   setScripts: (s: CustomScript[]) => void;
   upsertScript: (s: CustomScript) => void;
   applyScriptToActive: (scriptId: string) => void;
@@ -119,6 +136,8 @@ export const useDeskStore = create<DeskState>()(
           focusId: null,
         },
         overlayPattern: null,
+        favoriteIndicators: ["sma", "ema", "rsi", "macd", "bollinger"],
+        indicatorMenuOpen: false,
         setLayoutMode: (mode) =>
           set((s) => {
             const panes = panesForMode(mode, s.panes);
@@ -162,32 +181,124 @@ export const useDeskStore = create<DeskState>()(
           const { activePaneId, updatePane } = get();
           updatePane(activePaneId, { symbol, exchange });
         },
-        addIndicator: (paneId, type) =>
+        addIndicator: (paneId, type, source, parentId) =>
           set((s) => ({
             panes: s.panes.map((p) => {
               if (p.id !== paneId) return p;
               const meta = BUILTIN_META[type];
+              if (!meta) return p;
+              // Nesting depth limit
+              let depth = 0;
+              if (source?.type === "indicator") {
+                let cur = p.indicators.find((i) => i.id === source.indicatorId);
+                while (cur?.source?.type === "indicator" && depth < 5) {
+                  depth++;
+                  const pid = cur.source.indicatorId;
+                  cur = p.indicators.find((i) => i.id === pid);
+                }
+                if (depth >= 2) return p; // max nested depth 2 (parent + child, or child of child blocked)
+              }
+              const params = defaultsFor(type);
               const inst: IndicatorInstance = {
                 id: uid("ind"),
                 type,
                 name: meta.label,
-                params: { ...meta.defaults },
+                params,
                 visible: true,
+                source: source ?? { type: "price", field: "close" },
+                parentId,
               };
+              // Pretty name for nested
+              if (source?.type === "indicator") {
+                inst.name = formatIndicatorLabel(inst, [...p.indicators, inst]);
+              }
               return { ...p, indicators: [...p.indicators, inst] };
             }),
           })),
         removeIndicator: (paneId, indicatorId) =>
+          set((s) => ({
+            panes: s.panes.map((p) => {
+              if (p.id !== paneId) return p;
+              // also remove children that source from this indicator
+              const removeIds = new Set<string>([indicatorId]);
+              let changed = true;
+              while (changed) {
+                changed = false;
+                for (const ind of p.indicators) {
+                  if (
+                    ind.source?.type === "indicator" &&
+                    removeIds.has(ind.source.indicatorId) &&
+                    !removeIds.has(ind.id)
+                  ) {
+                    removeIds.add(ind.id);
+                    changed = true;
+                  }
+                }
+              }
+              return {
+                ...p,
+                indicators: p.indicators.filter((i) => !removeIds.has(i.id)),
+              };
+            }),
+          })),
+        updateIndicatorParams: (paneId, indId, params) =>
+          set((s) => ({
+            panes: s.panes.map((p) => {
+              if (p.id !== paneId) return p;
+              return {
+                ...p,
+                indicators: p.indicators.map((ind) => {
+                  if (ind.id !== indId) return ind;
+                  const next = {
+                    ...ind,
+                    params: { ...ind.params, ...params },
+                  };
+                  // sync price source field if params.source changed
+                  if (typeof params.source === "string" && (!ind.source || ind.source.type === "price")) {
+                    next.source = {
+                      type: "price",
+                      field: params.source as import("@/lib/types").PriceField,
+                    };
+                  }
+                  next.name = formatIndicatorLabel(next, p.indicators);
+                  return next;
+                }),
+              };
+            }),
+          })),
+        toggleIndicatorVisible: (paneId, indId) =>
           set((s) => ({
             panes: s.panes.map((p) =>
               p.id !== paneId
                 ? p
                 : {
                     ...p,
-                    indicators: p.indicators.filter((i) => i.id !== indicatorId),
+                    indicators: p.indicators.map((i) =>
+                      i.id === indId ? { ...i, visible: !i.visible } : i
+                    ),
                   }
             ),
           })),
+        setIndicatorColor: (paneId, indId, color) =>
+          set((s) => ({
+            panes: s.panes.map((p) =>
+              p.id !== paneId
+                ? p
+                : {
+                    ...p,
+                    indicators: p.indicators.map((i) =>
+                      i.id === indId ? { ...i, color } : i
+                    ),
+                  }
+            ),
+          })),
+        toggleFavoriteIndicator: (type) =>
+          set((s) => ({
+            favoriteIndicators: s.favoriteIndicators.includes(type)
+              ? s.favoriteIndicators.filter((x) => x !== type)
+              : [...s.favoriteIndicators, type],
+          })),
+        setIndicatorMenuOpen: (open) => set({ indicatorMenuOpen: open }),
         setScripts: (scripts) => set({ scripts }),
         upsertScript: (script) =>
           set((s) => {
@@ -250,6 +361,7 @@ export const useDeskStore = create<DeskState>()(
         showRiskLines: s.showRiskLines,
         activeWatchlistId: s.activeWatchlistId,
         sidebarTab: s.sidebarTab,
+        favoriteIndicators: s.favoriteIndicators,
         patternSettings: {
           ...s.patternSettings,
           focusId: null,

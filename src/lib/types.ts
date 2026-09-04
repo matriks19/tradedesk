@@ -53,20 +53,85 @@ export interface PaneConfig {
   indicators: IndicatorInstance[];
 }
 
+export type IndicatorCategory =
+  | "trend"
+  | "momentum"
+  | "volatility"
+  | "volume"
+  | "other";
+
+export type PriceField = "close" | "open" | "high" | "low" | "hl2" | "hlc3" | "ohlc4";
+
+export type IndicatorSource =
+  | { type: "price"; field: PriceField }
+  | { type: "indicator"; indicatorId: string; seriesKey?: string };
+
 export type BuiltinIndicatorId =
   | "sma"
   | "ema"
-  | "rsi"
-  | "macd"
-  | "bollinger"
-  | "atr"
-  | "stochastic"
-  | "vwap"
+  | "wma"
+  | "dema"
+  | "tema"
+  | "hma"
+  | "vwma"
+  | "ichimoku"
   | "supertrend"
+  | "psar"
+  | "adx"
+  | "linreg"
+  | "rsi"
+  | "stochastic"
+  | "stochRsi"
+  | "macd"
+  | "cci"
+  | "roc"
+  | "momentum"
+  | "williamsR"
+  | "tsi"
+  | "ultimateOsc"
+  | "awesomeOsc"
+  | "ppo"
+  | "bollinger"
+  | "keltner"
   | "donchian"
-  | "hull"
+  | "atr"
+  | "stddev"
+  | "histVol"
+  | "chaikinVol"
+  | "vwap"
+  | "obv"
+  | "mfi"
+  | "cmf"
   | "volumeOsc"
-  | "stochRsi";
+  | "adl"
+  | "pivot"
+  | "zigzag"
+  | "highest"
+  | "lowest"
+  | "cumDelta";
+
+export interface IndicatorInputDef {
+  key: string;
+  label: string;
+  type: "number" | "select";
+  min?: number;
+  max?: number;
+  step?: number;
+  default: number | string;
+  options?: { value: string | number; label: string }[];
+}
+
+export interface IndicatorMeta {
+  id: BuiltinIndicatorId;
+  label: string;
+  category: IndicatorCategory;
+  pane: "main" | "sub";
+  inputs: IndicatorInputDef[];
+  /** Can accept a series input (indicator-on-indicator) */
+  acceptsSeries?: boolean;
+  /** Primary series key exposed for child indicators */
+  primarySeriesKey?: string;
+}
 
 export interface IndicatorInstance {
   id: string;
@@ -76,6 +141,9 @@ export interface IndicatorInstance {
   visible: boolean;
   scriptId?: string;
   color?: string;
+  source?: IndicatorSource;
+  /** Parent indicator id when nested */
+  parentId?: string;
 }
 
 export interface Watchlist {

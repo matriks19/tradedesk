@@ -14,19 +14,29 @@ export function SymbolSearch({ symbol, exchange, onSelect }: Props) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
   const [results, setResults] = useState<SymbolInfo[]>([]);
+  const [total, setTotal] = useState(0);
   const [exFilter, setExFilter] = useState<Exchange | "all">("all");
+  const [loading, setLoading] = useState(false);
   const boxRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
     const t = setTimeout(async () => {
-      const params = new URLSearchParams();
-      if (q) params.set("q", q);
-      if (exFilter !== "all") params.set("exchange", exFilter);
-      const res = await fetch(`/api/symbols?${params}`);
-      const json = await res.json();
-      setResults(json.symbols ?? []);
-    }, 200);
+      setLoading(true);
+      try {
+        const params = new URLSearchParams();
+        if (q) params.set("q", q);
+        if (exFilter !== "all") params.set("exchange", exFilter);
+        // request full match set for search
+        params.set("limit", q ? "200" : "80");
+        const res = await fetch(`/api/symbols?${params}`);
+        const json = await res.json();
+        setResults(json.symbols ?? []);
+        setTotal(Number(json.total ?? json.symbols?.length ?? 0));
+      } finally {
+        setLoading(false);
+      }
+    }, 180);
     return () => clearTimeout(t);
   }, [q, open, exFilter]);
 
@@ -59,7 +69,7 @@ export function SymbolSearch({ symbol, exchange, onSelect }: Props) {
         {symbol}
       </button>
       {open && (
-        <div className="absolute z-50 top-full left-0 mt-1 w-72 panel shadow-xl p-2">
+        <div className="absolute z-50 top-full left-0 mt-1 w-80 panel shadow-xl p-2">
           <div className="flex gap-1 mb-2">
             {(["all", "binance", "bist"] as const).map((x) => (
               <button
@@ -78,7 +88,7 @@ export function SymbolSearch({ symbol, exchange, onSelect }: Props) {
           <input
             autoFocus
             className="input mb-2"
-            placeholder="Sembol ara… (BTC, THYAO)"
+            placeholder="Sembol ara… (AIO, THYAO, hlc…)"
             value={q}
             onChange={(e) => setQ(e.target.value)}
           />
@@ -95,13 +105,28 @@ export function SymbolSearch({ symbol, exchange, onSelect }: Props) {
               >
                 <span className="font-medium">{s.symbol}</span>
                 <span className="text-desk-muted text-2xs">
-                  {s.exchange === "bist" ? s.name ?? "BIST" : s.exchange}
+                  {s.exchange === "bist" ? s.name ?? "BIST" : s.base ?? s.exchange}
                 </span>
               </button>
             ))}
-            {!results.length && (
-              <div className="text-2xs text-desk-muted px-2 py-3">Sonuç yok</div>
+            {!loading && !results.length && (
+              <div className="text-2xs text-desk-muted px-2 py-3 space-y-1">
+                <div>Sonuç yok{q ? ` — “${q}”` : ""}</div>
+                {q && (
+                  <div>
+                    Bu sembol listede yok olabilir (Binance spot USDT / BIST
+                    kataloğu). Kısmi arama (ör. aio → *AIO*) dener; listede yoksa
+                    grafik verisi gelmeyebilir.
+                  </div>
+                )}
+              </div>
             )}
+            {loading && (
+              <div className="text-2xs text-desk-muted px-2 py-3">Aranıyor…</div>
+            )}
+          </div>
+          <div className="text-2xs text-desk-muted pt-1 border-t border-desk-border mt-1">
+            {total} eşleşme{exFilter !== "all" ? ` · ${exFilter}` : ""}
           </div>
         </div>
       )}
