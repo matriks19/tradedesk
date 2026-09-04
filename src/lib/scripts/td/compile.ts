@@ -43,6 +43,11 @@ const BUILTINS = new Set([
   "na",
   "nz",
   "color",
+  "trueRange",
+  "sessionVwap",
+  "change",
+  "stdev",
+  "atr",
 ]);
 
 export function isTdScript(code: string): boolean {
@@ -130,6 +135,32 @@ const bollinger = (src, len=20, mult=2) => {
     lower.push(mid[i] - mult * std);
   }
   return [mid, upper, lower];
+};
+const trueRange = () => high.map((h, i) => {
+  if (i === 0) return h - low[i];
+  return Math.max(h - low[i], Math.abs(h - close[i-1]), Math.abs(low[i] - close[i-1]));
+});
+const atr = (len=14) => sma(trueRange(), len);
+const change = (src, len=1) => src.map((v, i) => i < len || v == null || src[i-len] == null ? null : v - src[i-len]);
+const stdev = (src, len) => {
+  const mid = sma(src, len);
+  return src.map((_, i) => {
+    if (mid[i] == null) return null;
+    let s = 0;
+    for (let j = i - len + 1; j <= i; j++) { const d = src[j] - mid[i]; s += d*d; }
+    return Math.sqrt(s / len);
+  });
+};
+const sessionVwap = () => {
+  let cumPV = 0, cumV = 0, day = "";
+  return close.map((_, i) => {
+    const d = new Date(time[i] * 1000).toISOString().slice(0, 10);
+    if (d !== day) { day = d; cumPV = 0; cumV = 0; }
+    const tp = (high[i] + low[i] + close[i]) / 3;
+    cumPV += tp * volume[i];
+    cumV += volume[i];
+    return cumV === 0 ? null : cumPV / cumV;
+  });
 };
 const plotshape = (cond, title="shape", opts={}) => {
   const values = (Array.isArray(cond) ? cond : []).map(v => v ? 1 : null);

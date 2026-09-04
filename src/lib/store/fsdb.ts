@@ -2,13 +2,25 @@ import { promises as fs } from "fs";
 import path from "path";
 import type { CustomScript, StoredLayout, Watchlist } from "@/lib/types";
 import { SAMPLE_SCRIPTS } from "@/lib/scripts/sandbox";
+import { getPopularSeedScripts } from "@/lib/scripts/catalog";
+import type { ScannerFilter } from "@/lib/scanner/engine";
 
 const DATA_DIR = path.join(process.cwd(), "data");
+
+export interface SavedScanPreset {
+  id: string;
+  name: string;
+  filters: ScannerFilter[];
+  exchange?: string;
+  timeframe?: string;
+  updatedAt: number;
+}
 
 export interface AppDb {
   watchlists: Watchlist[];
   scripts: CustomScript[];
   layout: StoredLayout | null;
+  scanPresets?: SavedScanPreset[];
 }
 
 const DEFAULT_DB: AppDb = {
@@ -66,14 +78,18 @@ const DEFAULT_DB: AppDb = {
       ],
     },
   ],
-  scripts: SAMPLE_SCRIPTS.map((s, i) => ({
-    id: `sample-${i + 1}`,
-    name: s.name,
-    code: s.code,
-    language: "td" as const,
-    updatedAt: Date.now(),
-  })),
+  scripts: [
+    ...getPopularSeedScripts(),
+    ...SAMPLE_SCRIPTS.map((s, i) => ({
+      id: `sample-${i + 1}`,
+      name: s.name,
+      code: s.code,
+      language: "td" as const,
+      updatedAt: Date.now(),
+    })),
+  ],
   layout: null,
+  scanPresets: [],
 };
 
 async function ensure() {

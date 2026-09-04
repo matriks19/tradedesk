@@ -228,6 +228,101 @@ export function supertrend(
   return { line, direction };
 }
 
+
+export function donchian(
+  candles: Candle[],
+  period = 20
+): {
+  upper: (number | null)[];
+  lower: (number | null)[];
+  mid: (number | null)[];
+} {
+  const upper: (number | null)[] = [];
+  const lower: (number | null)[] = [];
+  const mid: (number | null)[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i < period - 1) {
+      upper.push(null);
+      lower.push(null);
+      mid.push(null);
+      continue;
+    }
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      hi = Math.max(hi, candles[j].high);
+      lo = Math.min(lo, candles[j].low);
+    }
+    upper.push(hi);
+    lower.push(lo);
+    mid.push((hi + lo) / 2);
+  }
+  return { upper, lower, mid };
+}
+
+/** Hull MA approximation using SMA proxies for WMA */
+export function hull(values: number[], period = 20): (number | null)[] {
+  const half = Math.max(1, Math.floor(period / 2));
+  const sqrtP = Math.max(1, Math.round(Math.sqrt(period)));
+  const wmaHalf = sma(values, half);
+  const wmaFull = sma(values, period);
+  const raw = values.map((_, i) =>
+    wmaHalf[i] != null && wmaFull[i] != null
+      ? 2 * (wmaHalf[i] as number) - (wmaFull[i] as number)
+      : 0
+  );
+  const h = sma(raw, sqrtP);
+  return values.map((_, i) =>
+    wmaHalf[i] == null || wmaFull[i] == null ? null : h[i]
+  );
+}
+
+export function volumeOsc(
+  candles: Candle[],
+  shortPeriod = 5,
+  longPeriod = 10
+): (number | null)[] {
+  const vols = candles.map((c) => c.volume);
+  const vs = ema(vols, shortPeriod);
+  const vl = ema(vols, longPeriod);
+  return vols.map((_, i) =>
+    vs[i] != null && vl[i] != null && (vl[i] as number) !== 0
+      ? (100 * ((vs[i] as number) - (vl[i] as number))) / (vl[i] as number)
+      : null
+  );
+}
+
+export function stochRsi(
+  values: number[],
+  rsiPeriod = 14,
+  stochPeriod = 14,
+  kSmooth = 3,
+  dSmooth = 3
+): { k: (number | null)[]; d: (number | null)[] } {
+  const r = rsi(values, rsiPeriod);
+  const st: (number | null)[] = [];
+  for (let i = 0; i < r.length; i++) {
+    if (r[i] == null || i < stochPeriod - 1) {
+      st.push(null);
+      continue;
+    }
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - stochPeriod + 1; j <= i; j++) {
+      const v = r[j];
+      if (v == null) continue;
+      hi = Math.max(hi, v);
+      lo = Math.min(lo, v);
+    }
+    st.push(hi === lo ? 50 : (((r[i] as number) - lo) / (hi - lo)) * 100);
+  }
+  const filled = st.map((v) => v ?? 0);
+  const k = sma(filled, kSmooth).map((v, i) => (st[i] == null ? null : v));
+  const kFilled = k.map((v) => v ?? 0);
+  const d = sma(kFilled, dSmooth).map((v, i) => (k[i] == null ? null : v));
+  return { k, d };
+}
+
 export function toLineData(
   candles: Candle[],
   values: (number | null)[]

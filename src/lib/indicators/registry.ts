@@ -3,13 +3,17 @@ import {
   atr,
   bollinger,
   closes,
+  donchian,
   ema,
+  hull,
   macd,
   rsi,
   sma,
   stochastic,
+  stochRsi,
   supertrend,
   toLineData,
+  volumeOsc,
   vwap,
 } from "./math";
 
@@ -50,6 +54,26 @@ export const BUILTIN_META: Record<
     label: "Supertrend",
     defaults: { period: 10, mult: 3 },
     pane: "main",
+  },
+  donchian: {
+    label: "Donchian",
+    defaults: { period: 20 },
+    pane: "main",
+  },
+  hull: {
+    label: "Hull MA",
+    defaults: { period: 20 },
+    pane: "main",
+  },
+  volumeOsc: {
+    label: "Volume Osc",
+    defaults: { shortPeriod: 5, longPeriod: 10 },
+    pane: "sub",
+  },
+  stochRsi: {
+    label: "Stoch RSI",
+    defaults: { rsiPeriod: 14, stochPeriod: 14, kSmooth: 3, dSmooth: 3 },
+    pane: "sub",
   },
 };
 
@@ -231,6 +255,91 @@ export function computeBuiltin(
           color: "#00bcd4",
           data: toLineData(candles, st.line),
           title: "Supertrend",
+        },
+      ];
+    }
+    case "donchian": {
+      const d = donchian(candles, Number(p.period ?? 20));
+      return [
+        {
+          id: `${inst.id}-up`,
+          pane: "main",
+          type: "line",
+          color: "#26a69a",
+          data: toLineData(candles, d.upper),
+          title: "Donch Up",
+        },
+        {
+          id: `${inst.id}-lo`,
+          pane: "main",
+          type: "line",
+          color: "#ef5350",
+          data: toLineData(candles, d.lower),
+          title: "Donch Low",
+        },
+        {
+          id: `${inst.id}-mid`,
+          pane: "main",
+          type: "line",
+          color: "#2962ff",
+          data: toLineData(candles, d.mid),
+          title: "Donch Mid",
+        },
+      ];
+    }
+    case "hull":
+      return [
+        {
+          id: `${inst.id}-hull`,
+          pane: "main",
+          type: "line",
+          color: "#00bcd4",
+          data: toLineData(candles, hull(c, Number(p.period ?? 20))),
+          title: `HMA(${p.period ?? 20})`,
+        },
+      ];
+    case "volumeOsc":
+      return [
+        {
+          id: `${inst.id}-vo`,
+          pane: "sub",
+          type: "histogram",
+          color: "#e040fb",
+          data: toLineData(
+            candles,
+            volumeOsc(
+              candles,
+              Number(p.shortPeriod ?? 5),
+              Number(p.longPeriod ?? 10)
+            )
+          ),
+          title: "Vol Osc",
+        },
+      ];
+    case "stochRsi": {
+      const sr = stochRsi(
+        c,
+        Number(p.rsiPeriod ?? 14),
+        Number(p.stochPeriod ?? 14),
+        Number(p.kSmooth ?? 3),
+        Number(p.dSmooth ?? 3)
+      );
+      return [
+        {
+          id: `${inst.id}-k`,
+          pane: "sub",
+          type: "line",
+          color: "#2962ff",
+          data: toLineData(candles, sr.k),
+          title: "StochRSI %K",
+        },
+        {
+          id: `${inst.id}-d`,
+          pane: "sub",
+          type: "line",
+          color: "#ff6d00",
+          data: toLineData(candles, sr.d),
+          title: "StochRSI %D",
         },
       ];
     }

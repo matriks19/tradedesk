@@ -60,7 +60,9 @@ export function pineToTd(pine: string): TranslateResult {
   code = code.replace(/input\s*\(\s*([^,)]+)/g, "$1");
 
   // ta.sma → sma, etc.
-  code = code.replace(/\bta\.(sma|ema|rsi|macd|bb|crossover|crossunder|highest|lowest|atr|vwap)\b/g, "$1");
+  code = code.replace(/\bta\.(sma|ema|rsi|macd|bb|crossover|crossunder|highest|lowest|atr|vwap|stdev|change|stoch)\b/g, "$1");
+  code = code.replace(/\bta\.tr\b/g, "trueRange");
+  code = code.replace(/\bta\.rma\b/g, "ema"); // approx
   code = code.replace(/\bbbollinger\b/g, "bollinger");
   code = code.replace(/\bbb\s*\(/g, "bollinger(");
   code = code.replace(/\bmath\.(max|min|abs|sqrt)\b/g, "Math.$1");
@@ -128,9 +130,11 @@ export function tdToPine(td: string): TranslateResult {
 
   // sma → ta.sma
   code = code.replace(
-    /\b(sma|ema|rsi|crossover|crossunder|highest|lowest|atr)\s*\(/g,
+    /\b(sma|ema|rsi|crossover|crossunder|highest|lowest|atr|stdev|change)\s*\(/g,
     "ta.$1("
   );
+  code = code.replace(/\btrueRange\s*\(/g, "ta.tr(");
+  code = code.replace(/\bsessionVwap\s*\(/g, "ta.vwap(");
   code = code.replace(/\bmacd\s*\(/g, "ta.macd(");
   code = code.replace(/\bbollinger\s*\(/g, "ta.bb(");
 

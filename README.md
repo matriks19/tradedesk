@@ -16,10 +16,10 @@ For production: run the build script then the start script.
 - Multi-chart layouts 1/2/4/6/9 (symbol + timeframe per pane)
 - Live Binance USDT candles + volume (REST + browser WS)
 - USDT spot searchable; BIST ticker list searchable
-- Indicators: SMA EMA RSI MACD Bollinger ATR Stochastic VWAP Supertrend
-- Custom JS sandbox + Monaco + 3 samples (no fs/network)
+- Indicators: SMA EMA RSI MACD Bollinger ATR Stochastic VWAP Supertrend Donchian Hull VolumeOsc StochRSI
+- Custom TD Script / Pine + Monaco + Community Library (≥12 installable scripts)
 - Watchlists: Crypto Majors, BIST30
-- Scanner: RSI, pct change, volume spike, EMA cross
+- Scanner: rich presets (MACD/BB/Supertrend/Stoch/ATR%/HOD…), Binance top 200 / BIST 120, concurrent klines
 - Heatmap (pct change)
 - Pattern hints: HH/HL, breakout, engulfing
 - TP/SL risk panel with R multiples + chart lines
@@ -42,7 +42,7 @@ Orders, Pine parity, licensed BIST live feed, drawings, alerts, cloud sync.
 
 ## Known gaps
 - BIST Yahoo may fail or rate-limit
-- Scanner limited to ~40-80 symbols per run
+- Scanner network-bound on large universes (mitigated by batch concurrency)
 - Shared sub-pane for oscillators
 - No auth
 - Indicator math practical not vendor-identical
@@ -69,6 +69,16 @@ Builtins: sma ema rsi macd bollinger highest lowest crossover crossunder plot pl
 - Best-effort: ta.sma/ema/rsi/macd/bb, plot, hline, crossover; unsupported features become warnings
 - Export TD as Pine via "Pine olarak dışa aktar"
 - Library stores `code` (runnable TD) + optional `originalCode` (raw Pine)
+
+
+## Community Library (Kütüphane)
+Script tab → **Kütüphane**: browse/search curated TD ports (RSI Divergence, EMA Ribbon, MACD Hist, BB Mean Reversion, Supertrend ATR, VWAP, Donchian, Stoch RSI, Ichimoku, Pivots, Volume Osc, Elder Impulse, Turtle, Hull MA, Squeeze Momentum LazyBear-style, S/R swings, Engulfing, Heikin-Ashi helper). One-click install/apply; ~8 popular scripts auto-seed when no `lib_*` scripts exist.
+
+## Scanner (improved)
+- Presets gallery (TR): Aşırı satım kombosu, Momentum breakout, Hacim+EMA, MACD bull, BB sıkışma, Supertrend long, crypto/BIST gainers-losers, multi combos
+- Filters: MACD cross, BB squeeze/break, Supertrend flip, ATR%, Stochastic, consecutive bars, near HOD/LOD, price vs SMA50/200, RSI divergence sketch
+- Universe: Binance top 200 by quoteVolume; BIST up to 120; parallel kline fetch (batch ~10)
+- UI: multi-select presets + filter chips, timeframe 15m/1h/4h/1d, progress X/Y, CSV export, sort by RSI/%Δ/volume, named preset save via `/api/store`
 
 ## Import from TradingView
 1. Copy Pine source from TradingView

@@ -62,7 +62,11 @@ export type BuiltinIndicatorId =
   | "atr"
   | "stochastic"
   | "vwap"
-  | "supertrend";
+  | "supertrend"
+  | "donchian"
+  | "hull"
+  | "volumeOsc"
+  | "stochRsi";
 
 export interface IndicatorInstance {
   id: string;
