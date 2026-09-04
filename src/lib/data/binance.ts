@@ -1,6 +1,8 @@
 import type { Candle, SymbolInfo, TickerQuote, Timeframe } from "@/lib/types";
 
-const REST = "https://api.binance.com";
+/** Market data via Binance Vision — api.binance.com returns 451 in some regions. */
+const REST = process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision";
+const WS_BASE = process.env.BINANCE_WS_URL ?? "wss://data-stream.binance.vision";
 
 const TF_MAP: Record<Timeframe, string> = {
   "1m": "1m",
@@ -97,11 +99,11 @@ export class BinanceProvider {
   static wsKlineUrl(symbol: string, timeframe: Timeframe): string {
     const s = symbol.toLowerCase();
     const i = (TF_MAP[timeframe] ?? "15m").toLowerCase();
-    return `wss://stream.binance.com:9443/ws/${s}@kline_${i}`;
+    return `${WS_BASE}/ws/${s}@kline_${i}`;
   }
 
   static wsTickerUrl(symbol: string): string {
-    return `wss://stream.binance.com:9443/ws/${symbol.toLowerCase()}@ticker`;
+    return `${WS_BASE}/ws/${symbol.toLowerCase()}@ticker`;
   }
 
   static parseKlineMessage(msg: unknown): Candle | null {
