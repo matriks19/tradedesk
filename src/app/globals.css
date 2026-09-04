@@ -1,0 +1,56 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#__next {
+  height: 100%;
+}
+
+body {
+  @apply bg-desk-bg text-desk-text antialiased;
+  font-feature-settings: "tnum" 1;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3140 transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a3140;
+  border-radius: 3px;
+}
+
+@layer components {
+  .panel {
+    @apply bg-desk-panel border border-desk-border rounded-md;
+  }
+  .btn {
+    @apply inline-flex items-center justify-center gap-1.5 rounded px-2.5 py-1 text-xs font-medium
+      bg-desk-elevated border border-desk-border text-desk-text hover:border-desk-accent
+      transition-colors disabled:opacity-40;
+  }
+  .btn-accent {
+    @apply btn bg-desk-accent/20 border-desk-accent/50 text-blue-200 hover:bg-desk-accent/30;
+  }
+  .input {
+    @apply w-full rounded bg-desk-bg border border-desk-border px-2 py-1.5 text-xs text-desk-text
+      placeholder:text-desk-muted focus:outline-none focus:border-desk-accent;
+  }
+  .tab-active {
+    @apply text-desk-text border-b-2 border-desk-accent;
+  }
+  .tab {
+    @apply px-2 py-1.5 text-2xs uppercase tracking-wide text-desk-muted hover:text-desk-text border-b-2 border-transparent;
+  }
+}
