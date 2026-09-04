@@ -18,6 +18,7 @@ import { SymbolSearch } from "@/components/chart/SymbolSearch";
 import { Badge } from "@/components/ui/Badge";
 import { usePatternOverlay } from "@/components/chart/PatternOverlay";
 import { detectPatterns } from "@/lib/patterns/detect";
+import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
 import type { PatternHit } from "@/lib/patterns/types";
 import clsx from "clsx";
 
@@ -47,6 +48,7 @@ export function ChartPane({ pane, compact }: Props) {
     risk,
     showRiskLines,
     patternSettings,
+    overlayPattern,
   } = useDeskStore();
 
   const { candles, loading, error, delayed, note } = useKlines(
@@ -59,12 +61,24 @@ export function ChartPane({ pane, compact }: Props) {
 
   const patterns: PatternHit[] = useMemo(() => {
     if (!candles.length) return [];
-    return detectPatterns(candles, {
+    const base = detectPatterns(candles, {
       swingStrength: patternSettings.swingStrength,
       twinTol: patternSettings.twinTol,
       boxLookback: patternSettings.boxLookback,
     });
-  }, [candles, patternSettings.swingStrength, patternSettings.twinTol, patternSettings.boxLookback]);
+    const adv = detectAdvancedAsPatternHits(candles, {
+      swingStrength: patternSettings.swingStrength,
+    });
+    const merged = [...adv, ...base];
+    if (
+      overlayPattern &&
+      // overlay applies when focused pattern is from scan
+      !merged.some((m) => m.id === overlayPattern.id)
+    ) {
+      merged.unshift(overlayPattern);
+    }
+    return merged.slice(0, 32);
+  }, [candles, patternSettings.swingStrength, patternSettings.twinTol, patternSettings.boxLookback, overlayPattern]);
 
   // expose patterns for panel via custom event when active
   useEffect(() => {

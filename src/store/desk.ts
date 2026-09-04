@@ -14,6 +14,7 @@ import type {
   Timeframe,
   Watchlist,
 } from "@/lib/types";
+import type { PatternHit } from "@/lib/patterns/types";
 import { BUILTIN_META } from "@/lib/indicators/registry";
 
 function uid(prefix = "id"): string {
@@ -59,6 +60,7 @@ interface DeskState {
   showRiskLines: boolean;
   bistBannerDismissed: boolean;
   patternSettings: PatternSettings;
+  overlayPattern: PatternHit | null;
   setLayoutMode: (mode: LayoutMode) => void;
   setActivePane: (id: string) => void;
   updatePane: (id: string, patch: Partial<PaneConfig>) => void;
@@ -81,6 +83,7 @@ interface DeskState {
   setShowRiskLines: (v: boolean) => void;
   setPatternSettings: (p: Partial<PatternSettings>) => void;
   setPatternFocus: (id: string | null) => void;
+  setOverlayPattern: (hit: PatternHit | null) => void;
   hydrateFromServer: (data: {
     watchlists: Watchlist[];
     scripts: CustomScript[];
@@ -115,6 +118,7 @@ export const useDeskStore = create<DeskState>()(
           boxLookback: 30,
           focusId: null,
         },
+        overlayPattern: null,
         setLayoutMode: (mode) =>
           set((s) => {
             const panes = panesForMode(mode, s.panes);
@@ -221,6 +225,7 @@ export const useDeskStore = create<DeskState>()(
           set((s) => ({
             patternSettings: { ...s.patternSettings, focusId: id },
           })),
+        setOverlayPattern: (hit) => set({ overlayPattern: hit }),
         hydrateFromServer: ({ watchlists, scripts }) =>
           set((s) => ({
             watchlists: watchlists.length ? watchlists : s.watchlists,

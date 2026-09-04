@@ -44,7 +44,8 @@ export interface PatternHit {
     | "flag"
     | "pennant"
     | "breakout_box"
-    | "engulfing";
+    | "engulfing"
+    | "advanced";
   label: string;
   detail: string;
   bias: PatternBias;
@@ -53,6 +54,8 @@ export interface PatternHit {
   tStart: number;
   tEnd: number;
   drawings: PatternDrawing[];
+  /** optional payload from advanced/harmonic/liquidity detectors */
+  advanced?: unknown;
 }
 
 export interface DetectOptions {

@@ -156,16 +156,28 @@ export function ScannerPanel() {
     setProgress({ done: 0, total: 0 });
     setStatus("");
     try {
-      const tickerRes = await fetch(`/api/ticker?exchange=${exchange}`);
+      const tickerRes = await fetch(
+        `/api/ticker?exchange=${exchange}${exchange === "bist" ? "&limit=180" : ""}`
+      );
       const tickerJson = await tickerRes.json();
       let quotes: TickerQuote[] = tickerJson.quotes ?? [];
+      if (exchange === "bist" && quotes.length === 0) {
+        setStatus(
+          tickerJson.note ||
+            "BIST kotasyonları alınamadı (Yahoo rate-limit / kaynak hatası). Tarama boş döndü — daha sonra tekrar deneyin."
+        );
+        setRows([]);
+        return;
+      }
       if (exchange === "binance") {
         quotes = quotes
           .filter((q) => q.symbol.endsWith("USDT"))
           .sort((a, b) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0))
           .slice(0, 200);
       } else {
-        quotes = quotes.slice(0, 120);
+        quotes = [...quotes]
+          .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+          .slice(0, 160);
       }
 
       const needsCandles = filtersNeedCandles(activeFilters);
@@ -234,7 +246,7 @@ export function ScannerPanel() {
           onChange={(e) => setExchange(e.target.value as "binance" | "bist")}
         >
           <option value="binance">Binance USDT (top 200)</option>
-          <option value="bist">BIST (max 120)</option>
+          <option value="bist">BIST (BIST30+likit ~180)</option>
         </select>
         <select
           className="input w-auto"
@@ -310,11 +322,19 @@ export function ScannerPanel() {
 
       {exchange === "bist" && (
         <p className="text-2xs text-desk-warn">
-          BIST taraması gecikmeli public kaynaktan; sonuçlar canlı değildir.
+          BIST taraması gecikmeli Yahoo query2 chart üzerinden; sonuçlar canlı değildir.
         </p>
       )}
       {status && (
-        <p className="text-2xs text-desk-muted">{status}</p>
+        <p
+          className={
+            status.includes("alınamadı") || status.includes("boş")
+              ? "text-2xs text-desk-down"
+              : "text-2xs text-desk-muted"
+          }
+        >
+          {status}
+        </p>
       )}
 
       <div className="flex gap-1 text-2xs text-desk-muted">

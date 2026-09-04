@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BinanceProvider } from "@/lib/data/binance";
-import { BistProvider } from "@/lib/data/bist";
+import { BistProvider, bistScanUniverse } from "@/lib/data/bist";
 import type { Exchange } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -9,16 +9,23 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const exchange = (sp.get("exchange") ?? "binance") as Exchange;
   const symbols = sp.get("symbols");
+  const limit = Math.min(250, Math.max(30, Number(sp.get("limit") ?? 180)));
 
   try {
     if (exchange === "bist") {
       const list = symbols
         ? symbols.split(",").map((s) => s.trim()).filter(Boolean)
-        : BistProvider.listSymbols()
-            .slice(0, 40)
-            .map((s) => s.symbol);
+        : bistScanUniverse(limit);
       const quotes = await BistProvider.getQuotes(list);
-      return NextResponse.json({ quotes, delayed: true });
+      return NextResponse.json({
+        quotes,
+        delayed: true,
+        requested: list.length,
+        note:
+          quotes.length === 0
+            ? "BIST kotasyonları alınamadı (Yahoo rate-limit). Daha sonra tekrar deneyin."
+            : undefined,
+      });
     }
     if (symbols) {
       const parts = symbols.split(",").map((s) => s.trim()).filter(Boolean);
