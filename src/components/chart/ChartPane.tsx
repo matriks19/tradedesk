@@ -60,6 +60,10 @@ function chartOptions(height: number, width: number, showTime: boolean) {
       timeVisible: showTime,
       secondsVisible: false,
       visible: showTime,
+      // Comfortable default density; initial range is set after setData.
+      barSpacing: 10,
+      minBarSpacing: 2,
+      rightOffset: 8,
     },
     handleScroll: {
       mouseWheel: true,
@@ -100,6 +104,9 @@ export function ChartPane({ pane, compact }: Props) {
   >(new Map());
   const subContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const priceLinesRef = useRef<IPriceLine[]>([]);
+  /** First open / symbol·TF change: show at least ~20 bars (target last 80). */
+  const INITIAL_VISIBLE_BARS = 80;
+  const dataViewKeyRef = useRef("");
   /** Ignore range events shortly after programmatic setVisibleLogicalRange. */
   const programmaticUntil = useRef(0);
   const lastSyncedRange = useRef<LogicalRange | null>(null);
@@ -583,14 +590,39 @@ export function ChartPane({ pane, compact }: Props) {
           c.close >= c.open ? "rgba(38,166,154,0.4)" : "rgba(239,83,80,0.4)",
       }))
     );
-    // Keep oscillator panes locked after candle reload
+    // Reset zoom on first load / symbol·TF change (not on every live tick).
+    // Skip when a formation overlay is driving its own visible range.
+    const viewKey = `${pane.symbol}|${pane.timeframe}|${candles[0]?.time ?? ""}`;
+    const shouldResetView = dataViewKeyRef.current !== viewKey;
+    if (shouldResetView) {
+      dataViewKeyRef.current = viewKey;
+    }
     requestAnimationFrame(() => {
+      const main = chartRef.current;
+      if (main && shouldResetView && !overlayPattern) {
+        const n = candles.length;
+        const visible = Math.min(INITIAL_VISIBLE_BARS, Math.max(20, n));
+        const from = Math.max(0, n - visible);
+        const to = n + 5; // right padding so last bar isn't glued to the edge
+        programmaticUntil.current = performance.now() + 100;
+        try {
+          const range = { from, to } as LogicalRange;
+          main.timeScale().setVisibleLogicalRange(range);
+          lastSyncedRange.current = range;
+        } catch {
+          try {
+            main.timeScale().fitContent();
+          } catch {
+            /* */
+          }
+        }
+      }
       syncLogicalRanges(chartRef.current);
       if (overlayPattern) {
         window.dispatchEvent(new Event(TD_OVERLAY_REDRAW));
       }
     });
-  }, [candles, syncLogicalRanges, overlayPattern]);
+  }, [candles, syncLogicalRanges, overlayPattern, pane.symbol, pane.timeframe]);
 
   // Main overlays
   useEffect(() => {
