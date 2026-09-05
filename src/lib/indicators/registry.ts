@@ -7,52 +7,97 @@ import type {
   PriceField,
 } from "@/lib/types";
 import {
+  acceleratorOsc,
   adl,
   adx,
+  alligator,
+  alma,
+  aroon,
   atr,
   awesomeOsc,
+  bbPercentB,
+  bbWidth,
   bollinger,
   cci,
+  chaikinOsc,
   chaikinVol,
+  chandelier,
   cmf,
+  cmo,
+  connorsRsi,
   cumDelta,
   dema,
   donchian,
+  dpo,
   ema,
+  envelope,
+  eom,
+  fibChannel,
+  fisher,
+  forceIndex,
+  fractals,
+  gator,
+  heikinAshiSmooth,
   highest,
   histVol,
   hull,
   ichimoku,
   keltner,
+  klinger,
+  kst,
   linreg,
   lowest,
+  maCross,
   macd,
+  massIndex,
+  mcginley,
   mfi,
   momentum,
+  natr,
+  netVolume,
   obv,
+  pivotCamarilla,
   pivotClassic,
+  pivotFib,
+  pivotStandard,
+  pivotWoodie,
   ppo,
+  priceChannel,
   priceSeries,
   psar,
+  pvt,
+  regChannel,
   roc,
   rsi,
+  rvi,
   seriesToLineData,
   sma,
+  smma,
   stddev,
+  stddevBands,
   stochastic,
   stochasticSeries,
   stochRsi,
   supertrend,
   tema,
+  tma,
   toLineData,
+  trendStrength,
+  trix,
+  trueRange,
   tsi,
+  ulcerIndex,
   ultimateOsc,
+  vma,
   volumeOsc,
+  vortex,
   vwap,
   vwma,
+  wavetrend,
   williamsR,
   wma,
   zigzag,
+  zlema,
 } from "./math";
 
 export interface PlotSeries {
@@ -98,20 +143,34 @@ function src(def: string = "close") {
 }
 
 export const BUILTIN_LIST: IndicatorMeta[] = [
-  // Trend
-  { id: "sma", label: "SMA", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "sma", inputs: [num("period", "Period", 20), src()] },
-  { id: "ema", label: "EMA", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "ema", inputs: [num("period", "Period", 21), src()] },
-  { id: "wma", label: "WMA", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "wma", inputs: [num("period", "Period", 20), src()] },
-  { id: "dema", label: "DEMA", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "dema", inputs: [num("period", "Period", 20), src()] },
-  { id: "tema", label: "TEMA", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "tema", inputs: [num("period", "Period", 20), src()] },
-  { id: "hma", label: "HMA", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "hma", inputs: [num("period", "Period", 20), src()] },
-  { id: "vwma", label: "VWMA", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "vwma", inputs: [num("period", "Period", 20)] },
-  { id: "ichimoku", label: "Ichimoku", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "tenkan", inputs: [num("tenkan", "Tenkan", 9), num("kijun", "Kijun", 26), num("senkou", "Senkou", 52)] },
-  { id: "supertrend", label: "Supertrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "st", inputs: [num("period", "ATR Period", 10), num("mult", "Multiplier", 3, 0.5, 20, 0.1)] },
-  { id: "psar", label: "Parabolic SAR", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "psar", inputs: [num("step", "Step", 0.02, 0.001, 0.5, 0.001), num("max", "Max", 0.2, 0.01, 1, 0.01)] },
-  { id: "adx", label: "ADX / DMI", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "adx", inputs: [num("period", "Period", 14)] },
-  { id: "linreg", label: "Linear Regression", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "linreg", inputs: [num("period", "Period", 14), src()] },
-  // Momentum
+  // —— Hareketli Ortalamalar (ma)
+  { id: "sma", label: "SMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "sma", inputs: [num("period", "Period", 20), src()] },
+  { id: "ema", label: "EMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "ema", inputs: [num("period", "Period", 21), src()] },
+  { id: "wma", label: "WMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "wma", inputs: [num("period", "Period", 20), src()] },
+  { id: "vwma", label: "VWMA", category: "ma", pane: "main", acceptsSeries: false, primarySeriesKey: "vwma", inputs: [num("period", "Period", 20)] },
+  { id: "smma", label: "SMMA / RMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "smma", inputs: [num("period", "Period", 14), src()] },
+  { id: "dema", label: "DEMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "dema", inputs: [num("period", "Period", 20), src()] },
+  { id: "tema", label: "TEMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "tema", inputs: [num("period", "Period", 20), src()] },
+  { id: "hma", label: "HMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "hma", inputs: [num("period", "Period", 20), src()] },
+  { id: "alma", label: "ALMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "alma", inputs: [num("period", "Period", 9), num("offset", "Offset", 0.85, 0, 1, 0.01), num("sigma", "Sigma", 6, 0.1, 20, 0.1), src()] },
+  { id: "linreg", label: "LSMA / LinReg", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "linreg", inputs: [num("period", "Period", 14), src()] },
+  { id: "mcginley", label: "McGinley Dynamic", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "mcg", inputs: [num("period", "Period", 14), src()] },
+  { id: "tma", label: "Triangular MA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "tma", inputs: [num("period", "Period", 20), src()] },
+  { id: "vma", label: "Variable MA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "vma", inputs: [num("period", "Period", 20), src()] },
+  { id: "zlema", label: "Zero Lag EMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "zlema", inputs: [num("period", "Period", 20), src()] },
+  { id: "maCross", label: "MA Cross", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "fast", inputs: [num("fast", "Fast", 9), num("slow", "Slow", 21), src()] },
+
+  // —— Bantlar / Kanallar (bands)
+  { id: "bollinger", label: "Bollinger Bands", category: "bands", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", inputs: [num("period", "Period", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "keltner", label: "Keltner Channels", category: "bands", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", inputs: [num("period", "Period", 20), num("mult", "Mult", 1.5, 0.5, 10, 0.1)] },
+  { id: "donchian", label: "Donchian Channels", category: "bands", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", inputs: [num("period", "Period", 20)] },
+  { id: "envelope", label: "Envelope", category: "bands", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", inputs: [num("period", "Period", 20), num("pct", "Percent", 2.5, 0.1, 50, 0.1), src()] },
+  { id: "priceChannel", label: "Price Channel", category: "bands", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", inputs: [num("period", "Period", 20)] },
+  { id: "stddevBands", label: "StdDev Bands", category: "bands", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", inputs: [num("period", "Period", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "fibChannel", label: "Fibonacci Channel", category: "bands", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", inputs: [num("period", "Period", 50)] },
+  { id: "regChannel", label: "Regression Channel", category: "bands", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", inputs: [num("period", "Period", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+
+  // —— Momentum / Osilatörler
   { id: "rsi", label: "RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", inputs: [num("period", "Period", 14), src()] },
   { id: "stochastic", label: "Stochastic", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("kPeriod", "%K Period", 14), num("dPeriod", "%D Period", 3)] },
   { id: "stochRsi", label: "Stoch RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("rsiPeriod", "RSI Period", 14), num("stochPeriod", "Stoch Period", 14), num("kSmooth", "K Smooth", 3), num("dSmooth", "D Smooth", 3), src()] },
@@ -120,31 +179,75 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "roc", label: "ROC", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "roc", inputs: [num("period", "Period", 12), src()] },
   { id: "momentum", label: "Momentum", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "mom", inputs: [num("period", "Period", 10), src()] },
   { id: "williamsR", label: "Williams %R", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "wr", inputs: [num("period", "Period", 14)] },
-  { id: "tsi", label: "TSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "tsi", inputs: [num("longPeriod", "Long", 25), num("shortPeriod", "Short", 13), num("signalPeriod", "Signal", 7), src()] },
   { id: "ultimateOsc", label: "Ultimate Oscillator", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "uo", inputs: [num("p1", "Period 1", 7), num("p2", "Period 2", 14), num("p3", "Period 3", 28)] },
-  { id: "awesomeOsc", label: "Awesome Oscillator", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "ao", inputs: [] },
+  { id: "tsi", label: "TSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "tsi", inputs: [num("longPeriod", "Long", 25), num("shortPeriod", "Short", 13), num("signalPeriod", "Signal", 7), src()] },
   { id: "ppo", label: "PPO", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "ppo", inputs: [num("fast", "Fast", 12), num("slow", "Slow", 26), num("signal", "Signal", 9), src()] },
-  // Volatility
-  { id: "bollinger", label: "Bollinger Bands", category: "volatility", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", inputs: [num("period", "Period", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
-  { id: "keltner", label: "Keltner Channels", category: "volatility", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", inputs: [num("period", "Period", 20), num("mult", "Mult", 1.5, 0.5, 10, 0.1)] },
-  { id: "donchian", label: "Donchian Channels", category: "volatility", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", inputs: [num("period", "Period", 20)] },
+  { id: "cmo", label: "CMO", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "cmo", inputs: [num("period", "Period", 14), src()] },
+  { id: "connorsRsi", label: "Connors RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "crsi", inputs: [num("rsiPeriod", "RSI", 3), num("streakPeriod", "Streak", 2), num("pctRankPeriod", "Percent Rank", 100), src()] },
+  { id: "fisher", label: "Fisher Transform", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "fisher", inputs: [num("period", "Period", 10), src()] },
+  { id: "wavetrend", label: "WaveTrend", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "wt1", inputs: [num("channelLen", "Channel", 10), num("avgLen", "Average", 21)] },
+  { id: "trix", label: "TRIX", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "trix", inputs: [num("period", "Period", 18), src()] },
+  { id: "dpo", label: "DPO", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "dpo", inputs: [num("period", "Period", 21), src()] },
+  { id: "kst", label: "Know Sure Thing", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "kst", inputs: [num("sig", "Signal", 9), src()] },
+  { id: "rvi", label: "RVI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rvi", inputs: [num("period", "Period", 10)] },
+
+  // —— Trend
+  { id: "supertrend", label: "Supertrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "st", inputs: [num("period", "ATR Period", 10), num("mult", "Multiplier", 3, 0.5, 20, 0.1)] },
+  { id: "psar", label: "Parabolic SAR", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "psar", inputs: [num("step", "Step", 0.02, 0.001, 0.5, 0.001), num("max", "Max", 0.2, 0.01, 1, 0.01)] },
+  { id: "adx", label: "ADX / DMI", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "adx", inputs: [num("period", "Period", 14)] },
+  { id: "aroon", label: "Aroon", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", inputs: [num("period", "Period", 14)] },
+  { id: "ichimoku", label: "Ichimoku Cloud", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "tenkan", inputs: [num("tenkan", "Tenkan", 9), num("kijun", "Kijun", 26), num("senkou", "Senkou", 52)] },
+  { id: "vortex", label: "Vortex", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "vip", inputs: [num("period", "Period", 14)] },
+  { id: "chandelier", label: "Chandelier Exit", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "long", inputs: [num("period", "Period", 22), num("mult", "Mult", 3, 0.5, 20, 0.1)] },
+  { id: "trendStrength", label: "Trend Strength", category: "trend", pane: "sub", acceptsSeries: true, primarySeriesKey: "ts", inputs: [num("period", "Period", 20), src()] },
+  { id: "heikinAshiSmooth", label: "Heikin-Ashi Smooth", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ha", inputs: [num("period", "Period", 10)] },
+
+  // —— Volatilite
   { id: "atr", label: "ATR", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "atr", inputs: [num("period", "Period", 14)] },
-  { id: "stddev", label: "Standard Deviation", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "sd", inputs: [num("period", "Period", 20), src()] },
   { id: "histVol", label: "Historical Volatility", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "hv", inputs: [num("period", "Period", 20), src()] },
   { id: "chaikinVol", label: "Chaikin Volatility", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "cv", inputs: [num("period", "Period", 10)] },
-  // Volume
-  { id: "vwap", label: "VWAP", category: "volume", pane: "main", acceptsSeries: false, primarySeriesKey: "vwap", inputs: [] },
+  { id: "massIndex", label: "Mass Index", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "mi", inputs: [num("period", "Period", 25)] },
+  { id: "ulcerIndex", label: "Ulcer Index", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "ui", inputs: [num("period", "Period", 14), src()] },
+  { id: "natr", label: "Normalized ATR", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "natr", inputs: [num("period", "Period", 14)] },
+  { id: "bbWidth", label: "Bollinger Width", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "width", inputs: [num("period", "Period", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "bbPercentB", label: "Bollinger %B", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "pctb", inputs: [num("period", "Period", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "trueRange", label: "True Range", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "tr", inputs: [] },
+  { id: "stddev", label: "Standard Deviation", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "sd", inputs: [num("period", "Period", 20), src()] },
+
+  // —— Hacim
   { id: "obv", label: "OBV", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "obv", inputs: [] },
+  { id: "vwap", label: "VWAP", category: "volume", pane: "main", acceptsSeries: false, primarySeriesKey: "vwap", inputs: [] },
   { id: "mfi", label: "MFI", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "mfi", inputs: [num("period", "Period", 14)] },
   { id: "cmf", label: "CMF", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "cmf", inputs: [num("period", "Period", 20)] },
+  { id: "adl", label: "ADL", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "adl", inputs: [] },
+  { id: "chaikinOsc", label: "Chaikin Oscillator", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "cho", inputs: [num("fast", "Fast", 3), num("slow", "Slow", 10)] },
   { id: "volumeOsc", label: "Volume Oscillator", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "vo", inputs: [num("shortPeriod", "Short", 5), num("longPeriod", "Long", 10)] },
-  { id: "adl", label: "ADL (Accumulation/Distribution)", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "adl", inputs: [] },
-  // Other
-  { id: "pivot", label: "Pivot Points (Classic)", category: "other", pane: "main", acceptsSeries: false, primarySeriesKey: "pp", inputs: [] },
+  { id: "pvt", label: "PVT", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "pvt", inputs: [] },
+  { id: "eom", label: "Ease of Movement", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "eom", inputs: [num("period", "Period", 14)] },
+  { id: "forceIndex", label: "Force Index", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "fi", inputs: [num("period", "Period", 13)] },
+  { id: "klinger", label: "Klinger (simplified)", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "kvo", inputs: [num("fast", "Fast", 34), num("slow", "Slow", 55), num("signal", "Signal", 13)] },
+  { id: "netVolume", label: "Net Volume", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "nv", inputs: [] },
+  { id: "volumeDelta", label: "Volume Delta", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "vd", inputs: [] },
+
+  // —— Bill Williams
+  { id: "awesomeOsc", label: "Awesome Oscillator", category: "bill_williams", pane: "sub", acceptsSeries: false, primarySeriesKey: "ao", inputs: [] },
+  { id: "acceleratorOsc", label: "Accelerator Oscillator", category: "bill_williams", pane: "sub", acceptsSeries: false, primarySeriesKey: "ac", inputs: [] },
+  { id: "alligator", label: "Alligator", category: "bill_williams", pane: "main", acceptsSeries: false, primarySeriesKey: "jaw", inputs: [num("jawPeriod", "Jaw", 13), num("teethPeriod", "Teeth", 8), num("lipsPeriod", "Lips", 5)] },
+  { id: "fractals", label: "Fractals", category: "bill_williams", pane: "main", acceptsSeries: false, primarySeriesKey: "up", inputs: [] },
+  { id: "gator", label: "Gator Oscillator", category: "bill_williams", pane: "sub", acceptsSeries: false, primarySeriesKey: "upper", inputs: [] },
+
+  // —— Pivot / Seviye
+  { id: "pivot", label: "Pivot Classic", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "pp", inputs: [] },
+  { id: "pivotStandard", label: "Pivot Points Standard", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "pp", inputs: [] },
+  { id: "pivotFib", label: "Pivot Fibonacci", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "pp", inputs: [] },
+  { id: "pivotCamarilla", label: "Pivot Camarilla", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "pp", inputs: [] },
+  { id: "pivotWoodie", label: "Pivot Woodie", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "pp", inputs: [] },
+
+  // —— Diğer
+  { id: "highest", label: "Highest High", category: "other", pane: "main", acceptsSeries: true, primarySeriesKey: "hi", inputs: [num("period", "Period", 20), src()] },
+  { id: "lowest", label: "Lowest Low", category: "other", pane: "main", acceptsSeries: true, primarySeriesKey: "lo", inputs: [num("period", "Period", 20), src()] },
   { id: "zigzag", label: "ZigZag", category: "other", pane: "main", acceptsSeries: false, primarySeriesKey: "zz", inputs: [num("pct", "Deviation %", 5, 0.5, 50, 0.5)] },
-  { id: "highest", label: "Highest", category: "other", pane: "main", acceptsSeries: true, primarySeriesKey: "hi", inputs: [num("period", "Period", 20), src()] },
-  { id: "lowest", label: "Lowest", category: "other", pane: "main", acceptsSeries: true, primarySeriesKey: "lo", inputs: [num("period", "Period", 20), src()] },
-  { id: "cumDelta", label: "Cumulative Delta (sketch)", category: "other", pane: "sub", acceptsSeries: false, primarySeriesKey: "cd", inputs: [] },
+  { id: "cumDelta", label: "Cumulative Delta (legacy)", category: "other", pane: "sub", acceptsSeries: false, primarySeriesKey: "cd", inputs: [] },
 ];
 
 export const BUILTIN_META: Record<BuiltinIndicatorId, IndicatorMeta> =
@@ -162,18 +265,26 @@ export function defaultsFor(type: BuiltinIndicatorId): Record<string, number | s
 }
 
 export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
+  ma: "Hareketli Ortalamalar",
+  bands: "Bantlar / Kanallar",
+  momentum: "Momentum / Osilatörler",
   trend: "Trend",
-  momentum: "Momentum",
-  volatility: "Volatility",
-  volume: "Volume",
-  other: "Other",
+  volatility: "Volatilite",
+  volume: "Hacim",
+  bill_williams: "Bill Williams",
+  levels: "Pivot / Seviye",
+  other: "Diğer",
 };
 
 export const CATEGORY_ORDER: IndicatorCategory[] = [
-  "trend",
+  "ma",
+  "bands",
   "momentum",
+  "trend",
   "volatility",
   "volume",
+  "bill_williams",
+  "levels",
   "other",
 ];
 
@@ -217,7 +328,6 @@ function resolveSourceValues(
   const key = src.seriesKey || Object.keys(parent || {})[0];
   const series = parent?.[key];
   if (!series) return priceSeries(candles, "close");
-  // fill nulls with previous for child math stability
   let last = series.find((v) => v != null) ?? 0;
   return series.map((v) => {
     if (v != null) {
@@ -279,7 +389,6 @@ export function computeBuiltin(
   const color = inst.color ?? COLORS[hash(inst.id) % COLORS.length];
   const p = inst.params;
   const meta = BUILTIN_META[inst.type as BuiltinIndicatorId];
-  const pane = meta?.pane ?? "main";
   const store: Record<string, (number | null)[]> = {};
   const out: PlotSeries[] = [];
 
@@ -307,6 +416,18 @@ export function computeBuiltin(
       push([line(inst, "wma", "main", color, candles, v, `WMA(${period})`)], { wma: v });
       break;
     }
+    case "vwma": {
+      const period = n(p, "period", 20);
+      const v = vwma(candles, period);
+      push([line(inst, "vwma", "main", color, candles, v, `VWMA(${period})`)], { vwma: v });
+      break;
+    }
+    case "smma": {
+      const period = n(p, "period", 14);
+      const v = smma(values, period);
+      push([line(inst, "smma", "main", color, candles, v, `SMMA(${period})`)], { smma: v });
+      break;
+    }
     case "dema": {
       const period = n(p, "period", 20);
       const v = dema(values, period);
@@ -325,51 +446,153 @@ export function computeBuiltin(
       push([line(inst, "hma", "main", color, candles, v, `HMA(${period})`)], { hma: v });
       break;
     }
-    case "vwma": {
-      const period = n(p, "period", 20);
-      const v = vwma(candles, period);
-      push([line(inst, "vwma", "main", color, candles, v, `VWMA(${period})`)], { vwma: v });
-      break;
-    }
-    case "ichimoku": {
-      const ich = ichimoku(candles, n(p, "tenkan", 9), n(p, "kijun", 26), n(p, "senkou", 52));
-      push(
-        [
-          line(inst, "tenkan", "main", "#2962ff", candles, ich.tenkan, "Tenkan"),
-          line(inst, "kijun", "main", "#ff6d00", candles, ich.kijun, "Kijun"),
-          line(inst, "spanA", "main", "#26a69a88", candles, ich.spanA, "Span A"),
-          line(inst, "spanB", "main", "#ef535088", candles, ich.spanB, "Span B"),
-        ],
-        { tenkan: ich.tenkan, kijun: ich.kijun, spanA: ich.spanA, spanB: ich.spanB }
-      );
-      break;
-    }
-    case "supertrend": {
-      const st = supertrend(candles, n(p, "period", 10), n(p, "mult", 3));
-      push([line(inst, "st", "main", "#00bcd4", candles, st.line, "Supertrend")], { st: st.line });
-      break;
-    }
-    case "psar": {
-      const v = psar(candles, n(p, "step", 0.02), n(p, "max", 0.2));
-      push([line(inst, "psar", "main", color, candles, v, "PSAR")], { psar: v });
-      break;
-    }
-    case "adx": {
-      const a = adx(candles, n(p, "period", 14));
-      push(
-        [
-          line(inst, "adx", "sub", "#2962ff", candles, a.adx, "ADX"),
-          line(inst, "plusDI", "sub", "#26a69a", candles, a.plusDI, "+DI"),
-          line(inst, "minusDI", "sub", "#ef5350", candles, a.minusDI, "-DI"),
-        ],
-        { adx: a.adx, plusDI: a.plusDI, minusDI: a.minusDI }
-      );
+    case "alma": {
+      const period = n(p, "period", 9);
+      const v = alma(values, period, n(p, "offset", 0.85), n(p, "sigma", 6));
+      push([line(inst, "alma", "main", color, candles, v, `ALMA(${period})`)], { alma: v });
       break;
     }
     case "linreg": {
       const period = n(p, "period", 14);
       const v = linreg(values, period);
-      push([line(inst, "linreg", "main", color, candles, v, `LinReg(${period})`)], { linreg: v });
+      push([line(inst, "linreg", "main", color, candles, v, `LSMA(${period})`)], { linreg: v });
+      break;
+    }
+    case "mcginley": {
+      const period = n(p, "period", 14);
+      const v = mcginley(values, period);
+      push([line(inst, "mcg", "main", color, candles, v, `McGinley(${period})`)], { mcg: v });
+      break;
+    }
+    case "tma": {
+      const period = n(p, "period", 20);
+      const v = tma(values, period);
+      push([line(inst, "tma", "main", color, candles, v, `TMA(${period})`)], { tma: v });
+      break;
+    }
+    case "vma": {
+      const period = n(p, "period", 20);
+      const v = vma(values, period);
+      push([line(inst, "vma", "main", color, candles, v, `VMA(${period})`)], { vma: v });
+      break;
+    }
+    case "zlema": {
+      const period = n(p, "period", 20);
+      const v = zlema(values, period);
+      push([line(inst, "zlema", "main", color, candles, v, `ZLEMA(${period})`)], { zlema: v });
+      break;
+    }
+    case "maCross": {
+      const fast = n(p, "fast", 9);
+      const slow = n(p, "slow", 21);
+      const m = maCross(values, fast, slow);
+      push(
+        [
+          line(inst, "fast", "main", "#2962ff", candles, m.fast, `EMA(${fast})`),
+          line(inst, "slow", "main", "#ff6d00", candles, m.slow, `EMA(${slow})`),
+        ],
+        { fast: m.fast, slow: m.slow }
+      );
+      break;
+    }
+    case "bollinger": {
+      const period = n(p, "period", 20);
+      const mult = n(p, "mult", 2);
+      const b = bollinger(values, period, mult);
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, b.mid, "BB Mid"),
+          line(inst, "up", "main", "#ef5350", candles, b.upper, "BB Up"),
+          line(inst, "lo", "main", "#26a69a", candles, b.lower, "BB Low"),
+        ],
+        { mid: b.mid, upper: b.upper, lower: b.lower }
+      );
+      break;
+    }
+    case "keltner": {
+      const k = keltner(candles, n(p, "period", 20), n(p, "mult", 1.5));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, k.mid, "KC Mid"),
+          line(inst, "up", "main", "#ef5350", candles, k.upper, "KC Up"),
+          line(inst, "lo", "main", "#26a69a", candles, k.lower, "KC Low"),
+        ],
+        { mid: k.mid, upper: k.upper, lower: k.lower }
+      );
+      break;
+    }
+    case "donchian": {
+      const d = donchian(candles, n(p, "period", 20));
+      push(
+        [
+          line(inst, "up", "main", "#26a69a", candles, d.upper, "Donch Up"),
+          line(inst, "lo", "main", "#ef5350", candles, d.lower, "Donch Low"),
+          line(inst, "mid", "main", "#2962ff", candles, d.mid, "Donch Mid"),
+        ],
+        { upper: d.upper, lower: d.lower, mid: d.mid }
+      );
+      break;
+    }
+    case "envelope": {
+      const e = envelope(values, n(p, "period", 20), n(p, "pct", 2.5));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, e.mid, "Env Mid"),
+          line(inst, "up", "main", "#ef5350", candles, e.upper, "Env Up"),
+          line(inst, "lo", "main", "#26a69a", candles, e.lower, "Env Low"),
+        ],
+        { mid: e.mid, upper: e.upper, lower: e.lower }
+      );
+      break;
+    }
+    case "priceChannel": {
+      const d = priceChannel(candles, n(p, "period", 20));
+      push(
+        [
+          line(inst, "up", "main", "#26a69a", candles, d.upper, "PC Up"),
+          line(inst, "lo", "main", "#ef5350", candles, d.lower, "PC Low"),
+          line(inst, "mid", "main", "#2962ff", candles, d.mid, "PC Mid"),
+        ],
+        { upper: d.upper, lower: d.lower, mid: d.mid }
+      );
+      break;
+    }
+    case "stddevBands": {
+      const b = stddevBands(values, n(p, "period", 20), n(p, "mult", 2));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, b.mid, "SD Mid"),
+          line(inst, "up", "main", "#ef5350", candles, b.upper, "SD Up"),
+          line(inst, "lo", "main", "#26a69a", candles, b.lower, "SD Low"),
+        ],
+        { mid: b.mid, upper: b.upper, lower: b.lower }
+      );
+      break;
+    }
+    case "fibChannel": {
+      const f = fibChannel(candles, n(p, "period", 50));
+      push(
+        [
+          line(inst, "up", "main", "#ef5350", candles, f.upper, "Fib High"),
+          line(inst, "r618", "main", "#ff6d00", candles, f.r618, "Fib 0.618"),
+          line(inst, "mid", "main", "#2962ff", candles, f.mid, "Fib 0.5"),
+          line(inst, "r382", "main", "#00bcd4", candles, f.r382, "Fib 0.382"),
+          line(inst, "lo", "main", "#26a69a", candles, f.lower, "Fib Low"),
+        ],
+        { upper: f.upper, mid: f.mid, lower: f.lower, r382: f.r382, r618: f.r618 }
+      );
+      break;
+    }
+    case "regChannel": {
+      const r = regChannel(values, n(p, "period", 20), n(p, "mult", 2));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, r.mid, "Reg Mid"),
+          line(inst, "up", "main", "#ef5350", candles, r.upper, "Reg Up"),
+          line(inst, "lo", "main", "#26a69a", candles, r.lower, "Reg Low"),
+        ],
+        { mid: r.mid, upper: r.upper, lower: r.lower }
+      );
       break;
     }
     case "rsi": {
@@ -463,11 +686,6 @@ export function computeBuiltin(
       push([line(inst, "uo", "sub", color, candles, v, "UO")], { uo: v });
       break;
     }
-    case "awesomeOsc": {
-      const v = awesomeOsc(candles);
-      push([hist(inst, "ao", "sub", color, candles, v, "AO")], { ao: v });
-      break;
-    }
     case "ppo": {
       const m = ppo(values, n(p, "fast", 12), n(p, "slow", 26), n(p, "signal", 9));
       push(
@@ -480,54 +698,163 @@ export function computeBuiltin(
       );
       break;
     }
-    case "bollinger": {
+    case "cmo": {
+      const period = n(p, "period", 14);
+      const v = cmo(values, period);
+      push([line(inst, "cmo", "sub", color, candles, v, `CMO(${period})`)], { cmo: v });
+      break;
+    }
+    case "connorsRsi": {
+      const v = connorsRsi(
+        values,
+        n(p, "rsiPeriod", 3),
+        n(p, "streakPeriod", 2),
+        n(p, "pctRankPeriod", 100)
+      );
+      push([line(inst, "crsi", "sub", color, candles, v, "Connors RSI")], { crsi: v });
+      break;
+    }
+    case "fisher": {
+      const f = fisher(values, n(p, "period", 10));
+      push(
+        [
+          line(inst, "fisher", "sub", "#2962ff", candles, f.fisher, "Fisher"),
+          line(inst, "trigger", "sub", "#ff6d00", candles, f.trigger, "Trigger"),
+        ],
+        { fisher: f.fisher, trigger: f.trigger }
+      );
+      break;
+    }
+    case "wavetrend": {
+      const w = wavetrend(candles, n(p, "channelLen", 10), n(p, "avgLen", 21));
+      push(
+        [
+          line(inst, "wt1", "sub", "#2962ff", candles, w.wt1, "WT1"),
+          line(inst, "wt2", "sub", "#ff6d00", candles, w.wt2, "WT2"),
+        ],
+        { wt1: w.wt1, wt2: w.wt2 }
+      );
+      break;
+    }
+    case "trix": {
+      const period = n(p, "period", 18);
+      const v = trix(values, period);
+      push([line(inst, "trix", "sub", color, candles, v, `TRIX(${period})`)], { trix: v });
+      break;
+    }
+    case "dpo": {
+      const period = n(p, "period", 21);
+      const v = dpo(values, period);
+      push([line(inst, "dpo", "sub", color, candles, v, `DPO(${period})`)], { dpo: v });
+      break;
+    }
+    case "kst": {
+      const k = kst(values);
+      push(
+        [
+          line(inst, "kst", "sub", "#2962ff", candles, k.kst, "KST"),
+          line(inst, "sig", "sub", "#ff6d00", candles, k.signal, "Signal"),
+        ],
+        { kst: k.kst, signal: k.signal }
+      );
+      break;
+    }
+    case "rvi": {
+      const r = rvi(candles, n(p, "period", 10));
+      push(
+        [
+          line(inst, "rvi", "sub", "#2962ff", candles, r.rvi, "RVI"),
+          line(inst, "sig", "sub", "#ff6d00", candles, r.signal, "Signal"),
+        ],
+        { rvi: r.rvi, signal: r.signal }
+      );
+      break;
+    }
+    case "supertrend": {
+      const st = supertrend(candles, n(p, "period", 10), n(p, "mult", 3));
+      push([line(inst, "st", "main", "#00bcd4", candles, st.line, "Supertrend")], { st: st.line });
+      break;
+    }
+    case "psar": {
+      const v = psar(candles, n(p, "step", 0.02), n(p, "max", 0.2));
+      push([line(inst, "psar", "main", color, candles, v, "PSAR")], { psar: v });
+      break;
+    }
+    case "adx": {
+      const a = adx(candles, n(p, "period", 14));
+      push(
+        [
+          line(inst, "adx", "sub", "#2962ff", candles, a.adx, "ADX"),
+          line(inst, "plusDI", "sub", "#26a69a", candles, a.plusDI, "+DI"),
+          line(inst, "minusDI", "sub", "#ef5350", candles, a.minusDI, "-DI"),
+        ],
+        { adx: a.adx, plusDI: a.plusDI, minusDI: a.minusDI }
+      );
+      break;
+    }
+    case "aroon": {
+      const a = aroon(candles, n(p, "period", 14));
+      push(
+        [
+          line(inst, "up", "sub", "#26a69a", candles, a.up, "Aroon Up"),
+          line(inst, "down", "sub", "#ef5350", candles, a.down, "Aroon Down"),
+          line(inst, "osc", "sub", "#2962ff", candles, a.osc, "Aroon Osc"),
+        ],
+        { up: a.up, down: a.down, osc: a.osc }
+      );
+      break;
+    }
+    case "ichimoku": {
+      const ich = ichimoku(candles, n(p, "tenkan", 9), n(p, "kijun", 26), n(p, "senkou", 52));
+      push(
+        [
+          line(inst, "tenkan", "main", "#2962ff", candles, ich.tenkan, "Tenkan"),
+          line(inst, "kijun", "main", "#ff6d00", candles, ich.kijun, "Kijun"),
+          line(inst, "spanA", "main", "#26a69a88", candles, ich.spanA, "Span A"),
+          line(inst, "spanB", "main", "#ef535088", candles, ich.spanB, "Span B"),
+        ],
+        { tenkan: ich.tenkan, kijun: ich.kijun, spanA: ich.spanA, spanB: ich.spanB }
+      );
+      break;
+    }
+    case "vortex": {
+      const v = vortex(candles, n(p, "period", 14));
+      push(
+        [
+          line(inst, "vip", "sub", "#26a69a", candles, v.vip, "+VI"),
+          line(inst, "vim", "sub", "#ef5350", candles, v.vim, "-VI"),
+        ],
+        { vip: v.vip, vim: v.vim }
+      );
+      break;
+    }
+    case "chandelier": {
+      const c = chandelier(candles, n(p, "period", 22), n(p, "mult", 3));
+      push(
+        [
+          line(inst, "long", "main", "#26a69a", candles, c.long, "CE Long"),
+          line(inst, "short", "main", "#ef5350", candles, c.short, "CE Short"),
+        ],
+        { long: c.long, short: c.short }
+      );
+      break;
+    }
+    case "trendStrength": {
       const period = n(p, "period", 20);
-      const mult = n(p, "mult", 2);
-      const b = bollinger(values, period, mult);
-      push(
-        [
-          line(inst, "mid", "main", "#2962ff", candles, b.mid, "BB Mid"),
-          line(inst, "up", "main", "#ef5350", candles, b.upper, "BB Up"),
-          line(inst, "lo", "main", "#26a69a", candles, b.lower, "BB Low"),
-        ],
-        { mid: b.mid, upper: b.upper, lower: b.lower }
-      );
+      const v = trendStrength(values, period);
+      push([line(inst, "ts", "sub", color, candles, v, `TrendStr(${period})`)], { ts: v });
       break;
     }
-    case "keltner": {
-      const k = keltner(candles, n(p, "period", 20), n(p, "mult", 1.5));
-      push(
-        [
-          line(inst, "mid", "main", "#2962ff", candles, k.mid, "KC Mid"),
-          line(inst, "up", "main", "#ef5350", candles, k.upper, "KC Up"),
-          line(inst, "lo", "main", "#26a69a", candles, k.lower, "KC Low"),
-        ],
-        { mid: k.mid, upper: k.upper, lower: k.lower }
-      );
-      break;
-    }
-    case "donchian": {
-      const d = donchian(candles, n(p, "period", 20));
-      push(
-        [
-          line(inst, "up", "main", "#26a69a", candles, d.upper, "Donch Up"),
-          line(inst, "lo", "main", "#ef5350", candles, d.lower, "Donch Low"),
-          line(inst, "mid", "main", "#2962ff", candles, d.mid, "Donch Mid"),
-        ],
-        { upper: d.upper, lower: d.lower, mid: d.mid }
-      );
+    case "heikinAshiSmooth": {
+      const period = n(p, "period", 10);
+      const v = heikinAshiSmooth(candles, period);
+      push([line(inst, "ha", "main", color, candles, v, `HA Smooth(${period})`)], { ha: v });
       break;
     }
     case "atr": {
       const period = n(p, "period", 14);
       const v = atr(candles, period);
       push([line(inst, "atr", "sub", color, candles, v, `ATR(${period})`)], { atr: v });
-      break;
-    }
-    case "stddev": {
-      const period = n(p, "period", 20);
-      const v = stddev(values, period);
-      push([line(inst, "sd", "sub", color, candles, v, `StdDev(${period})`)], { sd: v });
       break;
     }
     case "histVol": {
@@ -540,6 +867,45 @@ export function computeBuiltin(
       const period = n(p, "period", 10);
       const v = chaikinVol(candles, period);
       push([line(inst, "cv", "sub", color, candles, v, `Chaikin Vol(${period})`)], { cv: v });
+      break;
+    }
+    case "massIndex": {
+      const period = n(p, "period", 25);
+      const v = massIndex(candles, period);
+      push([line(inst, "mi", "sub", color, candles, v, `Mass(${period})`)], { mi: v });
+      break;
+    }
+    case "ulcerIndex": {
+      const period = n(p, "period", 14);
+      const v = ulcerIndex(values, period);
+      push([line(inst, "ui", "sub", color, candles, v, `Ulcer(${period})`)], { ui: v });
+      break;
+    }
+    case "natr": {
+      const period = n(p, "period", 14);
+      const v = natr(candles, period);
+      push([line(inst, "natr", "sub", color, candles, v, `NATR(${period})`)], { natr: v });
+      break;
+    }
+    case "bbWidth": {
+      const v = bbWidth(values, n(p, "period", 20), n(p, "mult", 2));
+      push([line(inst, "width", "sub", color, candles, v, "BB Width")], { width: v });
+      break;
+    }
+    case "bbPercentB": {
+      const v = bbPercentB(values, n(p, "period", 20), n(p, "mult", 2));
+      push([line(inst, "pctb", "sub", color, candles, v, "BB %B")], { pctb: v });
+      break;
+    }
+    case "trueRange": {
+      const v = trueRange(candles);
+      push([line(inst, "tr", "sub", color, candles, v, "True Range")], { tr: v });
+      break;
+    }
+    case "stddev": {
+      const period = n(p, "period", 20);
+      const v = stddev(values, period);
+      push([line(inst, "sd", "sub", color, candles, v, `StdDev(${period})`)], { sd: v });
       break;
     }
     case "vwap": {
@@ -564,18 +930,157 @@ export function computeBuiltin(
       push([line(inst, "cmf", "sub", color, candles, v, `CMF(${period})`)], { cmf: v });
       break;
     }
-    case "volumeOsc": {
-      const v = volumeOsc(candles, n(p, "shortPeriod", 5), n(p, "longPeriod", 10));
-      push([hist(inst, "vo", "sub", "#e040fb", candles, v, "Vol Osc")], { vo: v });
-      break;
-    }
     case "adl": {
       const v = adl(candles);
       push([line(inst, "adl", "sub", color, candles, v, "ADL")], { adl: v });
       break;
     }
-    case "pivot": {
-      const pv = pivotClassic(candles);
+    case "chaikinOsc": {
+      const v = chaikinOsc(candles, n(p, "fast", 3), n(p, "slow", 10));
+      push([hist(inst, "cho", "sub", color, candles, v, "Chaikin Osc")], { cho: v });
+      break;
+    }
+    case "volumeOsc": {
+      const v = volumeOsc(candles, n(p, "shortPeriod", 5), n(p, "longPeriod", 10));
+      push([hist(inst, "vo", "sub", "#e040fb", candles, v, "Vol Osc")], { vo: v });
+      break;
+    }
+    case "pvt": {
+      const v = pvt(candles);
+      push([line(inst, "pvt", "sub", color, candles, v, "PVT")], { pvt: v });
+      break;
+    }
+    case "eom": {
+      const period = n(p, "period", 14);
+      const v = eom(candles, period);
+      push([line(inst, "eom", "sub", color, candles, v, `EOM(${period})`)], { eom: v });
+      break;
+    }
+    case "forceIndex": {
+      const period = n(p, "period", 13);
+      const v = forceIndex(candles, period);
+      push([hist(inst, "fi", "sub", color, candles, v, `FI(${period})`)], { fi: v });
+      break;
+    }
+    case "klinger": {
+      const k = klinger(candles, n(p, "fast", 34), n(p, "slow", 55), n(p, "signal", 13));
+      push(
+        [
+          line(inst, "kvo", "sub", "#2962ff", candles, k.kvo, "KVO"),
+          line(inst, "sig", "sub", "#ff6d00", candles, k.signal, "Signal"),
+        ],
+        { kvo: k.kvo, signal: k.signal }
+      );
+      break;
+    }
+    case "netVolume": {
+      const v = netVolume(candles);
+      push([hist(inst, "nv", "sub", color, candles, v, "Net Volume")], { nv: v });
+      break;
+    }
+    case "volumeDelta": {
+      const v = cumDelta(candles);
+      push([line(inst, "vd", "sub", color, candles, v, "Volume Delta")], { vd: v });
+      break;
+    }
+    case "awesomeOsc": {
+      const v = awesomeOsc(candles);
+      push([hist(inst, "ao", "sub", color, candles, v, "AO")], { ao: v });
+      break;
+    }
+    case "acceleratorOsc": {
+      const v = acceleratorOsc(candles);
+      push([hist(inst, "ac", "sub", color, candles, v, "AC")], { ac: v });
+      break;
+    }
+    case "alligator": {
+      const a = alligator(
+        candles,
+        n(p, "jawPeriod", 13),
+        n(p, "teethPeriod", 8),
+        n(p, "lipsPeriod", 5)
+      );
+      push(
+        [
+          line(inst, "jaw", "main", "#2962ff", candles, a.jaw, "Jaw"),
+          line(inst, "teeth", "main", "#ef5350", candles, a.teeth, "Teeth"),
+          line(inst, "lips", "main", "#26a69a", candles, a.lips, "Lips"),
+        ],
+        { jaw: a.jaw, teeth: a.teeth, lips: a.lips }
+      );
+      break;
+    }
+    case "fractals": {
+      const f = fractals(candles);
+      push(
+        [
+          line(inst, "up", "main", "#26a69a", candles, f.up, "Fractal Up"),
+          line(inst, "down", "main", "#ef5350", candles, f.down, "Fractal Down"),
+        ],
+        { up: f.up, down: f.down }
+      );
+      break;
+    }
+    case "gator": {
+      const g = gator(candles);
+      push(
+        [
+          hist(inst, "upper", "sub", "#26a69a", candles, g.upper, "Gator Up"),
+          hist(inst, "lower", "sub", "#ef5350", candles, g.lower, "Gator Down"),
+        ],
+        { upper: g.upper, lower: g.lower }
+      );
+      break;
+    }
+    case "pivot":
+    case "pivotStandard": {
+      const pv = inst.type === "pivotStandard" ? pivotStandard(candles) : pivotClassic(candles);
+      push(
+        [
+          line(inst, "pp", "main", "#2962ff", candles, pv.pp, "PP"),
+          line(inst, "r1", "main", "#ef5350", candles, pv.r1, "R1"),
+          line(inst, "s1", "main", "#26a69a", candles, pv.s1, "S1"),
+          line(inst, "r2", "main", "#ef535088", candles, pv.r2, "R2"),
+          line(inst, "s2", "main", "#26a69a88", candles, pv.s2, "S2"),
+        ],
+        { pp: pv.pp, r1: pv.r1, s1: pv.s1, r2: pv.r2, s2: pv.s2 }
+      );
+      break;
+    }
+    case "pivotFib": {
+      const pv = pivotFib(candles);
+      push(
+        [
+          line(inst, "pp", "main", "#2962ff", candles, pv.pp, "PP"),
+          line(inst, "r1", "main", "#ef5350", candles, pv.r1, "R1"),
+          line(inst, "s1", "main", "#26a69a", candles, pv.s1, "S1"),
+          line(inst, "r2", "main", "#ef5350", candles, pv.r2, "R2"),
+          line(inst, "s2", "main", "#26a69a", candles, pv.s2, "S2"),
+          line(inst, "r3", "main", "#ef535088", candles, pv.r3, "R3"),
+          line(inst, "s3", "main", "#26a69a88", candles, pv.s3, "S3"),
+        ],
+        { pp: pv.pp, r1: pv.r1, s1: pv.s1, r2: pv.r2, s2: pv.s2, r3: pv.r3, s3: pv.s3 }
+      );
+      break;
+    }
+    case "pivotCamarilla": {
+      const pv = pivotCamarilla(candles);
+      push(
+        [
+          line(inst, "pp", "main", "#2962ff", candles, pv.pp, "PP"),
+          line(inst, "r1", "main", "#ef5350", candles, pv.r1, "R1"),
+          line(inst, "s1", "main", "#26a69a", candles, pv.s1, "S1"),
+          line(inst, "r2", "main", "#ef5350", candles, pv.r2, "R2"),
+          line(inst, "s2", "main", "#26a69a", candles, pv.s2, "S2"),
+          line(inst, "r3", "main", "#ef535088", candles, pv.r3, "R3"),
+          line(inst, "s3", "main", "#26a69a88", candles, pv.s3, "S3"),
+        ],
+        { pp: pv.pp, r1: pv.r1, s1: pv.s1, r2: pv.r2, s2: pv.s2, r3: pv.r3, s3: pv.s3 }
+      );
+      break;
+    }
+    case "pivotWoodie": {
+      const pv = pivotWoodie(candles);
       push(
         [
           line(inst, "pp", "main", "#2962ff", candles, pv.pp, "PP"),
@@ -663,5 +1168,4 @@ export function formatIndicatorLabel(
   return base;
 }
 
-// silence unused import in case tree-shaking
 void seriesToLineData;

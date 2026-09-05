@@ -48,7 +48,8 @@ export function IndicatorMenu({ open, onClose, onParentId, paneId }: Props) {
       items = items.filter(
         (m) =>
           m.label.toLowerCase().includes(qq) ||
-          m.id.toLowerCase().includes(qq)
+          m.id.toLowerCase().includes(qq) ||
+          CATEGORY_LABELS[m.category].toLowerCase().includes(qq)
       );
     }
     return items;
@@ -78,7 +79,7 @@ export function IndicatorMenu({ open, onClose, onParentId, paneId }: Props) {
           </button>
         </div>
         <div className="flex flex-1 min-h-0">
-          <div className="w-40 shrink-0 border-r border-desk-border overflow-y-auto p-1">
+          <div className="w-48 shrink-0 border-r border-desk-border overflow-y-auto p-1">
             <CatBtn
               active={category === "favorites"}
               onClick={() => setCategory("favorites")}

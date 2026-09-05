@@ -53,11 +53,16 @@ export interface PaneConfig {
   indicators: IndicatorInstance[];
 }
 
+/** TradingView-style indicator taxonomy */
 export type IndicatorCategory =
-  | "trend"
+  | "ma"
+  | "bands"
   | "momentum"
+  | "trend"
   | "volatility"
   | "volume"
+  | "bill_williams"
+  | "levels"
   | "other";
 
 export type PriceField = "close" | "open" | "high" | "low" | "hl2" | "hlc3" | "ohlc4";
@@ -67,18 +72,32 @@ export type IndicatorSource =
   | { type: "indicator"; indicatorId: string; seriesKey?: string };
 
 export type BuiltinIndicatorId =
+  // Moving averages
   | "sma"
   | "ema"
   | "wma"
+  | "vwma"
+  | "smma"
   | "dema"
   | "tema"
   | "hma"
-  | "vwma"
-  | "ichimoku"
-  | "supertrend"
-  | "psar"
-  | "adx"
+  | "alma"
   | "linreg"
+  | "mcginley"
+  | "tma"
+  | "vma"
+  | "zlema"
+  | "maCross"
+  // Bands / channels
+  | "bollinger"
+  | "keltner"
+  | "donchian"
+  | "envelope"
+  | "priceChannel"
+  | "stddevBands"
+  | "fibChannel"
+  | "regChannel"
+  // Momentum / oscillators
   | "rsi"
   | "stochastic"
   | "stochRsi"
@@ -87,27 +106,69 @@ export type BuiltinIndicatorId =
   | "roc"
   | "momentum"
   | "williamsR"
-  | "tsi"
   | "ultimateOsc"
-  | "awesomeOsc"
+  | "tsi"
   | "ppo"
-  | "bollinger"
-  | "keltner"
-  | "donchian"
+  | "cmo"
+  | "connorsRsi"
+  | "fisher"
+  | "wavetrend"
+  | "trix"
+  | "dpo"
+  | "kst"
+  | "rvi"
+  // Trend
+  | "supertrend"
+  | "psar"
+  | "adx"
+  | "aroon"
+  | "ichimoku"
+  | "vortex"
+  | "chandelier"
+  | "trendStrength"
+  | "heikinAshiSmooth"
+  // Volatility
   | "atr"
-  | "stddev"
   | "histVol"
   | "chaikinVol"
-  | "vwap"
+  | "massIndex"
+  | "ulcerIndex"
+  | "natr"
+  | "bbWidth"
+  | "bbPercentB"
+  | "trueRange"
+  | "stddev"
+  // Volume
   | "obv"
+  | "vwap"
   | "mfi"
   | "cmf"
-  | "volumeOsc"
   | "adl"
+  | "chaikinOsc"
+  | "volumeOsc"
+  | "pvt"
+  | "eom"
+  | "forceIndex"
+  | "klinger"
+  | "netVolume"
+  | "volumeDelta"
+  // Bill Williams
+  | "awesomeOsc"
+  | "acceleratorOsc"
+  | "alligator"
+  | "fractals"
+  | "gator"
+  // Pivot / levels
   | "pivot"
-  | "zigzag"
+  | "pivotFib"
+  | "pivotCamarilla"
+  | "pivotWoodie"
+  | "pivotStandard"
+  // Other
   | "highest"
   | "lowest"
+  | "zigzag"
+  // legacy alias kept for stored layouts
   | "cumDelta";
 
 export interface IndicatorInputDef {

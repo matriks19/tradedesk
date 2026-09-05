@@ -1010,3 +1010,1001 @@ export function seriesToLineData(
   }
   return out;
 }
+
+/** Wilder / RMA / SMMA */
+export function smma(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  if (values.length < period) return out;
+  let sum = 0;
+  for (let i = 0; i < period; i++) sum += values[i];
+  let prev = sum / period;
+  out[period - 1] = prev;
+  for (let i = period; i < values.length; i++) {
+    prev = (prev * (period - 1) + values[i]) / period;
+    out[i] = prev;
+  }
+  return out;
+}
+
+/** Arnaud Legoux Moving Average */
+export function alma(
+  values: number[],
+  period = 9,
+  offset = 0.85,
+  sigma = 6
+): (number | null)[] {
+  const out: (number | null)[] = [];
+  const m = offset * (period - 1);
+  const s = period / sigma;
+  const weights: number[] = [];
+  let norm = 0;
+  for (let i = 0; i < period; i++) {
+    const w = Math.exp(-((i - m) * (i - m)) / (2 * s * s));
+    weights.push(w);
+    norm += w;
+  }
+  for (let i = 0; i < values.length; i++) {
+    if (i < period - 1) {
+      out.push(null);
+      continue;
+    }
+    let sum = 0;
+    for (let j = 0; j < period; j++) {
+      sum += values[i - period + 1 + j] * weights[j];
+    }
+    out.push(sum / norm);
+  }
+  return out;
+}
+
+/** McGinley Dynamic */
+export function mcginley(values: number[], period = 14): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  if (!values.length) return out;
+  let md = values[0];
+  out[0] = md;
+  for (let i = 1; i < values.length; i++) {
+    const ratio = md === 0 ? 1 : values[i] / md;
+    const den = period * Math.pow(ratio, 4);
+    md = md + (values[i] - md) / (den === 0 ? 1 : den);
+    out[i] = i >= period - 1 ? md : null;
+  }
+  // fill early nulls after warmup
+  for (let i = 0; i < values.length; i++) {
+    if (i < period - 1) out[i] = null;
+  }
+  return out;
+}
+
+/** Triangular Moving Average */
+export function tma(values: number[], period = 20): (number | null)[] {
+  const p1 = Math.ceil(period / 2);
+  const p2 = Math.floor(period / 2) + 1;
+  const first = sma(values, p1);
+  const filled = first.map((v, i) => (v == null ? values[i] : v));
+  const second = sma(filled, p2);
+  return values.map((_, i) => (first[i] == null ? null : second[i]));
+}
+
+/** Variable MA (Chande VIDYA-style using CMO) */
+export function vma(values: number[], period = 20): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  const c = cmoSeries(values, period);
+  let prev: number | null = null;
+  for (let i = 0; i < values.length; i++) {
+    if (c[i] == null) continue;
+    const alpha = Math.abs(c[i] as number) / 100;
+    if (prev == null) {
+      prev = values[i];
+      out[i] = prev;
+    } else {
+      prev = alpha * values[i] + (1 - alpha) * prev;
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+
+function cmoSeries(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  for (let i = period; i < values.length; i++) {
+    let up = 0;
+    let down = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const d = values[j] - values[j - 1];
+      if (d > 0) up += d;
+      else down -= d;
+    }
+    const s = up + down;
+    out[i] = s === 0 ? 0 : (100 * (up - down)) / s;
+  }
+  return out;
+}
+
+/** Zero-Lag EMA */
+export function zlema(values: number[], period = 20): (number | null)[] {
+  const lag = Math.floor((period - 1) / 2);
+  const adj = values.map((v, i) =>
+    i >= lag ? v + (v - values[i - lag]) : v
+  );
+  return ema(adj, period);
+}
+
+export function cmo(values: number[], period = 14): (number | null)[] {
+  return cmoSeries(values, period);
+}
+
+/** Connors RSI sketch: RSI + streak RSI + percent rank ROC */
+export function connorsRsi(
+  values: number[],
+  rsiPeriod = 3,
+  streakPeriod = 2,
+  pctRankPeriod = 100
+): (number | null)[] {
+  const r = rsi(values, rsiPeriod);
+  const streak: number[] = [0];
+  for (let i = 1; i < values.length; i++) {
+    if (values[i] > values[i - 1])
+      streak.push(streak[i - 1] > 0 ? streak[i - 1] + 1 : 1);
+    else if (values[i] < values[i - 1])
+      streak.push(streak[i - 1] < 0 ? streak[i - 1] - 1 : -1);
+    else streak.push(0);
+  }
+  const streakRsi = rsi(streak, streakPeriod);
+  const pctRank: (number | null)[] = values.map((_, i) => {
+    if (i < pctRankPeriod) return null;
+    const change = values[i - 1] === 0 ? 0 : (values[i] - values[i - 1]) / values[i - 1];
+    let count = 0;
+    for (let j = i - pctRankPeriod + 1; j <= i; j++) {
+      const ch =
+        values[j - 1] === 0 ? 0 : (values[j] - values[j - 1]) / values[j - 1];
+      if (ch <= change) count++;
+    }
+    return (100 * count) / pctRankPeriod;
+  });
+  return values.map((_, i) =>
+    r[i] != null && streakRsi[i] != null && pctRank[i] != null
+      ? ((r[i] as number) + (streakRsi[i] as number) + (pctRank[i] as number)) / 3
+      : null
+  );
+}
+
+export function fisher(values: number[], period = 10): {
+  fisher: (number | null)[];
+  trigger: (number | null)[];
+} {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  let prevFish = 0;
+  let prevVal = 0;
+  for (let i = period - 1; i < values.length; i++) {
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      hi = Math.max(hi, values[j]);
+      lo = Math.min(lo, values[j]);
+    }
+    let val =
+      hi === lo ? 0 : 0.33 * 2 * ((values[i] - lo) / (hi - lo) - 0.5) + 0.67 * prevVal;
+    val = Math.max(-0.999, Math.min(0.999, val));
+    const fish = 0.5 * Math.log((1 + val) / (1 - val)) + 0.5 * prevFish;
+    out[i] = fish;
+    prevFish = fish;
+    prevVal = val;
+  }
+  const trigger = out.map((v, i) => (i === 0 ? null : out[i - 1]));
+  return { fisher: out, trigger };
+}
+
+/** WaveTrend (LazyBear simplified) */
+export function wavetrend(
+  candles: Candle[],
+  channelLen = 10,
+  avgLen = 21
+): { wt1: (number | null)[]; wt2: (number | null)[] } {
+  const ap = candles.map((c) => (c.high + c.low + c.close) / 3);
+  const esa = ema(ap, channelLen);
+  const d = ema(
+    ap.map((v, i) => (esa[i] == null ? 0 : Math.abs(v - (esa[i] as number)))),
+    channelLen
+  );
+  const ci = ap.map((v, i) =>
+    esa[i] != null && d[i] != null && (d[i] as number) !== 0
+      ? (v - (esa[i] as number)) / (0.015 * (d[i] as number))
+      : 0
+  );
+  const wt1 = ema(ci, avgLen);
+  const wt1Filled = wt1.map((v) => v ?? 0);
+  const wt2 = sma(wt1Filled, 4).map((v, i) => (wt1[i] == null ? null : v));
+  return { wt1, wt2 };
+}
+
+export function trix(values: number[], period = 18): (number | null)[] {
+  const e1 = ema(values, period);
+  const f1 = e1.map((v, i) => (v == null ? values[i] : v));
+  const e2 = ema(f1, period);
+  const f2 = e2.map((v, i) => (v == null ? f1[i] : v));
+  const e3 = ema(f2, period);
+  return e3.map((v, i) => {
+    if (v == null || i === 0 || e3[i - 1] == null || e3[i - 1] === 0) return null;
+    return (100 * (v - (e3[i - 1] as number))) / (e3[i - 1] as number);
+  });
+}
+
+export function dpo(values: number[], period = 21): (number | null)[] {
+  const shift = Math.floor(period / 2) + 1;
+  const mid = sma(values, period);
+  return values.map((v, i) => {
+    const j = i - shift;
+    if (j < 0 || mid[j] == null) return null;
+    return v - (mid[j] as number);
+  });
+}
+
+/** Know Sure Thing */
+export function kst(
+  values: number[],
+  r1 = 10,
+  r2 = 15,
+  r3 = 20,
+  r4 = 30,
+  s1 = 10,
+  s2 = 10,
+  s3 = 10,
+  s4 = 15,
+  sig = 9
+): { kst: (number | null)[]; signal: (number | null)[] } {
+  const rc = (p: number, s: number) => {
+    const r = roc(values, p);
+    const filled = r.map((v) => v ?? 0);
+    return sma(filled, s).map((v, i) => (r[i] == null ? null : v));
+  };
+  const a = rc(r1, s1);
+  const b = rc(r2, s2);
+  const c = rc(r3, s3);
+  const d = rc(r4, s4);
+  const line = values.map((_, i) =>
+    a[i] != null && b[i] != null && c[i] != null && d[i] != null
+      ? (a[i] as number) +
+        2 * (b[i] as number) +
+        3 * (c[i] as number) +
+        4 * (d[i] as number)
+      : null
+  );
+  const filled = line.map((v) => v ?? 0);
+  const signal = sma(filled, sig).map((v, i) => (line[i] == null ? null : v));
+  return { kst: line, signal };
+}
+
+/** Relative Vigor Index */
+export function rvi(
+  candles: Candle[],
+  period = 10
+): { rvi: (number | null)[]; signal: (number | null)[] } {
+  const num = candles.map((c) => c.close - c.open);
+  const den = candles.map((c) => c.high - c.low || 1e-10);
+  const sn = sma(num, period);
+  const sd = sma(den, period);
+  const line = sn.map((v, i) =>
+    v != null && sd[i] != null && sd[i] !== 0 ? v / (sd[i] as number) : null
+  );
+  const filled = line.map((v) => v ?? 0);
+  const signal = sma(filled, 4).map((v, i) => (line[i] == null ? null : v));
+  return { rvi: line, signal };
+}
+
+export function envelope(
+  values: number[],
+  period = 20,
+  pct = 2.5
+): {
+  mid: (number | null)[];
+  upper: (number | null)[];
+  lower: (number | null)[];
+} {
+  const mid = sma(values, period);
+  const f = pct / 100;
+  return {
+    mid,
+    upper: mid.map((m) => (m == null ? null : m * (1 + f))),
+    lower: mid.map((m) => (m == null ? null : m * (1 - f))),
+  };
+}
+
+export function priceChannel(
+  candles: Candle[],
+  period = 20
+): {
+  upper: (number | null)[];
+  lower: (number | null)[];
+  mid: (number | null)[];
+} {
+  return donchian(candles, period);
+}
+
+export function stddevBands(
+  values: number[],
+  period = 20,
+  mult = 2
+): {
+  mid: (number | null)[];
+  upper: (number | null)[];
+  lower: (number | null)[];
+} {
+  return bollinger(values, period, mult);
+}
+
+/** Fibonacci channel sketch from period high/low */
+export function fibChannel(
+  candles: Candle[],
+  period = 50
+): {
+  upper: (number | null)[];
+  mid: (number | null)[];
+  lower: (number | null)[];
+  r382: (number | null)[];
+  r618: (number | null)[];
+} {
+  const upper: (number | null)[] = [];
+  const lower: (number | null)[] = [];
+  const mid: (number | null)[] = [];
+  const r382: (number | null)[] = [];
+  const r618: (number | null)[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i < period - 1) {
+      upper.push(null);
+      lower.push(null);
+      mid.push(null);
+      r382.push(null);
+      r618.push(null);
+      continue;
+    }
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      hi = Math.max(hi, candles[j].high);
+      lo = Math.min(lo, candles[j].low);
+    }
+    const range = hi - lo;
+    upper.push(hi);
+    lower.push(lo);
+    mid.push(lo + range * 0.5);
+    r382.push(lo + range * 0.382);
+    r618.push(lo + range * 0.618);
+  }
+  return { upper, mid, lower, r382, r618 };
+}
+
+/** Regression channel: linreg ± stddev of residuals */
+export function regChannel(
+  values: number[],
+  period = 20,
+  mult = 2
+): {
+  mid: (number | null)[];
+  upper: (number | null)[];
+  lower: (number | null)[];
+} {
+  const mid = linreg(values, period);
+  const upper: (number | null)[] = [];
+  const lower: (number | null)[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (mid[i] == null) {
+      upper.push(null);
+      lower.push(null);
+      continue;
+    }
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      // approximate residual vs endpoint mid
+      const d = values[j] - (mid[i] as number);
+      sum += d * d;
+    }
+    const sd = Math.sqrt(sum / period);
+    upper.push((mid[i] as number) + mult * sd);
+    lower.push((mid[i] as number) - mult * sd);
+  }
+  return { mid, upper, lower };
+}
+
+export function aroon(
+  candles: Candle[],
+  period = 14
+): {
+  up: (number | null)[];
+  down: (number | null)[];
+  osc: (number | null)[];
+} {
+  const up: (number | null)[] = [];
+  const down: (number | null)[] = [];
+  const osc: (number | null)[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i < period) {
+      up.push(null);
+      down.push(null);
+      osc.push(null);
+      continue;
+    }
+    let hi = -Infinity;
+    let lo = Infinity;
+    let hiIdx = i;
+    let loIdx = i;
+    for (let j = i - period; j <= i; j++) {
+      if (candles[j].high >= hi) {
+        hi = candles[j].high;
+        hiIdx = j;
+      }
+      if (candles[j].low <= lo) {
+        lo = candles[j].low;
+        loIdx = j;
+      }
+    }
+    const aUp = (100 * (period - (i - hiIdx))) / period;
+    const aDown = (100 * (period - (i - loIdx))) / period;
+    up.push(aUp);
+    down.push(aDown);
+    osc.push(aUp - aDown);
+  }
+  return { up, down, osc };
+}
+
+export function vortex(
+  candles: Candle[],
+  period = 14
+): { vip: (number | null)[]; vim: (number | null)[] } {
+  const n = candles.length;
+  const tr: number[] = [candles[0]?.high - candles[0]?.low || 0];
+  const vp: number[] = [0];
+  const vm: number[] = [0];
+  for (let i = 1; i < n; i++) {
+    const prev = candles[i - 1];
+    tr.push(
+      Math.max(
+        candles[i].high - candles[i].low,
+        Math.abs(candles[i].high - prev.close),
+        Math.abs(candles[i].low - prev.close)
+      )
+    );
+    vp.push(Math.abs(candles[i].high - prev.low));
+    vm.push(Math.abs(candles[i].low - prev.high));
+  }
+  const vip: (number | null)[] = [];
+  const vim: (number | null)[] = [];
+  for (let i = 0; i < n; i++) {
+    if (i < period - 1) {
+      vip.push(null);
+      vim.push(null);
+      continue;
+    }
+    let str = 0;
+    let sp = 0;
+    let sm = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      str += tr[j];
+      sp += vp[j];
+      sm += vm[j];
+    }
+    vip.push(str === 0 ? null : sp / str);
+    vim.push(str === 0 ? null : sm / str);
+  }
+  return { vip, vim };
+}
+
+export function chandelier(
+  candles: Candle[],
+  period = 22,
+  mult = 3
+): { long: (number | null)[]; short: (number | null)[] } {
+  const a = atr(candles, period);
+  const long: (number | null)[] = [];
+  const short: (number | null)[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (i < period - 1 || a[i] == null) {
+      long.push(null);
+      short.push(null);
+      continue;
+    }
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      hi = Math.max(hi, candles[j].high);
+      lo = Math.min(lo, candles[j].low);
+    }
+    long.push(hi - mult * (a[i] as number));
+    short.push(lo + mult * (a[i] as number));
+  }
+  return { long, short };
+}
+
+/** Trend strength via ADX-like normalized slope */
+export function trendStrength(values: number[], period = 20): (number | null)[] {
+  const lr = linreg(values, period);
+  return values.map((v, i) => {
+    if (lr[i] == null || i < period) return null;
+    const prev = lr[i - 1];
+    if (prev == null || prev === 0) return null;
+    return (100 * ((lr[i] as number) - prev)) / Math.abs(prev);
+  });
+}
+
+/** Heikin-Ashi close smoothed with EMA overlay helper */
+export function heikinAshiSmooth(
+  candles: Candle[],
+  period = 10
+): (number | null)[] {
+  const haClose: number[] = [];
+  let prevHaOpen = candles[0]
+    ? (candles[0].open + candles[0].close) / 2
+    : 0;
+  for (let i = 0; i < candles.length; i++) {
+    const c = candles[i];
+    const hac = (c.open + c.high + c.low + c.close) / 4;
+    const hao = i === 0 ? (c.open + c.close) / 2 : (prevHaOpen + haClose[i - 1]) / 2;
+    prevHaOpen = hao;
+    haClose.push(hac);
+  }
+  return ema(haClose, period);
+}
+
+export function massIndex(candles: Candle[], period = 25): (number | null)[] {
+  const hl = candles.map((c) => c.high - c.low);
+  const e1 = ema(hl, 9);
+  const f1 = e1.map((v, i) => (v == null ? hl[i] : v));
+  const e2 = ema(f1, 9);
+  const ratio = e1.map((v, i) =>
+    v != null && e2[i] != null && e2[i] !== 0 ? v / (e2[i] as number) : null
+  );
+  const out: (number | null)[] = [];
+  for (let i = 0; i < ratio.length; i++) {
+    if (i < period - 1) {
+      out.push(null);
+      continue;
+    }
+    let sum = 0;
+    let ok = true;
+    for (let j = i - period + 1; j <= i; j++) {
+      if (ratio[j] == null) {
+        ok = false;
+        break;
+      }
+      sum += ratio[j] as number;
+    }
+    out.push(ok ? sum : null);
+  }
+  return out;
+}
+
+export function ulcerIndex(values: number[], period = 14): (number | null)[] {
+  const out: (number | null)[] = [];
+  for (let i = 0; i < values.length; i++) {
+    if (i < period - 1) {
+      out.push(null);
+      continue;
+    }
+    let peak = -Infinity;
+    let sumSq = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      peak = Math.max(peak, values[j]);
+      const dd = peak === 0 ? 0 : (100 * (values[j] - peak)) / peak;
+      sumSq += dd * dd;
+    }
+    out.push(Math.sqrt(sumSq / period));
+  }
+  return out;
+}
+
+export function natr(candles: Candle[], period = 14): (number | null)[] {
+  const a = atr(candles, period);
+  return candles.map((c, i) =>
+    a[i] == null || c.close === 0 ? null : (100 * (a[i] as number)) / c.close
+  );
+}
+
+export function bbWidth(
+  values: number[],
+  period = 20,
+  mult = 2
+): (number | null)[] {
+  const b = bollinger(values, period, mult);
+  return b.mid.map((m, i) =>
+    m == null || m === 0 || b.upper[i] == null || b.lower[i] == null
+      ? null
+      : ((b.upper[i] as number) - (b.lower[i] as number)) / m
+  );
+}
+
+export function bbPercentB(
+  values: number[],
+  period = 20,
+  mult = 2
+): (number | null)[] {
+  const b = bollinger(values, period, mult);
+  return values.map((v, i) => {
+    if (b.upper[i] == null || b.lower[i] == null) return null;
+    const range = (b.upper[i] as number) - (b.lower[i] as number);
+    return range === 0 ? 0.5 : (v - (b.lower[i] as number)) / range;
+  });
+}
+
+export function trueRange(candles: Candle[]): (number | null)[] {
+  return candles.map((c, i) => {
+    if (i === 0) return c.high - c.low;
+    const prev = candles[i - 1].close;
+    return Math.max(c.high - c.low, Math.abs(c.high - prev), Math.abs(c.low - prev));
+  });
+}
+
+export function chaikinOsc(
+  candles: Candle[],
+  fast = 3,
+  slow = 10
+): (number | null)[] {
+  const a = adl(candles).map((v) => v ?? 0);
+  const ef = ema(a, fast);
+  const es = ema(a, slow);
+  return a.map((_, i) =>
+    ef[i] != null && es[i] != null ? (ef[i] as number) - (es[i] as number) : null
+  );
+}
+
+export function pvt(candles: Candle[]): (number | null)[] {
+  const out: (number | null)[] = [];
+  let cum = 0;
+  for (let i = 0; i < candles.length; i++) {
+    if (i === 0) {
+      out.push(0);
+      continue;
+    }
+    const prev = candles[i - 1].close;
+    if (prev !== 0) cum += ((candles[i].close - prev) / prev) * candles[i].volume;
+    out.push(cum);
+  }
+  return out;
+}
+
+export function eom(candles: Candle[], period = 14): (number | null)[] {
+  const raw = candles.map((c, i) => {
+    if (i === 0) return 0;
+    const dist =
+      (c.high + c.low) / 2 - (candles[i - 1].high + candles[i - 1].low) / 2;
+    const box = c.volume === 0 ? 0 : c.volume / (c.high - c.low || 1e-10);
+    return box === 0 ? 0 : dist / box;
+  });
+  return sma(raw, period);
+}
+
+export function forceIndex(candles: Candle[], period = 13): (number | null)[] {
+  const raw = candles.map((c, i) =>
+    i === 0 ? 0 : (c.close - candles[i - 1].close) * c.volume
+  );
+  return ema(raw, period);
+}
+
+/** Klinger Volume Oscillator (simplified) */
+export function klinger(
+  candles: Candle[],
+  fast = 34,
+  slow = 55,
+  signal = 13
+): { kvo: (number | null)[]; signal: (number | null)[] } {
+  const vf: number[] = [];
+  let trend = 0;
+  for (let i = 0; i < candles.length; i++) {
+    const hlc = candles[i].high + candles[i].low + candles[i].close;
+    const prevHlc =
+      i > 0
+        ? candles[i - 1].high + candles[i - 1].low + candles[i - 1].close
+        : hlc;
+    trend = hlc > prevHlc ? 1 : hlc < prevHlc ? -1 : trend;
+    vf.push(candles[i].volume * trend);
+  }
+  const ef = ema(vf, fast);
+  const es = ema(vf, slow);
+  const kvo = vf.map((_, i) =>
+    ef[i] != null && es[i] != null ? (ef[i] as number) - (es[i] as number) : null
+  );
+  const filled = kvo.map((v) => v ?? 0);
+  const sig = ema(filled, signal).map((v, i) => (kvo[i] == null ? null : v));
+  return { kvo, signal: sig };
+}
+
+export function netVolume(candles: Candle[]): (number | null)[] {
+  return candles.map((c) => (c.close >= c.open ? c.volume : -c.volume));
+}
+
+export function acceleratorOsc(candles: Candle[]): (number | null)[] {
+  const ao = awesomeOsc(candles);
+  const filled = ao.map((v) => v ?? 0);
+  const sm = sma(filled, 5);
+  return ao.map((v, i) => (v == null || sm[i] == null ? null : v - (sm[i] as number)));
+}
+
+/** Alligator (approx SMMA jaws/teeth/lips) */
+export function alligator(
+  candles: Candle[],
+  jawPeriod = 13,
+  teethPeriod = 8,
+  lipsPeriod = 5
+): {
+  jaw: (number | null)[];
+  teeth: (number | null)[];
+  lips: (number | null)[];
+} {
+  const mid = candles.map((c) => (c.high + c.low) / 2);
+  const shift = (arr: (number | null)[], n: number) =>
+    arr.map((_, i) => (i >= n ? arr[i - n] : null));
+  return {
+    jaw: shift(smma(mid, jawPeriod), 8),
+    teeth: shift(smma(mid, teethPeriod), 5),
+    lips: shift(smma(mid, lipsPeriod), 3),
+  };
+}
+
+/** Williams Fractals as marker values (high/low or null) */
+export function fractals(candles: Candle[]): {
+  up: (number | null)[];
+  down: (number | null)[];
+} {
+  const up: (number | null)[] = new Array(candles.length).fill(null);
+  const down: (number | null)[] = new Array(candles.length).fill(null);
+  for (let i = 2; i < candles.length - 2; i++) {
+    if (
+      candles[i].high > candles[i - 1].high &&
+      candles[i].high > candles[i - 2].high &&
+      candles[i].high > candles[i + 1].high &&
+      candles[i].high > candles[i + 2].high
+    ) {
+      up[i] = candles[i].high;
+    }
+    if (
+      candles[i].low < candles[i - 1].low &&
+      candles[i].low < candles[i - 2].low &&
+      candles[i].low < candles[i + 1].low &&
+      candles[i].low < candles[i + 2].low
+    ) {
+      down[i] = candles[i].low;
+    }
+  }
+  // forward-fill markers sparsely for line visibility
+  let lastUp: number | null = null;
+  let lastDown: number | null = null;
+  const upF = up.map((v) => {
+    if (v != null) lastUp = v;
+    return lastUp;
+  });
+  const downF = down.map((v) => {
+    if (v != null) lastDown = v;
+    return lastDown;
+  });
+  return { up: upF, down: downF };
+}
+
+export function gator(candles: Candle[]): {
+  upper: (number | null)[];
+  lower: (number | null)[];
+} {
+  const a = alligator(candles);
+  return {
+    upper: a.jaw.map((j, i) =>
+      j != null && a.teeth[i] != null ? Math.abs(j - (a.teeth[i] as number)) : null
+    ),
+    lower: a.teeth.map((t, i) =>
+      t != null && a.lips[i] != null
+        ? -Math.abs(t - (a.lips[i] as number))
+        : null
+    ),
+  };
+}
+
+export function maCross(
+  values: number[],
+  fast = 9,
+  slow = 21
+): { fast: (number | null)[]; slow: (number | null)[] } {
+  return { fast: ema(values, fast), slow: ema(values, slow) };
+}
+
+function sessionPivotBase(candles: Candle[]): {
+  dayHi: number[];
+  dayLo: number[];
+  dayClose: number[];
+  dayChanged: boolean[];
+} {
+  const dayHi: number[] = [];
+  const dayLo: number[] = [];
+  const dayClose: number[] = [];
+  const dayChanged: boolean[] = [];
+  let curDay = "";
+  let hi = -Infinity;
+  let lo = Infinity;
+  let close = 0;
+  const days: { hi: number; lo: number; close: number }[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    const d = new Date(candles[i].time * 1000).toISOString().slice(0, 10);
+    if (d !== curDay) {
+      if (curDay) days.push({ hi, lo, close });
+      curDay = d;
+      hi = candles[i].high;
+      lo = candles[i].low;
+      dayChanged.push(true);
+    } else {
+      dayChanged.push(false);
+      hi = Math.max(hi, candles[i].high);
+      lo = Math.min(lo, candles[i].low);
+    }
+    close = candles[i].close;
+    dayHi.push(hi);
+    dayLo.push(lo);
+    dayClose.push(close);
+  }
+  return { dayHi, dayLo, dayClose, dayChanged };
+}
+
+/** Use previous day's H/L/C for session pivots (approx on intraday bars) */
+function prevDayOHLC(candles: Candle[]): {
+  ph: (number | null)[];
+  pl: (number | null)[];
+  pc: (number | null)[];
+} {
+  const ph: (number | null)[] = [];
+  const pl: (number | null)[] = [];
+  const pc: (number | null)[] = [];
+  let curDay = "";
+  let hi = -Infinity;
+  let lo = Infinity;
+  let close = 0;
+  let prevHi: number | null = null;
+  let prevLo: number | null = null;
+  let prevClose: number | null = null;
+  let dayHi = -Infinity;
+  let dayLo = Infinity;
+  let dayClose = 0;
+  for (let i = 0; i < candles.length; i++) {
+    const d = new Date(candles[i].time * 1000).toISOString().slice(0, 10);
+    if (d !== curDay) {
+      if (curDay) {
+        prevHi = dayHi;
+        prevLo = dayLo;
+        prevClose = dayClose;
+      }
+      curDay = d;
+      dayHi = candles[i].high;
+      dayLo = candles[i].low;
+    } else {
+      dayHi = Math.max(dayHi, candles[i].high);
+      dayLo = Math.min(dayLo, candles[i].low);
+    }
+    dayClose = candles[i].close;
+    ph.push(prevHi);
+    pl.push(prevLo);
+    pc.push(prevClose);
+  }
+  void hi;
+  void lo;
+  void close;
+  return { ph, pl, pc };
+}
+
+export function pivotFib(candles: Candle[]): {
+  pp: (number | null)[];
+  r1: (number | null)[];
+  s1: (number | null)[];
+  r2: (number | null)[];
+  s2: (number | null)[];
+  r3: (number | null)[];
+  s3: (number | null)[];
+} {
+  const { ph, pl, pc } = prevDayOHLC(candles);
+  const pp: (number | null)[] = [];
+  const r1: (number | null)[] = [];
+  const s1: (number | null)[] = [];
+  const r2: (number | null)[] = [];
+  const s2: (number | null)[] = [];
+  const r3: (number | null)[] = [];
+  const s3: (number | null)[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (ph[i] == null || pl[i] == null || pc[i] == null) {
+      pp.push(null);
+      r1.push(null);
+      s1.push(null);
+      r2.push(null);
+      s2.push(null);
+      r3.push(null);
+      s3.push(null);
+      continue;
+    }
+    const p = ((ph[i] as number) + (pl[i] as number) + (pc[i] as number)) / 3;
+    const range = (ph[i] as number) - (pl[i] as number);
+    pp.push(p);
+    r1.push(p + 0.382 * range);
+    s1.push(p - 0.382 * range);
+    r2.push(p + 0.618 * range);
+    s2.push(p - 0.618 * range);
+    r3.push(p + 1 * range);
+    s3.push(p - 1 * range);
+  }
+  return { pp, r1, s1, r2, s2, r3, s3 };
+}
+
+export function pivotCamarilla(candles: Candle[]): {
+  pp: (number | null)[];
+  r1: (number | null)[];
+  s1: (number | null)[];
+  r2: (number | null)[];
+  s2: (number | null)[];
+  r3: (number | null)[];
+  s3: (number | null)[];
+} {
+  const { ph, pl, pc } = prevDayOHLC(candles);
+  const pp: (number | null)[] = [];
+  const r1: (number | null)[] = [];
+  const s1: (number | null)[] = [];
+  const r2: (number | null)[] = [];
+  const s2: (number | null)[] = [];
+  const r3: (number | null)[] = [];
+  const s3: (number | null)[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (ph[i] == null || pl[i] == null || pc[i] == null) {
+      pp.push(null);
+      r1.push(null);
+      s1.push(null);
+      r2.push(null);
+      s2.push(null);
+      r3.push(null);
+      s3.push(null);
+      continue;
+    }
+    const range = (ph[i] as number) - (pl[i] as number);
+    const c = pc[i] as number;
+    pp.push(((ph[i] as number) + (pl[i] as number) + c) / 3);
+    r1.push(c + range * 1.1 / 12);
+    s1.push(c - range * 1.1 / 12);
+    r2.push(c + range * 1.1 / 6);
+    s2.push(c - range * 1.1 / 6);
+    r3.push(c + range * 1.1 / 4);
+    s3.push(c - range * 1.1 / 4);
+  }
+  return { pp, r1, s1, r2, s2, r3, s3 };
+}
+
+export function pivotWoodie(candles: Candle[]): {
+  pp: (number | null)[];
+  r1: (number | null)[];
+  s1: (number | null)[];
+  r2: (number | null)[];
+  s2: (number | null)[];
+} {
+  const { ph, pl, pc } = prevDayOHLC(candles);
+  // Woodie uses current open ≈ first bar of day close of prev as proxy:  (H+L+2C)/4
+  const pp: (number | null)[] = [];
+  const r1: (number | null)[] = [];
+  const s1: (number | null)[] = [];
+  const r2: (number | null)[] = [];
+  const s2: (number | null)[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    if (ph[i] == null || pl[i] == null || pc[i] == null) {
+      pp.push(null);
+      r1.push(null);
+      s1.push(null);
+      r2.push(null);
+      s2.push(null);
+      continue;
+    }
+    const p =
+      ((ph[i] as number) + (pl[i] as number) + 2 * (pc[i] as number)) / 4;
+    const range = (ph[i] as number) - (pl[i] as number);
+    pp.push(p);
+    r1.push(2 * p - (pl[i] as number));
+    s1.push(2 * p - (ph[i] as number));
+    r2.push(p + range);
+    s2.push(p - range);
+  }
+  return { pp, r1, s1, r2, s2 };
+}
+
+/** Pivot Points Standard ≈ classic from previous bar (kept for menu naming) */
+export function pivotStandard(candles: Candle[]) {
+  return pivotClassic(candles);
+}
+
+// silence unused helper warning
+void sessionPivotBase;
