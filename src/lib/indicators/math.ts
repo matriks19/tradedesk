@@ -985,28 +985,43 @@ export function cumDelta(candles: Candle[]): (number | null)[] {
   return out;
 }
 
-export function toLineData(
+/** One point per candle: value or LWC whitespace `{ time }` so logical indices stay aligned. */
+export type SyncedLinePoint = { time: number; value: number } | { time: number };
+
+export function toSyncedLineData(
   candles: Candle[],
-  values: (number | null)[]
-): { time: number; value: number }[] {
-  const out: { time: number; value: number }[] = [];
-  for (let i = 0; i < candles.length; i++) {
+  values: (number | null | undefined)[]
+): SyncedLinePoint[] {
+  const out: SyncedLinePoint[] = [];
+  const n = candles.length;
+  for (let i = 0; i < n; i++) {
     const v = values[i];
-    if (v != null && Number.isFinite(v))
+    if (v != null && Number.isFinite(v)) {
       out.push({ time: candles[i].time, value: v });
+    } else {
+      out.push({ time: candles[i].time });
+    }
   }
   return out;
 }
 
-/** Map nullable series onto candle times (for series-sourced children) */
+export function toLineData(
+  candles: Candle[],
+  values: (number | null)[]
+): SyncedLinePoint[] {
+  return toSyncedLineData(candles, values);
+}
+
+/** Map nullable series onto times — never drop bars (whitespace when null). */
 export function seriesToLineData(
   times: number[],
   values: (number | null)[]
-): { time: number; value: number }[] {
-  const out: { time: number; value: number }[] = [];
+): SyncedLinePoint[] {
+  const out: SyncedLinePoint[] = [];
   for (let i = 0; i < times.length; i++) {
     const v = values[i];
     if (v != null && Number.isFinite(v)) out.push({ time: times[i], value: v });
+    else out.push({ time: times[i] });
   }
   return out;
 }

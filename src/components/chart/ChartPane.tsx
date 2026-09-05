@@ -14,6 +14,7 @@ import {
 import type { PaneConfig } from "@/lib/types";
 import { useKlines } from "@/lib/hooks/useKlines";
 import { computeAllIndicators, BUILTIN_META, type PlotSeries } from "@/lib/indicators/registry";
+import { toSyncedLineData } from "@/lib/indicators/math";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 import { SymbolSearch } from "@/components/chart/SymbolSearch";
@@ -36,6 +37,11 @@ interface SubPaneGroup {
   plots: PlotSeries[];
 }
 
+type ChartWithMeta = IChartApi & {
+  __ro?: ResizeObserver;
+  __el?: HTMLDivElement;
+};
+
 function chartOptions(height: number, width: number, showTime: boolean) {
   return {
     layout: {
@@ -47,15 +53,39 @@ function chartOptions(height: number, width: number, showTime: boolean) {
       horzLines: { color: "#1a1f27" },
     },
     crosshair: { mode: CrosshairMode.Normal },
-    rightPriceScale: { borderColor: "#2a3140" },
+    rightPriceScale: {
+      borderColor: "#2a3140",
+      // Prefer time-scale pan; price axis drag shouldn't fight horizontal sync
+      entireTextOnly: true,
+    },
     timeScale: {
       borderColor: "#2a3140",
       timeVisible: showTime,
       secondsVisible: false,
       visible: showTime,
     },
+    handleScroll: {
+      mouseWheel: true,
+      pressedMouseMove: true,
+      horzTouchDrag: true,
+      vertTouchDrag: false,
+    },
+    handleScale: {
+      axisPressedMouseMove: { time: true, price: true },
+      axisDoubleClickReset: true,
+      mouseWheel: true,
+      pinch: true,
+    },
     width,
     height,
+  };
+}
+
+function pixelSize(el: HTMLElement): { width: number; height: number } {
+  const r = el.getBoundingClientRect();
+  return {
+    width: Math.max(1, Math.floor(r.width)),
+    height: Math.max(1, Math.floor(r.height)),
   };
 }
 
@@ -67,7 +97,7 @@ export function ChartPane({ pane, compact }: Props) {
   const mainOverlayRefs = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
     new Map()
   );
-  const subChartsRef = useRef<Map<string, IChartApi>>(new Map());
+  const subChartsRef = useRef<Map<string, ChartWithMeta>>(new Map());
   const subSeriesRef = useRef<
     Map<string, Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>
   >(new Map());
@@ -75,8 +105,11 @@ export function ChartPane({ pane, compact }: Props) {
   const priceLinesRef = useRef<IPriceLine[]>([]);
   const syncingRange = useRef(false);
   const syncingCross = useRef(false);
+  const rangeRaf = useRef(0);
+  const pendingRange = useRef<LogicalRange | null>(null);
   const [chartReady, setChartReady] = useState(0);
   const [subReady, setSubReady] = useState(0);
+  const [containersTick, setContainersTick] = useState(0);
 
   const {
     activePaneId,
@@ -137,14 +170,68 @@ export function ChartPane({ pane, compact }: Props) {
     container: chartReady ? containerRef.current : null,
   });
 
+  const destroySubChart = useCallback((id: string) => {
+    const chart = subChartsRef.current.get(id);
+    if (!chart) return;
+    try {
+      chart.__ro?.disconnect();
+    } catch {
+      /* */
+    }
+    try {
+      chart.remove();
+    } catch {
+      /* */
+    }
+    subChartsRef.current.delete(id);
+    subSeriesRef.current.delete(id);
+  }, []);
+
+  const syncLogicalRanges = useCallback((source?: IChartApi | null) => {
+    const main = chartRef.current;
+    if (!main) return;
+    const charts: IChartApi[] = [main, ...Array.from(subChartsRef.current.values())];
+    if (charts.length < 2) return;
+
+    let range: LogicalRange | null = null;
+    const primary = source ?? main;
+    try {
+      range = primary.timeScale().getVisibleLogicalRange();
+    } catch {
+      range = null;
+    }
+    if (!range) {
+      try {
+        main.timeScale().fitContent();
+        range = main.timeScale().getVisibleLogicalRange();
+      } catch {
+        range = null;
+      }
+    }
+    if (!range) return;
+
+    syncingRange.current = true;
+    try {
+      for (const c of charts) {
+        if (c === primary) continue;
+        try {
+          c.timeScale().setVisibleLogicalRange(range);
+        } catch {
+          /* */
+        }
+      }
+    } finally {
+      syncingRange.current = false;
+    }
+  }, []);
+
   // Main chart init
   useEffect(() => {
     if (!containerRef.current) return;
     const el = containerRef.current;
-    const chart = createChart(
-      el,
-      chartOptions(el.clientHeight || 300, el.clientWidth || 400, true)
-    );
+    el.innerHTML = "";
+    const { width, height } = pixelSize(el);
+    const chart = createChart(el, chartOptions(height || 300, width || 400, true));
     const candlesSeries = chart.addCandlestickSeries({
       upColor: "#26a69a",
       downColor: "#ef5350",
@@ -166,9 +253,10 @@ export function ChartPane({ pane, compact }: Props) {
 
     const ro = new ResizeObserver(() => {
       if (!containerRef.current || !chartRef.current) return;
+      const size = pixelSize(containerRef.current);
       chartRef.current.applyOptions({
-        width: containerRef.current.clientWidth,
-        height: containerRef.current.clientHeight,
+        width: size.width,
+        height: size.height,
       });
     });
     ro.observe(el);
@@ -189,10 +277,16 @@ export function ChartPane({ pane, compact }: Props) {
     for (const s of builtinPlots) {
       all.push({
         ...s,
-        data: s.data.map((d) => ({
-          time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
-          value: d.value,
-        })) as PlotSeries["data"],
+        data: s.data.map((d) =>
+          "value" in d && d.value != null
+            ? {
+                time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
+                value: d.value,
+              }
+            : {
+                time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
+              }
+        ) as PlotSeries["data"],
       });
     }
     for (const ind of pane.indicators) {
@@ -201,18 +295,8 @@ export function ChartPane({ pane, compact }: Props) {
         const sc = scripts.find((s) => s.id === ind.scriptId);
         if (!sc) continue;
         const result = runCustomScript(sc.code, candles, sc.language);
-        const hasSub = result.plots.some((p) => (p.pane ?? "main") === "sub");
         for (const p of result.plots) {
-          const data = candles
-            .map((c, i) => {
-              const v = p.values[i];
-              if (v == null || !Number.isFinite(v)) return null;
-              return {
-                time: c.time as unknown as import("lightweight-charts").UTCTimestamp,
-                value: v,
-              };
-            })
-            .filter(Boolean) as PlotSeries["data"];
+          const data = toSyncedLineData(candles, p.values) as PlotSeries["data"];
           const plotPane = (p.pane ?? "main") as "main" | "sub";
           all.push({
             id: `${ind.id}-${p.id}`,
@@ -225,7 +309,6 @@ export function ChartPane({ pane, compact }: Props) {
             title: p.title ?? ind.name,
           });
         }
-        void hasSub;
       }
     }
     return all;
@@ -263,113 +346,94 @@ export function ChartPane({ pane, compact }: Props) {
   }, [plots, pane.indicators]);
 
   const subGroupIds = subGroups.map((g) => g.id).join("|");
+  const oscCount = subGroups.length;
 
   const setSubContainerRef = useCallback(
     (id: string) => (el: HTMLDivElement | null) => {
-      if (el) subContainerRefs.current.set(id, el);
-      else subContainerRefs.current.delete(id);
+      if (el) {
+        const prev = subContainerRefs.current.get(id);
+        subContainerRefs.current.set(id, el);
+        if (prev !== el) setContainersTick((n) => n + 1);
+      } else {
+        if (subContainerRefs.current.has(id)) {
+          subContainerRefs.current.delete(id);
+        }
+        // Drop chart bound to detached node so a remount gets a clean createChart
+        const bound = subChartsRef.current.get(id);
+        if (bound) {
+          try {
+            bound.__ro?.disconnect();
+          } catch {
+            /* */
+          }
+          try {
+            bound.remove();
+          } catch {
+            /* */
+          }
+          subChartsRef.current.delete(id);
+          subSeriesRef.current.delete(id);
+        }
+        setContainersTick((n) => n + 1);
+      }
     },
     []
   );
 
-  // Create / destroy sub charts when groups change
+  // Single lifecycle: create / recreate / remove sub charts (no second-pass race)
   useEffect(() => {
     const ids = new Set(subGroups.map((g) => g.id));
-    // Remove obsolete
-    for (const [id, chart] of Array.from(subChartsRef.current.entries())) {
-      if (!ids.has(id)) {
-        try {
-          chart.remove();
-        } catch {
-          /* */
-        }
-        subChartsRef.current.delete(id);
-        subSeriesRef.current.delete(id);
-      }
+
+    for (const id of Array.from(subChartsRef.current.keys())) {
+      if (!ids.has(id)) destroySubChart(id);
     }
-    // Create missing
+
     for (const g of subGroups) {
-      if (subChartsRef.current.has(g.id)) continue;
       const el = subContainerRefs.current.get(g.id);
       if (!el) continue;
+
+      const existing = subChartsRef.current.get(g.id);
+      if (existing && existing.__el === el) continue;
+
+      if (existing) destroySubChart(g.id);
+
+      // Dedicated empty node — clear LWC leftovers before createChart
+      el.innerHTML = "";
+      const { width, height } = pixelSize(el);
       const chart = createChart(
         el,
-        chartOptions(el.clientHeight || 100, el.clientWidth || 400, false)
-      );
+        chartOptions(height || 120, width || 400, false)
+      ) as ChartWithMeta;
+      chart.__el = el;
       subChartsRef.current.set(g.id, chart);
       subSeriesRef.current.set(g.id, new Map());
+
       const ro = new ResizeObserver(() => {
         const c = subChartsRef.current.get(g.id);
         const node = subContainerRefs.current.get(g.id);
         if (!c || !node) return;
-        c.applyOptions({ width: node.clientWidth, height: node.clientHeight });
+        const size = pixelSize(node);
+        c.applyOptions({ width: size.width, height: size.height });
       });
       ro.observe(el);
-      (chart as unknown as { __ro?: ResizeObserver }).__ro = ro;
-      try {
-        const range = chartRef.current?.timeScale().getVisibleLogicalRange();
-        if (range) chart.timeScale().setVisibleLogicalRange(range);
-      } catch {
-        /* */
-      }
+      chart.__ro = ro;
+
+      syncLogicalRanges(chartRef.current);
     }
+
     setSubReady((n) => n + 1);
-
-    return () => {
-      /* keep charts alive across group id stability; cleaned when ids removed above */
-    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subGroupIds, subGroups.length]);
-
-  // Second pass after DOM refs attach for newly added osc panes
-  useEffect(() => {
-    let changed = false;
-    for (const g of subGroups) {
-      if (subChartsRef.current.has(g.id)) continue;
-      const el = subContainerRefs.current.get(g.id);
-      if (!el) continue;
-      const chart = createChart(
-        el,
-        chartOptions(el.clientHeight || 100, el.clientWidth || 400, false)
-      );
-      subChartsRef.current.set(g.id, chart);
-      subSeriesRef.current.set(g.id, new Map());
-      const ro = new ResizeObserver(() => {
-        const c = subChartsRef.current.get(g.id);
-        const node = subContainerRefs.current.get(g.id);
-        if (!c || !node) return;
-        c.applyOptions({ width: node.clientWidth, height: node.clientHeight });
-      });
-      ro.observe(el);
-      (chart as unknown as { __ro?: ResizeObserver }).__ro = ro;
-      try {
-        const range = chartRef.current?.timeScale().getVisibleLogicalRange();
-        if (range) chart.timeScale().setVisibleLogicalRange(range);
-      } catch {
-        /* */
-      }
-      changed = true;
-    }
-    if (changed) setSubReady((n) => n + 1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subGroupIds]);
+  }, [subGroupIds, containersTick, destroySubChart, syncLogicalRanges]);
 
   // Cleanup all sub charts on unmount
   useEffect(() => {
     return () => {
-      for (const [, chart] of Array.from(subChartsRef.current.entries())) {
-        const ro = (chart as unknown as { __ro?: ResizeObserver }).__ro;
-        ro?.disconnect();
-        try {
-          chart.remove();
-        } catch {
-          /* */
-        }
+      if (rangeRaf.current) cancelAnimationFrame(rangeRaf.current);
+      for (const id of Array.from(subChartsRef.current.keys())) {
+        destroySubChart(id);
       }
-      subChartsRef.current.clear();
-      subSeriesRef.current.clear();
     };
-  }, []);
+  }, [destroySubChart]);
 
   // Time + crosshair sync across main + all sub charts
   useEffect(() => {
@@ -378,27 +442,37 @@ export function ChartPane({ pane, compact }: Props) {
     const charts: IChartApi[] = [main, ...Array.from(subChartsRef.current.values())];
     const unsubs: (() => void)[] = [];
 
-    for (const chart of charts) {
-      const handler = (range: LogicalRange | null) => {
-        if (syncingRange.current || !range) return;
-        syncingRange.current = true;
-        try {
-          for (const other of charts) {
-            if (other === chart) continue;
-            try {
-              other.timeScale().setVisibleLogicalRange(range);
-            } catch {
-              /* */
-            }
+    const flushRange = () => {
+      rangeRaf.current = 0;
+      const range = pendingRange.current;
+      pendingRange.current = null;
+      if (!range || syncingRange.current) return;
+      syncingRange.current = true;
+      try {
+        for (const other of charts) {
+          try {
+            other.timeScale().setVisibleLogicalRange(range);
+          } catch {
+            /* */
           }
-        } finally {
-          syncingRange.current = false;
         }
-      };
-      chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
+      } finally {
+        syncingRange.current = false;
+      }
+    };
+
+    const sharedRangeHandler = (range: LogicalRange | null) => {
+      if (syncingRange.current || !range) return;
+      pendingRange.current = range;
+      if (rangeRaf.current) return;
+      rangeRaf.current = requestAnimationFrame(flushRange);
+    };
+
+    for (const chart of charts) {
+      chart.timeScale().subscribeVisibleLogicalRangeChange(sharedRangeHandler);
       unsubs.push(() => {
         try {
-          chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+          chart.timeScale().unsubscribeVisibleLogicalRangeChange(sharedRangeHandler);
         } catch {
           /* */
         }
@@ -415,7 +489,6 @@ export function ChartPane({ pane, compact }: Props) {
       return null;
     };
 
-    // Crosshair sync across stacked panes
     for (const chart of charts) {
       const onMove = (param: MouseEventParams) => {
         if (syncingCross.current) return;
@@ -459,10 +532,17 @@ export function ChartPane({ pane, compact }: Props) {
       });
     }
 
+    // Align once when charts join / remount
+    syncLogicalRanges(main);
+
     return () => {
       for (const u of unsubs) u();
+      if (rangeRaf.current) {
+        cancelAnimationFrame(rangeRaf.current);
+        rangeRaf.current = 0;
+      }
     };
-  }, [chartReady, subReady, subGroupIds]);
+  }, [chartReady, subReady, subGroupIds, syncLogicalRanges]);
 
   // Update candle + volume (same time base for all series)
   useEffect(() => {
@@ -484,7 +564,9 @@ export function ChartPane({ pane, compact }: Props) {
           c.close >= c.open ? "rgba(38,166,154,0.4)" : "rgba(239,83,80,0.4)",
       }))
     );
-  }, [candles]);
+    // Keep oscillator panes locked after candle reload
+    requestAnimationFrame(() => syncLogicalRanges(chartRef.current));
+  }, [candles, syncLogicalRanges]);
 
   // Main overlays
   useEffect(() => {
@@ -518,9 +600,10 @@ export function ChartPane({ pane, compact }: Props) {
         mainOverlayRefs.current.set(p.id, s);
       }
     }
-  }, [mainPlots, chartReady]);
+    requestAnimationFrame(() => syncLogicalRanges(main));
+  }, [mainPlots, chartReady, syncLogicalRanges]);
 
-  // Sub pane series
+  // Sub pane series — data already one-point-per-candle (whitespace for nulls)
   useEffect(() => {
     for (const g of subGroups) {
       const chart = subChartsRef.current.get(g.id);
@@ -560,7 +643,8 @@ export function ChartPane({ pane, compact }: Props) {
         }
       }
     }
-  }, [subGroups, subReady]);
+    requestAnimationFrame(() => syncLogicalRanges(chartRef.current));
+  }, [subGroups, subReady, syncLogicalRanges]);
 
   // TP/SL lines
   useEffect(() => {
@@ -614,10 +698,10 @@ export function ChartPane({ pane, compact }: Props) {
   }, [risk, showRiskLines, active, candles]);
 
   const last = candles[candles.length - 1];
-  const oscCount = subGroups.length;
-  // main ~65%, each osc shares remaining
-  const mainFlex = oscCount === 0 ? 1 : Math.max(1.8, 3.2 - oscCount * 0.15);
-  const oscFlex = 1;
+  const bodyGridRows =
+    oscCount === 0
+      ? "minmax(0, 1fr)"
+      : `minmax(0, 1fr) repeat(${oscCount}, minmax(110px, 140px))`;
 
   return (
     <div
@@ -674,7 +758,10 @@ export function ChartPane({ pane, compact }: Props) {
           </span>
         )}
       </div>
-      <div className="relative flex-1 min-h-0 flex flex-col">
+      <div
+        className="relative flex-1 min-h-0 grid"
+        style={{ gridTemplateRows: bodyGridRows }}
+      >
         {loading && (
           <div className="absolute inset-0 z-10 flex items-center justify-center bg-desk-panel/60 text-xs text-desk-muted">
             Yükleniyor…
@@ -685,23 +772,18 @@ export function ChartPane({ pane, compact }: Props) {
             {error}
           </div>
         )}
-        <div
-          ref={containerRef}
-          className="min-h-[120px]"
-          style={{ flex: mainFlex }}
-        />
+        <div ref={containerRef} className="min-h-0 overflow-hidden" />
         {subGroups.map((g) => (
           <div
             key={g.id}
-            className="relative border-t border-desk-border min-h-[72px]"
-            style={{ flex: oscFlex }}
+            className="min-h-[110px] h-[120px] overflow-hidden relative border-t border-desk-border"
           >
             <div className="absolute top-0 left-2 z-[1] text-2xs text-desk-muted pointer-events-none py-0.5">
               {g.title}
             </div>
             <div
               ref={setSubContainerRef(g.id)}
-              className="w-full h-full min-h-[72px]"
+              className="w-full h-full"
             />
           </div>
         ))}

@@ -159,7 +159,8 @@ export interface PlotSeries {
   pane: "main" | "sub";
   type: "line" | "histogram";
   color: string;
-  data: { time: number; value: number }[];
+  /** Prefer one point per candle; omit `value` for LWC whitespace (keeps time indices synced). */
+  data: ({ time: number; value: number } | { time: number })[];
   title?: string;
   /** Key used when nesting (primary series) */
   seriesKey?: string;
