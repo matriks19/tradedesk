@@ -20,6 +20,7 @@ import { NATIVE_TIMEFRAMES, normalizeTimeframe } from "@/lib/data/timeframes";
 import type { PatternHit } from "@/lib/patterns/types";
 import type { BacktestParams, BacktestResult } from "@/lib/backtest";
 import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
+import { strategyById } from "@/lib/strategies";
 
 function uid(prefix = "id"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -57,7 +58,11 @@ interface DeskState {
     | "risk"
     | "scripts"
     | "indicators"
-    | "backtest";
+    | "backtest"
+    | "strategies";
+  activeStrategyId: string | null;
+  pendingScannerPresets: string[] | null;
+  pendingScannerChips: string[] | null;
   lastBacktest: BacktestResult | null;
   backtestParams: Partial<BacktestParams>;
   watchlists: Watchlist[];
@@ -118,6 +123,8 @@ interface DeskState {
     scripts: CustomScript[];
   }) => void;
   setLastBacktest: (r: BacktestResult | null) => void;
+  applyStrategyPack: (strategyId: string) => void;
+  clearPendingScanner: () => void;
   setBacktestParams: (p: Partial<BacktestParams>) => void;
 }
 
@@ -130,6 +137,9 @@ export const useDeskStore = create<DeskState>()(
         panes: [first],
         activePaneId: first.id,
         sidebarTab: "watchlist",
+        activeStrategyId: null,
+        pendingScannerPresets: null,
+        pendingScannerChips: null,
         watchlists: [],
         activeWatchlistId: "crypto-majors",
         scripts: [],
@@ -381,6 +391,57 @@ export const useDeskStore = create<DeskState>()(
           })),
         setOverlayPattern: (hit) => set({ overlayPattern: hit }),
         setLastBacktest: (r) => set({ lastBacktest: r }),
+
+        applyStrategyPack: (strategyId) => {
+          const pack = strategyById(strategyId);
+          if (!pack) return;
+          set((s) => {
+            const paneId = s.activePaneId;
+            const indicators: IndicatorInstance[] = pack.indicators.map((spec) => {
+              const meta = BUILTIN_META[spec.type];
+              const base = defaultsFor(spec.type);
+              const inst: IndicatorInstance = {
+                id: uid("ind"),
+                type: spec.type,
+                name: meta?.label ?? spec.type,
+                params: { ...base, ...(spec.params ?? {}) },
+                visible: true,
+                color: spec.color,
+                source: { type: "price", field: "close" },
+              };
+              return inst;
+            });
+            return {
+              activeStrategyId: pack.id,
+              showRiskLines: true,
+              risk: {
+                ...s.risk,
+                rMultiple: pack.risk.rMultiple,
+              },
+              pendingScannerPresets: pack.scannerPresets ?? null,
+              pendingScannerChips: pack.scannerChips ?? null,
+              backtestParams: {
+                ...s.backtestParams,
+                preset: pack.backtestPreset ?? s.backtestParams.preset,
+                allowShort: pack.allowShort,
+                timeframe: pack.timeframe as never,
+                ...(pack.backtestExtras ?? {}),
+              },
+              panes: s.panes.map((p) => {
+                if (p.id !== paneId) return p;
+                return {
+                  ...p,
+                  timeframe: pack.timeframe,
+                  indicators: pack.replaceIndicators === false
+                    ? [...p.indicators, ...indicators]
+                    : indicators,
+                };
+              }),
+            };
+          });
+        },
+        clearPendingScanner: () =>
+          set({ pendingScannerPresets: null, pendingScannerChips: null }),
         setBacktestParams: (p) =>
           set((s) => ({ backtestParams: { ...s.backtestParams, ...p } })),
         hydrateFromServer: ({ watchlists, scripts }) =>
@@ -415,6 +476,7 @@ export const useDeskStore = create<DeskState>()(
         recentCustomTimeframes: s.recentCustomTimeframes,
         backtestParams: s.backtestParams,
         lastBacktest: s.lastBacktest,
+        activeStrategyId: s.activeStrategyId,
       }),
     }
   )

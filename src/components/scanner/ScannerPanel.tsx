@@ -93,6 +93,9 @@ function defaultUniverse(tf: string): number {
 
 export function ScannerPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
+  const pendingScannerPresets = useDeskStore((s) => s.pendingScannerPresets);
+  const pendingScannerChips = useDeskStore((s) => s.pendingScannerChips);
+  const clearPendingScanner = useDeskStore((s) => s.clearPendingScanner);
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<ScannerRow[]>([]);
   const [selectedPresets, setSelectedPresets] = useState<string[]>([]);
@@ -116,6 +119,20 @@ export function ScannerPanel() {
       abortRef.current?.abort();
     };
   }, []);
+
+  // Strategy pack → preselect scanner presets/chips once
+  useEffect(() => {
+    if (!pendingScannerPresets && !pendingScannerChips) return;
+    if (pendingScannerPresets?.length) {
+      setSelectedPresets(pendingScannerPresets);
+      setOpenSection("presets");
+    }
+    if (pendingScannerChips?.length) {
+      setExtraFilters(pendingScannerChips);
+      if (!pendingScannerPresets?.length) setOpenSection("extra");
+    }
+    clearPendingScanner();
+  }, [pendingScannerPresets, pendingScannerChips, clearPendingScanner]);
 
   // Draft row for adding a filter
   const [draftField, setDraftField] = useState<TechnicalFieldId>("rsi");

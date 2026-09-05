@@ -9,9 +9,11 @@ import { RiskPanel } from "@/components/risk/RiskPanel";
 import { IndicatorPanel } from "@/components/indicators/IndicatorPanel";
 import { ScriptEditor } from "@/components/editor/ScriptEditor";
 import { BacktestPanel } from "@/components/backtest/BacktestPanel";
+import { StrategiesPanel } from "@/components/strategies/StrategiesPanel";
 import clsx from "clsx";
 
 const TABS = [
+  { id: "strategies", label: "Strateji" },
   { id: "watchlist", label: "İzleme" },
   { id: "indicators", label: "Göstergeler" },
   { id: "scanner", label: "Tarayıcı" },
@@ -40,6 +42,7 @@ export function Sidebar() {
         ))}
       </div>
       <div className="flex-1 min-h-0 overflow-hidden">
+        {sidebarTab === "strategies" && <StrategiesPanel />}
         {sidebarTab === "watchlist" && <WatchlistPanel />}
         {sidebarTab === "indicators" && <IndicatorPanel />}
         {sidebarTab === "scanner" && <ScannerPanel />}
