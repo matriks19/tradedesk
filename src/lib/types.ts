@@ -305,13 +305,9 @@ export interface StoredLayout {
   activePaneId: string;
 }
 
-export type FormationScaleMode = "minor" | "major" | "both";
-
 export interface PatternSettings {
   swingStrength: number;
   twinTol: number;
   boxLookback: number;
   focusId: string | null;
-  /** Formasyon panel: Minör | Majör | İkisi */
-  formationScale: FormationScaleMode;
 }

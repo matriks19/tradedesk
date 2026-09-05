@@ -148,7 +148,6 @@ export const useDeskStore = create<DeskState>()(
           twinTol: 0.015,
           boxLookback: 30,
           focusId: null,
-          formationScale: "both",
         },
         overlayPattern: null,
         recentCustomTimeframes: [],

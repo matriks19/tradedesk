@@ -1,23 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useDeskStore } from "@/store/desk";
 import type { PatternHit } from "@/lib/patterns/types";
-import type { Candle, FormationScaleMode } from "@/lib/types";
+import type { Candle } from "@/lib/types";
 import { FormationScanPanel } from "@/components/formations/FormationScanPanel";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
-import {
-  MAJOR_TIMEFRAMES,
-  majorSwingStrength,
-} from "@/lib/data/timeframes";
 import clsx from "clsx";
-
-const SCALE_CHIPS: { id: FormationScaleMode; label: string }[] = [
-  { id: "minor", label: "Minör" },
-  { id: "major", label: "Majör" },
-  { id: "both", label: "İkisi" },
-];
 
 export function PatternPanel() {
   const panes = useDeskStore((s) => s.panes);
@@ -44,12 +34,6 @@ export function PatternPanel() {
     abortRef.current = null;
     setScanning(false);
   }, [activePaneId, pane?.symbol, pane?.exchange, pane?.timeframe]);
-
-  const visible = useMemo(() => {
-    const scale = patternSettings.formationScale ?? "both";
-    if (scale === "both") return patterns;
-    return patterns.filter((p) => (p.scale ?? "minor") === scale);
-  }, [patterns, patternSettings.formationScale]);
 
   const openHit = (h: PatternHit) => {
     if (pane) setActivePane(pane.id);
@@ -81,98 +65,52 @@ export function PatternPanel() {
     setScanning(true);
     setPatterns([]);
     setStatus("");
-    const scale = patternSettings.formationScale ?? "both";
-    const jobs: { tf: string; scale: "minor" | "major"; swing: number; boxLb: number }[] =
-      [];
-    if (scale !== "major") {
-      jobs.push({
-        tf: String(pane.timeframe),
-        scale: "minor",
-        swing: patternSettings.swingStrength,
-        boxLb: patternSettings.boxLookback,
-      });
-    }
-    if (scale !== "minor") {
-      const majSwing = majorSwingStrength(patternSettings.swingStrength);
-      for (const tf of MAJOR_TIMEFRAMES) {
-        jobs.push({
-          tf,
-          scale: "major",
-          swing: majSwing,
-          boxLb: Math.max(patternSettings.boxLookback, 40),
-        });
-      }
-    }
-    setProgress({ done: 0, total: jobs.length, label: "" });
+    const tf = String(pane.timeframe);
+    setProgress({ done: 0, total: 1, label: tf });
 
     const all: PatternHit[] = [];
     try {
-      for (let i = 0; i < jobs.length; i++) {
-        if (signal.aborted) break;
-        const job = jobs[i]!;
-        setProgress({
-          done: i,
-          total: jobs.length,
-          label: `${job.scale === "major" ? "Majör" : "Minör"} ${job.tf}`,
-        });
-        try {
-          const res = await fetch(
-            `/api/klines?symbol=${encodeURIComponent(pane.symbol)}&exchange=${pane.exchange}&timeframe=${encodeURIComponent(job.tf)}&limit=260`,
-            { signal }
-          );
-          const json = await res.json();
-          const bars = (json.candles ?? []) as Candle[];
-          if (bars.length < 40) {
-            setProgress({
-              done: i + 1,
-              total: jobs.length,
-              label: `${job.tf} (yetersiz veri)`,
-            });
-            continue;
-          }
+      if (signal.aborted) {
+        setStatus("Tarama iptal edildi");
+        return;
+      }
+      try {
+        const res = await fetch(
+          `/api/klines?symbol=${encodeURIComponent(pane.symbol)}&exchange=${pane.exchange}&timeframe=${encodeURIComponent(tf)}&limit=260`,
+          { signal }
+        );
+        const json = await res.json();
+        const bars = (json.candles ?? []) as Candle[];
+        if (bars.length < 40) {
+          setProgress({ done: 1, total: 1, label: `${tf} (yetersiz veri)` });
+        } else {
           const base = detectPatterns(bars, {
-            swingStrength: job.swing,
+            swingStrength: patternSettings.swingStrength,
             twinTol: patternSettings.twinTol,
-            boxLookback: job.boxLb,
+            boxLookback: patternSettings.boxLookback,
           }).map((h) => ({
             ...h,
-            id:
-              job.scale === "major" ? `maj_${job.tf}_${h.id}` : `min_${job.tf}_${h.id}`,
-            scale: job.scale,
-            timeframe: job.tf,
-            label:
-              job.scale === "major"
-                ? `${h.label} · ${job.tf}`
-                : h.label.includes("·")
-                  ? h.label
-                  : `${h.label} · ${job.tf}`,
-            detail:
-              job.scale === "major" ? `[Majör ${job.tf}] ${h.detail}` : h.detail,
+            id: `${tf}_${h.id}`,
+            timeframe: tf,
+            label: h.label.includes("·") ? h.label : `${h.label} · ${tf}`,
           }));
           const adv = detectAdvancedAsPatternHits(bars, {
-            swingStrength: job.swing,
+            swingStrength: patternSettings.swingStrength,
           }).map((h) => ({
             ...h,
-            id:
-              job.scale === "major" ? `maj_${job.tf}_${h.id}` : `min_${job.tf}_${h.id}`,
-            scale: job.scale,
-            timeframe: job.tf,
-            label:
-              job.scale === "major"
-                ? `${h.label.replace(/ · .*$/, "")} · ${job.tf}`
-                : h.label.includes("·")
-                  ? h.label
-                  : `${h.label} · ${job.tf}`,
-            detail:
-              job.scale === "major" ? `[Majör ${job.tf}] ${h.detail}` : h.detail,
+            id: `${tf}_${h.id}`,
+            timeframe: tf,
+            label: h.label.includes("·") ? h.label : `${h.label} · ${tf}`,
           }));
           all.push(...adv, ...base);
-        } catch (e) {
-          if (signal.aborted) break;
-          /* skip TF */
         }
-        setProgress({ done: i + 1, total: jobs.length, label: job.tf });
+      } catch (e) {
+        if (signal.aborted) {
+          setStatus("Tarama iptal edildi");
+          return;
+        }
       }
+      setProgress({ done: 1, total: 1, label: tf });
       if (signal.aborted) {
         setStatus("Tarama iptal edildi");
         return;
@@ -182,7 +120,7 @@ export function PatternPanel() {
       setPatterns(sliced);
       setStatus(
         sliced.length
-          ? `${sliced.length} formasyon · ${pane.symbol} · ${jobs.map((j) => j.tf).join(",")}`
+          ? `${sliced.length} formasyon · ${pane.symbol} · ${tf}`
           : `Formasyon bulunamadı · ${pane.symbol}`
       );
     } finally {
@@ -192,7 +130,6 @@ export function PatternPanel() {
     }
   }, [
     pane,
-    patternSettings.formationScale,
     patternSettings.swingStrength,
     patternSettings.twinTol,
     patternSettings.boxLookback,
@@ -222,27 +159,11 @@ export function PatternPanel() {
         <div className="flex flex-col h-full min-h-0 p-2 gap-2">
           <div className="text-xs font-medium">Formasyonlar — {pane?.symbol}</div>
           <p className="text-2xs text-desk-muted">
-            Minör: grafik TF. Majör: 1D / 3D / 1W (yüksek swing). Tara ile tarayın;
-            tıklayınca çizilir, majörde TF o periyoda geçer. Hard refresh overlay&apos;i
-            temizler (pane/layout localStorage&apos;da kalır); izleme listesi ve
-            scriptler /api/store üzerinden yeniden yüklenir — sıfırlanma değil.
+            Seçili grafik TF üzerinde tarar. Tara ile tarayın; tıklayınca çizilir.
+            Hard refresh overlay&apos;i temizler (pane/layout localStorage&apos;da
+            kalır); izleme listesi ve scriptler /api/store üzerinden yeniden
+            yüklenir — sıfırlanma değil.
           </p>
-
-          <div className="flex gap-1 flex-wrap">
-            {SCALE_CHIPS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={clsx(
-                  "btn text-2xs",
-                  (patternSettings.formationScale ?? "both") === c.id && "btn-accent"
-                )}
-                onClick={() => setPatternSettings({ formationScale: c.id })}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
 
           <div className="grid grid-cols-3 gap-1 text-2xs">
             <label className="text-desk-muted">
@@ -330,7 +251,7 @@ export function PatternPanel() {
           {status && <p className="text-2xs text-desk-muted">{status}</p>}
 
           <div className="flex-1 overflow-y-auto space-y-2">
-            {visible.map((h) => (
+            {patterns.map((h) => (
               <button
                 key={h.id}
                 type="button"
@@ -349,26 +270,20 @@ export function PatternPanel() {
                     {(h.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
-                <div className="flex gap-2 mt-0.5 text-2xs text-desk-muted">
-                  <span
-                    className={clsx(
-                      "uppercase tracking-wide",
-                      h.scale === "major" ? "text-desk-accent" : ""
-                    )}
-                  >
-                    {h.scale === "major" ? "Majör" : "Minör"}
-                    {h.timeframe ? ` · ${h.timeframe}` : ""}
-                  </span>
-                </div>
+                {h.timeframe && (
+                  <div className="flex gap-2 mt-0.5 text-2xs text-desk-muted">
+                    <span className="uppercase tracking-wide">{h.timeframe}</span>
+                  </div>
+                )}
                 <div className="text-2xs text-desk-muted mt-0.5">{h.detail}</div>
                 <div className="text-2xs text-desk-muted mt-1">
                   {h.drawings.length} çizim · {h.type}
                 </div>
               </button>
             ))}
-            {!visible.length && !scanning && (
+            {!patterns.length && !scanning && (
               <div className="text-2xs text-desk-muted">
-                Ölçek seçip Tara — canlı tarama yok; yalnızca butonla çalışır.
+                Tara — canlı tarama yok; yalnızca butonla çalışır.
               </div>
             )}
           </div>

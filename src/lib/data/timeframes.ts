@@ -269,9 +269,3 @@ export function yahooParamsForTimeframe(tf: string): {
   return { interval: "1d", range: "1y" };
 }
 
-export const MAJOR_TIMEFRAMES = ["1d", "3d", "1w"] as const;
-export type MajorTimeframe = (typeof MAJOR_TIMEFRAMES)[number];
-
-export function majorSwingStrength(base: number): number {
-  return Math.min(5, Math.max(3, base + 1));
-}

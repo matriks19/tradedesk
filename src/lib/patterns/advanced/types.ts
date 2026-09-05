@@ -68,7 +68,6 @@ export interface AdvancedPatternHit {
   tStart: number;
   tEnd: number;
   drawings: PatternDrawing[];
-  scale?: "minor" | "major";
   timeframe?: string;
 }
 
@@ -84,7 +83,6 @@ export function toPatternHit(a: AdvancedPatternHit): PatternHit {
     tEnd: a.tEnd,
     drawings: a.drawings,
     advanced: a,
-    scale: a.scale,
     timeframe: a.timeframe,
   };
 }
