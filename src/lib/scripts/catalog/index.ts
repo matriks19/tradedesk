@@ -391,6 +391,115 @@ plotshape(bull, "HA↑", style=triangleup, color=#26a69a)
 plotshape(bear, "HA↓", style=triangledown, color=#ef5350)
 `,
   },
+  {
+    id: "jurik-kase-stoch-notes",
+    name: "Jurik Kase Stoch Notes",
+    category: "Jurik / Loxx",
+    description:
+      "Built-in jurikKaseStoch / Pro preferred. This TD sketch mirrors permission zones. Inspired by Loxx Jurik/Kase concepts — community reconstructions, not affiliated.",
+    tags: ["jurik", "kase", "stochastic", "loxx"],
+    popular: true,
+    sourceNote:
+      "Inspired by Loxx Jurik/Kase concepts — community reconstructions, not affiliated. Prefer builtin jurikKaseStoch.",
+    tdCode: `//@version=td1
+r = rsi(close, 14)
+k = sma(r, 5)
+d = sma(k, 3)
+plot(k, "KaseK~", color=#2962ff)
+plot(d, "Signal", color=#ff6d00)
+hline(20, "Lo2", color=#26a69a)
+hline(80, "Hi2", color=#ef5350)
+hline(10, "Lo", color=#78909c)
+hline(90, "Hi", color=#78909c)
+bull = crossover(k, 20)
+bear = crossunder(k, 80)
+plotshape(bull, "BullPerm", style=triangleup, color=#26a69a)
+plotshape(bear, "BearPerm", style=triangledown, color=#ef5350)
+`,
+  },
+  {
+    id: "jma-ribbon-notes",
+    name: "JMA Ribbon Notes",
+    category: "Jurik / Loxx",
+    description:
+      "Use builtin jmaRibbon for full JMA (community). EMA ribbon sketch as fallback. Inspired by Loxx Jurik concepts — not affiliated.",
+    tags: ["jma", "jurik", "ribbon", "loxx"],
+    sourceNote:
+      "Inspired by Loxx Jurik/Kase concepts — community reconstructions, not affiliated.",
+    tdCode: `//@version=td1
+e8 = ema(close, 8)
+e13 = ema(close, 13)
+e21 = ema(close, 21)
+e34 = ema(close, 34)
+e55 = ema(close, 55)
+plot(e8, "JMA~8", color=#26a69a)
+plot(e13, "JMA~13", color=#66bb6a)
+plot(e21, "JMA~21", color=#ffeb3b)
+plot(e34, "JMA~34", color=#ff6d00)
+plot(e55, "JMA~55", color=#ef5350)
+`,
+  },
+  {
+    id: "beluga-momentum-notes",
+    name: "Beluga Momentum Notes",
+    category: "BigBeluga / SMC",
+    description:
+      "Prefer builtin nautilusLike. RSI+MFI blend sketch. Inspired by BigBeluga SMC concepts — community reconstructions, not affiliated.",
+    tags: ["bigbeluga", "nautilus", "momentum", "smc"],
+    popular: true,
+    sourceNote:
+      "Inspired by BigBeluga SMC concepts — community reconstructions, not affiliated. Prefer builtin nautilusLike.",
+    tdCode: `//@version=td1
+r = rsi(close, 14)
+plot(r, "BelugaMom~", color=#2962ff)
+hline(80, "ExhUp", color=#ef5350)
+hline(20, "ExhLow", color=#26a69a)
+hline(50, "Mid", color=#8b95a8)
+bull = crossover(r, 20)
+bear = crossunder(r, 80)
+plotshape(bull, "BM↑", style=triangleup, color=#26a69a)
+plotshape(bear, "BM↓", style=triangledown, color=#ef5350)
+`,
+  },
+  {
+    id: "smc-premium-discount-notes",
+    name: "SMC Premium/Discount Notes",
+    category: "BigBeluga / SMC",
+    description:
+      "Prefer builtin premiumDiscount / orderBlocks / fairValueGaps. Inspired by BigBeluga SMC concepts — not affiliated.",
+    tags: ["smc", "premium", "discount", "bigbeluga"],
+    sourceNote:
+      "Inspired by BigBeluga SMC concepts — community reconstructions, not affiliated.",
+    tdCode: `//@version=td1
+hi = highest(high, 50)
+lo = lowest(low, 50)
+mid = hi.map((v, i) => v != null && lo[i] != null ? (v + lo[i]) / 2 : null)
+prem = hi.map((v, i) => v != null && lo[i] != null ? lo[i] + (v - lo[i]) * 0.7 : null)
+disc = hi.map((v, i) => v != null && lo[i] != null ? lo[i] + (v - lo[i]) * 0.3 : null)
+plot(hi, "RangeHigh", color=#ef535088)
+plot(prem, "Premium", color=#ef5350)
+plot(mid, "EQ", color=#2962ff)
+plot(disc, "Discount", color=#26a69a)
+plot(lo, "RangeLow", color=#26a69a88)
+`,
+  },
+  {
+    id: "voltix-bands-notes",
+    name: "Voltix-like Bands Notes",
+    category: "BigBeluga / SMC",
+    description:
+      "Prefer builtin voltixBands (JMA + adaptive ATR). Inspired by BigBeluga concepts — not affiliated.",
+    tags: ["voltix", "bands", "bigbeluga", "atr"],
+    sourceNote:
+      "Inspired by BigBeluga SMC concepts — community reconstructions, not affiliated.",
+    tdCode: `//@version=td1
+[mid, upper, lower] = bollinger(close, 20, 1.8)
+plot(mid, "Voltix~Mid", color=#2962ff)
+plot(upper, "Voltix~Up", color=#ef5350)
+plot(lower, "Voltix~Low", color=#26a69a)
+`,
+  },
+
 ];
 
 export const POPULAR_CATALOG_IDS = COMMUNITY_LIBRARY.filter((e) => e.popular).map(

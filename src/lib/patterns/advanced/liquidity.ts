@@ -208,6 +208,185 @@ export function detectLiquidity(candles: Candle[], swingStrength = 2): AdvancedP
     }
   }
 
-  hits.sort((a, b) => b.confidence - a.confidence || b.tEnd - a.tEnd);
+
+  // Order Blocks (swing + impulse) — boxes for PatternOverlay
+  const atrApprox = (() => {
+    let s = 0;
+    const m = Math.min(20, candles.length);
+    for (let i = candles.length - m; i < candles.length; i++) s += candles[i].high - candles[i].low;
+    return s / m || 1;
+  })();
+  for (let i = highs.length - 1; i >= Math.max(0, highs.length - 5); i--) {
+    const h = highs[i];
+    const idx = candles.findIndex((c) => c.time === h.time);
+    if (idx < 0 || idx >= candles.length - 2) continue;
+    let impulse = false;
+    for (let j = idx + 1; j <= Math.min(candles.length - 1, idx + 4); j++) {
+      if (h.price - candles[j].close > 1.2 * atrApprox) {
+        impulse = true;
+        break;
+      }
+    }
+    if (!impulse) continue;
+    const c = candles[idx];
+    const top = c.high;
+    const bot = Math.min(c.open, c.close);
+    hits.push({
+      id: uid("ob_bear"),
+      family: "liquidity",
+      name: "order_block",
+      label: "Order Block ↓",
+      direction: "bear",
+      confidence: 0.62,
+      entry: last.close,
+      tp1: bot - atrApprox,
+      sl: top,
+      detail: "Bearish OB from swing high + impulse",
+      tStart: c.time,
+      tEnd: last.time,
+      drawings: [
+        { id: uid("b"), kind: "box", t1: c.time, t2: last.time, price1: top, price2: bot, color: "#ef5350", label: "OB↓" },
+      ],
+    });
+    break;
+  }
+  for (let i = lows.length - 1; i >= Math.max(0, lows.length - 5); i--) {
+    const l = lows[i];
+    const idx = candles.findIndex((c) => c.time === l.time);
+    if (idx < 0 || idx >= candles.length - 2) continue;
+    let impulse = false;
+    for (let j = idx + 1; j <= Math.min(candles.length - 1, idx + 4); j++) {
+      if (candles[j].close - l.price > 1.2 * atrApprox) {
+        impulse = true;
+        break;
+      }
+    }
+    if (!impulse) continue;
+    const c = candles[idx];
+    const top = Math.max(c.open, c.close);
+    const bot = c.low;
+    hits.push({
+      id: uid("ob_bull"),
+      family: "liquidity",
+      name: "order_block",
+      label: "Order Block ↑",
+      direction: "bull",
+      confidence: 0.62,
+      entry: last.close,
+      tp1: top + atrApprox,
+      sl: bot,
+      detail: "Bullish OB from swing low + impulse",
+      tStart: c.time,
+      tEnd: last.time,
+      drawings: [
+        { id: uid("b"), kind: "box", t1: c.time, t2: last.time, price1: top, price2: bot, color: "#26a69a", label: "OB↑" },
+      ],
+    });
+    break;
+  }
+
+  // Fair Value Gaps (3-candle) — recent unfilled
+  for (let i = candles.length - 2; i >= Math.max(2, candles.length - 40); i--) {
+    const c0 = candles[i - 2];
+    const c2 = candles[i];
+    if (c0.high < c2.low) {
+      const top = c2.low;
+      const bot = c0.high;
+      let filled = false;
+      for (let j = i + 1; j < candles.length; j++) {
+        if (candles[j].low <= bot) {
+          filled = true;
+          break;
+        }
+      }
+      if (!filled) {
+        hits.push({
+          id: uid("fvg_b"),
+          family: "liquidity",
+          name: "fair_value_gap",
+          label: "FVG ↑",
+          direction: "bull",
+          confidence: 0.6,
+          entry: last.close,
+          tp1: top,
+          sl: bot - atrApprox * 0.5,
+          detail: "Bullish fair value gap",
+          tStart: c0.time,
+          tEnd: last.time,
+          drawings: [
+            { id: uid("b"), kind: "box", t1: c0.time, t2: last.time, price1: top, price2: bot, color: "#26a69a", label: "FVG↑" },
+          ],
+        });
+        break;
+      }
+    }
+  }
+  for (let i = candles.length - 2; i >= Math.max(2, candles.length - 40); i--) {
+    const c0 = candles[i - 2];
+    const c2 = candles[i];
+    if (c0.low > c2.high) {
+      const top = c0.low;
+      const bot = c2.high;
+      let filled = false;
+      for (let j = i + 1; j < candles.length; j++) {
+        if (candles[j].high >= top) {
+          filled = true;
+          break;
+        }
+      }
+      if (!filled) {
+        hits.push({
+          id: uid("fvg_s"),
+          family: "liquidity",
+          name: "fair_value_gap",
+          label: "FVG ↓",
+          direction: "bear",
+          confidence: 0.6,
+          entry: last.close,
+          tp1: bot,
+          sl: top + atrApprox * 0.5,
+          detail: "Bearish fair value gap",
+          tStart: c0.time,
+          tEnd: last.time,
+          drawings: [
+            { id: uid("b"), kind: "box", t1: c0.time, t2: last.time, price1: top, price2: bot, color: "#ef5350", label: "FVG↓" },
+          ],
+        });
+        break;
+      }
+    }
+  }
+
+  // Premium / discount sketch from last 50-bar range
+  if (candles.length >= 50) {
+    const slice = candles.slice(-50);
+    const hi = Math.max(...slice.map((c) => c.high));
+    const lo = Math.min(...slice.map((c) => c.low));
+    const mid = (hi + lo) / 2;
+    const prem = lo + (hi - lo) * 0.7;
+    const disc = lo + (hi - lo) * 0.3;
+    hits.push({
+      id: uid("pd"),
+      family: "structure",
+      name: "premium_discount",
+      label: last.close > prem ? "Premium zone" : last.close < disc ? "Discount zone" : "Equilibrium",
+      direction: last.close < disc ? "bull" : last.close > prem ? "bear" : "neutral",
+      confidence: 0.55,
+      entry: last.close,
+      tp1: mid,
+      sl: last.close > mid ? hi : lo,
+      detail: "Range premium/discount",
+      tStart: slice[0].time,
+      tEnd: last.time,
+      drawings: [
+        { id: uid("h"), kind: "hline", t1: slice[0].time, t2: last.time, price1: mid, price2: mid, color: "#2962ff", label: "EQ", dashed: true },
+        { id: uid("h"), kind: "hline", t1: slice[0].time, t2: last.time, price1: prem, price2: prem, color: "#ef535088", label: "Prem", dashed: true },
+        { id: uid("h"), kind: "hline", t1: slice[0].time, t2: last.time, price1: disc, price2: disc, color: "#26a69a88", label: "Disc", dashed: true },
+      ],
+    });
+  }
+
+
+    hits.sort((a, b) => b.confidence - a.confidence || b.tEnd - a.tEnd);
   return hits.slice(0, 12);
 }

@@ -85,3 +85,11 @@ Script tab → **Kütüphane**: browse/search curated TD ports (RSI Divergence, 
 2. Script tab → İçe aktar → paste → Dönüştür & yükle (TD)
 3. Kaydet → Aktif grafiğe uygula
 4. Review warnings for dropped Pine APIs
+
+
+## Jurik / Loxx + BigBeluga-inspired suites
+- **Jurik / Loxx tarzı** builtins: JMA (community), Double JMA, JMA Ribbon, Jurik Filter Bands / Volty, Jurik RSI/RSX, Jurik MACD/CCI/Bollinger, Adaptive JMA, QQE (Jurik RSI), SuperSmoother, Jurik Stoch, Kase Stoch, **Jurik Kase Stochastic** (+ Pro).
+- **BigBeluga / SMC tarzı** builtins: Order Blocks, Fair Value Gaps, BOS/CHoCH, Equal Highs/Lows, Premium/Discount, Liquidity Sweep, Beluga Momentum (Nautilus-like), Voltix-like Bands, Flow Trend, Money Flow Composite, Channel Detection, High Volume Points.
+- Attribution: *Inspired by Loxx Jurik/Kase concepts / BigBeluga SMC concepts — community reconstructions, not affiliated.*
+- **JMA (community)** = widely circulated 3-stage adaptive filter reconstruction (phase, length, power/volty) — not commercial Jurik Research software.
+- Pattern overlay also draws OB / FVG / premium-discount sketches via advanced liquidity detectors.

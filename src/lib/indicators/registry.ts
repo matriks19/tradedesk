@@ -99,6 +99,40 @@ import {
   zigzag,
   zlema,
 } from "./math";
+import {
+  adaptiveJma,
+  doubleJma,
+  jma,
+  jmaRibbon,
+  jurikBollinger,
+  jurikCci,
+  jurikFilterBands,
+  jurikKaseStoch,
+  jurikKaseStochPro,
+  jurikMacd,
+  jurikQqe,
+  jurikRsi,
+  jurikRsx,
+  jurikStoch,
+  jurikVolty,
+  kaseStoch,
+  superSmoother,
+  type JurikSmoothMode,
+} from "./jurik";
+import {
+  bosChoch,
+  channelDetect,
+  equalHighsLows,
+  fairValueGaps,
+  flowTrend,
+  highVolumePoints,
+  liquiditySweep,
+  moneyFlowComposite,
+  nautilusLike,
+  orderBlocks,
+  premiumDiscount,
+  voltixBands,
+} from "./beluga";
 
 export interface PlotSeries {
   id: string;
@@ -141,6 +175,26 @@ function src(def: string = "close") {
     options: SOURCE_OPTIONS,
   };
 }
+
+const CRED_JURIK =
+  "Inspired by Loxx Jurik/Kase concepts — community reconstructions, not affiliated. JMA = JMA (community).";
+const CRED_BELUGA =
+  "Inspired by BigBeluga SMC concepts — community reconstructions, not affiliated.";
+
+function sel(
+  key: string,
+  label: string,
+  def: string,
+  options: { value: string; label: string }[]
+) {
+  return { key, label, type: "select" as const, default: def, options };
+}
+
+const SMOOTH_MODE = sel("smoothMode", "Smooth", "jma", [
+  { value: "jma", label: "JMA (community)" },
+  { value: "jurikLite", label: "Jurik-lite" },
+  { value: "ema", label: "EMA" },
+]);
 
 export const BUILTIN_LIST: IndicatorMeta[] = [
   // —— Hareketli Ortalamalar (ma)
@@ -248,6 +302,39 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "lowest", label: "Lowest Low", category: "other", pane: "main", acceptsSeries: true, primarySeriesKey: "lo", inputs: [num("period", "Period", 20), src()] },
   { id: "zigzag", label: "ZigZag", category: "other", pane: "main", acceptsSeries: false, primarySeriesKey: "zz", inputs: [num("pct", "Deviation %", 5, 0.5, 50, 0.5)] },
   { id: "cumDelta", label: "Cumulative Delta (legacy)", category: "other", pane: "sub", acceptsSeries: false, primarySeriesKey: "cd", inputs: [] },
+
+  // —— Jurik / Loxx tarzı
+  { id: "jma", label: "JMA (community)", category: "jurik", pane: "main", acceptsSeries: true, primarySeriesKey: "jma", description: CRED_JURIK, inputs: [num("period", "Length", 14), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), src()] },
+  { id: "doubleJma", label: "Double JMA", category: "jurik", pane: "main", acceptsSeries: true, primarySeriesKey: "djma", description: CRED_JURIK, inputs: [num("period", "Length", 14), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), src()] },
+  { id: "jmaRibbon", label: "JMA Ribbon", category: "jurik", pane: "main", acceptsSeries: true, primarySeriesKey: "j8", description: CRED_JURIK, inputs: [num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), src()] },
+  { id: "jurikFilterBands", label: "Jurik Filter Bands", category: "jurik", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_JURIK, inputs: [num("period", "Length", 14), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("mult", "Band Mult", 1.5, 0.2, 10, 0.1), src()] },
+  { id: "jurikVolty", label: "Jurik Volty (approx)", category: "jurik", pane: "sub", acceptsSeries: true, primarySeriesKey: "volty", description: CRED_JURIK, inputs: [num("period", "Length", 20), src()] },
+  { id: "jurikRsi", label: "Jurik RSI", category: "jurik", pane: "sub", acceptsSeries: true, primarySeriesKey: "jrsi", description: CRED_JURIK, inputs: [num("rsiLen", "RSI Length", 14), num("jmaLen", "JMA Length", 8), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), src()] },
+  { id: "jurikRsx", label: "Jurik RSX-style", category: "jurik", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsx", description: CRED_JURIK, inputs: [num("period", "Length", 14), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), src()] },
+  { id: "jurikMacd", label: "Jurik MACD", category: "jurik", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: CRED_JURIK, inputs: [num("fast", "Fast", 12), num("slow", "Slow", 26), num("signal", "Signal", 9), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), src()] },
+  { id: "jurikCci", label: "Jurik CCI", category: "jurik", pane: "sub", acceptsSeries: false, primarySeriesKey: "cci", description: CRED_JURIK, inputs: [num("period", "Period", 20), num("jmaLen", "JMA Length", 8), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1)] },
+  { id: "jurikBollinger", label: "Jurik Bollinger", category: "jurik", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_JURIK, inputs: [num("period", "Length", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), src()] },
+  { id: "adaptiveJma", label: "Adaptive JMA", category: "jurik", pane: "main", acceptsSeries: true, primarySeriesKey: "ajma", description: CRED_JURIK, inputs: [num("period", "Base Length", 14), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("atrLen", "ATR Length", 14), src()] },
+  { id: "jurikQqe", label: "QQE (Jurik RSI)", category: "jurik", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", description: CRED_JURIK, inputs: [num("rsiLen", "RSI", 14), num("jmaLen", "JMA", 8), num("smoothLen", "Smooth", 5), num("qqeFactor", "QQE Factor", 4.236, 0.5, 20, 0.001), num("phase", "Phase", 50, -100, 100, 1), src()] },
+  { id: "superSmoother", label: "Ehlers SuperSmoother", category: "jurik", pane: "main", acceptsSeries: true, primarySeriesKey: "ss", description: "Ehlers 2-pole SuperSmoother helper for Jurik suite.", inputs: [num("period", "Length", 10), src()] },
+  { id: "jurikStoch", label: "Jurik Stochastic", category: "jurik", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: CRED_JURIK, inputs: [num("kLen", "%K", 14), num("dLen", "%D", 3), num("jmaLen", "JMA Length", 8), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), SMOOTH_MODE] },
+  { id: "kaseStoch", label: "Kase Permission Stoch", category: "jurik", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: CRED_JURIK, inputs: [num("cycle", "Cycle", 5), num("kLen", "%K", 8), num("dLen", "%D", 3)] },
+  { id: "jurikKaseStoch", label: "Jurik Kase Stochastic", category: "jurik", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: CRED_JURIK + " Kase permission TF + JMA smooth + bands/signal/hist.", inputs: [num("cycle", "Cycle", 5), num("kLen", "%K", 8), num("dLen", "%D", 3), num("jmaLen", "JMA Length", 5), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("levelLo", "Level Lo", 10, 0, 50, 1), num("levelLo2", "Level Lo2", 20, 0, 50, 1), num("levelHi2", "Level Hi2", 80, 50, 100, 1), num("levelHi", "Level Hi", 90, 50, 100, 1), SMOOTH_MODE] },
+  { id: "jurikKaseStochPro", label: "Jurik Kase Stoch Pro", category: "jurik", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: CRED_JURIK + " Dual-cycle permission + full plots.", inputs: [num("cycle", "Fast Cycle", 5), num("cycleSlow", "Slow Cycle", 10), num("kLen", "%K", 8), num("dLen", "%D", 3), num("jmaLen", "JMA Length", 5), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("levelLo", "Level Lo", 10, 0, 50, 1), num("levelLo2", "Level Lo2", 20, 0, 50, 1), num("levelHi2", "Level Hi2", 80, 50, 100, 1), num("levelHi", "Level Hi", 90, 50, 100, 1), SMOOTH_MODE] },
+
+  // —— BigBeluga / SMC tarzı
+  { id: "orderBlocks", label: "Order Blocks", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", description: CRED_BELUGA, inputs: [num("swing", "Swing", 3), num("impulseMult", "Impulse ATR×", 1.2, 0.5, 5, 0.1)] },
+  { id: "fairValueGaps", label: "Fair Value Gaps", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "bullTop", description: CRED_BELUGA, inputs: [num("extend", "Extend Bars", 20)] },
+  { id: "bosChoch", label: "BOS / CHoCH", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "bos", description: CRED_BELUGA, inputs: [num("swing", "Swing", 3)] },
+  { id: "equalHighsLows", label: "Equal Highs/Lows", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "eqh", description: CRED_BELUGA, inputs: [num("swing", "Swing", 3), num("tolPct", "Tolerance %", 0.15, 0.01, 2, 0.01)] },
+  { id: "premiumDiscount", label: "Premium / Discount", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "equilibrium", description: CRED_BELUGA, inputs: [num("lookback", "Lookback", 50)] },
+  { id: "liquiditySweep", label: "Liquidity Sweep", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "state", description: CRED_BELUGA, inputs: [num("lookback", "Lookback", 20)] },
+  { id: "nautilusLike", label: "Beluga Momentum (Nautilus-like)", category: "bigbeluga", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: CRED_BELUGA + " Original RSI+MFI+trend blend.", inputs: [num("period", "Length", 14), num("smooth", "Smooth", 5)] },
+  { id: "voltixBands", label: "Voltix-like Bands", category: "bigbeluga", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_BELUGA, inputs: [num("period", "Length", 20), num("mult", "Mult", 1.8, 0.5, 10, 0.1), num("phase", "Phase", 50, -100, 100, 1), src()] },
+  { id: "flowTrend", label: "Flow Trend", category: "bigbeluga", pane: "sub", acceptsSeries: false, primarySeriesKey: "flow", description: CRED_BELUGA, inputs: [num("period", "Length", 14)] },
+  { id: "moneyFlowComposite", label: "Money Flow Composite", category: "bigbeluga", pane: "sub", acceptsSeries: false, primarySeriesKey: "flow", description: CRED_BELUGA, inputs: [num("period", "Length", 14)] },
+  { id: "channelDetect", label: "Channel Detection", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", description: CRED_BELUGA, inputs: [num("period", "Length", 20)] },
+  { id: "highVolumePoints", label: "High Volume Points", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "bullVol", description: CRED_BELUGA, inputs: [num("volMult", "Vol Mult", 2, 1, 10, 0.1), num("swing", "Swing", 2)] },
 ];
 
 export const BUILTIN_META: Record<BuiltinIndicatorId, IndicatorMeta> =
@@ -273,6 +360,8 @@ export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
   volume: "Hacim",
   bill_williams: "Bill Williams",
   levels: "Pivot / Seviye",
+  jurik: "Jurik / Loxx tarzı",
+  bigbeluga: "BigBeluga / SMC tarzı",
   other: "Diğer",
 };
 
@@ -285,6 +374,8 @@ export const CATEGORY_ORDER: IndicatorCategory[] = [
   "volume",
   "bill_williams",
   "levels",
+  "jurik",
+  "bigbeluga",
   "other",
 ];
 
@@ -1113,6 +1204,404 @@ export function computeBuiltin(
     case "cumDelta": {
       const v = cumDelta(candles);
       push([line(inst, "cd", "sub", color, candles, v, "Cum Delta")], { cd: v });
+      break;
+    }
+    case "jma": {
+      const period = n(p, "period", 14);
+      const v = jma(values, period, n(p, "phase", 50), n(p, "power", 2));
+      push([line(inst, "jma", "main", color, candles, v, `JMA(${period})`)], { jma: v });
+      break;
+    }
+    case "doubleJma": {
+      const period = n(p, "period", 14);
+      const v = doubleJma(values, period, n(p, "phase", 50), n(p, "power", 2));
+      push([line(inst, "djma", "main", color, candles, v, `DJMA(${period})`)], { djma: v });
+      break;
+    }
+    case "jmaRibbon": {
+      const phase = n(p, "phase", 50);
+      const power = n(p, "power", 2);
+      const lens = [8, 13, 21, 34, 55];
+      const cols = ["#26a69a", "#66bb6a", "#ffeb3b", "#ff6d00", "#ef5350"];
+      const ribs = jmaRibbon(values, lens, phase, power);
+      const plots = ribs.map((v, i) =>
+        line(inst, `j${lens[i]}`, "main", cols[i], candles, v, `JMA${lens[i]}`)
+      );
+      const storeMap: Record<string, (number | null)[]> = {};
+      ribs.forEach((v, i) => {
+        storeMap[`j${lens[i]}`] = v;
+      });
+      push(plots, storeMap);
+      break;
+    }
+    case "jurikFilterBands": {
+      const b = jurikFilterBands(
+        candles,
+        values,
+        n(p, "period", 14),
+        n(p, "phase", 50),
+        n(p, "power", 2),
+        n(p, "mult", 1.5)
+      );
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, b.mid, "JF Mid"),
+          line(inst, "up", "main", "#ef5350", candles, b.upper, "JF Up"),
+          line(inst, "lo", "main", "#26a69a", candles, b.lower, "JF Low"),
+        ],
+        { mid: b.mid, upper: b.upper, lower: b.lower, volty: b.volty }
+      );
+      break;
+    }
+    case "jurikVolty": {
+      const period = n(p, "period", 20);
+      const v = jurikVolty(values, period);
+      push([line(inst, "volty", "sub", color, candles, v, `Volty(${period})`)], { volty: v });
+      break;
+    }
+    case "jurikRsi": {
+      const v = jurikRsi(
+        values,
+        n(p, "rsiLen", 14),
+        n(p, "jmaLen", 8),
+        n(p, "phase", 50),
+        n(p, "power", 2)
+      );
+      push([line(inst, "jrsi", "sub", color, candles, v, "Jurik RSI")], { jrsi: v });
+      break;
+    }
+    case "jurikRsx": {
+      const v = jurikRsx(values, n(p, "period", 14), n(p, "phase", 50), n(p, "power", 2));
+      push([line(inst, "rsx", "sub", color, candles, v, "RSX")], { rsx: v });
+      break;
+    }
+    case "jurikMacd": {
+      const m = jurikMacd(
+        values,
+        n(p, "fast", 12),
+        n(p, "slow", 26),
+        n(p, "signal", 9),
+        n(p, "phase", 50),
+        n(p, "power", 2)
+      );
+      push(
+        [
+          line(inst, "macd", "sub", "#2962ff", candles, m.macd, "J-MACD"),
+          line(inst, "sig", "sub", "#ff6d00", candles, m.signal, "Signal"),
+          hist(inst, "hist", "sub", "#26a69a", candles, m.hist, "Hist"),
+        ],
+        { macd: m.macd, signal: m.signal, hist: m.hist }
+      );
+      break;
+    }
+    case "jurikCci": {
+      const v = jurikCci(
+        candles,
+        n(p, "period", 20),
+        n(p, "jmaLen", 8),
+        n(p, "phase", 50),
+        n(p, "power", 2)
+      );
+      push([line(inst, "cci", "sub", color, candles, v, "Jurik CCI")], { cci: v });
+      break;
+    }
+    case "jurikBollinger": {
+      const b = jurikBollinger(
+        values,
+        n(p, "period", 20),
+        n(p, "mult", 2),
+        n(p, "phase", 50),
+        n(p, "power", 2)
+      );
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, b.mid, "JB Mid"),
+          line(inst, "up", "main", "#ef5350", candles, b.upper, "JB Up"),
+          line(inst, "lo", "main", "#26a69a", candles, b.lower, "JB Low"),
+        ],
+        { mid: b.mid, upper: b.upper, lower: b.lower }
+      );
+      break;
+    }
+    case "adaptiveJma": {
+      const v = adaptiveJma(
+        candles,
+        values,
+        n(p, "period", 14),
+        n(p, "phase", 50),
+        n(p, "power", 2),
+        n(p, "atrLen", 14)
+      );
+      push([line(inst, "ajma", "main", color, candles, v, "Adaptive JMA")], { ajma: v });
+      break;
+    }
+    case "jurikQqe": {
+      const q = jurikQqe(
+        values,
+        n(p, "rsiLen", 14),
+        n(p, "jmaLen", 8),
+        n(p, "smoothLen", 5),
+        n(p, "qqeFactor", 4.236),
+        n(p, "phase", 50),
+        2
+      );
+      push(
+        [
+          line(inst, "rsi", "sub", "#2962ff", candles, q.rsi, "J-RSI"),
+          line(inst, "trail", "sub", "#ff6d00", candles, q.trail, "Trail"),
+          line(inst, "up", "sub", "#ef535088", candles, q.upper, "QQE Up"),
+          line(inst, "lo", "sub", "#26a69a88", candles, q.lower, "QQE Low"),
+        ],
+        { rsi: q.rsi, trail: q.trail, upper: q.upper, lower: q.lower }
+      );
+      break;
+    }
+    case "superSmoother": {
+      const period = n(p, "period", 10);
+      const v = superSmoother(values, period);
+      push([line(inst, "ss", "main", color, candles, v, `SS(${period})`)], { ss: v });
+      break;
+    }
+    case "jurikStoch": {
+      const mode = String(p.smoothMode || "jma") as JurikSmoothMode;
+      const s = jurikStoch(
+        candles,
+        n(p, "kLen", 14),
+        n(p, "dLen", 3),
+        n(p, "jmaLen", 8),
+        n(p, "phase", 50),
+        n(p, "power", 2),
+        mode
+      );
+      push(
+        [
+          line(inst, "k", "sub", "#2962ff", candles, s.k, "%K"),
+          line(inst, "d", "sub", "#ff6d00", candles, s.d, "%D"),
+          line(inst, "sig", "sub", "#e040fb", candles, s.signal, "Signal"),
+        ],
+        { k: s.k, d: s.d, signal: s.signal }
+      );
+      break;
+    }
+    case "kaseStoch": {
+      const s = kaseStoch(candles, n(p, "cycle", 5), n(p, "kLen", 8), n(p, "dLen", 3));
+      push(
+        [
+          line(inst, "k", "sub", "#2962ff", candles, s.k, "Kase %K"),
+          line(inst, "d", "sub", "#ff6d00", candles, s.d, "Kase %D"),
+        ],
+        { k: s.k, d: s.d }
+      );
+      break;
+    }
+    case "jurikKaseStoch":
+    case "jurikKaseStochPro": {
+      const mode = String(p.smoothMode || "jma") as JurikSmoothMode;
+      const pro = inst.type === "jurikKaseStochPro";
+      const s = (pro ? jurikKaseStochPro : jurikKaseStoch)(candles, {
+        cycle: n(p, "cycle", 5),
+        cycleSlow: n(p, "cycleSlow", 10),
+        kLen: n(p, "kLen", 8),
+        dLen: n(p, "dLen", 3),
+        jmaLen: n(p, "jmaLen", 5),
+        phase: n(p, "phase", 50),
+        power: n(p, "power", 2),
+        smoothMode: mode,
+        levelLo: n(p, "levelLo", 10),
+        levelLo2: n(p, "levelLo2", 20),
+        levelHi2: n(p, "levelHi2", 80),
+        levelHi: n(p, "levelHi", 90),
+        dualCycle: pro,
+      });
+      const plots: PlotSeries[] = [
+        line(inst, "k", "sub", "#2962ff", candles, s.k, "JKS %K"),
+        line(inst, "d", "sub", "#ff6d00", candles, s.d, "%D"),
+        line(inst, "sig", "sub", "#e040fb", candles, s.signal, "Signal"),
+        hist(inst, "hist", "sub", "#26a69a", candles, s.hist, "Hist"),
+        line(inst, "lo", "sub", "#78909c55", candles, s.levelLo, "L10"),
+        line(inst, "lo2", "sub", "#78909c88", candles, s.levelLo2, "L20"),
+        line(inst, "hi2", "sub", "#78909c88", candles, s.levelHi2, "L80"),
+        line(inst, "hi", "sub", "#78909c55", candles, s.levelHi, "L90"),
+        line(inst, "bull", "sub", "#26a69a", candles, s.bullMark, "Bull"),
+        line(inst, "bear", "sub", "#ef5350", candles, s.bearMark, "Bear"),
+        line(inst, "state", "sub", "#ffeb3b88", candles, s.state, "State"),
+      ];
+      const storeMap: Record<string, (number | null)[]> = {
+        k: s.k,
+        d: s.d,
+        signal: s.signal,
+        hist: s.hist,
+        state: s.state,
+      };
+      if (s.kSlow) {
+        plots.push(line(inst, "kSlow", "sub", "#00bcd4", candles, s.kSlow, "Slow %K"));
+        storeMap.kSlow = s.kSlow;
+      }
+      push(plots, storeMap);
+      break;
+    }
+    case "orderBlocks": {
+      const o = orderBlocks(candles, n(p, "swing", 3), n(p, "impulseMult", 1.2));
+      push(
+        [
+          line(inst, "bullTop", "main", "#26a69a", candles, o.bullTop, "Bull OB Top"),
+          line(inst, "bullBot", "main", "#26a69a88", candles, o.bullBot, "Bull OB Bot"),
+          line(inst, "bearTop", "main", "#ef5350", candles, o.bearTop, "Bear OB Top"),
+          line(inst, "bearBot", "main", "#ef535088", candles, o.bearBot, "Bear OB Bot"),
+          line(inst, "mid", "main", "#8b95a8", candles, o.mid, "OB Mid"),
+        ],
+        { bullTop: o.bullTop, bullBot: o.bullBot, bearTop: o.bearTop, bearBot: o.bearBot, mid: o.mid }
+      );
+      break;
+    }
+    case "fairValueGaps": {
+      const f = fairValueGaps(candles, n(p, "extend", 20));
+      push(
+        [
+          line(inst, "bullTop", "main", "#26a69a", candles, f.bullTop, "FVG Bull Top"),
+          line(inst, "bullBot", "main", "#26a69a88", candles, f.bullBot, "FVG Bull Bot"),
+          line(inst, "bearTop", "main", "#ef5350", candles, f.bearTop, "FVG Bear Top"),
+          line(inst, "bearBot", "main", "#ef535088", candles, f.bearBot, "FVG Bear Bot"),
+        ],
+        { bullTop: f.bullTop, bullBot: f.bullBot, bearTop: f.bearTop, bearBot: f.bearBot }
+      );
+      break;
+    }
+    case "bosChoch": {
+      const b = bosChoch(candles, n(p, "swing", 3));
+      push(
+        [
+          line(inst, "bos", "main", "#26a69a", candles, b.bos, "BOS"),
+          line(inst, "choch", "main", "#ab47bc", candles, b.choch, "CHoCH"),
+          line(inst, "bias", "main", "#ffeb3b55", candles, b.bias, "Bias"),
+        ],
+        { bos: b.bos, choch: b.choch, bias: b.bias }
+      );
+      break;
+    }
+    case "equalHighsLows": {
+      const e = equalHighsLows(candles, n(p, "swing", 3), n(p, "tolPct", 0.15));
+      push(
+        [
+          line(inst, "eqh", "main", "#ffa726", candles, e.eqh, "EQH"),
+          line(inst, "eql", "main", "#29b6f6", candles, e.eql, "EQL"),
+        ],
+        { eqh: e.eqh, eql: e.eql }
+      );
+      break;
+    }
+    case "premiumDiscount": {
+      const pd = premiumDiscount(candles, n(p, "lookback", 50));
+      push(
+        [
+          line(inst, "high", "main", "#ef535088", candles, pd.high, "Range High"),
+          line(inst, "premium", "main", "#ef5350", candles, pd.premium, "Premium"),
+          line(inst, "equilibrium", "main", "#2962ff", candles, pd.equilibrium, "EQ"),
+          line(inst, "discount", "main", "#26a69a", candles, pd.discount, "Discount"),
+          line(inst, "low", "main", "#26a69a88", candles, pd.low, "Range Low"),
+        ],
+        {
+          high: pd.high,
+          premium: pd.premium,
+          equilibrium: pd.equilibrium,
+          discount: pd.discount,
+          low: pd.low,
+        }
+      );
+      break;
+    }
+    case "liquiditySweep": {
+      const ls = liquiditySweep(candles, n(p, "lookback", 20));
+      push(
+        [
+          line(inst, "swH", "main", "#ef5350", candles, ls.sweepHigh, "Sweep High"),
+          line(inst, "swL", "main", "#26a69a", candles, ls.sweepLow, "Sweep Low"),
+          line(inst, "state", "main", "#ffeb3b88", candles, ls.state, "State"),
+        ],
+        { sweepHigh: ls.sweepHigh, sweepLow: ls.sweepLow, state: ls.state }
+      );
+      break;
+    }
+    case "nautilusLike": {
+      const nm = nautilusLike(candles, n(p, "period", 14), n(p, "smooth", 5));
+      push(
+        [
+          line(inst, "osc", "sub", "#2962ff", candles, nm.osc, "Beluga Mom"),
+          line(inst, "sig", "sub", "#ff6d00", candles, nm.signal, "Signal"),
+          line(inst, "up", "sub", "#ef535055", candles, nm.upperEx, "Exh Up"),
+          line(inst, "lo", "sub", "#26a69a55", candles, nm.lowerEx, "Exh Low"),
+          line(inst, "mid", "sub", "#8b95a855", candles, nm.mid, "Mid"),
+        ],
+        { osc: nm.osc, signal: nm.signal, mid: nm.mid }
+      );
+      break;
+    }
+    case "voltixBands": {
+      // use resolved values via jma path inside helper — pass candles; length from params
+      const vb = voltixBands(candles, n(p, "period", 20), n(p, "mult", 1.8), n(p, "phase", 50));
+      // if series source, rebuild mid around values
+      const mid =
+        inst.source?.type === "indicator"
+          ? jma(values, n(p, "period", 20), n(p, "phase", 50), 2)
+          : vb.mid;
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, mid, "Voltix Mid"),
+          line(inst, "up", "main", "#ef5350", candles, vb.upper, "Voltix Up"),
+          line(inst, "lo", "main", "#26a69a", candles, vb.lower, "Voltix Low"),
+          line(inst, "up2", "main", "#ef535055", candles, vb.upper2, "Voltix Up2"),
+          line(inst, "lo2", "main", "#26a69a55", candles, vb.lower2, "Voltix Low2"),
+        ],
+        { mid, upper: vb.upper, lower: vb.lower, upper2: vb.upper2, lower2: vb.lower2 }
+      );
+      break;
+    }
+    case "flowTrend": {
+      const f = flowTrend(candles, n(p, "period", 14));
+      push(
+        [
+          line(inst, "flow", "sub", "#2962ff", candles, f.flow, "Flow"),
+          line(inst, "sig", "sub", "#ff6d00", candles, f.signal, "Signal"),
+          hist(inst, "hist", "sub", "#26a69a", candles, f.hist, "Hist"),
+        ],
+        { flow: f.flow, signal: f.signal, hist: f.hist }
+      );
+      break;
+    }
+    case "moneyFlowComposite": {
+      const m = moneyFlowComposite(candles, n(p, "period", 14));
+      push(
+        [
+          line(inst, "flow", "sub", "#2962ff", candles, m.flow, "MF Comp"),
+          line(inst, "sig", "sub", "#ff6d00", candles, m.signal, "Signal"),
+          line(inst, "mfi", "sub", "#00bcd488", candles, m.mfiLine, "MFI"),
+        ],
+        { flow: m.flow, signal: m.signal, mfi: m.mfiLine, cmf: m.cmfLine }
+      );
+      break;
+    }
+    case "channelDetect": {
+      const c = channelDetect(candles, n(p, "period", 20));
+      push(
+        [
+          line(inst, "up", "main", "#26a69a", candles, c.upper, "Chan Up"),
+          line(inst, "lo", "main", "#ef5350", candles, c.lower, "Chan Low"),
+          line(inst, "mid", "main", "#2962ff", candles, c.mid, "Chan Mid"),
+          line(inst, "reg", "main", "#e040fb", candles, c.reg, "Reg"),
+        ],
+        { upper: c.upper, lower: c.lower, mid: c.mid, reg: c.reg, width: c.width }
+      );
+      break;
+    }
+    case "highVolumePoints": {
+      const hv = highVolumePoints(candles, n(p, "volMult", 2), n(p, "swing", 2));
+      push(
+        [
+          line(inst, "bullVol", "main", "#26a69a", candles, hv.bullVol, "HV Bull"),
+          line(inst, "bearVol", "main", "#ef5350", candles, hv.bearVol, "HV Bear"),
+        ],
+        { bullVol: hv.bullVol, bearVol: hv.bearVol, volMa: hv.volMa }
+      );
       break;
     }
     default:

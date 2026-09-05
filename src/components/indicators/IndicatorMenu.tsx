@@ -139,10 +139,17 @@ export function IndicatorMenu({ open, onClose, onParentId, paneId }: Props) {
                     onClose();
                   }}
                 >
-                  <span className="font-medium">{m.label}</span>
-                  <span className="text-2xs text-desk-muted ml-2">
-                    {CATEGORY_LABELS[m.category]} · {m.pane}
-                  </span>
+                  <div>
+                    <span className="font-medium">{m.label}</span>
+                    <span className="text-2xs text-desk-muted ml-2">
+                      {CATEGORY_LABELS[m.category]} · {m.pane}
+                    </span>
+                    {m.description ? (
+                      <div className="text-2xs text-desk-muted/80 mt-0.5 line-clamp-2">
+                        {m.description}
+                      </div>
+                    ) : null}
+                  </div>
                 </button>
               </div>
             ))}

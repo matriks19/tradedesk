@@ -63,6 +63,8 @@ export type IndicatorCategory =
   | "volume"
   | "bill_williams"
   | "levels"
+  | "jurik"
+  | "bigbeluga"
   | "other";
 
 export type PriceField = "close" | "open" | "high" | "low" | "hl2" | "hlc3" | "ohlc4";
@@ -169,7 +171,38 @@ export type BuiltinIndicatorId =
   | "lowest"
   | "zigzag"
   // legacy alias kept for stored layouts
-  | "cumDelta";
+  | "cumDelta"
+  // Jurik / Loxx-style (community)
+  | "jma"
+  | "doubleJma"
+  | "jmaRibbon"
+  | "jurikFilterBands"
+  | "jurikVolty"
+  | "jurikRsi"
+  | "jurikRsx"
+  | "jurikMacd"
+  | "jurikCci"
+  | "jurikBollinger"
+  | "adaptiveJma"
+  | "jurikQqe"
+  | "superSmoother"
+  | "jurikStoch"
+  | "kaseStoch"
+  | "jurikKaseStoch"
+  | "jurikKaseStochPro"
+  // BigBeluga / SMC-inspired
+  | "orderBlocks"
+  | "fairValueGaps"
+  | "bosChoch"
+  | "equalHighsLows"
+  | "premiumDiscount"
+  | "liquiditySweep"
+  | "nautilusLike"
+  | "voltixBands"
+  | "flowTrend"
+  | "moneyFlowComposite"
+  | "channelDetect"
+  | "highVolumePoints";
 
 export interface IndicatorInputDef {
   key: string;
@@ -192,6 +225,8 @@ export interface IndicatorMeta {
   acceptsSeries?: boolean;
   /** Primary series key exposed for child indicators */
   primarySeriesKey?: string;
+  /** Optional help / attribution shown in menus */
+  description?: string;
 }
 
 export interface IndicatorInstance {
