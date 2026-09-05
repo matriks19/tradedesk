@@ -38,6 +38,7 @@ const SIGNAL_EXIT_PRESETS = new Set<StrategyPresetId>([
   "supertrendAdx",
   "adxPumpStages",
   "eliziEdgeFire",
+  "eliziEdgeExhaust",
   "codeStrategy",
 ]);
 

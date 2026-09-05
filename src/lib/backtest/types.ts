@@ -21,6 +21,7 @@ export type StrategyPresetId =
   | "supertrendAdx"
   | "adxPumpStages"
   | "eliziEdgeFire"
+  | "eliziEdgeExhaust"
   | "codeStrategy"
   | "custom";
 

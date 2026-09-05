@@ -188,7 +188,7 @@ export function StrategiesPanel() {
                     {s.category === "elizi" && (
                       <span
                         className="text-2xs px-1 rounded border border-fuchsia-500/45 text-fuchsia-300/95"
-                        title="Elizi Lab proprietary"
+                        title="Elizi Lab proprietary composite — not measured WR; validate in backtest"
                       >
                         ◈ Elizi
                       </span>

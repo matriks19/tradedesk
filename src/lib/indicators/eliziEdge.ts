@@ -11,14 +11,21 @@
  *   3) flowAgree      — candle direction × volume expansion (+1/−1/0), EMA-smoothed
  *   4) diAccel        — Δ(+DI − −DI) from adx(); optional 2nd diff diAccel2
  *   5) bbPressure     — Δ(%B) — band pressure velocity
- *   6) coherence      — fraction of {eff↑, surprise↑, flow, diAccel, bbPressure}
- *                       voting together (0–1)
+ *   6) coherence      — NON-tautological agreement (see below)
  *   7) edgeTemp       — 0–100 weighted composite, EMA-smoothed (main oscillator)
  *   8) edgeUp/edgeDown— coherence-weighted ±E directional mix (like ±DI)
  *   9) phase          — 0 cold / 1 probe / 2 armed / 3 fire / 4 exhaust (signed by bias)
+ *                       with hysteresis so fire/exhaust are reachable and sticky
+ *
+ * Coherence (hardened):
+ *   Bias is anchored on DI spread (structural lead), NOT on a majority of the
+ *   same votes that later count as “coherence”. Coherence then measures whether
+ *   independent energy (ER, surprise) and confirmers (flow, diAccel, bbPressure)
+ *   agree with that DI lead. Previously, bias = majority(flow,da,bp,spr) and
+ *   those same signs were re-counted as coherence → free votes that always fire.
  *
  * Defaults tuned for crypto 15m–1h.
- * Aliases: eliziEdge / eliziMirror (mirror = same compute; pane can mute raws)
+ * Aliases: eliziEdge / eliziMirror (mirror = same compute; pane may mute detail)
  */
 import type { Candle } from "@/lib/types";
 import { adx, atr, bbPercentB, closes, sma, volumeOsc } from "./math";
@@ -45,7 +52,7 @@ export interface EliziEdgeParams {
   effHigh?: number;
   /** Surprise “elevated” vote threshold in ATR units (default 0.85) */
   surpriseHigh?: number;
-  /** Coherence vote weight mix / probe gates */
+  /** Coherence gate for armed/fire (default 0.6) */
   coherenceArmed?: number;
   /** edgeTemp fire threshold 0–100 (default 62) */
   fireTemp?: number;
@@ -55,6 +62,11 @@ export interface EliziEdgeParams {
   probeTemp?: number;
   /** Include 2nd difference of DI spread in diAccel2 series */
   useSecondDiff?: boolean;
+  /**
+   * When true (default), plot math still computes all series; UI registry
+   * uses detailMode separately. Kept for API symmetry with eliziMirror.
+   */
+  detailMode?: boolean;
 }
 
 export interface EliziEdgeResult {
@@ -91,10 +103,12 @@ function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
 }
 
-function softNorm(x: number, scale: number): number {
-  const z = x / Math.max(scale, 1e-9);
-  const e2 = Math.exp(2 * clamp(z, -20, 20));
-  return (e2 - 1) / (e2 + 1); // [-1,1]
+/** Soft map |x|/scale → [0,1] via tanh; NaN-safe. */
+function softAbs01(x: number, scale: number): number {
+  if (!Number.isFinite(x) || !Number.isFinite(scale) || scale <= 0) return 0;
+  const z = Math.abs(x) / scale;
+  const e2 = Math.exp(2 * clamp(z, 0, 20));
+  return (e2 - 1) / (e2 + 1);
 }
 
 function emaNullable(
@@ -110,7 +124,7 @@ function emaNullable(
   let seedCount = 0;
   for (let i = 0; i < n; i++) {
     const v = values[i];
-    if (v == null) {
+    if (v == null || !Number.isFinite(v)) {
       out[i] = prev;
       continue;
     }
@@ -136,21 +150,21 @@ export function eliziEdge(
   candles: Candle[],
   params: EliziEdgeParams = {}
 ): EliziEdgeResult {
-  const erLen = params.erLen ?? 10;
-  const atrLen = params.atrLen ?? 14;
-  const adxPeriod = params.adxPeriod ?? 14;
-  const bbPeriod = params.bbPeriod ?? 20;
+  const erLen = Math.max(2, Math.floor(params.erLen ?? 10));
+  const atrLen = Math.max(1, Math.floor(params.atrLen ?? 14));
+  const adxPeriod = Math.max(2, Math.floor(params.adxPeriod ?? 14));
+  const bbPeriod = Math.max(2, Math.floor(params.bbPeriod ?? 20));
   const bbMult = params.bbMult ?? 2;
-  const volLen = params.volLen ?? 5;
-  const volLong = params.volLong ?? 10;
-  const flowSmooth = params.flowSmooth ?? 3;
-  const tempSmooth = params.tempSmooth ?? 4;
-  const effHigh = params.effHigh ?? 0.45;
-  const surpriseHigh = params.surpriseHigh ?? 0.85;
-  const coherenceArmed = params.coherenceArmed ?? 0.6;
-  const fireTemp = params.fireTemp ?? 62;
-  const armedTemp = params.armedTemp ?? 48;
-  const probeTemp = params.probeTemp ?? 32;
+  const volLen = Math.max(1, Math.floor(params.volLen ?? 5));
+  const volLong = Math.max(volLen + 1, Math.floor(params.volLong ?? 10));
+  const flowSmooth = Math.max(1, Math.floor(params.flowSmooth ?? 3));
+  const tempSmooth = Math.max(1, Math.floor(params.tempSmooth ?? 4));
+  const effHigh = clamp(params.effHigh ?? 0.45, 0.05, 1);
+  const surpriseHigh = Math.max(0.05, params.surpriseHigh ?? 0.85);
+  const coherenceArmed = clamp(params.coherenceArmed ?? 0.6, 0.1, 1);
+  const fireTemp = clamp(params.fireTemp ?? 62, 10, 100);
+  const armedTemp = clamp(params.armedTemp ?? 48, 5, fireTemp - 1);
+  const probeTemp = clamp(params.probeTemp ?? 32, 1, armedTemp - 1);
   const useSecondDiff = params.useSecondDiff !== false;
 
   const n = candles.length;
@@ -198,7 +212,7 @@ export function eliziEdge(
   const volSma = sma(vols, volLen);
   const volOsc = volumeOsc(candles, volLen, volLong);
 
-  // —— 1) pathEfficiency (Kaufman ER)
+  // —— 1) pathEfficiency (Kaufman ER) — closed-bar, no look-ahead
   for (let i = 0; i < n; i++) {
     if (i < erLen) continue;
     const net = Math.abs(c[i] - c[i - erLen]);
@@ -212,8 +226,10 @@ export function eliziEdge(
   // —— 2) volSurprise = |close−open| / ATR
   for (let i = 0; i < n; i++) {
     const a = atrSeries[i];
-    if (a == null || a <= 0) continue;
-    volSurprise[i] = Math.abs(candles[i].close - candles[i].open) / a;
+    if (a == null || !(a > 0) || !Number.isFinite(a)) continue;
+    const body = Math.abs(candles[i].close - candles[i].open);
+    if (!Number.isFinite(body)) continue;
+    volSurprise[i] = body / a;
   }
 
   // —— 3) flowAgree raw: direction vs volume expansion
@@ -230,12 +246,13 @@ export function eliziEdge(
     if (vs != null && vs > 0) {
       volExpand = vols[i] > vs ? 1 : vols[i] < vs * 0.85 ? -1 : 0;
     }
-    if (vo != null && Math.abs(vo) > 5) {
+    // Oscillator override only when clearly expanded/contracted
+    if (vo != null && Number.isFinite(vo) && Math.abs(vo) > 5) {
       volExpand = vo > 0 ? 1 : -1;
     }
     if (dir === 0 || volExpand === 0) flowRaw[i] = 0;
     else if (dir === volExpand) flowRaw[i] = dir;
-    else flowRaw[i] = 0;
+    else flowRaw[i] = 0; // conflict → neutral (no fake agreement)
   }
   const flowAgree = emaNullable(flowRaw, Math.max(2, flowSmooth));
 
@@ -263,7 +280,11 @@ export function eliziEdge(
     bbPressure[i] = (pctB[i] as number) - (pctB[i - 1] as number);
   }
 
-  // —— 6–9) coherence, edgeTemp, ±E, phase
+  // —— 6–8) coherence, edgeTemp, ±E  (bias = DI-anchored, not circular)
+  const FLOW_EPS = 0.12;
+  const DA_EPS = 0.35; // DI-spread points per bar
+  const BP_EPS = 0.02; // %B velocity
+
   for (let i = 0; i < n; i++) {
     const eff = pathEfficiency[i];
     const sur = volSurprise[i];
@@ -280,41 +301,84 @@ export function eliziEdge(
       spr == null
     )
       continue;
+    if (
+      !Number.isFinite(eff) ||
+      !Number.isFinite(sur) ||
+      !Number.isFinite(flow) ||
+      !Number.isFinite(da) ||
+      !Number.isFinite(bp) ||
+      !Number.isFinite(spr)
+    )
+      continue;
 
-    // Bias from DI spread + flow + bb pressure
-    const flowSign = Math.sign(flow);
-    const daSign = Math.sign(da);
-    const bpSign = Math.sign(bp);
-    const sprSign = Math.sign(spr);
+    // Bias: DI spread is the structural lead. Flow/da only break a near-flat DI.
+    // Track biasSource so the tie-break confirmer is NOT double-counted in coherence.
+    const sprDead = Math.abs(spr) < 1.5;
     let bias = 0;
-    const votes =
-      (sprSign !== 0 ? sprSign : 0) +
-      (flowSign !== 0 ? flowSign : 0) +
-      (daSign !== 0 ? daSign : 0) +
-      (bpSign !== 0 ? bpSign : 0);
-    if (votes > 0) bias = 1;
-    else if (votes < 0) bias = -1;
-    else if (sprSign !== 0) bias = sprSign;
+    let biasSource: "di" | "flow" | "da" | "none" = "none";
+    if (!sprDead) {
+      bias = Math.sign(spr);
+      biasSource = "di";
+    } else if (Math.abs(flow) >= FLOW_EPS) {
+      bias = Math.sign(flow);
+      biasSource = "flow";
+    } else if (Math.abs(da) >= DA_EPS) {
+      bias = Math.sign(da);
+      biasSource = "da";
+    }
     biasArr[i] = bias;
 
-    // Coherence votes (5 binary)
-    const effVote = (eff as number) >= effHigh ? 1 : 0;
-    const surVote = (sur as number) >= surpriseHigh ? 1 : 0;
-    const flowVote =
-      bias !== 0 && flowSign === bias ? 1 : flowSign === 0 ? 0 : 0;
-    const daVote = bias !== 0 && daSign === bias ? 1 : 0;
-    const bpVote = bias !== 0 && bpSign === bias ? 1 : 0;
+    // Coherence votes:
+    // energy: ER + surprise (always independent);
+    // confirmers: flow / diAccel / bb vs bias — skip the source that defined bias
+    // when DI is flat (avoids tautology).
+    const effVote = eff >= effHigh ? 1 : 0;
+    const surVote = sur >= surpriseHigh ? 1 : 0;
+    let flowVote = 0;
+    let daVote = 0;
+    let bpVote = 0;
+    if (bias !== 0) {
+      if (
+        biasSource !== "flow" &&
+        Math.abs(flow) >= FLOW_EPS &&
+        Math.sign(flow) === bias
+      )
+        flowVote = 1;
+      if (
+        biasSource !== "da" &&
+        Math.abs(da) >= DA_EPS &&
+        Math.sign(da) === bias
+      )
+        daVote = 1;
+      if (Math.abs(bp) >= BP_EPS && Math.sign(bp) === bias) bpVote = 1;
+      // When DI leads, all three confirmers may vote — that is real agreement.
+    } else {
+      // No lead: directional coherence = pairwise agreement among confirmers
+      const signs = [
+        Math.abs(flow) >= FLOW_EPS ? Math.sign(flow) : 0,
+        Math.abs(da) >= DA_EPS ? Math.sign(da) : 0,
+        Math.abs(bp) >= BP_EPS ? Math.sign(bp) : 0,
+      ].filter((s) => s !== 0);
+      if (signs.length >= 2) {
+        const up = signs.filter((s) => s > 0).length;
+        const agree = Math.max(up, signs.length - up) / signs.length;
+        const conf = agree >= 0.66 ? 1 : 0;
+        flowVote = conf;
+        daVote = conf;
+        bpVote = conf;
+      }
+    }
     const voteSum = effVote + surVote + flowVote + daVote + bpVote;
     const coh = voteSum / 5;
     coherence[i] = coh;
 
-    // edgeTemp 0–100 composite (unsigned heat), then signed by bias for ±E
+    // edgeTemp 0–100 — stable soft norms (not raw unbounded DI/%B)
     // Weights: efficiency 0.22, surprise 0.22, |flow| 0.18, |diAccel| 0.22, |bbPressure| 0.16
-    const effN = clamp(eff as number, 0, 1);
-    const surN = clamp((sur as number) / 2.2, 0, 1);
-    const flowN = clamp(Math.abs(flow as number), 0, 1);
-    const daN = clamp(Math.abs(softNorm(da as number, 4)), 0, 1);
-    const bpN = clamp(Math.abs(softNorm(bp as number, 0.08)), 0, 1);
+    const effN = clamp(eff, 0, 1);
+    const surN = clamp(sur / 2.0, 0, 1);
+    const flowN = clamp(Math.abs(flow), 0, 1);
+    const daN = softAbs01(da, 3.5);
+    const bpN = softAbs01(bp, 0.07);
     const heat =
       100 *
       (0.22 * effN +
@@ -322,26 +386,25 @@ export function eliziEdge(
         0.18 * flowN +
         0.22 * daN +
         0.16 * bpN);
-    // Coherence boost: high agreement lifts temp
-    const boosted = clamp(heat * (0.7 + 0.5 * coh), 0, 100);
+    // Mild coherence lift (was 0.7+0.5*coh with tautological coh → chronic overheat)
+    const boosted = clamp(heat * (0.82 + 0.28 * coh), 0, 100);
     edgeTempRaw[i] = boosted;
 
-    // ±E: coherence-weighted directional mix (split like ±DI)
-    const mag = boosted * (0.35 + 0.65 * coh);
+    // ±E: coherence-weighted directional mix
+    const mag = boosted * (0.4 + 0.6 * coh);
     if (bias > 0) {
       edgeUp[i] = mag;
-      edgeDown[i] = mag * (1 - coh) * 0.35;
+      edgeDown[i] = mag * (1 - coh) * 0.3;
     } else if (bias < 0) {
       edgeDown[i] = mag;
-      edgeUp[i] = mag * (1 - coh) * 0.35;
+      edgeUp[i] = mag * (1 - coh) * 0.3;
     } else {
-      edgeUp[i] = mag * 0.35;
-      edgeDown[i] = mag * 0.35;
+      edgeUp[i] = mag * 0.3;
+      edgeDown[i] = mag * 0.3;
     }
   }
 
   const edgeTemp = emaNullable(edgeTempRaw, Math.max(2, tempSmooth));
-  // Smooth ±E lightly
   const edgeUpS = emaNullable(edgeUp, Math.max(2, tempSmooth));
   const edgeDownS = emaNullable(edgeDown, Math.max(2, tempSmooth));
   for (let i = 0; i < n; i++) {
@@ -349,7 +412,7 @@ export function eliziEdge(
     edgeDown[i] = edgeDownS[i];
   }
 
-  // Phase machine
+  // —— 9) Phase machine with hysteresis (fire holds; exhaust is a real exit state)
   for (let i = 0; i < n; i++) {
     const temp = edgeTemp[i];
     const coh = coherence[i];
@@ -357,46 +420,78 @@ export function eliziEdge(
     const da = diAccel[i];
     const eff = pathEfficiency[i];
     const sur = volSurprise[i];
-    if (temp == null || coh == null || bias == null || da == null || eff == null)
+    if (
+      temp == null ||
+      coh == null ||
+      bias == null ||
+      da == null ||
+      eff == null ||
+      !Number.isFinite(temp) ||
+      !Number.isFinite(coh)
+    )
       continue;
 
-    const sign = (bias as number) !== 0 ? (bias as number) : 1;
-    let ph = 0; // cold
+    const sign = bias !== 0 ? bias : 1;
+    const prevPh = i > 0 && phase[i - 1] != null ? (phase[i - 1] as number) : 0;
+    const prevAbs = Math.abs(prevPh);
+    const tempPrev =
+      i > 0 && edgeTemp[i - 1] != null ? (edgeTemp[i - 1] as number) : temp;
+    const risingTemp = temp > tempPrev + 0.15;
+    const fallingTemp = temp < tempPrev - 0.35;
 
-    const risingTemp =
-      i > 0 &&
-      edgeTemp[i - 1] != null &&
-      (temp as number) > (edgeTemp[i - 1] as number);
+    const daPrev = i > 0 ? diAccel[i - 1] : null;
+    const effPrev = i > 0 ? pathEfficiency[i - 1] : null;
+    const surPrev = i > 0 ? volSurprise[i - 1] : null;
 
-    // Exhaust: high heat but diAccel fades + efficiency drops (trap)
     const daFade =
-      i > 0 &&
-      diAccel[i - 1] != null &&
-      Math.abs(da as number) < Math.abs(diAccel[i - 1] as number) * 0.65;
+      daPrev != null &&
+      Number.isFinite(daPrev) &&
+      Math.abs(da) < Math.abs(daPrev) * 0.55;
+    const daOppose = Math.sign(da) !== 0 && Math.sign(da) !== sign;
     const effDrop =
-      i > 0 &&
-      pathEfficiency[i - 1] != null &&
-      (eff as number) < (pathEfficiency[i - 1] as number) - 0.05;
-    const exhaust =
-      (temp as number) >= fireTemp * 0.9 &&
-      (daFade || Math.sign(da as number) !== sign) &&
-      (effDrop || (eff as number) < effHigh * 0.85) &&
-      (sur == null || (sur as number) >= surpriseHigh * 0.7);
+      effPrev != null &&
+      Number.isFinite(effPrev) &&
+      (eff < effPrev - 0.06 || eff < effHigh * 0.75);
+    const surpriseClimax =
+      (sur != null && sur >= surpriseHigh * 0.85) ||
+      (surPrev != null && surPrev >= surpriseHigh * 0.85);
 
-    if (exhaust) ph = 4;
-    else if (
-      (temp as number) >= fireTemp &&
-      (coh as number) >= coherenceArmed &&
-      risingTemp
-    )
-      ph = 3;
-    else if (
-      (temp as number) >= armedTemp &&
-      (coh as number) >= coherenceArmed * 0.85
-    )
-      ph = 2;
-    else if ((temp as number) >= probeTemp) ph = 1;
-    else ph = 0;
+    // Exhaust: was hot (armed/fire or high temp), heat rolling over, accel dying, ER collapsing.
+    // Surprise climax is confirmatory, not mandatory — missing it was making exhaust nearly unreachable.
+    const wasHot = prevAbs >= 2 || tempPrev >= armedTemp || temp >= fireTemp * 0.88;
+    const exhaust =
+      wasHot &&
+      fallingTemp &&
+      (daFade || daOppose) &&
+      effDrop &&
+      (surpriseClimax || tempPrev >= fireTemp * 0.9);
+
+    let ph = 0;
+    if (exhaust) {
+      ph = 4;
+    } else {
+      // Hold fire: once in fire, stay while heat/coh remain (don't require rising every bar)
+      const holdFire =
+        prevAbs === 3 &&
+        temp >= fireTemp * 0.9 &&
+        coh >= coherenceArmed * 0.8;
+      // Enter/re-enter fire: hot + coherent; rising OR already armed/fire
+      const enterFire =
+        temp >= fireTemp &&
+        coh >= coherenceArmed &&
+        (risingTemp || prevAbs >= 2);
+      if (holdFire || enterFire) ph = 3;
+      else if (temp >= armedTemp && coh >= coherenceArmed * 0.85) ph = 2;
+      else if (temp >= probeTemp) ph = 1;
+      else ph = 0;
+
+      // Hysteresis: don't collapse more than one level per bar (exhaust already handled)
+      if (prevAbs > 0 && ph < prevAbs - 1) ph = prevAbs - 1;
+      // Leaving fire into armed if still warm
+      if (prevAbs === 3 && ph < 3 && temp >= armedTemp && coh >= coherenceArmed * 0.75) {
+        ph = 2;
+      }
+    }
 
     phase[i] = ph === 0 ? 0 : ph * sign;
   }
@@ -422,5 +517,5 @@ export function eliziEdge(
   };
 }
 
-/** Lightweight alias — same math; UI may plot fewer series. */
+/** Lightweight alias — same math; UI may plot fewer series via detailMode. */
 export const eliziMirror = eliziEdge;

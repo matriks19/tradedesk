@@ -91,19 +91,30 @@ export function validateStrategyPacks(): PackValidationIssue[] {
       }
     }
 
-    if (pack.category === "high_edge") {
+    if (pack.category === "high_edge" || pack.category === "elizi") {
       if (!pack.researchNote) {
         issues.push({
           packId: pack.id,
           severity: "warn",
-          message: "high_edge pack missing researchNote",
+          message: `${pack.category} pack missing researchNote`,
         });
       }
       if (!pack.howTo?.length) {
         issues.push({
           packId: pack.id,
           severity: "error",
-          message: "high_edge pack missing howTo",
+          message: `${pack.category} pack missing howTo`,
+        });
+      }
+      if (
+        pack.literatureEstimate?.winRateHint &&
+        pack.category === "elizi"
+      ) {
+        issues.push({
+          packId: pack.id,
+          severity: "warn",
+          message:
+            "elizi pack has literatureEstimate.winRateHint — Elizi is proprietary; prefer researchNote only",
         });
       }
     }

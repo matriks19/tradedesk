@@ -89,6 +89,7 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   supertrendAdx: "Supertrend + ADX Filter",
   adxPumpStages: "ADX Pump Radar (Saf/CCI/Medyan/Mom)",
   eliziEdgeFire: "Elizi Edge Fire (phase/temp/coherence)",
+  eliziEdgeExhaust: "Elizi Exhaust Fade (phase=4 counter)",
   codeStrategy: "Kod stratejisi (yapıştır)",
   custom: "Custom Rules",
 };
@@ -103,7 +104,7 @@ export function recommendedWarmup(
       ? Math.max(params.regimeSMA ?? 200, 220)
       : 40;
   }
-  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "eliziEdgeFire") return 60;
+  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "eliziEdgeFire" || preset === "eliziEdgeExhaust") return 60;
   if (preset === "aroonLongTrend") return 40;
   if (preset === "jurikOsBounce") return 80;
   if (preset === "donchianTurtle")
@@ -176,7 +177,23 @@ export function buildSignalContext(
       adxConfirm: params.adxConfirm ?? params.adxMin ?? 25,
       adxWake: params.adxWake ?? 15,
     }),
-    elizi: eliziEdge(candles, {
+
+    aroon: aroon(candles, params.aroonPeriod ?? 14),
+    vwap: vwap(candles),
+    ib: initialBalance(candles, orbBars),
+    atr: atr(candles, params.atrPeriod ?? 14),
+    donchianEntry: priorDonchian(candles, dcEntry),
+    donchianExit: priorDonchian(candles, dcExit),
+    donchianLive: donchian(candles, dcEntry),
+    closes,
+  };
+
+  // Only compute Elizi when the preset actually uses it (avoid scanner/backtest hang tax).
+  if (
+    params.preset === "eliziEdgeFire" ||
+    params.preset === "eliziEdgeExhaust"
+  ) {
+    ctx.elizi = eliziEdge(candles, {
       erLen: params.erLen ?? 10,
       atrLen: params.atrLen ?? params.atrPeriod ?? 14,
       adxPeriod: params.adxPeriod ?? 14,
@@ -192,16 +209,8 @@ export function buildSignalContext(
       fireTemp: params.fireTemp ?? 62,
       armedTemp: params.armedTemp ?? 48,
       probeTemp: params.probeTemp ?? 32,
-    }),
-    aroon: aroon(candles, params.aroonPeriod ?? 14),
-    vwap: vwap(candles),
-    ib: initialBalance(candles, orbBars),
-    atr: atr(candles, params.atrPeriod ?? 14),
-    donchianEntry: priorDonchian(candles, dcEntry),
-    donchianExit: priorDonchian(candles, dcExit),
-    donchianLive: donchian(candles, dcEntry),
-    closes,
-  };
+    });
+  }
 
   if (params.preset === "codeStrategy" && params.strategyCode?.trim()) {
     try {
@@ -613,18 +622,16 @@ export function getSignalFn(
           edgeTemp: (number | null)[];
           coherence: (number | null)[];
           bias: (number | null)[];
-          edgeUp: (number | null)[];
-          edgeDown: (number | null)[];
           pathEfficiency: (number | null)[];
           diAccel: (number | null)[];
           volSurprise: (number | null)[];
-        };
+        } | undefined;
+        if (!r || i < 1) return {};
         if (
           r.phase[i] == null ||
           r.edgeTemp[i] == null ||
           r.coherence[i] == null ||
-          r.bias[i] == null ||
-          i < 1
+          r.bias[i] == null
         )
           return {};
         const ph = r.phase[i] as number;
@@ -635,35 +642,84 @@ export function getSignalFn(
         const bias = r.bias[i] as number;
         const absPh = Math.abs(ph);
         const absPrev = Math.abs(phPrev);
-        const cohArmed = 0.55;
-        // Enter when phase escalates into armed(2)/fire(3) with high coherence + rising temp
+        const cohArmed = params.coherenceArmed ?? 0.55;
+        const fireT = params.fireTemp ?? 62;
+        const armedT = params.armedTemp ?? 48;
+        // Enter on escalate into armed/fire OR hold fire with real heat
         const escalated =
           absPh >= 2 &&
           absPh > absPrev &&
           coh >= cohArmed &&
           temp > tempPrev;
-        const fireHold = absPh >= 3 && coh >= cohArmed && temp >= 55;
+        const fireHold =
+          absPh >= 3 && coh >= cohArmed && temp >= Math.min(55, fireT * 0.9);
         const long = bias > 0 && (escalated || fireHold);
         const short = bias < 0 && (escalated || fireHold);
-        // Exit: exhaust(4), phase drop to ≤1, bias flip, temp collapse
         const exitLong =
           bias < 0 ||
           absPh === 4 ||
           absPh <= 1 ||
-          (temp < tempPrev && temp < 40) ||
-          (ph > 0 && absPh < absPrev && absPh <= 2 && temp < 50);
+          (temp < tempPrev && temp < armedT * 0.85) ||
+          (ph > 0 && absPh < absPrev && absPh <= 2 && temp < armedT);
         const exitShort =
           bias > 0 ||
           absPh === 4 ||
           absPh <= 1 ||
-          (temp < tempPrev && temp < 40) ||
-          (ph < 0 && absPh < absPrev && absPh <= 2 && temp < 50);
+          (temp < tempPrev && temp < armedT * 0.85) ||
+          (ph < 0 && absPh < absPrev && absPh <= 2 && temp < armedT);
         return {
           long,
           short,
           exitLong,
           exitShort,
           reason: "Elizi Fire",
+        };
+      };
+
+    case "eliziEdgeExhaust":
+      return (_c, i, ctx) => {
+        const r = ctx.elizi as {
+          phase: (number | null)[];
+          edgeTemp: (number | null)[];
+          coherence: (number | null)[];
+          bias: (number | null)[];
+          volSurprise: (number | null)[];
+          pathEfficiency: (number | null)[];
+          diAccel: (number | null)[];
+        } | undefined;
+        if (!r || i < 1) return {};
+        if (r.phase[i] == null || r.bias[i] == null || r.edgeTemp[i] == null)
+          return {};
+        const ph = r.phase[i] as number;
+        const phPrev = (r.phase[i - 1] as number) ?? 0;
+        const bias = r.bias[i] as number;
+        const temp = r.edgeTemp[i] as number;
+        const tempPrev = (r.edgeTemp[i - 1] as number) ?? temp;
+        const sur = r.volSurprise[i];
+        const minSur = params.surpriseHigh ?? 0.7;
+        const absPh = Math.abs(ph);
+        const absPrev = Math.abs(phPrev);
+        // Fade: enter opposite to exhaustion bias when phase newly hits exhaust
+        const newlyExhaust = absPh === 4 && absPrev < 4;
+        const surOk = sur == null || sur >= minSur * 0.85;
+        // +4 exhaust (bull heat dying) → short fade; −4 → long fade
+        const long = newlyExhaust && surOk && ph < 0;
+        const short = newlyExhaust && surOk && ph > 0;
+        // Exit fade when phase leaves exhaust or temp re-accelerates with old bias
+        const exitLong =
+          absPh !== 4 ||
+          (ph > 0 && absPh >= 2) ||
+          (temp > tempPrev && temp > (params.armedTemp ?? 48));
+        const exitShort =
+          absPh !== 4 ||
+          (ph < 0 && absPh >= 2) ||
+          (temp > tempPrev && temp > (params.armedTemp ?? 48));
+        return {
+          long,
+          short,
+          exitLong,
+          exitShort,
+          reason: "Elizi Exhaust Fade",
         };
       };
 

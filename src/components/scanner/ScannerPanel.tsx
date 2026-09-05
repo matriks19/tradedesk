@@ -76,6 +76,21 @@ const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "di_bull", label: "DI+↑DI−", filter: { type: "diCross", direction: "bull" } },
   { id: "di_bear", label: "DI−↑DI+", filter: { type: "diCross", direction: "bear" } },
   { id: "adx25", label: "ADX>25", filter: { type: "adxAbove", value: 25 } },
+  {
+    id: "elizi_fire_l",
+    label: "Elizi Fire L",
+    filter: { type: "eliziFire", direction: "bull", minTemp: 55, minCoherence: 0.55 },
+  },
+  {
+    id: "elizi_fire_s",
+    label: "Elizi Fire S",
+    filter: { type: "eliziFire", direction: "bear", minTemp: 55, minCoherence: 0.55 },
+  },
+  {
+    id: "elizi_exh",
+    label: "Elizi Exhaust",
+    filter: { type: "eliziExhaust", direction: "any", minSurprise: 0.7 },
+  },
   { id: "aroon_x", label: "Aroon↑", filter: { type: "aroonCross", direction: "bull" } },
   {
     id: "aroon_zone",
