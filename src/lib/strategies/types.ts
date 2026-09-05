@@ -7,7 +7,8 @@ export type StrategyCategory =
   | "trend"
   | "smc_ict"
   | "session"
-  | "swing";
+  | "swing"
+  | "niche";
 
 export interface StrategyIndicatorSpec {
   type: BuiltinIndicatorId;
@@ -51,4 +52,5 @@ export const CATEGORY_LABELS: Record<StrategyCategory, string> = {
   smc_ict: "SMC / ICT",
   session: "Seans / Killzone",
   swing: "Swing",
+  niche: "Az bilinen",
 };
