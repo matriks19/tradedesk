@@ -21,14 +21,7 @@ import { SymbolSearch } from "@/components/chart/SymbolSearch";
 import { IndicatorMenu } from "@/components/indicators/IndicatorMenu";
 import { Badge } from "@/components/ui/Badge";
 import { usePatternOverlay } from "@/components/chart/PatternOverlay";
-import { detectPatterns } from "@/lib/patterns/detect";
-import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
-import type { PatternHit } from "@/lib/patterns/types";
-import {
-  MAJOR_TIMEFRAMES,
-  majorSwingStrength,
-  normalizeTimeframe,
-} from "@/lib/data/timeframes";
+import { normalizeTimeframe } from "@/lib/data/timeframes";
 import clsx from "clsx";
 
 interface Props {
@@ -129,7 +122,6 @@ export function ChartPane({ pane, compact }: Props) {
     addRecentCustomTimeframe,
   } = useDeskStore();
   const [customTfDraft, setCustomTfDraft] = useState("");
-  const [majorHits, setMajorHits] = useState<PatternHit[]>([]);
 
   const { candles, loading, error, delayed, note } = useKlines(
     pane.symbol,
@@ -139,125 +131,16 @@ export function ChartPane({ pane, compact }: Props) {
 
   const active = activePaneId === pane.id;
 
-  const minorPatterns: PatternHit[] = useMemo(() => {
-    if (!candles.length) return [];
-    if (patternSettings.formationScale === "major") return [];
-    const base = detectPatterns(candles, {
-      swingStrength: patternSettings.swingStrength,
-      twinTol: patternSettings.twinTol,
-      boxLookback: patternSettings.boxLookback,
-    }).map((h) => ({
-      ...h,
-      scale: "minor" as const,
-      timeframe: String(pane.timeframe),
-    }));
-    const adv = detectAdvancedAsPatternHits(candles, {
-      swingStrength: patternSettings.swingStrength,
-    }).map((h) => ({
-      ...h,
-      scale: "minor" as const,
-      timeframe: String(pane.timeframe),
-      label: h.label.includes("·") ? h.label : `${h.label} · ${pane.timeframe}`,
-    }));
-    return [...adv, ...base];
-  }, [
-    candles,
-    pane.timeframe,
-    patternSettings.swingStrength,
-    patternSettings.twinTol,
-    patternSettings.boxLookback,
-    patternSettings.formationScale,
-  ]);
-
-  // Major structure: always scan 1D / 3D / 1W (even when chart TF is lower)
-  useEffect(() => {
-    if (!active) return;
-    if (patternSettings.formationScale === "minor") {
-      setMajorHits([]);
-      return;
-    }
-    let cancelled = false;
-    const swing = majorSwingStrength(patternSettings.swingStrength);
-    (async () => {
-      const all: PatternHit[] = [];
-      await Promise.all(
-        MAJOR_TIMEFRAMES.map(async (tf) => {
-          try {
-            const res = await fetch(
-              `/api/klines?symbol=${encodeURIComponent(pane.symbol)}&exchange=${pane.exchange}&timeframe=${tf}&limit=260`
-            );
-            const json = await res.json();
-            const bars = (json.candles ?? []) as import("@/lib/types").Candle[];
-            if (bars.length < 40) return;
-            const base = detectPatterns(bars, {
-              swingStrength: swing,
-              twinTol: patternSettings.twinTol,
-              boxLookback: Math.max(patternSettings.boxLookback, 40),
-            }).map((h) => ({
-              ...h,
-              id: `maj_${tf}_${h.id}`,
-              scale: "major" as const,
-              timeframe: tf,
-              label: `${h.label} · ${tf}`,
-              detail: `[Majör ${tf}] ${h.detail}`,
-            }));
-            const adv = detectAdvancedAsPatternHits(bars, {
-              swingStrength: swing,
-            }).map((h) => ({
-              ...h,
-              id: `maj_${tf}_${h.id}`,
-              scale: "major" as const,
-              timeframe: tf,
-              label: `${h.label.replace(/ · .*$/, "")} · ${tf}`,
-              detail: `[Majör ${tf}] ${h.detail}`,
-            }));
-            all.push(...adv, ...base);
-          } catch {
-            /* skip TF */
-          }
-        })
-      );
-      if (cancelled) return;
-      all.sort((a, b) => b.confidence - a.confidence);
-      setMajorHits(all.slice(0, 24));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    active,
-    pane.symbol,
-    pane.exchange,
-    patternSettings.formationScale,
-    patternSettings.swingStrength,
-    patternSettings.twinTol,
-    patternSettings.boxLookback,
-  ]);
-
-  const patterns: PatternHit[] = useMemo(() => {
-    const scale = patternSettings.formationScale;
-    const merged: PatternHit[] = [];
-    if (scale !== "major") merged.push(...minorPatterns);
-    if (scale !== "minor") merged.push(...majorHits);
-    if (overlayPattern && !merged.some((m) => m.id === overlayPattern.id)) {
-      merged.unshift(overlayPattern);
-    }
-    return merged.slice(0, 40);
-  }, [minorPatterns, majorHits, overlayPattern, patternSettings.formationScale]);
-
-  useEffect(() => {
-    if (!active) return;
-    window.dispatchEvent(
-      new CustomEvent("td-patterns", {
-        detail: { paneId: pane.id, patterns, symbol: pane.symbol },
-      })
-    );
-  }, [patterns, active, pane.id, pane.symbol]);
+  // Overlay only: user-selected pattern from Formasyon / Tarama (no live detect)
+  const overlayPatterns = useMemo(
+    () => (overlayPattern ? [overlayPattern] : []),
+    [overlayPattern]
+  );
 
   usePatternOverlay({
     chart: chartReady ? chartRef.current : null,
     series: chartReady ? candleRef.current : null,
-    patterns: active ? patterns : [],
+    patterns: active ? overlayPatterns : [],
     focusId: active ? patternSettings.focusId : null,
     container: chartReady ? containerRef.current : null,
   });
