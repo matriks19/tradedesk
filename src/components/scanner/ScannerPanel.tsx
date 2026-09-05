@@ -29,7 +29,8 @@ import {
   searchFields,
 } from "@/lib/scanner/fields";
 import { useDeskStore } from "@/store/desk";
-import type { Candle, Timeframe, TickerQuote } from "@/lib/types";
+import type { Candle, ChartTimeframe, TickerQuote } from "@/lib/types";
+import { timeframeToMinutes } from "@/lib/data/timeframes";
 import clsx from "clsx";
 
 type SortKey = "rsi" | "changePct" | "volume" | "symbol";
@@ -86,9 +87,19 @@ const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "atr2", label: "ATR%>2", filter: { type: "atrPctHigh", minPct: 2 } },
 ];
 
+const KLINE_TIMEOUT_MS = 10_000;
+
 function defaultUniverse(tf: string): number {
-  // Keep default universe light to avoid scan CPU storms
-  return tf === "1m" || tf === "3m" ? 40 : 60;
+  // Smaller universe on very fast / HTF scans to avoid stalls
+  if (tf === "1m" || tf === "3m") return 40;
+  if (tf === "4h" || tf === "1d") return 40;
+  if (tf === "3d" || tf === "1w") return 30;
+  return 60;
+}
+
+function isHtfScan(tf: string): boolean {
+  const m = timeframeToMinutes(tf);
+  return m != null && m >= 240;
 }
 
 export function ScannerPanel() {
@@ -104,7 +115,7 @@ export function ScannerPanel() {
   /** Filter editors collapsed by default so scan results stay visible. */
   const [openSection, setOpenSection] = useState<OpenSection>(null);
   const [exchange, setExchange] = useState<"binance" | "bist">("binance");
-  const [timeframe, setTimeframe] = useState<Timeframe>("15m");
+  const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
   const [universeN, setUniverseN] = useState(60);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [sortKey, setSortKey] = useState<SortKey>("changePct");
@@ -344,7 +355,9 @@ export function ScannerPanel() {
       setProgress({ done: 0, total: quotes.length });
 
       const out: ScannerRow[] = [];
-      const concurrency = needsCandles ? 6 : 1;
+      const htf = isHtfScan(String(timeframe));
+      const concurrency = needsCandles ? (htf ? 3 : 6) : 1;
+      let lastProgressDone = 0;
 
       await mapPool(
         quotes,
@@ -354,14 +367,24 @@ export function ScannerPanel() {
           let candles: Candle[] | null = null;
           if (needsCandles) {
             try {
+              const fetchSignal =
+                typeof AbortSignal !== "undefined" &&
+                typeof AbortSignal.any === "function" &&
+                typeof AbortSignal.timeout === "function"
+                  ? AbortSignal.any([
+                      ac.signal,
+                      AbortSignal.timeout(KLINE_TIMEOUT_MS),
+                    ])
+                  : ac.signal;
               const kr = await fetch(
                 `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${exchange}&timeframe=${timeframe}&limit=220`,
-                { signal: ac.signal }
+                { signal: fetchSignal }
               );
               const kj = await kr.json();
               candles = kj.candles ?? null;
             } catch (e) {
               if (ac.signal.aborted) return null;
+              // Timeout / network — skip symbol rather than hang the pool
               candles = null;
             }
           }
@@ -400,7 +423,12 @@ export function ScannerPanel() {
           return null;
         },
         (done, total) => {
-          if (!ac.signal.aborted) setProgress({ done, total });
+          if (ac.signal.aborted) return;
+          // Throttle React progress updates (every 3 symbols or finish)
+          if (done === total || done - lastProgressDone >= 3) {
+            lastProgressDone = done;
+            setProgress({ done, total });
+          }
         },
         ac.signal
       );
@@ -455,8 +483,8 @@ export function ScannerPanel() {
         <select
           className="input w-auto"
           value={timeframe}
-          onChange={(e) => setTimeframe(e.target.value as Timeframe)}
-          title="Scan timeframe (küçük zaman)"
+          onChange={(e) => setTimeframe(e.target.value as ChartTimeframe)}
+          title="Scan timeframe (1m–1w, 25m agg)"
         >
           {SCAN_TIMEFRAMES.map((tf) => (
             <option key={tf.value} value={tf.value}>
@@ -877,8 +905,9 @@ export function ScannerPanel() {
         ))}
         {!rows.length && !running && (
           <div className="text-2xs text-desk-muted p-2">
-            Advanced Filters ile MCC tarzı teknik tarama — TF 1m–4h, Binance top
-            N quoteVolume. Sonuç satırına tıklayınca aynı TF açılır.
+            Advanced Filters ile MCC tarzı teknik tarama — TF 1m–1w (25m agg,
+            1d/3d/1w dahil), Binance top N quoteVolume. Sonuç satırına
+            tıklayınca aynı TF açılır.
           </div>
         )}
       </div>

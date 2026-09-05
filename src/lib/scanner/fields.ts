@@ -190,17 +190,21 @@ export const COMPARE_MODES: { id: CompareMode; label: string }[] = [
   { id: "series", label: "Series" },
 ];
 
-/** Scan timeframes (small TF set) with dual labels for hour bars. */
+/** Scan timeframes incl. custom 25m agg + daily/weekly HTF. */
 export const SCAN_TIMEFRAMES: { value: string; label: string; minutes: number }[] = [
   { value: "1m", label: "1m", minutes: 1 },
   { value: "3m", label: "3m", minutes: 3 },
   { value: "5m", label: "5m", minutes: 5 },
   { value: "10m", label: "10m", minutes: 10 },
   { value: "15m", label: "15m", minutes: 15 },
+  { value: "25m", label: "25m (agg)", minutes: 25 },
   { value: "30m", label: "30m", minutes: 30 },
   { value: "1h", label: "1h (60)", minutes: 60 },
   { value: "2h", label: "2h (120)", minutes: 120 },
   { value: "4h", label: "4h (240)", minutes: 240 },
+  { value: "1d", label: "1d (günlük)", minutes: 1440 },
+  { value: "3d", label: "3d", minutes: 4320 },
+  { value: "1w", label: "1w (haftalık)", minutes: 10080 },
 ];
 
 export function fieldById(id: TechnicalFieldId): TechnicalFieldDef | undefined {

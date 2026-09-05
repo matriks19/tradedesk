@@ -150,7 +150,7 @@ function rising(series: (number | null)[], i: number): boolean {
 
 /**
  * Four ADX views + mix DI + Bollinger-aware stage scores.
- * Defaults for crypto / intraday (5m–15m).
+ * Defaults for crypto / intraday (15m–30m early; 1h mid/confirm; 2h swing).
  */
 export function adxPumpRadar(
   candles: Candle[],

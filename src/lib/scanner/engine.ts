@@ -377,7 +377,21 @@ const CANDLE_FILTERS = new Set([
   "consecBars",
   "priceVsSma",
   "rsiDivergence",
+  "adxPumpStage",
+  "adxPumpMixDi",
 ]);
+
+/** Reuse radar within a matchFilters pass (and across filters sharing candles ref). */
+const ADX_PUMP_CACHE = new WeakMap<Candle[], ReturnType<typeof adxPumpRadar>>();
+
+function getAdxPumpRadar(candles: Candle[]): ReturnType<typeof adxPumpRadar> {
+  let r = ADX_PUMP_CACHE.get(candles);
+  if (!r) {
+    r = adxPumpRadar(candles);
+    ADX_PUMP_CACHE.set(candles, r);
+  }
+  return r;
+}
 
 
 function crossedAbove(
@@ -427,6 +441,14 @@ export function matchFilters(
   const notes: string[] = [];
   let lastRsi: number | undefined;
   let lastAtrPct: number | undefined;
+
+  const needsPump = filters.some(
+    (f) => f.type === "adxPumpStage" || f.type === "adxPumpMixDi"
+  );
+  const pumpRadar =
+    needsPump && candles && candles.length >= 50
+      ? getAdxPumpRadar(candles)
+      : null;
 
   for (const f of filters) {
     if (f.type === "changePct") {
@@ -662,8 +684,8 @@ export function matchFilters(
       notes.push(`Aroon ${up.toFixed(0)}/${down.toFixed(0)}`);
 
     } else if (f.type === "adxPumpStage") {
-      if (!candles || candles.length < 50) return { ok: false, note: "" };
-      const r = adxPumpRadar(candles);
+      if (!pumpRadar) return { ok: false, note: "" };
+      const r = pumpRadar;
       const i = r.stage.length - 1;
       const bias = r.bias[i];
       const st = r.stage[i];
@@ -692,8 +714,8 @@ export function matchFilters(
         `Pump ${tag} ${wantBull ? "L" : "S"} ${score.toFixed(0)}`
       );
     } else if (f.type === "adxPumpMixDi") {
-      if (!candles || candles.length < 50) return { ok: false, note: "" };
-      const r = adxPumpRadar(candles);
+      if (!pumpRadar) return { ok: false, note: "" };
+      const r = pumpRadar;
       const i = r.plusDIMix.length - 1;
       const p = r.plusDIMix[i];
       const m = r.minusDIMix[i];
