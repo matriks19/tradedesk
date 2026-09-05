@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BinanceProvider } from "@/lib/data/binance";
 import { BistProvider } from "@/lib/data/bist";
-import type { Exchange, Timeframe } from "@/lib/types";
+import type { Exchange } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const symbol = sp.get("symbol") ?? "BTCUSDT";
   const exchange = (sp.get("exchange") ?? "binance") as Exchange;
-  const timeframe = (sp.get("timeframe") ?? "15m") as Timeframe;
+  const timeframe = sp.get("timeframe") ?? "15m";
   const limit = Number(sp.get("limit") ?? 500);
 
   try {

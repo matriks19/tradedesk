@@ -68,13 +68,15 @@ export interface AdvancedPatternHit {
   tStart: number;
   tEnd: number;
   drawings: PatternDrawing[];
+  scale?: "minor" | "major";
+  timeframe?: string;
 }
 
 export function toPatternHit(a: AdvancedPatternHit): PatternHit {
   return {
     id: a.id,
     type: "advanced" as PatternHit["type"],
-    label: a.label,
+    label: a.timeframe ? `${a.label} · ${a.timeframe}` : a.label,
     detail: a.detail,
     bias: a.direction === "neutral" ? "neutral" : a.direction,
     confidence: a.confidence,
@@ -82,5 +84,7 @@ export function toPatternHit(a: AdvancedPatternHit): PatternHit {
     tEnd: a.tEnd,
     drawings: a.drawings,
     advanced: a,
+    scale: a.scale,
+    timeframe: a.timeframe,
   };
 }

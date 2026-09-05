@@ -1,4 +1,5 @@
-import type { Candle, SymbolInfo, TickerQuote, Timeframe } from "@/lib/types";
+import type { Candle, SymbolInfo, TickerQuote } from "@/lib/types";
+import { aggregateCandles, yahooParamsForTimeframe } from "@/lib/data/timeframes";
 import { BIST_EXTRA } from "@/lib/data/bistUniverse";
 import { mkdirSync, readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
@@ -78,23 +79,6 @@ const YAHOO_HEADERS: HeadersInit = {
   "Accept-Language": "en-US,en;q=0.9,tr;q=0.8",
 };
 
-const TF_TO_YAHOO: Record<
-  Timeframe,
-  { interval: string; range: string }
-> = {
-  "1m": { interval: "1m", range: "1d" },
-  "3m": { interval: "5m", range: "5d" },
-  "5m": { interval: "5m", range: "5d" },
-  "15m": { interval: "15m", range: "5d" },
-  "30m": { interval: "30m", range: "1mo" },
-  "1h": { interval: "60m", range: "1mo" },
-  "2h": { interval: "60m", range: "3mo" },
-  "4h": { interval: "60m", range: "3mo" },
-  "6h": { interval: "1d", range: "6mo" },
-  "12h": { interval: "1d", range: "1y" },
-  "1d": { interval: "1d", range: "1y" },
-  "1w": { interval: "1wk", range: "5y" },
-};
 
 const CACHE_DIR = join(process.cwd(), "data", "cache", "bist");
 
@@ -318,19 +302,39 @@ export class BistProvider {
 
   static async getKlines(
     symbol: string,
-    timeframe: Timeframe,
+    timeframe: string,
     _limit = 500
   ): Promise<{ candles: Candle[]; delayed: true; note: string }> {
-    const { interval, range } = TF_TO_YAHOO[timeframe] ?? TF_TO_YAHOO["1d"];
+    const yp = yahooParamsForTimeframe(timeframe);
     const ysym = this.yahooSymbol(symbol);
-    const fetched = await fetchYahooChart(ysym, interval, range, 4);
+    const fetched = await fetchYahooChart(ysym, yp.interval, yp.range, 4);
+    const finalize = (candles: Candle[], note: string) => {
+      let out = candles;
+      if (yp.aggregateMinutes && yp.aggregateMinutes > 0) {
+        const srcMin =
+          yp.interval === "60m"
+            ? 60
+            : yp.interval === "1wk"
+              ? 10080
+              : yp.interval.endsWith("m")
+                ? Number(yp.interval.replace("m", "")) || 1
+                : yp.interval === "1d"
+                  ? 1440
+                  : 1440;
+        // Only aggregate when target differs from source bar size
+        if (yp.aggregateMinutes !== srcMin) {
+          out = aggregateCandles(candles, yp.aggregateMinutes);
+        }
+      }
+      return { candles: out, delayed: true as const, note };
+    };
     if (fetched?.candles?.length) {
-      writeCandleCache(symbol, timeframe, fetched.candles);
-      return {
-        candles: fetched.candles,
-        delayed: true,
-        note: "BIST: Yahoo query2 chart (gecikmeli/best-effort)",
-      };
+      const result = finalize(
+        fetched.candles,
+        "BIST: Yahoo query2 chart (gecikmeli/best-effort)"
+      );
+      writeCandleCache(symbol, timeframe, result.candles);
+      return result;
     }
     const cached = readCandleCache(symbol, timeframe);
     if (cached?.length) {

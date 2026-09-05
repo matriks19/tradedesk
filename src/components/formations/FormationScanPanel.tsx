@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import clsx from "clsx";
-import type { Candle, Exchange, Timeframe, TickerQuote } from "@/lib/types";
+import type { Candle, Exchange, FormationScaleMode, Timeframe, TickerQuote } from "@/lib/types";
 import {
   detectAdvanced,
   type AdvancedPatternFamily,
@@ -10,7 +10,11 @@ import {
   toPatternHit,
 } from "@/lib/patterns/advanced";
 import { mapPool } from "@/lib/scanner/engine";
-import { useDeskStore } from "@/store/desk";
+import { useDeskStore, TIMEFRAMES } from "@/store/desk";
+import {
+  MAJOR_TIMEFRAMES,
+  majorSwingStrength,
+} from "@/lib/data/timeframes";
 
 const FAMILY_OPTS: { id: AdvancedPatternFamily; label: string }[] = [
   { id: "harmonic", label: "Harmonik" },
@@ -19,14 +23,27 @@ const FAMILY_OPTS: { id: AdvancedPatternFamily; label: string }[] = [
   { id: "structure", label: "Yapı BOS/CHOCH" },
 ];
 
+const SCALE_CHIPS: { id: FormationScaleMode; label: string }[] = [
+  { id: "minor", label: "Minör" },
+  { id: "major", label: "Majör" },
+  { id: "both", label: "İkisi" },
+];
+
+type Row = AdvancedPatternHit & {
+  symbol: string;
+  exchange: Exchange;
+};
+
 export function FormationScanPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
   const setOverlayPattern = useDeskStore((s) => s.setOverlayPattern);
   const setPatternFocus = useDeskStore((s) => s.setPatternFocus);
   const setSidebarTab = useDeskStore((s) => s.setSidebarTab);
+  const patternSettings = useDeskStore((s) => s.patternSettings);
+  const setPatternSettings = useDeskStore((s) => s.setPatternSettings);
 
   const [exchange, setExchange] = useState<Exchange>("binance");
-  const [timeframe, setTimeframe] = useState<Timeframe>("1d");
+  const [timeframe, setTimeframe] = useState<Timeframe>("1h");
   const [families, setFamilies] = useState<AdvancedPatternFamily[]>([
     "harmonic",
     "candle",
@@ -34,8 +51,10 @@ export function FormationScanPanel() {
   ]);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
-  const [rows, setRows] = useState<(AdvancedPatternHit & { symbol: string; exchange: Exchange })[]>([]);
+  const [rows, setRows] = useState<Row[]>([]);
   const [status, setStatus] = useState("");
+
+  const scale = patternSettings.formationScale ?? "both";
 
   const toggleFamily = (id: AdvancedPatternFamily) => {
     setFamilies((prev) =>
@@ -74,22 +93,59 @@ export function FormationScanPanel() {
           .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
           .slice(0, 100);
       }
-      setProgress({ done: 0, total: quotes.length });
-      const out: (AdvancedPatternHit & { symbol: string; exchange: Exchange })[] = [];
+
+      const tfs: { tf: string; scale: "minor" | "major"; swing: number }[] = [];
+      if (scale !== "major") {
+        tfs.push({
+          tf: timeframe,
+          scale: "minor",
+          swing: patternSettings.swingStrength,
+        });
+      }
+      if (scale !== "minor") {
+        const majSwing = majorSwingStrength(patternSettings.swingStrength);
+        for (const tf of MAJOR_TIMEFRAMES) {
+          tfs.push({ tf, scale: "major", swing: majSwing });
+        }
+      }
+
+      const jobs = quotes.flatMap((q) =>
+        tfs.map((t) => ({ quote: q, ...t }))
+      );
+      setProgress({ done: 0, total: jobs.length });
+      const out: Row[] = [];
       await mapPool(
-        quotes,
+        jobs,
         8,
-        async (q) => {
+        async (job) => {
           try {
             const kr = await fetch(
-              `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${exchange}&timeframe=${timeframe}&limit=220`
+              `/api/klines?symbol=${encodeURIComponent(job.quote.symbol)}&exchange=${exchange}&timeframe=${job.tf}&limit=220`
             );
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
             if (candles.length < 40) return null;
-            const hits = detectAdvanced(candles, { families });
-            for (const h of hits.slice(0, 3)) {
-              out.push({ ...h, symbol: q.symbol, exchange });
+            const hits = detectAdvanced(candles, {
+              families,
+              swingStrength: job.swing,
+            });
+            for (const h of hits.slice(0, 2)) {
+              out.push({
+                ...h,
+                id: `${job.scale}_${job.tf}_${h.id}`,
+                symbol: job.quote.symbol,
+                exchange,
+                scale: job.scale,
+                timeframe: job.tf,
+                label:
+                  job.scale === "major"
+                    ? `${h.label} · ${job.tf}`
+                    : h.label,
+                detail:
+                  job.scale === "major"
+                    ? `[Majör ${job.tf}] ${h.detail}`
+                    : h.detail,
+              });
             }
           } catch {
             /* skip */
@@ -99,15 +155,27 @@ export function FormationScanPanel() {
         (done, total) => setProgress({ done, total })
       );
       out.sort((a, b) => b.confidence - a.confidence);
-      setRows(out.slice(0, 80));
-      setStatus(`${out.length} formasyon · ${quotes.length} sembol`);
+      setRows(out.slice(0, 100));
+      setStatus(
+        `${out.length} formasyon · ${quotes.length} sembol · TF: ${tfs.map((t) => t.tf).join(",")}`
+      );
     } finally {
       setRunning(false);
     }
-  }, [exchange, timeframe, families]);
+  }, [
+    exchange,
+    timeframe,
+    families,
+    scale,
+    patternSettings.swingStrength,
+  ]);
 
-  const openHit = (h: AdvancedPatternHit & { symbol: string; exchange: Exchange }) => {
-    openSymbolInActive(h.symbol, h.exchange);
+  const openHit = (h: Row) => {
+    openSymbolInActive(
+      h.symbol,
+      h.exchange,
+      h.scale === "major" && h.timeframe ? h.timeframe : undefined
+    );
     const ph = toPatternHit(h);
     setOverlayPattern(ph);
     setPatternFocus(ph.id);
@@ -118,9 +186,21 @@ export function FormationScanPanel() {
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">Formasyon Tarama</div>
       <p className="text-2xs text-desk-muted">
-        Harmonik (Gartley/Bat/…), mum formasyonları, likidite grab / BOS. Sonuç tıklanınca
-        grafikte XABCD + PRZ + TP/SL çizilir.
+        Minör: seçili TF. Majör: 1D + 3D + 1W (yüksek swing). Sonuç tıklanınca
+        grafikte XABCD + PRZ + TP/SL; majörde TF o periyoda geçer.
       </p>
+      <div className="flex gap-1 flex-wrap">
+        {SCALE_CHIPS.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={clsx("btn text-2xs", scale === c.id && "btn-accent")}
+            onClick={() => setPatternSettings({ formationScale: c.id })}
+          >
+            {c.label}
+          </button>
+        ))}
+      </div>
       <div className="flex gap-1 flex-wrap">
         <select
           className="input w-auto"
@@ -130,16 +210,19 @@ export function FormationScanPanel() {
           <option value="binance">Binance top ~120</option>
           <option value="bist">BIST likit ~100</option>
         </select>
-        <select
-          className="input w-auto"
-          value={timeframe}
-          onChange={(e) => setTimeframe(e.target.value as Timeframe)}
-        >
-          <option value="15m">15m</option>
-          <option value="1h">1h</option>
-          <option value="4h">4h</option>
-          <option value="1d">1d</option>
-        </select>
+        {scale !== "major" && (
+          <select
+            className="input w-auto"
+            value={timeframe}
+            onChange={(e) => setTimeframe(e.target.value as Timeframe)}
+          >
+            {TIMEFRAMES.map((tf) => (
+              <option key={tf} value={tf}>
+                {tf}
+              </option>
+            ))}
+          </select>
+        )}
         <button type="button" className="btn-accent" disabled={running} onClick={run}>
           {running ? `${progress.done}/${progress.total}` : "Tara"}
         </button>
@@ -184,6 +267,9 @@ export function FormationScanPanel() {
               <span className="truncate">
                 <span className="font-medium">{r.symbol}</span>{" "}
                 <span className="text-desk-muted">{r.label}</span>
+                {r.scale === "major" && (
+                  <span className="ml-1 text-2xs text-desk-accent">Majör</span>
+                )}
               </span>
               <span
                 className={clsx(
@@ -197,6 +283,7 @@ export function FormationScanPanel() {
               <span className="font-mono text-2xs">{(r.confidence * 100).toFixed(0)}%</span>
             </div>
             <div className="text-2xs text-desk-muted font-mono truncate">
+              {r.timeframe ? `${r.timeframe} · ` : ""}
               {r.entry != null ? `E ${fmt(r.entry)}` : ""}
               {r.prz ? ` · PRZ ${fmt(r.prz.low)}-${fmt(r.prz.high)}` : ""}
               {r.tp1 != null ? ` · TP1 ${fmt(r.tp1)}` : ""}
@@ -206,7 +293,7 @@ export function FormationScanPanel() {
         ))}
         {!rows.length && !running && (
           <div className="text-2xs text-desk-muted p-2">
-            Aile seçip Tara — paralel mum + offline dedektör.
+            Ölçek + aile seçip Tara — majör 1D/3D/1W paralel tarar.
           </div>
         )}
       </div>

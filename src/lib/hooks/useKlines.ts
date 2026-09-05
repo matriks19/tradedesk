@@ -1,13 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Candle, Exchange, Timeframe } from "@/lib/types";
+import type { Candle, Exchange } from "@/lib/types";
 import { BinanceProvider } from "@/lib/data/binance";
 
 export function useKlines(
   symbol: string,
   exchange: Exchange,
-  timeframe: Timeframe
+  timeframe: string
 ) {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,7 +21,7 @@ export function useKlines(
     setError(null);
     try {
       const res = await fetch(
-        `/api/klines?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}&timeframe=${timeframe}&limit=500`
+        `/api/klines?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}&timeframe=${encodeURIComponent(timeframe)}&limit=500`
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Kline hatası");
@@ -43,6 +43,7 @@ export function useKlines(
     if (exchange !== "binance") return;
     wsRef.current?.close();
     const url = BinanceProvider.wsKlineUrl(symbol, timeframe);
+    if (!url) return; // custom / aggregated TF — REST only
     let ws: WebSocket;
     try {
       ws = new WebSocket(url);

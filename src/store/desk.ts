@@ -10,11 +10,13 @@ import type {
   IndicatorSource,
   LayoutMode,
   PaneConfig,
+  ChartTimeframe,
   PatternSettings,
   RiskSettings,
   Timeframe,
   Watchlist,
 } from "@/lib/types";
+import { NATIVE_TIMEFRAMES, normalizeTimeframe } from "@/lib/data/timeframes";
 import type { PatternHit } from "@/lib/patterns/types";
 import type { BacktestParams, BacktestResult } from "@/lib/backtest";
 import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
@@ -26,7 +28,7 @@ function uid(prefix = "id"): string {
 function makePane(
   symbol = "BTCUSDT",
   exchange: Exchange = "binance",
-  timeframe: Timeframe = "15m"
+  timeframe: ChartTimeframe = "15m"
 ): PaneConfig {
   return {
     id: uid("pane"),
@@ -66,6 +68,7 @@ interface DeskState {
   bistBannerDismissed: boolean;
   patternSettings: PatternSettings;
   overlayPattern: PatternHit | null;
+  recentCustomTimeframes: string[];
   favoriteIndicators: BuiltinIndicatorId[];
   indicatorMenuOpen: boolean;
   setLayoutMode: (mode: LayoutMode) => void;
@@ -80,7 +83,12 @@ interface DeskState {
     exchange: Exchange
   ) => void;
   removeWatchlistSymbol: (listId: string, symbol: string) => void;
-  openSymbolInActive: (symbol: string, exchange: Exchange) => void;
+  openSymbolInActive: (
+    symbol: string,
+    exchange: Exchange,
+    timeframe?: ChartTimeframe
+  ) => void;
+  addRecentCustomTimeframe: (tf: string) => void;
   addIndicator: (
     paneId: string,
     type: BuiltinIndicatorId,
@@ -140,8 +148,10 @@ export const useDeskStore = create<DeskState>()(
           twinTol: 0.015,
           boxLookback: 30,
           focusId: null,
+          formationScale: "both",
         },
         overlayPattern: null,
+        recentCustomTimeframes: [],
         favoriteIndicators: ["sma", "ema", "rsi", "macd", "bollinger"],
         indicatorMenuOpen: false,
         lastBacktest: null,
@@ -196,9 +206,22 @@ export const useDeskStore = create<DeskState>()(
                 : w
             ),
           })),
-        openSymbolInActive: (symbol, exchange) => {
+        openSymbolInActive: (symbol, exchange, timeframe) => {
           const { activePaneId, updatePane } = get();
-          updatePane(activePaneId, { symbol, exchange });
+          updatePane(activePaneId, {
+            symbol,
+            exchange,
+            ...(timeframe ? { timeframe } : {}),
+          });
+        },
+        addRecentCustomTimeframe: (tf) => {
+          const n = normalizeTimeframe(tf);
+          if (!n) return;
+          if ((NATIVE_TIMEFRAMES as readonly string[]).includes(n)) return;
+          set((s) => {
+            const next = [n, ...s.recentCustomTimeframes.filter((x) => x !== n)].slice(0, 8);
+            return { recentCustomTimeframes: next };
+          });
         },
         addIndicator: (paneId, type, source, parentId) =>
           set((s) => ({
@@ -388,6 +411,7 @@ export const useDeskStore = create<DeskState>()(
           ...s.patternSettings,
           focusId: null,
         },
+        recentCustomTimeframes: s.recentCustomTimeframes,
         backtestParams: s.backtestParams,
         lastBacktest: s.lastBacktest,
       }),
@@ -395,15 +419,6 @@ export const useDeskStore = create<DeskState>()(
   )
 );
 
-export const TIMEFRAMES: Timeframe[] = [
-  "1m",
-  "5m",
-  "15m",
-  "30m",
-  "1h",
-  "4h",
-  "1d",
-  "1w",
-];
+export const TIMEFRAMES: Timeframe[] = [...NATIVE_TIMEFRAMES];
 
 export const LAYOUT_OPTIONS: LayoutMode[] = [1, 2, 4, 6, 9];

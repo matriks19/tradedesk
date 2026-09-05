@@ -56,6 +56,10 @@ export interface PatternHit {
   drawings: PatternDrawing[];
   /** optional payload from advanced/harmonic/liquidity detectors */
   advanced?: unknown;
+  /** minor = chart TF; major = 1D/3D/1W structure */
+  scale?: "minor" | "major";
+  /** TF the pattern was detected on */
+  timeframe?: string;
 }
 
 export interface DetectOptions {

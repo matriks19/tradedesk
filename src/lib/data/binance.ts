@@ -1,25 +1,16 @@
-import type { Candle, SymbolInfo, TickerQuote, Timeframe } from "@/lib/types";
+import type { Candle, SymbolInfo, TickerQuote } from "@/lib/types";
+import {
+  aggregateCandles,
+  isBinanceNativeInterval,
+  normalizeTimeframe,
+  resolveBinanceFetch,
+} from "@/lib/data/timeframes";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
 /** Market data via Binance Vision — api.binance.com returns 451 in some regions. */
 const REST = process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision";
 const WS_BASE = process.env.BINANCE_WS_URL ?? "wss://data-stream.binance.vision";
-
-const TF_MAP: Record<Timeframe, string> = {
-  "1m": "1m",
-  "3m": "3m",
-  "5m": "5m",
-  "15m": "15m",
-  "30m": "30m",
-  "1h": "1h",
-  "2h": "2h",
-  "4h": "4h",
-  "6h": "6h",
-  "12h": "12h",
-  "1d": "1d",
-  "1w": "1w",
-};
 
 const CACHE_DIR = join(process.cwd(), "data", "cache");
 const SYMBOLS_CACHE = join(CACHE_DIR, "binance_usdt_symbols.json");
@@ -51,6 +42,27 @@ function writeFileCache(symbols: SymbolInfo[]) {
   } catch {
     /* ignore */
   }
+}
+
+async function fetchNativeKlines(
+  symbol: string,
+  interval: string,
+  limit: number
+): Promise<Candle[]> {
+  const url = `${REST}/api/v3/klines?symbol=${encodeURIComponent(
+    symbol.toUpperCase()
+  )}&interval=${interval}&limit=${limit}`;
+  const res = await fetch(url, { cache: "no-store" });
+  if (!res.ok) throw new Error(`Binance klines ${res.status}`);
+  const rows = (await res.json()) as unknown[][];
+  return rows.map((r) => ({
+    time: Math.floor(Number(r[0]) / 1000),
+    open: Number(r[1]),
+    high: Number(r[2]),
+    low: Number(r[3]),
+    close: Number(r[4]),
+    volume: Number(r[5]),
+  }));
 }
 
 export class BinanceProvider {
@@ -98,24 +110,21 @@ export class BinanceProvider {
 
   static async getKlines(
     symbol: string,
-    timeframe: Timeframe,
+    timeframe: string,
     limit = 500
   ): Promise<Candle[]> {
-    const interval = TF_MAP[timeframe] ?? "15m";
-    const url = `${REST}/api/v3/klines?symbol=${encodeURIComponent(
-      symbol.toUpperCase()
-    )}&interval=${interval}&limit=${limit}`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) throw new Error(`Binance klines ${res.status}`);
-    const rows = (await res.json()) as unknown[][];
-    return rows.map((r) => ({
-      time: Math.floor(Number(r[0]) / 1000),
-      open: Number(r[1]),
-      high: Number(r[2]),
-      low: Number(r[3]),
-      close: Number(r[4]),
-      volume: Number(r[5]),
-    }));
+    const resolved = resolveBinanceFetch(timeframe);
+    if (!resolved) {
+      throw new Error(`Unsupported timeframe: ${timeframe}`);
+    }
+    if (!resolved.aggregated) {
+      return fetchNativeKlines(symbol, resolved.fetchInterval, limit);
+    }
+    // Need enough source bars to fill `limit` aggregated bars
+    const srcLimit = Math.min(1000, Math.max(limit * resolved.factor + resolved.factor, limit * 2));
+    const raw = await fetchNativeKlines(symbol, resolved.fetchInterval, srcLimit);
+    const agg = aggregateCandles(raw, resolved.targetMinutes);
+    return agg.slice(-limit);
   }
 
   static async getTicker24h(symbol?: string): Promise<TickerQuote[]> {
@@ -150,10 +159,13 @@ export class BinanceProvider {
       );
   }
 
-  static wsKlineUrl(symbol: string, timeframe: Timeframe): string {
+  /** WS only for native Binance intervals; custom TFs return null. */
+  static wsKlineUrl(symbol: string, timeframe: string): string | null {
+    const n = normalizeTimeframe(timeframe);
+    if (!n || !isBinanceNativeInterval(n)) return null;
+    // 3h is in our native list for charts but not on Binance — already excluded by isBinanceNativeInterval
     const s = symbol.toLowerCase();
-    const i = (TF_MAP[timeframe] ?? "15m").toLowerCase();
-    return `${WS_BASE}/ws/${s}@kline_${i}`;
+    return `${WS_BASE}/ws/${s}@kline_${n}`;
   }
 
   static wsTickerUrl(symbol: string): string {

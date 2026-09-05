@@ -8,11 +8,17 @@ export type Timeframe =
   | "30m"
   | "1h"
   | "2h"
+  | "3h"
   | "4h"
   | "6h"
+  | "8h"
   | "12h"
   | "1d"
+  | "3d"
   | "1w";
+
+/** Native Timeframe or custom like "90m" / "5h" (chart pane). */
+export type ChartTimeframe = Timeframe | (string & {});
 
 export interface Candle {
   time: number; // unix seconds
@@ -49,7 +55,8 @@ export interface PaneConfig {
   id: string;
   symbol: string;
   exchange: Exchange;
-  timeframe: Timeframe;
+  /** Native TF or custom e.g. 90m, 5h */
+  timeframe: ChartTimeframe;
   indicators: IndicatorInstance[];
 }
 
@@ -298,9 +305,13 @@ export interface StoredLayout {
   activePaneId: string;
 }
 
+export type FormationScaleMode = "minor" | "major" | "both";
+
 export interface PatternSettings {
   swingStrength: number;
   twinTol: number;
   boxLookback: number;
   focusId: string | null;
+  /** Formasyon panel: Minör | Majör | İkisi */
+  formationScale: FormationScaleMode;
 }

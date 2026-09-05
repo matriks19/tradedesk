@@ -1,10 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDeskStore } from "@/store/desk";
 import type { PatternHit } from "@/lib/patterns/types";
+import type { FormationScaleMode } from "@/lib/types";
 import { FormationScanPanel } from "@/components/formations/FormationScanPanel";
 import clsx from "clsx";
+
+const SCALE_CHIPS: { id: FormationScaleMode; label: string }[] = [
+  { id: "minor", label: "Minör" },
+  { id: "major", label: "Majör" },
+  { id: "both", label: "İkisi" },
+];
 
 export function PatternPanel() {
   const panes = useDeskStore((s) => s.panes);
@@ -13,6 +20,7 @@ export function PatternPanel() {
   const setPatternSettings = useDeskStore((s) => s.setPatternSettings);
   const setPatternFocus = useDeskStore((s) => s.setPatternFocus);
   const setOverlayPattern = useDeskStore((s) => s.setOverlayPattern);
+  const updatePane = useDeskStore((s) => s.updatePane);
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [patterns, setPatterns] = useState<PatternHit[]>([]);
   const [mode, setMode] = useState<"chart" | "scan">("scan");
@@ -28,6 +36,20 @@ export function PatternPanel() {
     window.addEventListener("td-patterns", handler);
     return () => window.removeEventListener("td-patterns", handler);
   }, [activePaneId]);
+
+  const visible = useMemo(() => {
+    const scale = patternSettings.formationScale ?? "both";
+    if (scale === "both") return patterns;
+    return patterns.filter((p) => (p.scale ?? "minor") === scale);
+  }, [patterns, patternSettings.formationScale]);
+
+  const openHit = (h: PatternHit) => {
+    setOverlayPattern(h);
+    setPatternFocus(h.id);
+    if (h.scale === "major" && h.timeframe && pane) {
+      updatePane(pane.id, { timeframe: h.timeframe });
+    }
+  };
 
   return (
     <div className="flex flex-col h-full min-h-0">
@@ -53,8 +75,25 @@ export function PatternPanel() {
         <div className="flex flex-col h-full min-h-0 p-2 gap-2">
           <div className="text-xs font-medium">Formasyonlar — {pane?.symbol}</div>
           <p className="text-2xs text-desk-muted">
-            Harmonik, mum, likidite + klasik yapılar. Tıklayınca grafikte vurgulanır.
+            Minör: grafik TF. Majör: 1D / 3D / 1W (yüksek swing). Tıklayınca çizilir;
+            majörde TF o periyoda geçer.
           </p>
+
+          <div className="flex gap-1 flex-wrap">
+            {SCALE_CHIPS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={clsx(
+                  "btn text-2xs",
+                  (patternSettings.formationScale ?? "both") === c.id && "btn-accent"
+                )}
+                onClick={() => setPatternSettings({ formationScale: c.id })}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
 
           <div className="grid grid-cols-3 gap-1 text-2xs">
             <label className="text-desk-muted">
@@ -111,14 +150,11 @@ export function PatternPanel() {
           </button>
 
           <div className="flex-1 overflow-y-auto space-y-2">
-            {patterns.map((h) => (
+            {visible.map((h) => (
               <button
                 key={h.id}
                 type="button"
-                onClick={() => {
-                  setOverlayPattern(h);
-                  setPatternFocus(h.id);
-                }}
+                onClick={() => openHit(h)}
                 className={clsx(
                   "w-full text-left rounded border px-2 py-2 transition-colors",
                   patternSettings.focusId === h.id && "ring-1 ring-desk-accent",
@@ -133,13 +169,24 @@ export function PatternPanel() {
                     {(h.confidence * 100).toFixed(0)}%
                   </span>
                 </div>
+                <div className="flex gap-2 mt-0.5 text-2xs text-desk-muted">
+                  <span
+                    className={clsx(
+                      "uppercase tracking-wide",
+                      h.scale === "major" ? "text-desk-accent" : ""
+                    )}
+                  >
+                    {h.scale === "major" ? "Majör" : "Minör"}
+                    {h.timeframe ? ` · ${h.timeframe}` : ""}
+                  </span>
+                </div>
                 <div className="text-2xs text-desk-muted mt-0.5">{h.detail}</div>
                 <div className="text-2xs text-desk-muted mt-1">
                   {h.drawings.length} çizim · {h.type}
                 </div>
               </button>
             ))}
-            {!patterns.length && (
+            {!visible.length && (
               <div className="text-2xs text-desk-muted">
                 Aktif grafikte formasyon aranıyor… Veri yüklenince burada listelenir.
               </div>
