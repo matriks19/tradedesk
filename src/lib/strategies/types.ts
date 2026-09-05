@@ -2,6 +2,7 @@ import type { BuiltinIndicatorId, ChartTimeframe } from "@/lib/types";
 import type { StrategyPresetId } from "@/lib/backtest";
 
 export type StrategyCategory =
+  | "high_edge"
   | "momentum"
   | "mean_reversion"
   | "trend"
@@ -43,9 +44,16 @@ export interface StrategyPack {
   /** Extra scanner chip ids */
   scannerChips?: string[];
   tags: string[];
+  /**
+   * Optional literature / community claim + caveat for high_edge packs.
+   * Shown in StrategiesPanel when present — not a measured win rate.
+   */
+  researchNote?: string;
 }
 
+/** Insertion order = filter chip order (high_edge first). */
 export const CATEGORY_LABELS: Record<StrategyCategory, string> = {
+  high_edge: "Yüksek başarı",
   momentum: "Momentum / ORB",
   mean_reversion: "Mean reversion",
   trend: "Trend",

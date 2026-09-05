@@ -144,8 +144,16 @@ export function StrategiesPanel() {
                   className="flex-1 text-left"
                   onClick={() => setOpenId(open ? null : s.id)}
                 >
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="font-medium">{s.name}</span>
+                    {s.category === "high_edge" && (
+                      <span
+                        className="text-2xs px-1 rounded border border-amber-500/40 text-amber-400/90"
+                        title="Literatür / topluluk kaynaklı — garanti değil"
+                      >
+                        ★ araştırılmış
+                      </span>
+                    )}
                     {active && (
                       <span className="text-2xs text-desk-accent">aktif</span>
                     )}
@@ -183,6 +191,11 @@ export function StrategiesPanel() {
                   <p className="text-2xs text-desk-muted italic">
                     Kaynak ilham: {s.inspiredBy}
                   </p>
+                  {s.researchNote && (
+                    <p className="text-2xs text-amber-400/80 leading-snug">
+                      Araştırma notu: {s.researchNote}
+                    </p>
+                  )}
                   <ol className="list-decimal pl-4 text-2xs space-y-0.5 text-desk-muted">
                     {s.howTo.map((h) => (
                       <li key={h}>{h}</li>
