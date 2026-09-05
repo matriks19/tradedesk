@@ -13,6 +13,7 @@ import {
   supertrend,
   vwap,
 } from "@/lib/indicators/math";
+import { adxPumpRadar } from "@/lib/indicators/adxPump";
 import { initialBalance } from "@/lib/indicators/proreal";
 import { jurikKaseStoch } from "@/lib/indicators/jurik";
 import type { BacktestParams, SignalFn } from "./types";
@@ -85,6 +86,7 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   rsi2MeanRev: "RSI(2) Mean Reversion",
   donchianTurtle: "Donchian / Turtle Breakout",
   supertrendAdx: "Supertrend + ADX Filter",
+  adxPumpStages: "ADX Pump Radar (Saf/CCI/Medyan/Mom)",
   codeStrategy: "Kod stratejisi (yapıştır)",
   custom: "Custom Rules",
 };
@@ -99,7 +101,7 @@ export function recommendedWarmup(
       ? Math.max(params.regimeSMA ?? 200, 220)
       : 40;
   }
-  if (preset === "diAdxTrend" || preset === "supertrendAdx") return 60;
+  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages") return 60;
   if (preset === "aroonLongTrend") return 40;
   if (preset === "jurikOsBounce") return 80;
   if (preset === "donchianTurtle")
@@ -160,6 +162,18 @@ export function buildSignalContext(
     smaRegime: sma(closes, regimeN),
     fastSMA: sma(closes, fastMa),
     dmi: adx(candles, params.adxPeriod ?? 14),
+    pumpRadar: adxPumpRadar(candles, {
+      adxPeriod: params.adxPeriod ?? 14,
+      fastSmooth: params.fastSmooth ?? 3,
+      medianLen: params.medianLen ?? 5,
+      momPeriod: params.momPeriod ?? 7,
+      cciPeriod: params.cciPeriod ?? 10,
+      bbPeriod: params.bbPeriod ?? 20,
+      bbMult: params.bbMult ?? 2,
+      smoothLen: params.smoothLen ?? 3,
+      adxConfirm: params.adxConfirm ?? params.adxMin ?? 25,
+      adxWake: params.adxWake ?? 15,
+    }),
     aroon: aroon(candles, params.aroonPeriod ?? 14),
     vwap: vwap(candles),
     ib: initialBalance(candles, orbBars),
@@ -504,6 +518,72 @@ export function getSignalFn(
         const exitShort =
           (dir[i] as number) > 0 || (d.adx[i] as number) < 20;
         return { long, short, exitLong, exitShort, reason: "ST+ADX" };
+      };
+
+    case "adxPumpStages":
+      return (_c, i, ctx) => {
+        const r = ctx.pumpRadar as {
+          stage: (number | null)[];
+          bias: (number | null)[];
+          osc: (number | null)[];
+          mid: (number | null)[];
+          early: (number | null)[];
+          confirm: (number | null)[];
+          adx: (number | null)[];
+          adxEarly: (number | null)[];
+          adxMid: (number | null)[];
+          adxConfirmSmooth: (number | null)[];
+        };
+        if (
+          r.stage[i] == null ||
+          r.bias[i] == null ||
+          r.osc[i] == null ||
+          i < 1
+        )
+          return {};
+        const st = r.stage[i] as number;
+        const stPrev = (r.stage[i - 1] as number) ?? 0;
+        const bias = r.bias[i] as number;
+        const osc = r.osc[i] as number;
+        const oscPrev = (r.osc[i - 1] as number) ?? osc;
+        const absSt = Math.abs(st);
+        const absPrev = Math.abs(stPrev);
+        // Enter on mid→confirm escalation (stage ≥2) with matching bias; prefer rising osc
+        const escalated = absSt >= 2 && absSt > absPrev;
+        const midRising =
+          absSt >= 2 &&
+          bias > 0 &&
+          osc > oscPrev &&
+          (r.mid[i] as number) > 0;
+        const midRisingShort =
+          absSt >= 2 &&
+          bias < 0 &&
+          osc < oscPrev &&
+          (r.mid[i] as number) < 0;
+        const long =
+          bias > 0 && (escalated || midRising || absSt === 3);
+        const short =
+          bias < 0 && (escalated || midRisingShort || absSt === 3);
+        // Faster exits: bias flip, stage drop to 0/1, osc zero-cross — don't wait ADX<20
+        const midNow = (r.mid[i] as number) ?? 0;
+        const midPrev = (r.mid[i - 1] as number) ?? midNow;
+        const exitLong =
+          bias < 0 ||
+          absSt <= 1 ||
+          (osc < 0 && oscPrev >= 0) ||
+          (osc < midNow && oscPrev >= midPrev && absSt < 3);
+        const exitShort =
+          bias > 0 ||
+          absSt <= 1 ||
+          (osc > 0 && oscPrev <= 0) ||
+          (osc > midNow && oscPrev <= midPrev && absSt < 3);
+        return {
+          long,
+          short,
+          exitLong,
+          exitShort,
+          reason: "ADX Pump",
+        };
       };
 
     case "codeStrategy":

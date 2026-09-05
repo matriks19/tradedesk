@@ -167,6 +167,7 @@ import {
   sweepReversalMap,
   varWeightedRegression,
 } from "./proreal";
+import { adxPumpRadar } from "./adxPump";
 
 export interface PlotSeries {
   id: string;
@@ -298,6 +299,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "supertrend", label: "Supertrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "st", inputs: [num("period", "ATR Period", 10), num("mult", "Multiplier", 3, 0.5, 20, 0.1)] },
   { id: "psar", label: "Parabolic SAR", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "psar", inputs: [num("step", "Step", 0.02, 0.001, 0.5, 0.001), num("max", "Max", 0.2, 0.01, 1, 0.01)] },
   { id: "adx", label: "ADX / DMI", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "adx", inputs: [num("period", "Period", 14)] },
+  { id: "adxPumpRadar", label: "ADX Pump Radar (Saf/CCI/Medyan/Mom)", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: "4 ADX + Bollinger + karışım DI: Saf ADX | ADX×CCI | ADX×Medyan | ADX×Momentum; plusDIMix/minusDIMix. Early: Mom-ADX+CCI+%B; Mid: karışım DI; Confirm: Saf/Medyan ≥25.", inputs: [num("adxPeriod", "ADX Period", 14), num("fastSmooth", "Hızlı DX Smooth", 3), num("medianLen", "Medyan Uzunluk", 5), num("momPeriod", "Mom/ROC", 7), num("cciPeriod", "CCI Period", 10), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("smoothLen", "Osc Smooth", 3), num("adxConfirm", "ADX Onay", 25), num("adxWake", "ADX Uyanış", 15)] },
   { id: "aroon", label: "Aroon", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", inputs: [num("period", "Period", 14)] },
   { id: "ichimoku", label: "Ichimoku Cloud", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "tenkan", inputs: [num("tenkan", "Tenkan", 9), num("kijun", "Kijun", 26), num("senkou", "Senkou", 52)] },
   { id: "vortex", label: "Vortex", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "vip", inputs: [num("period", "Period", 14)] },
@@ -959,6 +961,56 @@ export function computeBuiltin(
           line(inst, "minusDI", "sub", "#ef5350", candles, a.minusDI, "-DI"),
         ],
         { adx: a.adx, plusDI: a.plusDI, minusDI: a.minusDI }
+      );
+      break;
+    }
+    case "adxPumpRadar": {
+      const rr = adxPumpRadar(candles, {
+        adxPeriod: n(p, "adxPeriod", 14),
+        fastSmooth: n(p, "fastSmooth", 3),
+        medianLen: n(p, "medianLen", 5),
+        momPeriod: n(p, "momPeriod", 7),
+        cciPeriod: n(p, "cciPeriod", 10),
+        bbPeriod: n(p, "bbPeriod", 20),
+        bbMult: n(p, "bbMult", 2),
+        smoothLen: n(p, "smoothLen", 3),
+        adxConfirm: n(p, "adxConfirm", 25),
+        adxWake: n(p, "adxWake", 15),
+      });
+      push(
+        [
+          line(inst, "adx", "sub", "#e0e0e0", candles, rr.adx, "Saf ADX"),
+          line(inst, "adxCci", "sub", "#00e5ff", candles, rr.adxCci, "ADX×CCI"),
+          line(inst, "adxMedian", "sub", "#ffeb3b", candles, rr.adxMedian, "ADX×Medyan"),
+          line(inst, "adxMom", "sub", "#ff9100", candles, rr.adxMom, "ADX×Momentum"),
+          line(inst, "plusDIMix", "sub", "#69f0ae", candles, rr.plusDIMix, "Karışım +DI"),
+          line(inst, "minusDIMix", "sub", "#ff5252", candles, rr.minusDIMix, "Karışım −DI"),
+          hist(inst, "osc", "sub", color, candles, rr.osc, "Pump Osc"),
+          hist(inst, "stage", "sub", "#e040fb55", candles, rr.stage, "Aşama"),
+          line(inst, "early", "sub", "#00bcd466", candles, rr.early, "Erken Skor"),
+          line(inst, "mid", "sub", "#ffc10766", candles, rr.mid, "Orta Skor"),
+          line(inst, "confirm", "sub", "#8bc34a66", candles, rr.confirm, "Onay Skor"),
+          line(inst, "pctB", "sub", "#ce93d866", candles, rr.pctB, "BB %B"),
+        ],
+        {
+          osc: rr.osc,
+          stage: rr.stage,
+          early: rr.early,
+          mid: rr.mid,
+          confirm: rr.confirm,
+          bias: rr.bias,
+          adx: rr.adx,
+          adxCci: rr.adxCci,
+          adxMedian: rr.adxMedian,
+          adxMom: rr.adxMom,
+          plusDI: rr.plusDI,
+          minusDI: rr.minusDI,
+          plusDIMix: rr.plusDIMix,
+          minusDIMix: rr.minusDIMix,
+          diSpread: rr.diSpread,
+          pctB: rr.pctB,
+          bbWidth: rr.bbWidth,
+        }
       );
       break;
     }

@@ -245,7 +245,8 @@ export type BuiltinIndicatorId =
   | "rangeFilter"
   | "choppiness"
   | "bop"
-  | "elderRay";
+  | "elderRay"
+  | "adxPumpRadar";
 
 export interface IndicatorInputDef {
   key: string;

@@ -12,6 +12,7 @@ import {
   stochastic,
   supertrend,
 } from "@/lib/indicators/math";
+import { adxPumpRadar } from "@/lib/indicators/adxPump";
 import { jurikKaseStoch, jurikStoch } from "@/lib/indicators/jurik";
 
 export type ScannerFilter =
@@ -57,7 +58,19 @@ export type ScannerFilter =
   | { type: "nearHod"; pct?: number }
   | { type: "nearLod"; pct?: number }
   | { type: "priceVsSma"; period: 50 | 200; side: "above" | "below" }
-  | { type: "rsiDivergence"; direction: "bull" | "bear"; lookback?: number };
+  | { type: "rsiDivergence"; direction: "bull" | "bear"; lookback?: number }
+  | {
+      type: "adxPumpStage";
+      /** early | mid | confirm */
+      stage: "early" | "mid" | "confirm";
+      direction: "bull" | "bear";
+      /** Min |score| for early/mid/confirm series (default 25/30/35) */
+      minScore?: number;
+    }
+  | {
+      type: "adxPumpMixDi";
+      direction: "bull" | "bear";
+    };
 
 export interface ScannerRow {
   symbol: string;
@@ -306,6 +319,42 @@ export const SCANNER_PRESETS: Record<
     label: "Aroon Up>70 Down<30",
     description: "Klasik Aroon long zone (güçlü uptrend)",
     filters: [{ type: "aroonLong", upMin: 70, downMax: 30 }],
+  },
+  adx_pump_early_long: {
+    label: "ADX Pump erken long",
+    description: "Erken skor yüksek + bull bias (Mom-ADX + CCI + %B)",
+    filters: [{ type: "adxPumpStage", stage: "early", direction: "bull", minScore: 25 }],
+  },
+  adx_pump_early_short: {
+    label: "ADX Pump erken short",
+    description: "Erken skor yüksek + bear bias",
+    filters: [{ type: "adxPumpStage", stage: "early", direction: "bear", minScore: 25 }],
+  },
+  adx_pump_mid_long: {
+    label: "ADX Pump orta DI",
+    description: "Karışım +DI/−DI hizalı mid build (long)",
+    filters: [
+      { type: "adxPumpStage", stage: "mid", direction: "bull", minScore: 30 },
+      { type: "adxPumpMixDi", direction: "bull" },
+    ],
+  },
+  adx_pump_mid_short: {
+    label: "ADX Pump orta DI short",
+    description: "Karışım DI mid build (short)",
+    filters: [
+      { type: "adxPumpStage", stage: "mid", direction: "bear", minScore: 30 },
+      { type: "adxPumpMixDi", direction: "bear" },
+    ],
+  },
+  adx_pump_confirm_long: {
+    label: "ADX Pump onay long",
+    description: "Confirm stage + Saf/Medyan ADX gücü (long)",
+    filters: [{ type: "adxPumpStage", stage: "confirm", direction: "bull", minScore: 35 }],
+  },
+  adx_pump_confirm_short: {
+    label: "ADX Pump onay short",
+    description: "Confirm stage (short)",
+    filters: [{ type: "adxPumpStage", stage: "confirm", direction: "bear", minScore: 35 }],
   },
 };
 
@@ -611,6 +660,48 @@ export function matchFilters(
       if (up == null || down == null) return { ok: false, note: "" };
       if (!(up >= upMin && down <= downMax)) return { ok: false, note: "" };
       notes.push(`Aroon ${up.toFixed(0)}/${down.toFixed(0)}`);
+
+    } else if (f.type === "adxPumpStage") {
+      if (!candles || candles.length < 50) return { ok: false, note: "" };
+      const r = adxPumpRadar(candles);
+      const i = r.stage.length - 1;
+      const bias = r.bias[i];
+      const st = r.stage[i];
+      if (bias == null || st == null) return { ok: false, note: "" };
+      const wantBull = f.direction === "bull";
+      if (wantBull && bias <= 0) return { ok: false, note: "" };
+      if (!wantBull && bias >= 0) return { ok: false, note: "" };
+      const scoreSeries =
+        f.stage === "early" ? r.early : f.stage === "mid" ? r.mid : r.confirm;
+      const score = scoreSeries[i];
+      const min =
+        f.minScore ??
+        (f.stage === "early" ? 25 : f.stage === "mid" ? 30 : 35);
+      if (score == null || Math.abs(score) < min) return { ok: false, note: "" };
+      const absSt = Math.abs(st);
+      const need =
+        f.stage === "early" ? 1 : f.stage === "mid" ? 2 : 3;
+      if (absSt < need && f.stage !== "early") {
+        // allow early on score alone; mid/confirm prefer stage level
+        if (f.stage === "confirm" && absSt < 3) return { ok: false, note: "" };
+        if (f.stage === "mid" && absSt < 2) return { ok: false, note: "" };
+      }
+      const tag =
+        f.stage === "early" ? "Erken" : f.stage === "mid" ? "Orta" : "Onay";
+      notes.push(
+        `Pump ${tag} ${wantBull ? "L" : "S"} ${score.toFixed(0)}`
+      );
+    } else if (f.type === "adxPumpMixDi") {
+      if (!candles || candles.length < 50) return { ok: false, note: "" };
+      const r = adxPumpRadar(candles);
+      const i = r.plusDIMix.length - 1;
+      const p = r.plusDIMix[i];
+      const m = r.minusDIMix[i];
+      if (p == null || m == null) return { ok: false, note: "" };
+      if (f.direction === "bull" && !(p > m)) return { ok: false, note: "" };
+      if (f.direction === "bear" && !(m > p)) return { ok: false, note: "" };
+      notes.push(f.direction === "bull" ? "Mix +DI>+DI−" : "Mix −DI>+DI");
+
     } else if (f.type === "rsiDivergence") {
 
       if (!candles || candles.length < 40) return { ok: false, note: "" };

@@ -36,6 +36,7 @@ const SIGNAL_EXIT_PRESETS = new Set<StrategyPresetId>([
   "rsi2MeanRev",
   "donchianTurtle",
   "supertrendAdx",
+  "adxPumpStages",
   "codeStrategy",
 ]);
 

@@ -19,6 +19,7 @@ export type StrategyPresetId =
   | "rsi2MeanRev"
   | "donchianTurtle"
   | "supertrendAdx"
+  | "adxPumpStages"
   | "codeStrategy"
   | "custom";
 
@@ -77,6 +78,14 @@ export interface BacktestParams {
   requireRegimeAbove?: boolean;
   /** VWAP bounce: max distance from VWAP as fraction of ATR (default 0.35) */
   vwapTouchAtr?: number;
+  /** ADX Pump Radar stage knobs */
+  momPeriod?: number;
+  cciPeriod?: number;
+  smoothLen?: number;
+  medianLen?: number;
+  adxWake?: number;
+  adxConfirm?: number;
+  fastSmooth?: number;
 }
 
 export interface BacktestTrade {
