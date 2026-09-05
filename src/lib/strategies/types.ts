@@ -3,6 +3,7 @@ import type { StrategyPresetId } from "@/lib/backtest";
 
 export type StrategyCategory =
   | "high_edge"
+  | "elizi"
   | "momentum"
   | "mean_reversion"
   | "trend"
@@ -14,6 +15,7 @@ export type StrategyCategory =
 /** Intentional UI / filter chip order — do not rely on Object.keys alone. */
 export const STRATEGY_CATEGORY_ORDER: StrategyCategory[] = [
   "high_edge",
+  "elizi",
   "momentum",
   "trend",
   "mean_reversion",
@@ -83,6 +85,7 @@ export interface StrategyPack {
 /** Insertion order = filter chip order (high_edge first). Prefer STRATEGY_CATEGORY_ORDER. */
 export const CATEGORY_LABELS: Record<StrategyCategory, string> = {
   high_edge: "Yüksek başarı",
+  elizi: "Elizi Lab",
   momentum: "Momentum / ORB",
   mean_reversion: "Mean reversion",
   trend: "Trend",

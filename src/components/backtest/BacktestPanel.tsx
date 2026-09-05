@@ -37,6 +37,7 @@ const SIGNAL_EXIT_PRESETS = new Set<StrategyPresetId>([
   "donchianTurtle",
   "supertrendAdx",
   "adxPumpStages",
+  "eliziEdgeFire",
   "codeStrategy",
 ]);
 

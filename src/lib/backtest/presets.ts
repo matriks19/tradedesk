@@ -14,6 +14,7 @@ import {
   vwap,
 } from "@/lib/indicators/math";
 import { adxPumpRadar } from "@/lib/indicators/adxPump";
+import { eliziEdge } from "@/lib/indicators/eliziEdge";
 import { initialBalance } from "@/lib/indicators/proreal";
 import { jurikKaseStoch } from "@/lib/indicators/jurik";
 import type { BacktestParams, SignalFn } from "./types";
@@ -87,6 +88,7 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   donchianTurtle: "Donchian / Turtle Breakout",
   supertrendAdx: "Supertrend + ADX Filter",
   adxPumpStages: "ADX Pump Radar (Saf/CCI/Medyan/Mom)",
+  eliziEdgeFire: "Elizi Edge Fire (phase/temp/coherence)",
   codeStrategy: "Kod stratejisi (yapıştır)",
   custom: "Custom Rules",
 };
@@ -101,7 +103,7 @@ export function recommendedWarmup(
       ? Math.max(params.regimeSMA ?? 200, 220)
       : 40;
   }
-  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages") return 60;
+  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "eliziEdgeFire") return 60;
   if (preset === "aroonLongTrend") return 40;
   if (preset === "jurikOsBounce") return 80;
   if (preset === "donchianTurtle")
@@ -173,6 +175,23 @@ export function buildSignalContext(
       smoothLen: params.smoothLen ?? 3,
       adxConfirm: params.adxConfirm ?? params.adxMin ?? 25,
       adxWake: params.adxWake ?? 15,
+    }),
+    elizi: eliziEdge(candles, {
+      erLen: params.erLen ?? 10,
+      atrLen: params.atrLen ?? params.atrPeriod ?? 14,
+      adxPeriod: params.adxPeriod ?? 14,
+      bbPeriod: params.bbPeriod ?? 20,
+      bbMult: params.bbMult ?? 2,
+      volLen: params.volLen ?? 5,
+      volLong: params.volLong ?? 10,
+      flowSmooth: params.flowSmooth ?? 3,
+      tempSmooth: params.tempSmooth ?? 4,
+      effHigh: params.effHigh ?? 0.45,
+      surpriseHigh: params.surpriseHigh ?? 0.85,
+      coherenceArmed: params.coherenceArmed ?? 0.6,
+      fireTemp: params.fireTemp ?? 62,
+      armedTemp: params.armedTemp ?? 48,
+      probeTemp: params.probeTemp ?? 32,
     }),
     aroon: aroon(candles, params.aroonPeriod ?? 14),
     vwap: vwap(candles),
@@ -583,6 +602,68 @@ export function getSignalFn(
           exitLong,
           exitShort,
           reason: "ADX Pump",
+        };
+      };
+
+
+    case "eliziEdgeFire":
+      return (_c, i, ctx) => {
+        const r = ctx.elizi as {
+          phase: (number | null)[];
+          edgeTemp: (number | null)[];
+          coherence: (number | null)[];
+          bias: (number | null)[];
+          edgeUp: (number | null)[];
+          edgeDown: (number | null)[];
+          pathEfficiency: (number | null)[];
+          diAccel: (number | null)[];
+          volSurprise: (number | null)[];
+        };
+        if (
+          r.phase[i] == null ||
+          r.edgeTemp[i] == null ||
+          r.coherence[i] == null ||
+          r.bias[i] == null ||
+          i < 1
+        )
+          return {};
+        const ph = r.phase[i] as number;
+        const phPrev = (r.phase[i - 1] as number) ?? 0;
+        const temp = r.edgeTemp[i] as number;
+        const tempPrev = (r.edgeTemp[i - 1] as number) ?? temp;
+        const coh = r.coherence[i] as number;
+        const bias = r.bias[i] as number;
+        const absPh = Math.abs(ph);
+        const absPrev = Math.abs(phPrev);
+        const cohArmed = 0.55;
+        // Enter when phase escalates into armed(2)/fire(3) with high coherence + rising temp
+        const escalated =
+          absPh >= 2 &&
+          absPh > absPrev &&
+          coh >= cohArmed &&
+          temp > tempPrev;
+        const fireHold = absPh >= 3 && coh >= cohArmed && temp >= 55;
+        const long = bias > 0 && (escalated || fireHold);
+        const short = bias < 0 && (escalated || fireHold);
+        // Exit: exhaust(4), phase drop to ≤1, bias flip, temp collapse
+        const exitLong =
+          bias < 0 ||
+          absPh === 4 ||
+          absPh <= 1 ||
+          (temp < tempPrev && temp < 40) ||
+          (ph > 0 && absPh < absPrev && absPh <= 2 && temp < 50);
+        const exitShort =
+          bias > 0 ||
+          absPh === 4 ||
+          absPh <= 1 ||
+          (temp < tempPrev && temp < 40) ||
+          (ph < 0 && absPh < absPrev && absPh <= 2 && temp < 50);
+        return {
+          long,
+          short,
+          exitLong,
+          exitShort,
+          reason: "Elizi Fire",
         };
       };
 

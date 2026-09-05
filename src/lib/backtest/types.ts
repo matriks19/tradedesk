@@ -20,6 +20,7 @@ export type StrategyPresetId =
   | "donchianTurtle"
   | "supertrendAdx"
   | "adxPumpStages"
+  | "eliziEdgeFire"
   | "codeStrategy"
   | "custom";
 
@@ -86,6 +87,19 @@ export interface BacktestParams {
   adxWake?: number;
   adxConfirm?: number;
   fastSmooth?: number;
+  /** Elizi Edge knobs */
+  erLen?: number;
+  atrLen?: number;
+  volLen?: number;
+  volLong?: number;
+  flowSmooth?: number;
+  tempSmooth?: number;
+  effHigh?: number;
+  surpriseHigh?: number;
+  coherenceArmed?: number;
+  fireTemp?: number;
+  armedTemp?: number;
+  probeTemp?: number;
 }
 
 export interface BacktestTrade {

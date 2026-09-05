@@ -103,7 +103,7 @@ export function StrategiesPanel() {
         </p>
         <input
           className="input w-full text-2xs"
-          placeholder="Ara: ORB, RSI2, Turtle, ICT, Jurik…"
+          placeholder="Ara: Elizi, ORB, RSI2, Turtle, ICT, Jurik…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -136,13 +136,18 @@ export function StrategiesPanel() {
                 cat === c && "btn-accent",
                 c === "high_edge" &&
                   cat !== c &&
-                  "border border-amber-500/40 text-amber-400/90"
+                  "border border-amber-500/40 text-amber-400/90",
+                c === "elizi" &&
+                  cat !== c &&
+                  "border border-fuchsia-500/40 text-fuchsia-300/90"
               )}
               onClick={() => setCat(c)}
             >
               {c === "high_edge"
                 ? `★ ${CATEGORY_LABELS[c]}`
-                : CATEGORY_LABELS[c]}
+                : c === "elizi"
+                  ? `◈ ${CATEGORY_LABELS[c]}`
+                  : CATEGORY_LABELS[c]}
             </button>
           ))}
         </div>
@@ -160,7 +165,8 @@ export function StrategiesPanel() {
               className={clsx(
                 "border rounded border-desk-border/60 p-2 space-y-1.5",
                 active && "border-desk-accent/60 bg-desk-elevated/40",
-                s.category === "high_edge" && !active && "border-amber-500/25"
+                s.category === "high_edge" && !active && "border-amber-500/25",
+                s.category === "elizi" && !active && "border-fuchsia-500/30"
               )}
             >
               <div className="flex items-start gap-2">
@@ -177,6 +183,14 @@ export function StrategiesPanel() {
                         title="Literatür / topluluk kaynaklı — garanti değil"
                       >
                         ★ araştırılmış
+                      </span>
+                    )}
+                    {s.category === "elizi" && (
+                      <span
+                        className="text-2xs px-1 rounded border border-fuchsia-500/45 text-fuchsia-300/95"
+                        title="Elizi Lab proprietary"
+                      >
+                        ◈ Elizi
                       </span>
                     )}
                     {active && (
@@ -201,7 +215,9 @@ export function StrategiesPanel() {
                     "text-2xs px-1 rounded bg-desk-elevated",
                     s.category === "high_edge"
                       ? "text-amber-400/90"
-                      : "text-desk-muted"
+                      : s.category === "elizi"
+                        ? "text-fuchsia-300/90"
+                        : "text-desk-muted"
                   )}
                 >
                   {CATEGORY_LABELS[s.category]}

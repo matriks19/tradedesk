@@ -168,6 +168,7 @@ import {
   varWeightedRegression,
 } from "./proreal";
 import { adxPumpRadar } from "./adxPump";
+import { eliziEdge } from "./eliziEdge";
 
 export interface PlotSeries {
   id: string;
@@ -412,6 +413,9 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "schaffTrendCycle", label: "Schaff Trend Cycle", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "stc", description: CRED_PROREAL, inputs: [num("period", "Cycle", 10), num("fast", "Fast", 23), num("slow", "Slow", 50), src()] },
   { id: "selfAwareTrail", label: "Self-Aware Trend Trail", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "trail", description: CRED_PROREAL, inputs: [num("atrLen", "ATR", 10), num("mult", "Mult", 3, 0.5, 10, 0.1), num("qiLen", "QI Length", 14)] },
   { id: "adaptiveMacd", label: "Adaptive MACD", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: CRED_PROREAL, inputs: [num("baseFast", "Base Fast", 12), num("baseSlow", "Base Slow", 26), num("signal", "Signal", 9), src()] },
+
+  // —— Elizi Lab
+  { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — coherence + surprise + DI acceleration before ADX confirms. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1)] },
 ];
 
 export const BUILTIN_META: Record<BuiltinIndicatorId, IndicatorMeta> =
@@ -440,6 +444,7 @@ export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
   jurik: "Jurik / Loxx tarzı",
   bigbeluga: "BigBeluga / SMC tarzı",
   proreal: "ProRealCode tarzı",
+  lab: "Elizi Lab",
   other: "Diğer",
 };
 
@@ -455,6 +460,7 @@ export const CATEGORY_ORDER: IndicatorCategory[] = [
   "jurik",
   "bigbeluga",
   "proreal",
+  "lab",
   "other",
 ];
 
@@ -2064,6 +2070,64 @@ export function computeBuiltin(
       push([line(inst, "bop", "sub", color, candles, v, `BOP(${smooth})`)], { bop: v });
       break;
     }
+
+    case "eliziEdge": {
+      const ee = eliziEdge(candles, {
+        erLen: n(p, "erLen", 10),
+        atrLen: n(p, "atrLen", 14),
+        adxPeriod: n(p, "adxPeriod", 14),
+        bbPeriod: n(p, "bbPeriod", 20),
+        bbMult: n(p, "bbMult", 2),
+        volLen: n(p, "volLen", 5),
+        volLong: n(p, "volLong", 10),
+        flowSmooth: n(p, "flowSmooth", 3),
+        tempSmooth: n(p, "tempSmooth", 4),
+        effHigh: n(p, "effHigh", 0.45),
+        surpriseHigh: n(p, "surpriseHigh", 0.85),
+        coherenceArmed: n(p, "coherenceArmed", 0.6),
+        fireTemp: n(p, "fireTemp", 62),
+        armedTemp: n(p, "armedTemp", 48),
+        probeTemp: n(p, "probeTemp", 32),
+      });
+      // Scale coherence 0–1 → 0–100 and surprise for readable pane
+      const coh100 = ee.coherence.map((v) => (v == null ? null : v * 100));
+      const surScaled = ee.volSurprise.map((v) => (v == null ? null : Math.min(v * 40, 100)));
+      const phaseScaled = ee.phase.map((v) => (v == null ? null : v * 20));
+      push(
+        [
+          hist(inst, "edgeTemp", "sub", color, candles, ee.edgeTemp, "Edge Temp"),
+          line(inst, "edgeUp", "sub", "#69f0ae", candles, ee.edgeUp, "Elizi +E"),
+          line(inst, "edgeDown", "sub", "#ff5252", candles, ee.edgeDown, "Elizi −E"),
+          line(inst, "coherence", "sub", "#ce93d888", candles, coh100, "Uyum"),
+          line(inst, "surprise", "sub", "#ffab4088", candles, surScaled, "Sürpriz"),
+          hist(inst, "phase", "sub", "#e040fb55", candles, phaseScaled, "Faz"),
+          line(inst, "efficiency", "sub", "#90a4ae66", candles, ee.pathEfficiency.map((v) => (v == null ? null : v * 100)), "Verim"),
+          line(inst, "diAccel", "sub", "#00e5ff55", candles, ee.diAccel, "DI İvme"),
+          line(inst, "flowAgree", "sub", "#aed58155", candles, ee.flowAgree.map((v) => (v == null ? null : v * 50)), "Akış"),
+        ],
+        {
+          edgeTemp: ee.edgeTemp,
+          edgeUp: ee.edgeUp,
+          edgeDown: ee.edgeDown,
+          coherence: ee.coherence,
+          volSurprise: ee.volSurprise,
+          phase: ee.phase,
+          bias: ee.bias,
+          pathEfficiency: ee.pathEfficiency,
+          diAccel: ee.diAccel,
+          diAccel2: ee.diAccel2,
+          bbPressure: ee.bbPressure,
+          flowAgree: ee.flowAgree,
+          diSpread: ee.diSpread,
+          pctB: ee.pctB,
+          adx: ee.adx,
+          plusDI: ee.plusDI,
+          minusDI: ee.minusDI,
+        }
+      );
+      break;
+    }
+
     case "elderRay": {
       const e = elderRay(candles, n(p, "period", 13));
       push(

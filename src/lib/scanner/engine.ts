@@ -13,6 +13,7 @@ import {
   supertrend,
 } from "@/lib/indicators/math";
 import { adxPumpRadar } from "@/lib/indicators/adxPump";
+import { eliziEdge } from "@/lib/indicators/eliziEdge";
 import { jurikKaseStoch, jurikStoch } from "@/lib/indicators/jurik";
 
 export type ScannerFilter =
@@ -70,6 +71,25 @@ export type ScannerFilter =
   | {
       type: "adxPumpMixDi";
       direction: "bull" | "bear";
+    }
+  | {
+      type: "eliziPhase";
+      /** armed | fire | exhaust | probe */
+      phase: "probe" | "armed" | "fire" | "exhaust";
+      direction: "bull" | "bear" | "any";
+      minTemp?: number;
+      minCoherence?: number;
+    }
+  | {
+      type: "eliziFire";
+      direction: "bull" | "bear";
+      minTemp?: number;
+      minCoherence?: number;
+    }
+  | {
+      type: "eliziExhaust";
+      direction: "bull" | "bear" | "any";
+      minSurprise?: number;
     };
 
 export interface ScannerRow {
@@ -356,6 +376,26 @@ export const SCANNER_PRESETS: Record<
     description: "Confirm stage (short)",
     filters: [{ type: "adxPumpStage", stage: "confirm", direction: "bear", minScore: 35 }],
   },
+  elizi_fire_long: {
+    label: "Elizi Fire long",
+    description: "phase armed/fire + yüksek uyum + yükselen edgeTemp (long)",
+    filters: [{ type: "eliziFire", direction: "bull", minTemp: 55, minCoherence: 0.55 }],
+  },
+  elizi_fire_short: {
+    label: "Elizi Fire short",
+    description: "phase armed/fire + yüksek uyum (short)",
+    filters: [{ type: "eliziFire", direction: "bear", minTemp: 55, minCoherence: 0.55 }],
+  },
+  elizi_exhaust: {
+    label: "Elizi Exhaust",
+    description: "Faz exhaust — sürpriz climax + verim çöküşü (fade)",
+    filters: [{ type: "eliziExhaust", direction: "any", minSurprise: 0.7 }],
+  },
+  elizi_armed: {
+    label: "Elizi Armed",
+    description: "phase ≥ armed, uyum yüksek — fire öncesi hazır",
+    filters: [{ type: "eliziPhase", phase: "armed", direction: "any", minTemp: 45, minCoherence: 0.5 }],
+  },
 };
 
 const CANDLE_FILTERS = new Set([
@@ -379,6 +419,9 @@ const CANDLE_FILTERS = new Set([
   "rsiDivergence",
   "adxPumpStage",
   "adxPumpMixDi",
+  "eliziPhase",
+  "eliziFire",
+  "eliziExhaust",
 ]);
 
 /** Reuse radar within a matchFilters pass (and across filters sharing candles ref). */
@@ -392,6 +435,19 @@ function getAdxPumpRadar(candles: Candle[]): ReturnType<typeof adxPumpRadar> {
   }
   return r;
 }
+
+/** Reuse Elizi Edge within a matchFilters pass. */
+const ELIZI_CACHE = new WeakMap<Candle[], ReturnType<typeof eliziEdge>>();
+
+function getEliziEdge(candles: Candle[]): ReturnType<typeof eliziEdge> {
+  let r = ELIZI_CACHE.get(candles);
+  if (!r) {
+    r = eliziEdge(candles);
+    ELIZI_CACHE.set(candles, r);
+  }
+  return r;
+}
+
 
 
 function crossedAbove(
@@ -448,6 +504,16 @@ export function matchFilters(
   const pumpRadar =
     needsPump && candles && candles.length >= 50
       ? getAdxPumpRadar(candles)
+      : null;
+  const needsElizi = filters.some(
+    (f) =>
+      f.type === "eliziPhase" ||
+      f.type === "eliziFire" ||
+      f.type === "eliziExhaust"
+  );
+  const elizi =
+    needsElizi && candles && candles.length >= 50
+      ? getEliziEdge(candles)
       : null;
 
   for (const f of filters) {
@@ -723,6 +789,72 @@ export function matchFilters(
       if (f.direction === "bull" && !(p > m)) return { ok: false, note: "" };
       if (f.direction === "bear" && !(m > p)) return { ok: false, note: "" };
       notes.push(f.direction === "bull" ? "Mix +DI>+DI−" : "Mix −DI>+DI");
+
+
+    } else if (f.type === "eliziFire") {
+      if (!elizi) return { ok: false, note: "" };
+      const r = elizi;
+      const i = r.phase.length - 1;
+      const ph = r.phase[i];
+      const temp = r.edgeTemp[i];
+      const coh = r.coherence[i];
+      const bias = r.bias[i];
+      if (ph == null || temp == null || coh == null || bias == null)
+        return { ok: false, note: "" };
+      const absPh = Math.abs(ph);
+      const wantBull = f.direction === "bull";
+      if (wantBull && bias <= 0) return { ok: false, note: "" };
+      if (!wantBull && bias >= 0) return { ok: false, note: "" };
+      if (absPh < 2) return { ok: false, note: "" };
+      const minTemp = f.minTemp ?? 55;
+      const minCoh = f.minCoherence ?? 0.55;
+      if (temp < minTemp || coh < minCoh) return { ok: false, note: "" };
+      const tempPrev = i > 0 ? r.edgeTemp[i - 1] : null;
+      if (tempPrev != null && temp < tempPrev) return { ok: false, note: "" };
+      notes.push(
+        `Elizi Fire ${wantBull ? "L" : "S"} T${temp.toFixed(0)} C${(coh * 100).toFixed(0)}`
+      );
+    } else if (f.type === "eliziPhase") {
+      if (!elizi) return { ok: false, note: "" };
+      const r = elizi;
+      const i = r.phase.length - 1;
+      const ph = r.phase[i];
+      const temp = r.edgeTemp[i];
+      const coh = r.coherence[i];
+      const bias = r.bias[i];
+      if (ph == null || temp == null || coh == null || bias == null)
+        return { ok: false, note: "" };
+      const absPh = Math.abs(ph);
+      if (f.phase === "exhaust") {
+        if (absPh !== 4) return { ok: false, note: "" };
+      } else {
+        const need =
+          f.phase === "probe" ? 1 : f.phase === "armed" ? 2 : 3;
+        if (absPh < need) return { ok: false, note: "" };
+      }
+      if (f.direction === "bull" && bias <= 0) return { ok: false, note: "" };
+      if (f.direction === "bear" && bias >= 0) return { ok: false, note: "" };
+      const minTemp = f.minTemp ?? 0;
+      const minCoh = f.minCoherence ?? 0;
+      if (temp < minTemp || coh < minCoh) return { ok: false, note: "" };
+      notes.push(`Elizi ${f.phase} T${temp.toFixed(0)}`);
+    } else if (f.type === "eliziExhaust") {
+      if (!elizi) return { ok: false, note: "" };
+      const r = elizi;
+      const i = r.phase.length - 1;
+      const ph = r.phase[i];
+      const sur = r.volSurprise[i];
+      const eff = r.pathEfficiency[i];
+      const bias = r.bias[i];
+      if (ph == null || bias == null) return { ok: false, note: "" };
+      if (Math.abs(ph) !== 4) return { ok: false, note: "" };
+      if (f.direction === "bull" && bias <= 0) return { ok: false, note: "" };
+      if (f.direction === "bear" && bias >= 0) return { ok: false, note: "" };
+      const minSur = f.minSurprise ?? 0.7;
+      if (sur != null && sur < minSur) return { ok: false, note: "" };
+      notes.push(
+        `Elizi Exhaust${eff != null ? ` ER${(eff * 100).toFixed(0)}` : ""}`
+      );
 
     } else if (f.type === "rsiDivergence") {
 

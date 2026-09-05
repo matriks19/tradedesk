@@ -74,6 +74,7 @@ export type IndicatorCategory =
   | "jurik"
   | "bigbeluga"
   | "proreal"
+  | "lab"
   | "other";
 
 export type PriceField = "close" | "open" | "high" | "low" | "hl2" | "hlc3" | "ohlc4";
@@ -246,7 +247,9 @@ export type BuiltinIndicatorId =
   | "choppiness"
   | "bop"
   | "elderRay"
-  | "adxPumpRadar";
+  | "adxPumpRadar"
+  // Elizi Lab
+  | "eliziEdge";
 
 export interface IndicatorInputDef {
   key: string;
