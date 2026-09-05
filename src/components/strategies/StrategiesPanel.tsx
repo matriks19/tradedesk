@@ -46,7 +46,7 @@ function packSortKey(s: StrategyPack): number {
 export function StrategiesPanel() {
   const { activeStrategyId, applyStrategyPack, setSidebarTab } = useDeskStore();
   const [cat, setCat] = useState<StrategyCategory | "all">("all");
-  const [tfFilter, setTfFilter] = useState<"all" | "5m" | "10m" | "15m">("all");
+  const [tfFilter, setTfFilter] = useState<"all" | "5m" | "10m" | "15m" | "30m" | "1h" | "2h">("all");
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(activeStrategyId);
   const [toast, setToast] = useState<string | null>(null);
@@ -108,7 +108,7 @@ export function StrategiesPanel() {
           onChange={(e) => setQ(e.target.value)}
         />
         <div className="flex flex-wrap gap-1">
-          {(["all", "5m", "10m", "15m"] as const).map((tf) => (
+          {(["all", "5m", "10m", "15m", "30m", "1h", "2h"] as const).map((tf) => (
             <button
               key={tf}
               type="button"

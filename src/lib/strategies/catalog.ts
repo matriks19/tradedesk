@@ -2726,8 +2726,8 @@ export const STRATEGY_PACKS: StrategyPack[] = [
   },
   {
     id: "high_edge_adx_pump_radar",
-    name: "ADX Pump Radar (Saf/CCI/Medyan/Mom)",
-    shortName: "ADX·Pump",
+    name: "ADX Pump Radar — 15m erken (varsayılan)",
+    shortName: "ADX·Pump·15m",
     category: "high_edge",
     inspiredBy:
       "Wilder ADX lag critique + Bollinger %B expansion + CCI/median/momentum adaptive ADX blends (crypto intraday playbooks)",
@@ -2740,7 +2740,7 @@ export const STRATEGY_PACKS: StrategyPack[] = [
       "Orta (build): Karışım +DI > −DI (veya spread yükseliyor) + osc yükseliş. Pozisyon ölçekle — 1h (60) ideal.",
       "Onay (commit): Saf ADX veya ADX×Medyan ≥25 + karışım DI hizalı + %B ekstrem / width expand. Tam boyut.",
       "Çıkış (ADX<20 bekleme): karışım DI tersine flip, stage 0/1’e düşüş, osc mid altı kırılım, %B çöküş.",
-      "Opsiyonel: volumeOsc veya VWAP filtre olarak ekle. Scanner’da 30m / 1h (60) / 2h (120) ile tara.",
+      "Opsiyonel: volumeOsc veya VWAP filtre olarak ekle. Scanner’da 15m / 30m / 1h (60) / 2h (120) ile tara.",
     ],
     timeframe: "15m",
     allowShort: true,
@@ -2803,6 +2803,82 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     },
     researchNote:
       "Saf ADX, Wilder-smoothed DX olduğu için pompalarda geç kalır. CCI/Medyan/Momentum ile uyarlanmış ADX katmanları + BB %B erken genişleme; confirm hâlâ Saf/Medyan ≥25 ister. Literatür iddiası doğrulanmalı — garanti değil.",
+  },
+
+  {
+    id: "high_edge_adx_pump_radar_15m",
+    name: "ADX Pump Radar — 15m erken",
+    shortName: "ADX·Pump·15",
+    category: "high_edge",
+    inspiredBy:
+      "Wilder ADX lag critique + Bollinger %B expansion (15m early pump scout)",
+    summary:
+      "Aynı ADX Pump Radar stack; 15m TF — en hızlı erken scout (Mom+CCI + %B). 30m ile teyit, 1h confirm.",
+    howTo: [
+      "TF 15m. Erken katman birincil: ADX×Mom + ADX×CCI + BB %B genişleme.",
+      "Noise yüksek — küçük boyut; 30m mid ve 1h (60) confirm ile ölçekle.",
+      "Çıkış: karışım DI flip / stage düşüş — ADX<20 bekleme.",
+      "Tarayıcıda TF 15m + adx_pump_early_* preset.",
+    ],
+    timeframe: "15m",
+    allowShort: true,
+    replaceIndicators: true,
+    indicators: [
+      {
+        type: "adxPumpRadar",
+        params: {
+          adxPeriod: 14,
+          fastSmooth: 3,
+          medianLen: 5,
+          momPeriod: 7,
+          cciPeriod: 10,
+          bbPeriod: 20,
+          bbMult: 2,
+          smoothLen: 3,
+          adxConfirm: 25,
+          adxWake: 15,
+        },
+      },
+      { type: "vwap", params: {} },
+      { type: "volumeOsc", params: { shortPeriod: 5, longPeriod: 10 } },
+      { type: "atr", params: { period: 14 } },
+    ],
+    risk: {
+      rMultiple: 1.8,
+      tip: "15m erken sinyallerde çok küçük boyut; 30m/1h teyitsiz full size yok.",
+    },
+    backtestPreset: "adxPumpStages",
+    backtestExtras: {
+      useAtrStops: true,
+      useSignalExits: true,
+      adxPeriod: 14,
+      adxMin: 25,
+      adxConfirm: 25,
+      adxWake: 15,
+      momPeriod: 7,
+      cciPeriod: 10,
+      medianLen: 5,
+      fastSmooth: 3,
+      slAtrMult: 1.3,
+      tpAtrMult: 2.2,
+      allowShort: true,
+      warmup: 60,
+    },
+    scannerPresets: [
+      "adx_pump_early_long",
+      "adx_pump_mid_long",
+      "adx_pump_early_short",
+    ],
+    scannerChips: ["adx25", "bb_sq"],
+    tags: ["high_edge", "ADX", "15m", "early", "pump"],
+    edgeScore: 85,
+    literatureEstimate: {
+      winRateHint: "15m erken — daha fazla sinyal, daha fazla gürültü",
+      expectancyHint: "sadece scout; mid/confirm üst TF",
+      disclaimer: "Community/araştırma sentezi — ölçülmüş TradeDesk WR değil",
+    },
+    researchNote:
+      "15m en hızlı erken pencere. 30m dengeli early/mid; 1h confirm; 2h swing.",
   },
   {
     id: "high_edge_adx_pump_radar_30m",
