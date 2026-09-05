@@ -90,6 +90,8 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   adxPumpStages: "ADX Pump Radar (Saf/CCI/Medyan/Mom)",
   eliziEdgeFire: "Elizi Edge Fire (phase/temp/coherence)",
   eliziEdgeExhaust: "Elizi Exhaust Fade (phase=4 counter)",
+  hybridMacdPump: "Hibrit MACD+Pump (seçici short)",
+  hybridMacdPumpLong: "Hibrit MACD+Pump Long-only",
   codeStrategy: "Kod stratejisi (yapıştır)",
   custom: "Custom Rules",
 };
@@ -104,7 +106,7 @@ export function recommendedWarmup(
       ? Math.max(params.regimeSMA ?? 200, 220)
       : 40;
   }
-  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "eliziEdgeFire" || preset === "eliziEdgeExhaust") return 60;
+  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "eliziEdgeFire" || preset === "eliziEdgeExhaust" || preset === "hybridMacdPump" || preset === "hybridMacdPumpLong") return 60;
   if (preset === "aroonLongTrend") return 40;
   if (preset === "jurikOsBounce") return 80;
   if (preset === "donchianTurtle")
@@ -191,7 +193,9 @@ export function buildSignalContext(
   // Only compute Elizi when the preset actually uses it (avoid scanner/backtest hang tax).
   if (
     params.preset === "eliziEdgeFire" ||
-    params.preset === "eliziEdgeExhaust"
+    params.preset === "eliziEdgeExhaust" ||
+    params.preset === "hybridMacdPump" ||
+    params.preset === "hybridMacdPumpLong"
   ) {
     ctx.elizi = eliziEdge(candles, {
       erLen: params.erLen ?? 10,
@@ -720,6 +724,82 @@ export function getSignalFn(
           exitLong,
           exitShort,
           reason: "Elizi Exhaust Fade",
+        };
+      };
+
+
+    case "hybridMacdPump":
+    case "hybridMacdPumpLong":
+      return (_c, i, ctx) => {
+        const m = ctx.macd as {
+          macd: (number | null)[];
+          signal: (number | null)[];
+          hist: (number | null)[];
+        };
+        const r = ctx.pumpRadar as {
+          stage: (number | null)[];
+          bias: (number | null)[];
+        };
+        const d = ctx.dmi as {
+          plusDI: (number | null)[];
+          minusDI: (number | null)[];
+        };
+        const j = ctx.jks as {
+          k: (number | null)[];
+          d: (number | null)[];
+          state: (number | null)[];
+        };
+        const el = ctx.elizi as
+          | {
+              phase: (number | null)[];
+              volSurprise: (number | null)[];
+            }
+          | undefined;
+        if (
+          i < 1 ||
+          m.macd[i] == null ||
+          m.signal[i] == null ||
+          r.stage[i] == null ||
+          r.bias[i] == null
+        )
+          return {};
+        const macdBull = crossedAbove(m.macd, m.signal, i);
+        const macdBear = crossedBelow(m.macd, m.signal, i);
+        const macdUp = (m.macd[i] as number) > (m.signal[i] as number);
+        const bias = r.bias[i] as number;
+        const absSt = Math.abs(r.stage[i] as number);
+        const absPrev = Math.abs((r.stage[i - 1] as number) ?? 0);
+        const pumpEsc =
+          absSt >= 2 && absSt > absPrev && bias > 0;
+        const diBull =
+          d.plusDI[i] != null &&
+          d.minusDI[i] != null &&
+          (d.plusDI[i] as number) > (d.minusDI[i] as number);
+        // Bakeoff: MACD long was strong; Pump long strong; don't over-filter MACD longs.
+        const long =
+          macdBull || (pumpEsc && macdUp && diBull);
+        // Bakeoff: Jurik/MACD shorts overshot when stacked; only Elizi Exhaust fade shorts.
+        let exhaustShort = false;
+        if (el && el.phase[i] != null) {
+          const ph = el.phase[i] as number;
+          const phPrev = (el.phase[i - 1] as number) ?? 0;
+          const newly = Math.abs(ph) === 4 && Math.abs(phPrev) < 4;
+          exhaustShort = newly && ph > 0; // bull exhaust → short fade
+        }
+        const short =
+          params.preset !== "hybridMacdPumpLong" && exhaustShort;
+        // Keep MACD-style exits — bakeoff: bias exits cut MACD long runners.
+        const exitLong = macdBear;
+        const exitShort = macdBull;
+        return {
+          long,
+          short,
+          exitLong,
+          exitShort,
+          reason:
+            params.preset === "hybridMacdPumpLong"
+              ? "Hybrid L (MACD/Pump)"
+              : "Hybrid MACD/Pump/JKS",
         };
       };
 

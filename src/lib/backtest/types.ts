@@ -22,6 +22,8 @@ export type StrategyPresetId =
   | "adxPumpStages"
   | "eliziEdgeFire"
   | "eliziEdgeExhaust"
+  | "hybridMacdPump"
+  | "hybridMacdPumpLong"
   | "codeStrategy"
   | "custom";
 

@@ -39,6 +39,8 @@ const SIGNAL_EXIT_PRESETS = new Set<StrategyPresetId>([
   "adxPumpStages",
   "eliziEdgeFire",
   "eliziEdgeExhaust",
+  "hybridMacdPump",
+  "hybridMacdPumpLong",
   "codeStrategy",
 ]);
 
