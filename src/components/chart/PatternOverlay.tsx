@@ -167,7 +167,7 @@ export function usePatternOverlay({
       if (!canvas) return;
       const w = container.clientWidth;
       const h = container.clientHeight;
-      if (w < 2 || h < 2) return;
+      if (!w || !h || w < 2 || h < 2) return;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = Math.floor(w * dpr);
       canvas.height = Math.floor(h * dpr);
@@ -281,24 +281,33 @@ export function usePatternOverlay({
       ctx.setLineDash([]);
     };
 
-    draw();
-    const ro = new ResizeObserver(draw);
-    ro.observe(container);
-    chart.timeScale().subscribeVisibleLogicalRangeChange(draw);
+    // Redraw only on range / resize / patterns / focus / custom event — no setInterval.
+    let raf = 0;
+    const scheduleDraw = () => {
+      if (raf) return;
+      raf = requestAnimationFrame(() => {
+        raf = 0;
+        draw();
+      });
+    };
 
-    const onCustom = () => draw();
+    draw();
+    const ro = new ResizeObserver(scheduleDraw);
+    ro.observe(container);
+    chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleDraw);
+
+    const onCustom = () => scheduleDraw();
     window.addEventListener(TD_OVERLAY_REDRAW, onCustom);
 
-    const id = window.setInterval(draw, 500);
     return () => {
+      if (raf) cancelAnimationFrame(raf);
       ro.disconnect();
       try {
-        chart.timeScale().unsubscribeVisibleLogicalRangeChange(draw);
+        chart.timeScale().unsubscribeVisibleLogicalRangeChange(scheduleDraw);
       } catch {
         /* */
       }
       window.removeEventListener(TD_OVERLAY_REDRAW, onCustom);
-      clearInterval(id);
     };
   }, [chart, series, patterns, focusId, container, overlayEpoch, candleTimes]);
 

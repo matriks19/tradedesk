@@ -51,7 +51,8 @@ const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
 ];
 
 function defaultUniverse(tf: string): number {
-  return tf === "1m" || tf === "3m" ? 80 : 120;
+  // Keep default universe light to avoid scan CPU storms
+  return tf === "1m" || tf === "3m" ? 40 : 60;
 }
 
 export function ScannerPanel() {
@@ -63,8 +64,8 @@ export function ScannerPanel() {
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilter[]>([]);
   const [uiMode, setUiMode] = useState<UiMode>("advanced");
   const [exchange, setExchange] = useState<"binance" | "bist">("binance");
-  const [timeframe, setTimeframe] = useState<Timeframe>("5m");
-  const [universeN, setUniverseN] = useState(80);
+  const [timeframe, setTimeframe] = useState<Timeframe>("15m");
+  const [universeN, setUniverseN] = useState(60);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [sortKey, setSortKey] = useState<SortKey>("changePct");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -72,6 +73,12 @@ export function ScannerPanel() {
   const [status, setStatus] = useState("");
   const [fieldSearch, setFieldSearch] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+    };
+  }, []);
 
   // Draft row for adding a filter
   const [draftField, setDraftField] = useState<TechnicalFieldId>("rsi");
@@ -250,7 +257,7 @@ export function ScannerPanel() {
     setProgress({ done: 0, total: 0 });
     setStatus("");
 
-    const nCap = Math.min(200, Math.max(50, universeN));
+    const nCap = Math.min(120, Math.max(20, universeN));
 
     try {
       const tickerRes = await fetch(
@@ -283,7 +290,7 @@ export function ScannerPanel() {
       setProgress({ done: 0, total: quotes.length });
 
       const out: ScannerRow[] = [];
-      const concurrency = needsCandles ? 10 : 1;
+      const concurrency = needsCandles ? 6 : 1;
 
       await mapPool(
         quotes,
@@ -407,13 +414,13 @@ export function ScannerPanel() {
           N
           <input
             type="number"
-            min={50}
-            max={200}
+            min={20}
+            max={120}
             className="input w-14"
             value={universeN}
             onChange={(e) =>
               setUniverseN(
-                Math.min(200, Math.max(50, Number(e.target.value) || 50))
+                Math.min(120, Math.max(20, Number(e.target.value) || 20))
               )
             }
           />

@@ -141,15 +141,8 @@ export function matchAdvancedFilters(
     notes.push(describeAdvancedFilter(f));
   }
 
-  // Enrich RSI/ATR for table even if not filtered
-  if (lastRsi == null) {
-    const r = computeFieldSeries(candles, "rsi");
-    if (r[i] != null) lastRsi = r[i] as number;
-  }
-  if (lastAtrPct == null) {
-    const a = computeFieldSeries(candles, "atr_pct");
-    if (a[i] != null) lastAtrPct = a[i] as number;
-  }
+  // Only fields required by active filters are computed above (no full 55-field sweep).
+  // Do not enrich RSI/ATR unless a filter already requested those series.
 
   return {
     ok: true,

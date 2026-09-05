@@ -7,7 +7,6 @@ import {
   type ISeriesApi,
   type IPriceLine,
   type LogicalRange,
-  type MouseEventParams,
   ColorType,
   CrosshairMode,
 } from "lightweight-charts";
@@ -101,13 +100,15 @@ export function ChartPane({ pane, compact }: Props) {
   >(new Map());
   const subContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const priceLinesRef = useRef<IPriceLine[]>([]);
-  const syncingRange = useRef(false);
-  const syncingCross = useRef(false);
+  /** Ignore range events shortly after programmatic setVisibleLogicalRange. */
+  const programmaticUntil = useRef(0);
+  const lastSyncedRange = useRef<LogicalRange | null>(null);
   const rangeRaf = useRef(0);
   const pendingRange = useRef<LogicalRange | null>(null);
+  const subGroupsRef = useRef<SubPaneGroup[]>([]);
   const [chartReady, setChartReady] = useState(0);
+  /** Bumped only when sub charts are created/destroyed (series effect). */
   const [subReady, setSubReady] = useState(0);
-  const [containersTick, setContainersTick] = useState(0);
 
   const {
     activePaneId,
@@ -249,11 +250,16 @@ export function ChartPane({ pane, compact }: Props) {
     subSeriesRef.current.delete(id);
   }, []);
 
+  const rangesNearlyEqual = useCallback((a: LogicalRange, b: LogicalRange) => {
+    const eps = 0.05;
+    return Math.abs(a.from - b.from) < eps && Math.abs(a.to - b.to) < eps;
+  }, []);
+
+  /** Push main (or source) visible range to oscillator panes only — never re-enter via subs. */
   const syncLogicalRanges = useCallback((source?: IChartApi | null) => {
     const main = chartRef.current;
     if (!main) return;
-    const charts: IChartApi[] = [main, ...Array.from(subChartsRef.current.values())];
-    if (charts.length < 2) return;
+    if (subChartsRef.current.size === 0) return;
 
     let range: LogicalRange | null = null;
     const primary = source ?? main;
@@ -271,21 +277,20 @@ export function ChartPane({ pane, compact }: Props) {
       }
     }
     if (!range) return;
-
-    syncingRange.current = true;
-    try {
-      for (const c of charts) {
-        if (c === primary) continue;
-        try {
-          c.timeScale().setVisibleLogicalRange(range);
-        } catch {
-          /* */
-        }
-      }
-    } finally {
-      syncingRange.current = false;
+    if (lastSyncedRange.current && rangesNearlyEqual(lastSyncedRange.current, range)) {
+      return;
     }
-  }, []);
+
+    lastSyncedRange.current = range;
+    programmaticUntil.current = performance.now() + 80;
+    for (const c of Array.from(subChartsRef.current.values())) {
+      try {
+        c.timeScale().setVisibleLogicalRange(range);
+      } catch {
+        /* */
+      }
+    }
+  }, [rangesNearlyEqual]);
 
   // Main chart init
   useEffect(() => {
@@ -410,34 +415,61 @@ export function ChartPane({ pane, compact }: Props) {
   const subGroupIds = subGroups.map((g) => g.id).join("|");
   const oscCount = subGroups.length;
 
-  // IMPORTANT: never setState on ref detach — React Strict Mode attach/detach
-  // loops would infinite-update (Maximum update depth exceeded).
+  // IMPORTANT: never setState on ref attach/detach — Strict Mode loops / thrash.
+  // Lifecycle effect reads subContainerRefs after paint; one rAF retry if lagging.
   const setSubContainerRef = useCallback(
     (id: string) => (el: HTMLDivElement | null) => {
       if (el) {
-        const prev = subContainerRefs.current.get(id);
         subContainerRefs.current.set(id, el);
-        if (prev !== el) {
-          // Defer tick so we don't setState during commit phase storms
-          void Promise.resolve().then(() => {
-            setContainersTick((n) => n + 1);
-          });
-        }
-      } else {
-        // Only clear the ref map; chart teardown belongs in the lifecycle effect
-        // when group ids change or on unmount — not here.
-        if (subContainerRefs.current.get(id)) {
-          subContainerRefs.current.delete(id);
-        }
+      } else if (subContainerRefs.current.get(id)) {
+        subContainerRefs.current.delete(id);
       }
     },
     []
   );
 
-  // Single lifecycle: create / recreate / remove sub charts (no second-pass race)
+  subGroupsRef.current = subGroups;
+
+  // Single lifecycle: create / recreate / remove sub charts (refs only — no containersTick)
   useEffect(() => {
-    const ids = new Set(subGroups.map((g) => g.id));
+    const groups = subGroupsRef.current;
+    const ids = new Set(groups.map((g) => g.id));
     let created = false;
+
+    const createMissing = () => {
+      let any = false;
+      for (const g of groups) {
+        const el = subContainerRefs.current.get(g.id);
+        if (!el) continue;
+
+        const existing = subChartsRef.current.get(g.id);
+        if (existing && existing.__el === el) continue;
+
+        if (existing) destroySubChart(g.id);
+
+        el.innerHTML = "";
+        const { width, height } = pixelSize(el);
+        const chart = createChart(
+          el,
+          chartOptions(height || 120, width || 400, false)
+        ) as ChartWithMeta;
+        chart.__el = el;
+        subChartsRef.current.set(g.id, chart);
+        subSeriesRef.current.set(g.id, new Map());
+
+        const ro = new ResizeObserver(() => {
+          const c = subChartsRef.current.get(g.id);
+          const node = subContainerRefs.current.get(g.id);
+          if (!c || !node) return;
+          const size = pixelSize(node);
+          c.applyOptions({ width: size.width, height: size.height });
+        });
+        ro.observe(el);
+        chart.__ro = ro;
+        any = true;
+      }
+      return any;
+    };
 
     for (const id of Array.from(subChartsRef.current.keys())) {
       if (!ids.has(id)) {
@@ -446,43 +478,28 @@ export function ChartPane({ pane, compact }: Props) {
       }
     }
 
-    for (const g of subGroups) {
-      const el = subContainerRefs.current.get(g.id);
-      if (!el) continue;
+    created = createMissing() || created;
 
-      const existing = subChartsRef.current.get(g.id);
-      if (existing && existing.__el === el) continue;
-
-      if (existing) destroySubChart(g.id);
-
-      // Dedicated empty node — clear LWC leftovers before createChart
-      el.innerHTML = "";
-      const { width, height } = pixelSize(el);
-      const chart = createChart(
-        el,
-        chartOptions(height || 120, width || 400, false)
-      ) as ChartWithMeta;
-      chart.__el = el;
-      subChartsRef.current.set(g.id, chart);
-      subSeriesRef.current.set(g.id, new Map());
-
-      const ro = new ResizeObserver(() => {
-        const c = subChartsRef.current.get(g.id);
-        const node = subContainerRefs.current.get(g.id);
-        if (!c || !node) return;
-        const size = pixelSize(node);
-        c.applyOptions({ width: size.width, height: size.height });
+    let raf = 0;
+    if (groups.some((g) => !subChartsRef.current.has(g.id))) {
+      raf = requestAnimationFrame(() => {
+        if (createMissing()) {
+          syncLogicalRanges(chartRef.current);
+          setSubReady((n) => n + 1);
+        }
       });
-      ro.observe(el);
-      chart.__ro = ro;
-
-      syncLogicalRanges(chartRef.current);
-      created = true;
     }
 
-    if (created) setSubReady((n) => n + 1);
+    if (created) {
+      syncLogicalRanges(chartRef.current);
+      setSubReady((n) => n + 1);
+    }
+
+    return () => {
+      if (raf) cancelAnimationFrame(raf);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subGroupIds, containersTick]);
+  }, [subGroupIds, destroySubChart, syncLogicalRanges]);
 
   // Cleanup all sub charts on unmount
   useEffect(() => {
@@ -494,114 +511,57 @@ export function ChartPane({ pane, compact }: Props) {
     };
   }, [destroySubChart]);
 
-  // Time + crosshair sync across main + all sub charts
+  // Time sync: MAIN chart is the only source. Subs follow; never subscribe subs
+  // (setVisibleLogicalRange would re-fire → A→B→A thrash even with a boolean flag).
+  // Crosshair multi-pane sync disabled by default (expensive on every mousemove).
   useEffect(() => {
     const main = chartRef.current;
     if (!main) return;
-    const charts: IChartApi[] = [main, ...Array.from(subChartsRef.current.values())];
-    const unsubs: (() => void)[] = [];
 
     const flushRange = () => {
       rangeRaf.current = 0;
       const range = pendingRange.current;
       pendingRange.current = null;
-      if (!range || syncingRange.current) return;
-      syncingRange.current = true;
-      try {
-        for (const other of charts) {
-          try {
-            other.timeScale().setVisibleLogicalRange(range);
-          } catch {
-            /* */
-          }
-        }
-      } finally {
-        syncingRange.current = false;
+      if (!range) return;
+      if (performance.now() < programmaticUntil.current) return;
+      if (lastSyncedRange.current && rangesNearlyEqual(lastSyncedRange.current, range)) {
+        return;
       }
+      syncLogicalRanges(main);
     };
 
-    const sharedRangeHandler = (range: LogicalRange | null) => {
-      if (syncingRange.current || !range) return;
+    const onMainRange = (range: LogicalRange | null) => {
+      if (!range) return;
+      if (performance.now() < programmaticUntil.current) return;
+      if (lastSyncedRange.current && rangesNearlyEqual(lastSyncedRange.current, range)) {
+        return;
+      }
       pendingRange.current = range;
       if (rangeRaf.current) return;
       rangeRaf.current = requestAnimationFrame(flushRange);
     };
 
-    for (const chart of charts) {
-      chart.timeScale().subscribeVisibleLogicalRangeChange(sharedRangeHandler);
-      unsubs.push(() => {
-        try {
-          chart.timeScale().unsubscribeVisibleLogicalRangeChange(sharedRangeHandler);
-        } catch {
-          /* */
-        }
-      });
-    }
-
-    const seriesFor = (chart: IChartApi) => {
-      if (chart === main && candleRef.current) return candleRef.current;
-      for (const [gid, c] of Array.from(subChartsRef.current.entries())) {
-        if (c !== chart) continue;
-        const smap = subSeriesRef.current.get(gid);
-        return smap?.values().next().value ?? null;
-      }
-      return null;
-    };
-
-    for (const chart of charts) {
-      const onMove = (param: MouseEventParams) => {
-        if (syncingCross.current) return;
-        syncingCross.current = true;
-        try {
-          if (param.time == null) {
-            for (const other of charts) {
-              if (other !== chart) other.clearCrosshairPosition();
-            }
-            return;
-          }
-          for (const other of charts) {
-            if (other === chart) continue;
-            const series = seriesFor(other);
-            if (!series) continue;
-            try {
-              const data = series.dataByIndex(
-                other.timeScale().coordinateToLogical(
-                  chart.timeScale().timeToCoordinate(param.time as never) ?? 0
-                ) ?? 0,
-                -1
-              ) as { value?: number; close?: number } | null;
-              const price = data?.value ?? data?.close;
-              if (price == null || !Number.isFinite(price)) continue;
-              other.setCrosshairPosition(price, param.time, series);
-            } catch {
-              /* ignore sync failures */
-            }
-          }
-        } finally {
-          syncingCross.current = false;
-        }
-      };
-      chart.subscribeCrosshairMove(onMove);
-      unsubs.push(() => {
-        try {
-          chart.unsubscribeCrosshairMove(onMove);
-        } catch {
-          /* */
-        }
-      });
-    }
-
-    // Align once when charts join / remount
+    main.timeScale().subscribeVisibleLogicalRangeChange(onMainRange);
     syncLogicalRanges(main);
 
     return () => {
-      for (const u of unsubs) u();
+      try {
+        main.timeScale().unsubscribeVisibleLogicalRangeChange(onMainRange);
+      } catch {
+        /* */
+      }
       if (rangeRaf.current) {
         cancelAnimationFrame(rangeRaf.current);
         rangeRaf.current = 0;
       }
     };
-  }, [chartReady, subReady, subGroupIds, syncLogicalRanges]);
+  }, [chartReady, syncLogicalRanges, rangesNearlyEqual]);
+
+  // When oscillator panes appear/disappear, align once from main (no re-subscribe).
+  useEffect(() => {
+    if (!chartReady) return;
+    syncLogicalRanges(chartRef.current);
+  }, [subReady, subGroupIds, chartReady, syncLogicalRanges]);
 
   // Update candle + volume (same time base for all series)
   useEffect(() => {
