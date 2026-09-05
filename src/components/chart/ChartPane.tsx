@@ -348,33 +348,25 @@ export function ChartPane({ pane, compact }: Props) {
   const subGroupIds = subGroups.map((g) => g.id).join("|");
   const oscCount = subGroups.length;
 
+  // IMPORTANT: never setState on ref detach — React Strict Mode attach/detach
+  // loops would infinite-update (Maximum update depth exceeded).
   const setSubContainerRef = useCallback(
     (id: string) => (el: HTMLDivElement | null) => {
       if (el) {
         const prev = subContainerRefs.current.get(id);
         subContainerRefs.current.set(id, el);
-        if (prev !== el) setContainersTick((n) => n + 1);
+        if (prev !== el) {
+          // Defer tick so we don't setState during commit phase storms
+          queuePromise.resolve().then(() => {
+            setContainersTick((n) => n + 1);
+          });
+        }
       } else {
-        if (subContainerRefs.current.has(id)) {
+        // Only clear the ref map; chart teardown belongs in the lifecycle effect
+        // when group ids change or on unmount — not here.
+        if (subContainerRefs.current.get(id)) {
           subContainerRefs.current.delete(id);
         }
-        // Drop chart bound to detached node so a remount gets a clean createChart
-        const bound = subChartsRef.current.get(id);
-        if (bound) {
-          try {
-            bound.__ro?.disconnect();
-          } catch {
-            /* */
-          }
-          try {
-            bound.remove();
-          } catch {
-            /* */
-          }
-          subChartsRef.current.delete(id);
-          subSeriesRef.current.delete(id);
-        }
-        setContainersTick((n) => n + 1);
       }
     },
     []
@@ -383,9 +375,13 @@ export function ChartPane({ pane, compact }: Props) {
   // Single lifecycle: create / recreate / remove sub charts (no second-pass race)
   useEffect(() => {
     const ids = new Set(subGroups.map((g) => g.id));
+    let created = false;
 
     for (const id of Array.from(subChartsRef.current.keys())) {
-      if (!ids.has(id)) destroySubChart(id);
+      if (!ids.has(id)) {
+        destroySubChart(id);
+        created = true;
+      }
     }
 
     for (const g of subGroups) {
@@ -419,11 +415,12 @@ export function ChartPane({ pane, compact }: Props) {
       chart.__ro = ro;
 
       syncLogicalRanges(chartRef.current);
+      created = true;
     }
 
-    setSubReady((n) => n + 1);
+    if (created) setSubReady((n) => n + 1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [subGroupIds, containersTick, destroySubChart, syncLogicalRanges]);
+  }, [subGroupIds, containersTick]);
 
   // Cleanup all sub charts on unmount
   useEffect(() => {
