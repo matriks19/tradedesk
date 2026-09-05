@@ -400,20 +400,22 @@ export function matchFilters(
   return { ok: true, note: notes.join(" · "), rsi: lastRsi, atrPct: lastAtrPct };
 }
 
-/** Run async work over items with limited concurrency. */
+/** Run async work over items with limited concurrency. Supports AbortSignal. */
 export async function mapPool<T, R>(
   items: T[],
   concurrency: number,
   fn: (item: T, index: number) => Promise<R>,
-  onProgress?: (done: number, total: number) => void
+  onProgress?: (done: number, total: number) => void,
+  signal?: AbortSignal
 ): Promise<R[]> {
   const results: R[] = new Array(items.length);
   let next = 0;
   let done = 0;
   const workers = Array.from(
-    { length: Math.min(concurrency, items.length) },
+    { length: Math.min(concurrency, items.length || 1) },
     async () => {
       while (true) {
+        if (signal?.aborted) throw new DOMException("Aborted", "AbortError");
         const i = next++;
         if (i >= items.length) break;
         results[i] = await fn(items[i], i);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ScannerFilter, ScannerRow } from "@/lib/scanner/engine";
 import {
   SCANNER_PRESETS,
@@ -8,11 +8,32 @@ import {
   mapPool,
   matchFilters,
 } from "@/lib/scanner/engine";
+import type { AdvancedFilter } from "@/lib/scanner/advanced";
+import {
+  createAdvancedFilter,
+  describeAdvancedFilter,
+  matchAdvancedFilters,
+} from "@/lib/scanner/advanced";
+import type {
+  CompareMode,
+  FilterCondition,
+  TechnicalFieldId,
+} from "@/lib/scanner/fields";
+import {
+  COMPARE_MODES,
+  FILTER_CONDITIONS,
+  RATING_DOC,
+  SCAN_TIMEFRAMES,
+  TECHNICAL_FIELDS,
+  fieldById,
+  searchFields,
+} from "@/lib/scanner/fields";
 import { useDeskStore } from "@/store/desk";
 import type { Candle, Timeframe, TickerQuote } from "@/lib/types";
 import clsx from "clsx";
 
 type SortKey = "rsi" | "changePct" | "volume" | "symbol";
+type UiMode = "presets" | "advanced";
 
 const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "rsi30", label: "RSI<30", filter: { type: "rsi", op: "lt", value: 30 } },
@@ -29,30 +50,47 @@ const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "atr2", label: "ATR%>2", filter: { type: "atrPctHigh", minPct: 2 } },
 ];
 
+function defaultUniverse(tf: string): number {
+  return tf === "1m" || tf === "3m" ? 80 : 120;
+}
+
 export function ScannerPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
   const [running, setRunning] = useState(false);
   const [rows, setRows] = useState<ScannerRow[]>([]);
-  const [selectedPresets, setSelectedPresets] = useState<string[]>([
-    "asiri_satim",
-  ]);
+  const [selectedPresets, setSelectedPresets] = useState<string[]>([]);
   const [extraFilters, setExtraFilters] = useState<string[]>([]);
+  const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilter[]>([]);
+  const [uiMode, setUiMode] = useState<UiMode>("advanced");
   const [exchange, setExchange] = useState<"binance" | "bist">("binance");
-  const [timeframe, setTimeframe] = useState<Timeframe>("1h");
+  const [timeframe, setTimeframe] = useState<Timeframe>("5m");
+  const [universeN, setUniverseN] = useState(80);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [sortKey, setSortKey] = useState<SortKey>("changePct");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const [saveName, setSaveName] = useState("");
   const [status, setStatus] = useState("");
+  const [fieldSearch, setFieldSearch] = useState("");
+  const abortRef = useRef<AbortController | null>(null);
 
-  const activeFilters = useMemo(() => {
+  // Draft row for adding a filter
+  const [draftField, setDraftField] = useState<TechnicalFieldId>("rsi");
+  const [draftCond, setDraftCond] = useState<FilterCondition>("below");
+  const [draftCompare, setDraftCompare] = useState<CompareMode>("value");
+  const [draftValue, setDraftValue] = useState(30);
+  const [draftValue2, setDraftValue2] = useState(70);
+  const [draftSeries, setDraftSeries] = useState<TechnicalFieldId>("sma20");
+
+  useEffect(() => {
+    setUniverseN(defaultUniverse(timeframe));
+  }, [timeframe]);
+
+  const legacyFilters = useMemo(() => {
     const map = new Map<string, ScannerFilter>();
     for (const pid of selectedPresets) {
       const p = SCANNER_PRESETS[pid];
       if (!p) continue;
-      for (const f of p.filters) {
-        map.set(JSON.stringify(f), f);
-      }
+      for (const f of p.filters) map.set(JSON.stringify(f), f);
     }
     for (const cid of extraFilters) {
       const chip = FILTER_CHIPS.find((c) => c.id === cid);
@@ -60,6 +98,51 @@ export function ScannerPanel() {
     }
     return [...map.values()];
   }, [selectedPresets, extraFilters]);
+
+  const activeFilterCount = legacyFilters.length + advancedFilters.length;
+
+  const filteredFieldList = useMemo(
+    () => searchFields(fieldSearch),
+    [fieldSearch]
+  );
+
+  const pickField = (id: TechnicalFieldId) => {
+    const def = fieldById(id);
+    setDraftField(id);
+    setDraftCompare(def?.defaultCompare ?? "value");
+    setDraftValue(def?.defaultValue ?? 0);
+    setDraftValue2(def?.defaultValue2 ?? 100);
+    if (def?.defaultCompare === "price") {
+      setDraftCond("above");
+    } else if (id === "rsi" || id.startsWith("stoch") || id === "mfi") {
+      setDraftCond("below");
+    } else {
+      setDraftCond("above");
+    }
+  };
+
+  const addAdvanced = () => {
+    setAdvancedFilters((prev) => [
+      ...prev,
+      createAdvancedFilter(draftField, {
+        condition: draftCond,
+        compare: draftCompare,
+        value: draftValue,
+        value2: draftValue2,
+        seriesField: draftSeries,
+      }),
+    ]);
+  };
+
+  const removeAdvanced = (id: string) => {
+    setAdvancedFilters((prev) => prev.filter((f) => f.id !== id));
+  };
+
+  const resetAllFilters = () => {
+    setSelectedPresets([]);
+    setExtraFilters([]);
+    setAdvancedFilters([]);
+  };
 
   const togglePreset = (id: string) => {
     setSelectedPresets((prev) =>
@@ -98,7 +181,8 @@ export function ScannerPanel() {
   }, [rows, sortKey, sortDir]);
 
   const exportCsv = () => {
-    const header = "symbol,exchange,last,changePct,rsi,volume,quoteVolume,atrPct,note\n";
+    const header =
+      "symbol,exchange,last,changePct,rsi,volume,quoteVolume,atrPct,note\n";
     const body = sortedRows
       .map(
         (r) =>
@@ -116,7 +200,7 @@ export function ScannerPanel() {
 
   const saveNamedPreset = async () => {
     const name = saveName.trim();
-    if (!name || !activeFilters.length) {
+    if (!name || !activeFilterCount) {
       setStatus("İsim ve filtre gerekli");
       return;
     }
@@ -127,16 +211,21 @@ export function ScannerPanel() {
       const entry = {
         id: `scan_${Date.now().toString(36)}`,
         name,
-        filters: activeFilters,
+        filters: legacyFilters,
+        advancedFilters,
         exchange,
         timeframe,
+        universeN,
         updatedAt: Date.now(),
       };
       await fetch("/api/store", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          scanPresets: [...scanPresets.filter((x: { name: string }) => x.name !== name), entry],
+          scanPresets: [
+            ...scanPresets.filter((x: { name: string }) => x.name !== name),
+            entry,
+          ],
         }),
       });
       setStatus(`"${name}" kaydedildi`);
@@ -147,17 +236,26 @@ export function ScannerPanel() {
   };
 
   const run = useCallback(async () => {
-    if (!activeFilters.length) {
-      setStatus("En az bir preset veya filtre seçin");
+    if (!activeFilterCount) {
+      setStatus("En az bir preset veya advanced filtre seçin");
       return;
     }
+
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
     setRunning(true);
     setRows([]);
     setProgress({ done: 0, total: 0 });
     setStatus("");
+
+    const nCap = Math.min(200, Math.max(50, universeN));
+
     try {
       const tickerRes = await fetch(
-        `/api/ticker?exchange=${exchange}${exchange === "bist" ? "&limit=180" : ""}`
+        `/api/ticker?exchange=${exchange}${exchange === "bist" ? "&limit=180" : ""}`,
+        { signal: ac.signal }
       );
       const tickerJson = await tickerRes.json();
       let quotes: TickerQuote[] = tickerJson.quotes ?? [];
@@ -173,14 +271,15 @@ export function ScannerPanel() {
         quotes = quotes
           .filter((q) => q.symbol.endsWith("USDT"))
           .sort((a, b) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0))
-          .slice(0, 200);
+          .slice(0, nCap);
       } else {
         quotes = [...quotes]
           .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-          .slice(0, 160);
+          .slice(0, Math.min(nCap, 180));
       }
 
-      const needsCandles = filtersNeedCandles(activeFilters);
+      const needsCandles =
+        filtersNeedCandles(legacyFilters) || advancedFilters.length > 0;
       setProgress({ done: 0, total: quotes.length });
 
       const out: ScannerRow[] = [];
@@ -190,43 +289,83 @@ export function ScannerPanel() {
         quotes,
         concurrency,
         async (q) => {
+          if (ac.signal.aborted) return null;
           let candles: Candle[] | null = null;
           if (needsCandles) {
             try {
               const kr = await fetch(
-                `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${exchange}&timeframe=${timeframe}&limit=220`
+                `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${exchange}&timeframe=${timeframe}&limit=220`,
+                { signal: ac.signal }
               );
               const kj = await kr.json();
               candles = kj.candles ?? null;
-            } catch {
+            } catch (e) {
+              if (ac.signal.aborted) return null;
               candles = null;
             }
           }
-          const m = matchFilters(q, candles, activeFilters);
-          if (m.ok) {
-            out.push({
-              symbol: q.symbol,
-              exchange,
-              last: q.last,
-              changePct: q.changePct,
-              rsi: m.rsi,
-              volume: q.volume,
-              quoteVolume: q.quoteVolume,
-              atrPct: m.atrPct,
-              note: m.note,
-            });
+
+          let noteParts: string[] = [];
+          let rsi: number | undefined;
+          let atrPct: number | undefined;
+
+          if (legacyFilters.length) {
+            const m = matchFilters(q, candles, legacyFilters);
+            if (!m.ok) return null;
+            noteParts.push(m.note);
+            rsi = m.rsi;
+            atrPct = m.atrPct;
           }
+
+          if (advancedFilters.length) {
+            const m = matchAdvancedFilters(candles, advancedFilters, q);
+            if (!m.ok) return null;
+            noteParts.push(m.note);
+            rsi = m.rsi ?? rsi;
+            atrPct = m.atrPct ?? atrPct;
+          }
+
+          out.push({
+            symbol: q.symbol,
+            exchange,
+            last: q.last,
+            changePct: q.changePct,
+            rsi,
+            volume: q.volume,
+            quoteVolume: q.quoteVolume,
+            atrPct,
+            note: noteParts.filter(Boolean).join(" · "),
+          });
           return null;
         },
-        (done, total) => setProgress({ done, total })
+        (done, total) => {
+          if (!ac.signal.aborted) setProgress({ done, total });
+        },
+        ac.signal
       );
 
+      if (ac.signal.aborted) return;
       setRows(out);
-      setStatus(`${out.length} eşleşme / ${quotes.length} tarandı`);
+      setStatus(`${out.length} eşleşme / ${quotes.length} tarandı · TF ${timeframe}`);
+    } catch (e) {
+      if ((e as Error)?.name === "AbortError") {
+        setStatus("Tarama iptal edildi");
+        return;
+      }
+      setStatus("Tarama hatası");
     } finally {
-      setRunning(false);
+      if (abortRef.current === ac) {
+        setRunning(false);
+      }
     }
-  }, [activeFilters, exchange, timeframe]);
+  }, [
+    activeFilterCount,
+    advancedFilters,
+    exchange,
+    legacyFilters,
+    timeframe,
+    universeN,
+  ]);
 
   const setSort = (key: SortKey) => {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -236,33 +375,68 @@ export function ScannerPanel() {
     }
   };
 
+  const openRow = (r: ScannerRow) => {
+    openSymbolInActive(r.symbol, r.exchange, timeframe);
+  };
+
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">Tarayıcı (Scanner)</div>
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex gap-1 flex-wrap items-center">
         <select
           className="input w-auto"
           value={exchange}
           onChange={(e) => setExchange(e.target.value as "binance" | "bist")}
         >
-          <option value="binance">Binance USDT (top 200)</option>
-          <option value="bist">BIST (BIST30+likit ~180)</option>
+          <option value="binance">Binance USDT (top N)</option>
+          <option value="bist">BIST (best-effort)</option>
         </select>
         <select
           className="input w-auto"
           value={timeframe}
           onChange={(e) => setTimeframe(e.target.value as Timeframe)}
+          title="Scan timeframe (küçük zaman)"
         >
-          <option value="15m">15m</option>
-          <option value="1h">1h</option>
-          <option value="4h">4h</option>
-          <option value="1d">1d</option>
+          {SCAN_TIMEFRAMES.map((tf) => (
+            <option key={tf.value} value={tf.value}>
+              {tf.label}
+            </option>
+          ))}
         </select>
-        <button type="button" className="btn-accent" disabled={running} onClick={run}>
+        <label className="text-2xs text-desk-muted flex items-center gap-1">
+          N
+          <input
+            type="number"
+            min={50}
+            max={200}
+            className="input w-14"
+            value={universeN}
+            onChange={(e) =>
+              setUniverseN(
+                Math.min(200, Math.max(50, Number(e.target.value) || 50))
+              )
+            }
+          />
+        </label>
+        <button
+          type="button"
+          className="btn-accent"
+          disabled={running}
+          onClick={run}
+        >
           {running
             ? `${progress.done}/${progress.total} tarandı`
             : "Tara"}
         </button>
+        {running && (
+          <button
+            type="button"
+            className="btn text-2xs"
+            onClick={() => abortRef.current?.abort()}
+          >
+            İptal
+          </button>
+        )}
         <button
           type="button"
           className="btn text-2xs"
@@ -273,40 +447,246 @@ export function ScannerPanel() {
         </button>
       </div>
 
-      <div className="text-2xs text-desk-muted">Preset galerisi (çoklu seçim)</div>
-      <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
-        {Object.entries(SCANNER_PRESETS).map(([id, p]) => (
-          <button
-            key={id}
-            type="button"
-            title={p.description}
-            className={clsx(
-              "btn text-2xs",
-              selectedPresets.includes(id) && "btn-accent"
-            )}
-            onClick={() => togglePreset(id)}
-          >
-            {p.label}
-          </button>
-        ))}
+      <div className="flex gap-1 text-2xs">
+        <button
+          type="button"
+          className={clsx("btn text-2xs", uiMode === "advanced" && "btn-accent")}
+          onClick={() => setUiMode("advanced")}
+        >
+          Advanced Filters
+        </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", uiMode === "presets" && "btn-accent")}
+          onClick={() => setUiMode("presets")}
+        >
+          Presets
+        </button>
+        <span className="text-desk-muted self-center ml-1">
+          Aktif: {activeFilterCount}
+        </span>
+        <button
+          type="button"
+          className="btn text-2xs ml-auto"
+          onClick={resetAllFilters}
+          disabled={!activeFilterCount}
+        >
+          Reset all
+        </button>
       </div>
 
-      <div className="text-2xs text-desk-muted">Ek filtreler (birleştir)</div>
-      <div className="flex flex-wrap gap-1">
-        {FILTER_CHIPS.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            className={clsx(
-              "btn text-2xs",
-              extraFilters.includes(c.id) && "btn-accent"
+      {/* Active filter chips */}
+      {(advancedFilters.length > 0 || legacyFilters.length > 0) && (
+        <div className="flex flex-wrap gap-1 max-h-16 overflow-y-auto">
+          {advancedFilters.map((f) => (
+            <button
+              key={f.id}
+              type="button"
+              className="btn text-2xs btn-accent"
+              title="Kaldır"
+              onClick={() => removeAdvanced(f.id)}
+            >
+              {describeAdvancedFilter(f)} ×
+            </button>
+          ))}
+          {selectedPresets.map((id) => (
+            <button
+              key={`p-${id}`}
+              type="button"
+              className="btn text-2xs"
+              onClick={() => togglePreset(id)}
+            >
+              {SCANNER_PRESETS[id]?.label ?? id} ×
+            </button>
+          ))}
+          {extraFilters.map((id) => (
+            <button
+              key={`c-${id}`}
+              type="button"
+              className="btn text-2xs"
+              onClick={() => toggleChip(id)}
+            >
+              {FILTER_CHIPS.find((c) => c.id === id)?.label ?? id} ×
+            </button>
+          ))}
+        </div>
+      )}
+
+      {uiMode === "advanced" ? (
+        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 min-h-0">
+          <input
+            className="input text-2xs w-full"
+            placeholder="Teknik alan ara… (RSI, MACD, Bollinger…)"
+            value={fieldSearch}
+            onChange={(e) => setFieldSearch(e.target.value)}
+          />
+          <div className="max-h-24 overflow-y-auto flex flex-col gap-0.5">
+            {filteredFieldList.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={clsx(
+                  "text-left text-2xs px-1.5 py-0.5 rounded hover:bg-desk-elevated",
+                  draftField === f.id && "bg-desk-elevated text-desk-accent"
+                )}
+                onClick={() => pickField(f.id)}
+              >
+                <span className="text-desk-muted">{f.group}</span> · {f.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-2 gap-1 sm:grid-cols-4">
+            <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+              Indicator
+              <select
+                className="input text-2xs"
+                value={draftField}
+                onChange={(e) => pickField(e.target.value as TechnicalFieldId)}
+              >
+                {TECHNICAL_FIELDS.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+              Condition
+              <select
+                className="input text-2xs"
+                value={draftCond}
+                onChange={(e) =>
+                  setDraftCond(e.target.value as FilterCondition)
+                }
+              >
+                {FILTER_CONDITIONS.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+              Compare
+              <select
+                className="input text-2xs"
+                value={draftCompare}
+                disabled={draftCond === "between"}
+                onChange={(e) =>
+                  setDraftCompare(e.target.value as CompareMode)
+                }
+              >
+                {COMPARE_MODES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {draftCompare === "series" && draftCond !== "between" ? (
+              <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+                Series
+                <select
+                  className="input text-2xs"
+                  value={draftSeries}
+                  onChange={(e) =>
+                    setDraftSeries(e.target.value as TechnicalFieldId)
+                  }
+                >
+                  {TECHNICAL_FIELDS.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : draftCond === "between" ? (
+              <div className="flex gap-1 items-end">
+                <label className="text-2xs text-desk-muted flex flex-col gap-0.5 flex-1">
+                  From
+                  <input
+                    type="number"
+                    className="input text-2xs"
+                    value={draftValue}
+                    onChange={(e) => setDraftValue(Number(e.target.value))}
+                  />
+                </label>
+                <label className="text-2xs text-desk-muted flex flex-col gap-0.5 flex-1">
+                  To
+                  <input
+                    type="number"
+                    className="input text-2xs"
+                    value={draftValue2}
+                    onChange={(e) => setDraftValue2(Number(e.target.value))}
+                  />
+                </label>
+              </div>
+            ) : draftCompare === "value" ? (
+              <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+                Value
+                <input
+                  type="number"
+                  className="input text-2xs"
+                  value={draftValue}
+                  onChange={(e) => setDraftValue(Number(e.target.value))}
+                />
+              </label>
+            ) : (
+              <div className="text-2xs text-desk-muted self-end pb-1">
+                vs Price (close)
+              </div>
             )}
-            onClick={() => toggleChip(c.id)}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+          </div>
+
+          <div className="flex gap-1 items-center">
+            <button type="button" className="btn-accent text-2xs" onClick={addAdvanced}>
+              + Filtre ekle
+            </button>
+            <span className="text-2xs text-desk-muted truncate" title={RATING_DOC}>
+              Filtreler AND · {TECHNICAL_FIELDS.length} alan
+            </span>
+          </div>
+        </div>
+      ) : (
+        <>
+          <div className="text-2xs text-desk-muted">
+            Preset galerisi (çoklu; advanced ile AND)
+          </div>
+          <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
+            {Object.entries(SCANNER_PRESETS).map(([id, p]) => (
+              <button
+                key={id}
+                type="button"
+                title={p.description}
+                className={clsx(
+                  "btn text-2xs",
+                  selectedPresets.includes(id) && "btn-accent"
+                )}
+                onClick={() => togglePreset(id)}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="text-2xs text-desk-muted">Ek filtreler</div>
+          <div className="flex flex-wrap gap-1">
+            {FILTER_CHIPS.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                className={clsx(
+                  "btn text-2xs",
+                  extraFilters.includes(c.id) && "btn-accent"
+                )}
+                onClick={() => toggleChip(c.id)}
+              >
+                {c.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="flex gap-1 items-center">
         <input
@@ -322,13 +702,17 @@ export function ScannerPanel() {
 
       {exchange === "bist" && (
         <p className="text-2xs text-desk-warn">
-          BIST taraması gecikmeli Yahoo query2 chart üzerinden; sonuçlar canlı değildir.
+          BIST: küçük TF (1m) Yahoo&apos;da sınırlı — 5m+ önerilir; sonuçlar
+          gecikmeli best-effort.
         </p>
       )}
       {status && (
         <p
           className={
-            status.includes("alınamadı") || status.includes("boş")
+            status.includes("alınamadı") ||
+            status.includes("boş") ||
+            status.includes("iptal") ||
+            status.includes("hata")
               ? "text-2xs text-desk-down"
               : "text-2xs text-desk-muted"
           }
@@ -338,16 +722,32 @@ export function ScannerPanel() {
       )}
 
       <div className="flex gap-1 text-2xs text-desk-muted">
-        <button type="button" className="btn text-2xs" onClick={() => setSort("symbol")}>
+        <button
+          type="button"
+          className="btn text-2xs"
+          onClick={() => setSort("symbol")}
+        >
           Sembol{sortKey === "symbol" ? (sortDir === "asc" ? "↑" : "↓") : ""}
         </button>
-        <button type="button" className="btn text-2xs" onClick={() => setSort("changePct")}>
+        <button
+          type="button"
+          className="btn text-2xs"
+          onClick={() => setSort("changePct")}
+        >
           %Δ{sortKey === "changePct" ? (sortDir === "asc" ? "↑" : "↓") : ""}
         </button>
-        <button type="button" className="btn text-2xs" onClick={() => setSort("rsi")}>
+        <button
+          type="button"
+          className="btn text-2xs"
+          onClick={() => setSort("rsi")}
+        >
           RSI{sortKey === "rsi" ? (sortDir === "asc" ? "↑" : "↓") : ""}
         </button>
-        <button type="button" className="btn text-2xs" onClick={() => setSort("volume")}>
+        <button
+          type="button"
+          className="btn text-2xs"
+          onClick={() => setSort("volume")}
+        >
           Hacim{sortKey === "volume" ? (sortDir === "asc" ? "↑" : "↓") : ""}
         </button>
       </div>
@@ -364,7 +764,7 @@ export function ScannerPanel() {
             key={r.symbol}
             type="button"
             className="w-full text-left px-2 py-1.5 border-b border-desk-border/40 hover:bg-desk-elevated"
-            onClick={() => openSymbolInActive(r.symbol, r.exchange)}
+            onClick={() => openRow(r)}
           >
             <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 text-xs items-center">
               <span className="font-medium truncate">{r.symbol}</span>
@@ -386,13 +786,15 @@ export function ScannerPanel() {
             </div>
             <div className="text-2xs text-desk-muted truncate">{r.note}</div>
             <div className="text-2xs text-desk-muted font-mono">
-              {r.last} {r.atrPct != null ? `· ATR% ${r.atrPct.toFixed(2)}` : ""}
+              {r.last}{" "}
+              {r.atrPct != null ? `· ATR% ${r.atrPct.toFixed(2)}` : ""} · {timeframe}
             </div>
           </button>
         ))}
         {!rows.length && !running && (
           <div className="text-2xs text-desk-muted p-2">
-            Preset/filtre seçip Tara — Binance top 200 / BIST 120, paralel kline.
+            Advanced Filters ile MCC tarzı teknik tarama — TF 1m–4h, Binance top
+            N quoteVolume. Sonuç satırına tıklayınca aynı TF açılır.
           </div>
         )}
       </div>
