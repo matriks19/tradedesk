@@ -1,17 +1,19 @@
 "use client";
 
-import { useEffect, useRef, useMemo, useState } from "react";
+import { useEffect, useRef, useMemo, useState, useCallback } from "react";
 import {
   createChart,
   type IChartApi,
   type ISeriesApi,
   type IPriceLine,
+  type LogicalRange,
+  type MouseEventParams,
   ColorType,
   CrosshairMode,
 } from "lightweight-charts";
 import type { PaneConfig } from "@/lib/types";
 import { useKlines } from "@/lib/hooks/useKlines";
-import { computeAllIndicators } from "@/lib/indicators/registry";
+import { computeAllIndicators, BUILTIN_META, type PlotSeries } from "@/lib/indicators/registry";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 import { SymbolSearch } from "@/components/chart/SymbolSearch";
@@ -28,18 +30,53 @@ interface Props {
   compact?: boolean;
 }
 
+interface SubPaneGroup {
+  id: string;
+  title: string;
+  plots: PlotSeries[];
+}
+
+function chartOptions(height: number, width: number, showTime: boolean) {
+  return {
+    layout: {
+      background: { type: ColorType.Solid, color: "#12161c" as const },
+      textColor: "#8b95a8",
+    },
+    grid: {
+      vertLines: { color: "#1a1f27" },
+      horzLines: { color: "#1a1f27" },
+    },
+    crosshair: { mode: CrosshairMode.Normal },
+    rightPriceScale: { borderColor: "#2a3140" },
+    timeScale: {
+      borderColor: "#2a3140",
+      timeVisible: showTime,
+      secondsVisible: false,
+      visible: showTime,
+    },
+    width,
+    height,
+  };
+}
+
 export function ChartPane({ pane, compact }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const candleRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
   const volRef = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const overlayRefs = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
+  const mainOverlayRefs = useRef<Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>(
     new Map()
   );
-  const subChartRef = useRef<IChartApi | null>(null);
-  const subContainerRef = useRef<HTMLDivElement>(null);
+  const subChartsRef = useRef<Map<string, IChartApi>>(new Map());
+  const subSeriesRef = useRef<
+    Map<string, Map<string, ISeriesApi<"Line"> | ISeriesApi<"Histogram">>>
+  >(new Map());
+  const subContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const priceLinesRef = useRef<IPriceLine[]>([]);
+  const syncingRange = useRef(false);
+  const syncingCross = useRef(false);
   const [chartReady, setChartReady] = useState(0);
+  const [subReady, setSubReady] = useState(0);
 
   const {
     activePaneId,
@@ -71,21 +108,24 @@ export function ChartPane({ pane, compact }: Props) {
       swingStrength: patternSettings.swingStrength,
     });
     const merged = [...adv, ...base];
-    if (
-      overlayPattern &&
-      // overlay applies when focused pattern is from scan
-      !merged.some((m) => m.id === overlayPattern.id)
-    ) {
+    if (overlayPattern && !merged.some((m) => m.id === overlayPattern.id)) {
       merged.unshift(overlayPattern);
     }
     return merged.slice(0, 32);
-  }, [candles, patternSettings.swingStrength, patternSettings.twinTol, patternSettings.boxLookback, overlayPattern]);
+  }, [
+    candles,
+    patternSettings.swingStrength,
+    patternSettings.twinTol,
+    patternSettings.boxLookback,
+    overlayPattern,
+  ]);
 
-  // expose patterns for panel via custom event when active
   useEffect(() => {
     if (!active) return;
     window.dispatchEvent(
-      new CustomEvent("td-patterns", { detail: { paneId: pane.id, patterns, symbol: pane.symbol } })
+      new CustomEvent("td-patterns", {
+        detail: { paneId: pane.id, patterns, symbol: pane.symbol },
+      })
     );
   }, [patterns, active, pane.id, pane.symbol]);
 
@@ -97,25 +137,14 @@ export function ChartPane({ pane, compact }: Props) {
     container: chartReady ? containerRef.current : null,
   });
 
-
   // Main chart init
   useEffect(() => {
     if (!containerRef.current) return;
-    const chart = createChart(containerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: "#12161c" },
-        textColor: "#8b95a8",
-      },
-      grid: {
-        vertLines: { color: "#1a1f27" },
-        horzLines: { color: "#1a1f27" },
-      },
-      crosshair: { mode: CrosshairMode.Normal },
-      rightPriceScale: { borderColor: "#2a3140" },
-      timeScale: { borderColor: "#2a3140", timeVisible: true, secondsVisible: false },
-      width: containerRef.current.clientWidth,
-      height: containerRef.current.clientHeight,
-    });
+    const el = containerRef.current;
+    const chart = createChart(
+      el,
+      chartOptions(el.clientHeight || 300, el.clientWidth || 400, true)
+    );
     const candlesSeries = chart.addCandlestickSeries({
       upColor: "#26a69a",
       downColor: "#ef5350",
@@ -142,7 +171,7 @@ export function ChartPane({ pane, compact }: Props) {
         height: containerRef.current.clientHeight,
       });
     });
-    ro.observe(containerRef.current);
+    ro.observe(el);
 
     return () => {
       ro.disconnect();
@@ -153,43 +182,9 @@ export function ChartPane({ pane, compact }: Props) {
     };
   }, []);
 
-  // Sub chart for oscillators
-  useEffect(() => {
-    if (!subContainerRef.current) return;
-    const chart = createChart(subContainerRef.current, {
-      layout: {
-        background: { type: ColorType.Solid, color: "#12161c" },
-        textColor: "#8b95a8",
-      },
-      grid: {
-        vertLines: { color: "#1a1f27" },
-        horzLines: { color: "#1a1f27" },
-      },
-      rightPriceScale: { borderColor: "#2a3140" },
-      timeScale: { borderColor: "#2a3140", visible: false },
-      width: subContainerRef.current.clientWidth,
-      height: subContainerRef.current.clientHeight,
-    });
-    subChartRef.current = chart;
-    const ro = new ResizeObserver(() => {
-      if (!subContainerRef.current || !subChartRef.current) return;
-      subChartRef.current.applyOptions({
-        width: subContainerRef.current.clientWidth,
-        height: subContainerRef.current.clientHeight,
-      });
-    });
-    ro.observe(subContainerRef.current);
-    return () => {
-      ro.disconnect();
-      chart.remove();
-      subChartRef.current = null;
-    };
-  }, []);
-
   const plots = useMemo(() => {
-    if (!candles.length) return [];
-    const all = [];
-    // Builtins with nesting (parents before children)
+    if (!candles.length) return [] as PlotSeries[];
+    const all: PlotSeries[] = [];
     const builtinPlots = computeAllIndicators(pane.indicators, candles);
     for (const s of builtinPlots) {
       all.push({
@@ -197,7 +192,7 @@ export function ChartPane({ pane, compact }: Props) {
         data: s.data.map((d) => ({
           time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
           value: d.value,
-        })),
+        })) as PlotSeries["data"],
       });
     }
     for (const ind of pane.indicators) {
@@ -206,29 +201,270 @@ export function ChartPane({ pane, compact }: Props) {
         const sc = scripts.find((s) => s.id === ind.scriptId);
         if (!sc) continue;
         const result = runCustomScript(sc.code, candles, sc.language);
+        const hasSub = result.plots.some((p) => (p.pane ?? "main") === "sub");
         for (const p of result.plots) {
           const data = candles
             .map((c, i) => {
               const v = p.values[i];
               if (v == null || !Number.isFinite(v)) return null;
-              return { time: c.time as unknown as import("lightweight-charts").UTCTimestamp, value: v };
+              return {
+                time: c.time as unknown as import("lightweight-charts").UTCTimestamp,
+                value: v,
+              };
             })
-            .filter(Boolean) as { time: import("lightweight-charts").UTCTimestamp; value: number }[];
+            .filter(Boolean) as PlotSeries["data"];
+          const plotPane = (p.pane ?? "main") as "main" | "sub";
           all.push({
             id: `${ind.id}-${p.id}`,
-            pane: (p.pane ?? "main") as "main" | "sub",
+            pane: plotPane,
+            paneGroup: plotPane === "sub" ? ind.id : undefined,
+            indicatorId: ind.id,
             type: (p.type ?? "line") as "line" | "histogram",
             color: p.color ?? "#2962ff",
             data,
             title: p.title ?? ind.name,
           });
         }
+        void hasSub;
       }
     }
     return all;
   }, [candles, pane.indicators, scripts]);
 
-  // Update candle + volume data
+  const mainPlots = useMemo(
+    () => plots.filter((p) => p.pane === "main"),
+    [plots]
+  );
+
+  const subGroups: SubPaneGroup[] = useMemo(() => {
+    const map = new Map<string, SubPaneGroup>();
+    for (const p of plots) {
+      if (p.pane !== "sub") continue;
+      const gid = p.paneGroup || p.indicatorId || "sub";
+      if (!map.has(gid)) {
+        const ind = pane.indicators.find((i) => i.id === gid);
+        const meta =
+          ind && ind.type !== "custom"
+            ? BUILTIN_META[ind.type]
+            : null;
+        map.set(gid, {
+          id: gid,
+          title: ind?.name ?? meta?.label ?? p.title ?? "Osc",
+          plots: [],
+        });
+      }
+      map.get(gid)!.plots.push(p);
+    }
+    // Preserve indicator order
+    const order = pane.indicators.map((i) => i.id);
+    return Array.from(map.values()).sort(
+      (a, b) => order.indexOf(a.id) - order.indexOf(b.id)
+    );
+  }, [plots, pane.indicators]);
+
+  const subGroupIds = subGroups.map((g) => g.id).join("|");
+
+  const setSubContainerRef = useCallback(
+    (id: string) => (el: HTMLDivElement | null) => {
+      if (el) subContainerRefs.current.set(id, el);
+      else subContainerRefs.current.delete(id);
+    },
+    []
+  );
+
+  // Create / destroy sub charts when groups change
+  useEffect(() => {
+    const ids = new Set(subGroups.map((g) => g.id));
+    // Remove obsolete
+    for (const [id, chart] of Array.from(subChartsRef.current.entries())) {
+      if (!ids.has(id)) {
+        try {
+          chart.remove();
+        } catch {
+          /* */
+        }
+        subChartsRef.current.delete(id);
+        subSeriesRef.current.delete(id);
+      }
+    }
+    // Create missing
+    for (const g of subGroups) {
+      if (subChartsRef.current.has(g.id)) continue;
+      const el = subContainerRefs.current.get(g.id);
+      if (!el) continue;
+      const chart = createChart(
+        el,
+        chartOptions(el.clientHeight || 100, el.clientWidth || 400, false)
+      );
+      subChartsRef.current.set(g.id, chart);
+      subSeriesRef.current.set(g.id, new Map());
+      const ro = new ResizeObserver(() => {
+        const c = subChartsRef.current.get(g.id);
+        const node = subContainerRefs.current.get(g.id);
+        if (!c || !node) return;
+        c.applyOptions({ width: node.clientWidth, height: node.clientHeight });
+      });
+      ro.observe(el);
+      (chart as unknown as { __ro?: ResizeObserver }).__ro = ro;
+      try {
+        const range = chartRef.current?.timeScale().getVisibleLogicalRange();
+        if (range) chart.timeScale().setVisibleLogicalRange(range);
+      } catch {
+        /* */
+      }
+    }
+    setSubReady((n) => n + 1);
+
+    return () => {
+      /* keep charts alive across group id stability; cleaned when ids removed above */
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subGroupIds, subGroups.length]);
+
+  // Second pass after DOM refs attach for newly added osc panes
+  useEffect(() => {
+    let changed = false;
+    for (const g of subGroups) {
+      if (subChartsRef.current.has(g.id)) continue;
+      const el = subContainerRefs.current.get(g.id);
+      if (!el) continue;
+      const chart = createChart(
+        el,
+        chartOptions(el.clientHeight || 100, el.clientWidth || 400, false)
+      );
+      subChartsRef.current.set(g.id, chart);
+      subSeriesRef.current.set(g.id, new Map());
+      const ro = new ResizeObserver(() => {
+        const c = subChartsRef.current.get(g.id);
+        const node = subContainerRefs.current.get(g.id);
+        if (!c || !node) return;
+        c.applyOptions({ width: node.clientWidth, height: node.clientHeight });
+      });
+      ro.observe(el);
+      (chart as unknown as { __ro?: ResizeObserver }).__ro = ro;
+      try {
+        const range = chartRef.current?.timeScale().getVisibleLogicalRange();
+        if (range) chart.timeScale().setVisibleLogicalRange(range);
+      } catch {
+        /* */
+      }
+      changed = true;
+    }
+    if (changed) setSubReady((n) => n + 1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subGroupIds]);
+
+  // Cleanup all sub charts on unmount
+  useEffect(() => {
+    return () => {
+      for (const [, chart] of Array.from(subChartsRef.current.entries())) {
+        const ro = (chart as unknown as { __ro?: ResizeObserver }).__ro;
+        ro?.disconnect();
+        try {
+          chart.remove();
+        } catch {
+          /* */
+        }
+      }
+      subChartsRef.current.clear();
+      subSeriesRef.current.clear();
+    };
+  }, []);
+
+  // Time + crosshair sync across main + all sub charts
+  useEffect(() => {
+    const main = chartRef.current;
+    if (!main) return;
+    const charts: IChartApi[] = [main, ...Array.from(subChartsRef.current.values())];
+    const unsubs: (() => void)[] = [];
+
+    for (const chart of charts) {
+      const handler = (range: LogicalRange | null) => {
+        if (syncingRange.current || !range) return;
+        syncingRange.current = true;
+        try {
+          for (const other of charts) {
+            if (other === chart) continue;
+            try {
+              other.timeScale().setVisibleLogicalRange(range);
+            } catch {
+              /* */
+            }
+          }
+        } finally {
+          syncingRange.current = false;
+        }
+      };
+      chart.timeScale().subscribeVisibleLogicalRangeChange(handler);
+      unsubs.push(() => {
+        try {
+          chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+        } catch {
+          /* */
+        }
+      });
+    }
+
+    const seriesFor = (chart: IChartApi) => {
+      if (chart === main && candleRef.current) return candleRef.current;
+      for (const [gid, c] of Array.from(subChartsRef.current.entries())) {
+        if (c !== chart) continue;
+        const smap = subSeriesRef.current.get(gid);
+        return smap?.values().next().value ?? null;
+      }
+      return null;
+    };
+
+    // Crosshair sync across stacked panes
+    for (const chart of charts) {
+      const onMove = (param: MouseEventParams) => {
+        if (syncingCross.current) return;
+        syncingCross.current = true;
+        try {
+          if (param.time == null) {
+            for (const other of charts) {
+              if (other !== chart) other.clearCrosshairPosition();
+            }
+            return;
+          }
+          for (const other of charts) {
+            if (other === chart) continue;
+            const series = seriesFor(other);
+            if (!series) continue;
+            try {
+              const data = series.dataByIndex(
+                other.timeScale().coordinateToLogical(
+                  chart.timeScale().timeToCoordinate(param.time as never) ?? 0
+                ) ?? 0,
+                -1
+              ) as { value?: number; close?: number } | null;
+              const price = data?.value ?? data?.close;
+              if (price == null || !Number.isFinite(price)) continue;
+              other.setCrosshairPosition(price, param.time, series);
+            } catch {
+              /* ignore sync failures */
+            }
+          }
+        } finally {
+          syncingCross.current = false;
+        }
+      };
+      chart.subscribeCrosshairMove(onMove);
+      unsubs.push(() => {
+        try {
+          chart.unsubscribeCrosshairMove(onMove);
+        } catch {
+          /* */
+        }
+      });
+    }
+
+    return () => {
+      for (const u of unsubs) u();
+    };
+  }, [chartReady, subReady, subGroupIds]);
+
+  // Update candle + volume (same time base for all series)
   useEffect(() => {
     if (!candleRef.current || !volRef.current || !candles.length) return;
     candleRef.current.setData(
@@ -250,50 +486,83 @@ export function ChartPane({ pane, compact }: Props) {
     );
   }, [candles]);
 
-  // Overlay / sub indicators
+  // Main overlays
   useEffect(() => {
     const main = chartRef.current;
-    const sub = subChartRef.current;
-    if (!main || !sub) return;
-
-    // clear previous overlay series
-    for (const series of Array.from(overlayRefs.current.values())) {
+    if (!main) return;
+    for (const series of Array.from(mainOverlayRefs.current.values())) {
       try {
         main.removeSeries(series as ISeriesApi<"Line">);
       } catch {
-        try {
-          sub.removeSeries(series as ISeriesApi<"Line">);
-        } catch {
-          /* */
-        }
+        /* */
       }
     }
-    overlayRefs.current.clear();
-
-    for (const p of plots) {
-      const target = p.pane === "sub" ? sub : main;
+    mainOverlayRefs.current.clear();
+    for (const p of mainPlots) {
       if (p.type === "histogram") {
-        const s = target.addHistogramSeries({
+        const s = main.addHistogramSeries({
           color: p.color,
           priceFormat: { type: "price", precision: 4, minMove: 0.0001 },
         });
-        s.setData(p.data);
-        overlayRefs.current.set(p.id, s);
+        s.setData(p.data as never);
+        mainOverlayRefs.current.set(p.id, s);
       } else {
-        const s = target.addLineSeries({
+        const s = main.addLineSeries({
           color: p.color,
           lineWidth: 2,
           title: p.title,
           priceLineVisible: false,
           lastValueVisible: true,
         });
-        s.setData(p.data);
-        overlayRefs.current.set(p.id, s);
+        s.setData(p.data as never);
+        mainOverlayRefs.current.set(p.id, s);
       }
     }
-  }, [plots]);
+  }, [mainPlots, chartReady]);
 
-  // TP/SL lines on active pane
+  // Sub pane series
+  useEffect(() => {
+    for (const g of subGroups) {
+      const chart = subChartsRef.current.get(g.id);
+      if (!chart) continue;
+      let seriesMap = subSeriesRef.current.get(g.id);
+      if (!seriesMap) {
+        seriesMap = new Map();
+        subSeriesRef.current.set(g.id, seriesMap);
+      }
+      for (const series of Array.from(seriesMap.values())) {
+        try {
+          chart.removeSeries(series as ISeriesApi<"Line">);
+        } catch {
+          /* */
+        }
+      }
+      seriesMap.clear();
+      for (const p of g.plots) {
+        if (p.type === "histogram") {
+          const s = chart.addHistogramSeries({
+            color: p.color,
+            priceFormat: { type: "price", precision: 4, minMove: 0.0001 },
+            title: p.title,
+          });
+          s.setData(p.data as never);
+          seriesMap.set(p.id, s);
+        } else {
+          const s = chart.addLineSeries({
+            color: p.color,
+            lineWidth: 2,
+            title: p.title,
+            priceLineVisible: false,
+            lastValueVisible: true,
+          });
+          s.setData(p.data as never);
+          seriesMap.set(p.id, s);
+        }
+      }
+    }
+  }, [subGroups, subReady]);
+
+  // TP/SL lines
   useEffect(() => {
     const series = candleRef.current;
     if (!series) return;
@@ -345,6 +614,10 @@ export function ChartPane({ pane, compact }: Props) {
   }, [risk, showRiskLines, active, candles]);
 
   const last = candles[candles.length - 1];
+  const oscCount = subGroups.length;
+  // main ~65%, each osc shares remaining
+  const mainFlex = oscCount === 0 ? 1 : Math.max(1.8, 3.2 - oscCount * 0.15);
+  const oscFlex = 1;
 
   return (
     <div
@@ -380,9 +653,15 @@ export function ChartPane({ pane, compact }: Props) {
         </select>
         {pane.exchange === "bist" && <Badge tone="warn">Gecikmeli</Badge>}
         {delayed && note && !compact && (
-          <span className="text-2xs text-desk-warn truncate max-w-[180px]" title={note}>
+          <span
+            className="text-2xs text-desk-warn truncate max-w-[180px]"
+            title={note}
+          >
             BIST
           </span>
+        )}
+        {oscCount > 0 && (
+          <span className="text-2xs text-desk-muted">{oscCount} osc</span>
         )}
         {last && (
           <span
@@ -406,8 +685,26 @@ export function ChartPane({ pane, compact }: Props) {
             {error}
           </div>
         )}
-        <div ref={containerRef} className="flex-[3] min-h-[120px]" />
-        <div ref={subContainerRef} className="flex-1 min-h-[60px] border-t border-desk-border" />
+        <div
+          ref={containerRef}
+          className="min-h-[120px]"
+          style={{ flex: mainFlex }}
+        />
+        {subGroups.map((g) => (
+          <div
+            key={g.id}
+            className="relative border-t border-desk-border min-h-[72px]"
+            style={{ flex: oscFlex }}
+          >
+            <div className="absolute top-0 left-2 z-[1] text-2xs text-desk-muted pointer-events-none py-0.5">
+              {g.title}
+            </div>
+            <div
+              ref={setSubContainerRef(g.id)}
+              className="w-full h-full min-h-[72px]"
+            />
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -417,10 +714,22 @@ function ChartIndicatorsButton({ paneId }: { paneId: string }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <button type="button" className="btn px-2 text-2xs" title="Göstergeler" onClick={(e) => { e.stopPropagation(); setOpen(true); }}>
+      <button
+        type="button"
+        className="btn px-2 text-2xs"
+        title="Göstergeler"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(true);
+        }}
+      >
         ☰
       </button>
-      <IndicatorMenu open={open} onClose={() => setOpen(false)} paneId={paneId} />
+      <IndicatorMenu
+        open={open}
+        onClose={() => setOpen(false)}
+        paneId={paneId}
+      />
     </>
   );
 }

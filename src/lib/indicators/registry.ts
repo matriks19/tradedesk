@@ -133,6 +133,26 @@ import {
   premiumDiscount,
   voltixBands,
 } from "./beluga";
+import {
+  adaptiveMacd,
+  adaptiveSupertrend,
+  adaptiveTrendChannel,
+  asymVolEnvelope,
+  coralTrend,
+  elderImpulse,
+  fibGravityClusters,
+  initialBalance,
+  laguerreRsi,
+  nadarayaWatson,
+  pacLiteStructure,
+  prtDmiPack,
+  qualityTrendTrail,
+  rsiBbCombo,
+  schaffTrendCycle,
+  selfAwareTrail,
+  sweepReversalMap,
+  varWeightedRegression,
+} from "./proreal";
 
 export interface PlotSeries {
   id: string;
@@ -143,6 +163,10 @@ export interface PlotSeries {
   title?: string;
   /** Key used when nesting (primary series) */
   seriesKey?: string;
+  /** Root sub-indicator instance id — each distinct group gets its own chart panel */
+  paneGroup?: string;
+  /** Owning indicator instance id */
+  indicatorId?: string;
 }
 
 const SOURCE_OPTIONS = [
@@ -180,6 +204,8 @@ const CRED_JURIK =
   "Inspired by Loxx Jurik/Kase concepts — community reconstructions, not affiliated. JMA = JMA (community).";
 const CRED_BELUGA =
   "Inspired by BigBeluga SMC concepts — community reconstructions, not affiliated.";
+const CRED_PROREAL =
+  "Inspired by ProRealCode / community themes — conceptual reimplementations, not affiliated; no ProBuilder verbatim.";
 
 function sel(
   key: string,
@@ -335,6 +361,26 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "moneyFlowComposite", label: "Money Flow Composite", category: "bigbeluga", pane: "sub", acceptsSeries: false, primarySeriesKey: "flow", description: CRED_BELUGA, inputs: [num("period", "Length", 14)] },
   { id: "channelDetect", label: "Channel Detection", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", description: CRED_BELUGA, inputs: [num("period", "Length", 20)] },
   { id: "highVolumePoints", label: "High Volume Points", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "bullVol", description: CRED_BELUGA, inputs: [num("volMult", "Vol Mult", 2, 1, 10, 0.1), num("swing", "Swing", 2)] },
+
+  // —— ProRealCode tarzı
+  { id: "adaptiveSupertrend", label: "Adaptive SuperTrend", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "st", description: CRED_PROREAL, inputs: [num("atrLen", "ATR Length", 10), num("baseMult", "Base Mult", 2, 0.5, 10, 0.1), num("lookback", "Cluster Lookback", 50)] },
+  { id: "adaptiveTrendChannel", label: "Adaptive Trend Channel", category: "proreal", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_PROREAL, inputs: [num("period", "Period", 40), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "qualityTrendTrail", label: "Quality Trend Trail", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "trail", description: CRED_PROREAL, inputs: [num("atrLen", "ATR", 14), num("mult", "Mult", 2.5, 0.5, 10, 0.1), num("qualLen", "Quality Len", 20)] },
+  { id: "varWeightedReg", label: "Variance-Weighted Regression", category: "proreal", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_PROREAL, inputs: [num("period", "Period", 30), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "asymVolEnvelope", label: "Asym Volatility Envelope", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", description: CRED_PROREAL, inputs: [num("period", "Period", 20), num("upMult", "Up Mult", 2, 0.5, 10, 0.1), num("dnMult", "Down Mult", 2, 0.5, 10, 0.1)] },
+  { id: "sweepReversalMap", label: "Sweep Reversal Map", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "state", description: CRED_PROREAL, inputs: [num("lookback", "Lookback", 20), num("confirm", "Confirm", 2)] },
+  { id: "initialBalance", label: "Initial Balance", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "ibMid", description: CRED_PROREAL, inputs: [num("sessionBars", "Session Bars", 4, 1, 48, 1)] },
+  { id: "fibGravityClusters", label: "Fibonacci Gravity Clusters", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "cluster", description: CRED_PROREAL, inputs: [num("swing", "Swing", 3), num("lookback", "Lookback", 80)] },
+  { id: "pacLiteStructure", label: "PAC-lite Structure", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "hh", description: CRED_PROREAL, inputs: [num("swing", "Swing", 2)] },
+  { id: "rsiBbCombo", label: "RSI+BB Mean Reversion", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "combo", description: CRED_PROREAL, inputs: [num("rsiLen", "RSI", 14), num("bbLen", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "prtDmiPack", label: "PRT DMI/ADX Pack", category: "proreal", pane: "sub", acceptsSeries: false, primarySeriesKey: "adx", description: CRED_PROREAL, inputs: [num("period", "Period", 14)] },
+  { id: "elderImpulse", label: "Elder Impulse System", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "impulse", description: CRED_PROREAL, inputs: [num("emaLen", "EMA", 13), num("macdFast", "MACD Fast", 12), num("macdSlow", "MACD Slow", 26), num("macdSig", "Signal", 9), src()] },
+  { id: "laguerreRsi", label: "Laguerre RSI", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "lrsi", description: CRED_PROREAL, inputs: [num("gamma", "Gamma", 0.5, 0.05, 0.95, 0.01), src()] },
+  { id: "coralTrend", label: "Coral Trend", category: "proreal", pane: "main", acceptsSeries: true, primarySeriesKey: "coral", description: CRED_PROREAL, inputs: [num("period", "Period", 34), num("mult", "Mult", 0.4, 0.05, 2, 0.05), src()] },
+  { id: "nadarayaWatson", label: "Nadaraya-Watson Band", category: "proreal", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_PROREAL, inputs: [num("bandwidth", "Bandwidth", 8, 1, 50, 1), num("mult", "Mult", 1.5, 0.2, 5, 0.1), src()] },
+  { id: "schaffTrendCycle", label: "Schaff Trend Cycle", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "stc", description: CRED_PROREAL, inputs: [num("period", "Cycle", 10), num("fast", "Fast", 23), num("slow", "Slow", 50), src()] },
+  { id: "selfAwareTrail", label: "Self-Aware Trend Trail", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "trail", description: CRED_PROREAL, inputs: [num("atrLen", "ATR", 10), num("mult", "Mult", 3, 0.5, 10, 0.1), num("qiLen", "QI Length", 14)] },
+  { id: "adaptiveMacd", label: "Adaptive MACD", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: CRED_PROREAL, inputs: [num("baseFast", "Base Fast", 12), num("baseSlow", "Base Slow", 26), num("signal", "Signal", 9), src()] },
 ];
 
 export const BUILTIN_META: Record<BuiltinIndicatorId, IndicatorMeta> =
@@ -362,6 +408,7 @@ export const CATEGORY_LABELS: Record<IndicatorCategory, string> = {
   levels: "Pivot / Seviye",
   jurik: "Jurik / Loxx tarzı",
   bigbeluga: "BigBeluga / SMC tarzı",
+  proreal: "ProRealCode tarzı",
   other: "Diğer",
 };
 
@@ -376,6 +423,7 @@ export const CATEGORY_ORDER: IndicatorCategory[] = [
   "levels",
   "jurik",
   "bigbeluga",
+  "proreal",
   "other",
 ];
 
@@ -446,6 +494,7 @@ function line(
     data: toLineData(candles, values),
     title,
     seriesKey: key,
+    indicatorId: inst.id,
   };
 }
 
@@ -466,6 +515,7 @@ function hist(
     data: toLineData(candles, values),
     title,
     seriesKey: key,
+    indicatorId: inst.id,
   };
 }
 
@@ -1604,12 +1654,241 @@ export function computeBuiltin(
       );
       break;
     }
+
+    case "adaptiveSupertrend": {
+      const a = adaptiveSupertrend(candles, n(p, "atrLen", 10), n(p, "baseMult", 2), n(p, "lookback", 50));
+      push(
+        [line(inst, "st", "main", color, candles, a.st, "Adapt ST")],
+        { st: a.st, dir: a.dir, mult: a.mult, atr: a.atrLine }
+      );
+      break;
+    }
+    case "adaptiveTrendChannel": {
+      const period = n(p, "period", 40);
+      const c = adaptiveTrendChannel(values, candles, period, n(p, "mult", 2));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, c.mid, "ATC Mid"),
+          line(inst, "up", "main", "#ef5350", candles, c.upper, "ATC Up"),
+          line(inst, "lo", "main", "#26a69a", candles, c.lower, "ATC Low"),
+          line(inst, "fit", "sub", "#e040fb", candles, c.fit, "Fit %"),
+        ],
+        { mid: c.mid, upper: c.upper, lower: c.lower, fit: c.fit }
+      );
+      break;
+    }
+    case "qualityTrendTrail": {
+      const q = qualityTrendTrail(candles, n(p, "atrLen", 14), n(p, "mult", 2.5), n(p, "qualLen", 20));
+      push(
+        [
+          line(inst, "trail", "main", color, candles, q.trail, "Quality Trail"),
+          line(inst, "quality", "sub", "#00bcd4", candles, q.quality, "Quality"),
+        ],
+        { trail: q.trail, quality: q.quality, dir: q.dir }
+      );
+      break;
+    }
+    case "varWeightedReg": {
+      const v = varWeightedRegression(values, n(p, "period", 30), n(p, "mult", 2));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, v.mid, "VWReg"),
+          line(inst, "up", "main", "#ef5350", candles, v.upper, "VW Up"),
+          line(inst, "lo", "main", "#26a69a", candles, v.lower, "VW Low"),
+        ],
+        { mid: v.mid, upper: v.upper, lower: v.lower }
+      );
+      break;
+    }
+    case "asymVolEnvelope": {
+      const e = asymVolEnvelope(candles, n(p, "period", 20), n(p, "upMult", 2), n(p, "dnMult", 2));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, e.mid, "Asym Mid"),
+          line(inst, "up", "main", "#ef5350", candles, e.upper, "Asym Up"),
+          line(inst, "lo", "main", "#26a69a", candles, e.lower, "Asym Low"),
+        ],
+        { mid: e.mid, upper: e.upper, lower: e.lower }
+      );
+      break;
+    }
+    case "sweepReversalMap": {
+      const s = sweepReversalMap(candles, n(p, "lookback", 20), n(p, "confirm", 2));
+      push(
+        [
+          line(inst, "bull", "main", "#26a69a", candles, s.bull, "Sweep Bull"),
+          line(inst, "bear", "main", "#ef5350", candles, s.bear, "Sweep Bear"),
+        ],
+        { bull: s.bull, bear: s.bear, state: s.state }
+      );
+      break;
+    }
+    case "initialBalance": {
+      const ib = initialBalance(candles, n(p, "sessionBars", 4));
+      push(
+        [
+          line(inst, "ibHigh", "main", "#26a69a", candles, ib.ibHigh, "IB High"),
+          line(inst, "ibLow", "main", "#ef5350", candles, ib.ibLow, "IB Low"),
+          line(inst, "ibMid", "main", "#2962ff", candles, ib.ibMid, "IB Mid"),
+        ],
+        { ibHigh: ib.ibHigh, ibLow: ib.ibLow, ibMid: ib.ibMid }
+      );
+      break;
+    }
+    case "fibGravityClusters": {
+      const f = fibGravityClusters(candles, n(p, "swing", 3), n(p, "lookback", 80));
+      push(
+        [
+          line(inst, "cluster", "main", "#e040fb", candles, f.cluster, "Fib Gravity"),
+          line(inst, "gravUp", "main", "#26a69a88", candles, f.gravUp, "Grav Up"),
+          line(inst, "gravDn", "main", "#ef535088", candles, f.gravDn, "Grav Dn"),
+        ],
+        { cluster: f.cluster, gravUp: f.gravUp, gravDn: f.gravDn }
+      );
+      break;
+    }
+    case "pacLiteStructure": {
+      const p2 = pacLiteStructure(candles, n(p, "swing", 2));
+      push(
+        [
+          line(inst, "hh", "main", "#26a69a", candles, p2.hh, "HH"),
+          line(inst, "hl", "main", "#8bc34a", candles, p2.hl, "HL"),
+          line(inst, "lh", "main", "#ff6d00", candles, p2.lh, "LH"),
+          line(inst, "ll", "main", "#ef5350", candles, p2.ll, "LL"),
+        ],
+        { hh: p2.hh, hl: p2.hl, lh: p2.lh, ll: p2.ll }
+      );
+      break;
+    }
+    case "rsiBbCombo": {
+      const c = rsiBbCombo(values, n(p, "rsiLen", 14), n(p, "bbLen", 20), n(p, "bbMult", 2));
+      push(
+        [
+          line(inst, "combo", "sub", color, candles, c.combo, "RSI+BB"),
+          line(inst, "rsi", "sub", "#2962ff88", candles, c.rsiLine, "RSI"),
+          line(inst, "pctb", "sub", "#ff6d0088", candles, c.pctB, "%B"),
+        ],
+        { combo: c.combo, rsi: c.rsiLine, pctb: c.pctB }
+      );
+      break;
+    }
+    case "prtDmiPack": {
+      const d = prtDmiPack(candles, n(p, "period", 14));
+      push(
+        [
+          line(inst, "adx", "sub", "#e040fb", candles, d.adx, "ADX"),
+          line(inst, "dip", "sub", "#26a69a", candles, d.dip, "+DI"),
+          line(inst, "dim", "sub", "#ef5350", candles, d.dim, "-DI"),
+          hist(inst, "dx", "sub", "#2962ff55", candles, d.dx, "DX"),
+        ],
+        { adx: d.adx, dip: d.dip, dim: d.dim, dx: d.dx }
+      );
+      break;
+    }
+    case "elderImpulse": {
+      const e = elderImpulse(values, n(p, "emaLen", 13), n(p, "macdFast", 12), n(p, "macdSlow", 26), n(p, "macdSig", 9));
+      push(
+        [
+          hist(inst, "impulse", "sub", color, candles, e.impulse, "Impulse"),
+          line(inst, "ema", "main", "#2962ff", candles, e.emaLine, "Elder EMA"),
+          hist(inst, "hist", "sub", "#ff6d00", candles, e.hist, "MACD Hist"),
+        ],
+        { impulse: e.impulse, ema: e.emaLine, hist: e.hist }
+      );
+      break;
+    }
+    case "laguerreRsi": {
+      const l = laguerreRsi(values, n(p, "gamma", 0.5));
+      push([line(inst, "lrsi", "sub", color, candles, l.lrsi, "Laguerre RSI")], { lrsi: l.lrsi });
+      break;
+    }
+    case "coralTrend": {
+      const c = coralTrend(values, n(p, "period", 34), n(p, "mult", 0.4));
+      push([line(inst, "coral", "main", color, candles, c.coral, "Coral")], { coral: c.coral, dir: c.dir });
+      break;
+    }
+    case "nadarayaWatson": {
+      const nw = nadarayaWatson(values, n(p, "bandwidth", 8), n(p, "mult", 1.5));
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, nw.mid, "NW Mid"),
+          line(inst, "up", "main", "#ef5350", candles, nw.upper, "NW Up"),
+          line(inst, "lo", "main", "#26a69a", candles, nw.lower, "NW Low"),
+        ],
+        { mid: nw.mid, upper: nw.upper, lower: nw.lower }
+      );
+      break;
+    }
+    case "schaffTrendCycle": {
+      const s = schaffTrendCycle(values, n(p, "period", 10), n(p, "fast", 23), n(p, "slow", 50));
+      push(
+        [
+          line(inst, "stc", "sub", color, candles, s.stc, "STC"),
+          line(inst, "macd", "sub", "#ff6d0088", candles, s.macd, "MACD"),
+        ],
+        { stc: s.stc, macd: s.macd }
+      );
+      break;
+    }
+    case "selfAwareTrail": {
+      const s = selfAwareTrail(candles, n(p, "atrLen", 10), n(p, "mult", 3), n(p, "qiLen", 14));
+      push(
+        [
+          line(inst, "trail", "main", color, candles, s.trail, "Self-Aware Trail"),
+          line(inst, "qi", "sub", "#00bcd4", candles, s.qi, "QI"),
+        ],
+        { trail: s.trail, qi: s.qi, dir: s.dir }
+      );
+      break;
+    }
+    case "adaptiveMacd": {
+      const m = adaptiveMacd(values, candles, n(p, "baseFast", 12), n(p, "baseSlow", 26), n(p, "signal", 9));
+      push(
+        [
+          line(inst, "macd", "sub", "#2962ff", candles, m.macd, "Adapt MACD"),
+          line(inst, "sig", "sub", "#ff6d00", candles, m.sig, "Signal"),
+          hist(inst, "hist", "sub", "#26a69a", candles, m.hist, "Hist"),
+        ],
+        { macd: m.macd, sig: m.sig, hist: m.hist }
+      );
+      break;
+    }
     default:
       break;
   }
 
   cache.set(inst.id, store);
   return out;
+}
+
+function resolvePaneTarget(
+  inst: IndicatorInstance,
+  byId: Map<string, IndicatorInstance>
+): { pane: "main" | "sub"; paneGroup?: string } {
+  const chain: IndicatorInstance[] = [inst];
+  let cur = inst;
+  const seen = new Set<string>([inst.id]);
+  while (cur.source?.type === "indicator") {
+    const parent = byId.get(cur.source.indicatorId);
+    if (!parent || seen.has(parent.id)) break;
+    seen.add(parent.id);
+    chain.push(parent);
+    cur = parent;
+  }
+  // Prefer root-most sub ancestor so children stay in parent sub panel
+  for (let i = chain.length - 1; i >= 0; i--) {
+    const node = chain[i];
+    if (node.type === "custom") continue;
+    const m = BUILTIN_META[node.type as BuiltinIndicatorId];
+    if (m?.pane === "sub") {
+      return { pane: "sub", paneGroup: node.id };
+    }
+  }
+  if (inst.type !== "custom") {
+    const m = BUILTIN_META[inst.type as BuiltinIndicatorId];
+    if (m?.pane === "sub") return { pane: "sub", paneGroup: inst.id };
+  }
+  return { pane: "main" };
 }
 
 /** Topological compute: parents before children */
@@ -1631,7 +1910,22 @@ export function computeAllIndicators(
   for (const ind of sorted) {
     if (!ind.visible) continue;
     if (ind.type === "custom") continue;
-    all.push(...computeBuiltin(ind, candles, cache));
+    const target = resolvePaneTarget(ind, byId);
+    const plots = computeBuiltin(ind, candles, cache);
+    const nestedOnSub =
+      target.pane === "sub" && target.paneGroup != null && target.paneGroup !== ind.id;
+    for (const p of plots) {
+      if (nestedOnSub) {
+        // Child of a sub indicator stays in the parent's sub panel
+        p.pane = "sub";
+        p.paneGroup = target.paneGroup;
+      } else if (p.pane === "sub") {
+        // Each top-level sub (or sub-series from a main indicator) gets its own panel group
+        p.paneGroup = p.paneGroup ?? target.paneGroup ?? ind.id;
+      }
+      p.indicatorId = ind.id;
+      all.push(p);
+    }
   }
   return all;
 }

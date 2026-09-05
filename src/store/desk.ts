@@ -16,6 +16,7 @@ import type {
   Watchlist,
 } from "@/lib/types";
 import type { PatternHit } from "@/lib/patterns/types";
+import type { BacktestParams, BacktestResult } from "@/lib/backtest";
 import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
 
 function uid(prefix = "id"): string {
@@ -53,7 +54,10 @@ interface DeskState {
     | "patterns"
     | "risk"
     | "scripts"
-    | "indicators";
+    | "indicators"
+    | "backtest";
+  lastBacktest: BacktestResult | null;
+  backtestParams: Partial<BacktestParams>;
   watchlists: Watchlist[];
   activeWatchlistId: string;
   scripts: CustomScript[];
@@ -105,6 +109,8 @@ interface DeskState {
     watchlists: Watchlist[];
     scripts: CustomScript[];
   }) => void;
+  setLastBacktest: (r: BacktestResult | null) => void;
+  setBacktestParams: (p: Partial<BacktestParams>) => void;
 }
 
 export const useDeskStore = create<DeskState>()(
@@ -138,6 +144,19 @@ export const useDeskStore = create<DeskState>()(
         overlayPattern: null,
         favoriteIndicators: ["sma", "ema", "rsi", "macd", "bollinger"],
         indicatorMenuOpen: false,
+        lastBacktest: null,
+        backtestParams: {
+          symbol: "BTCUSDT",
+          exchange: "binance",
+          timeframe: "15m",
+          preset: "emaCross",
+          allowShort: true,
+          slAtrMult: 1.5,
+          tpAtrMult: 2.5,
+          positionSize: 1000,
+          commissionBps: 4,
+          warmup: 60,
+        },
         setLayoutMode: (mode) =>
           set((s) => {
             const panes = panesForMode(mode, s.panes);
@@ -337,6 +356,9 @@ export const useDeskStore = create<DeskState>()(
             patternSettings: { ...s.patternSettings, focusId: id },
           })),
         setOverlayPattern: (hit) => set({ overlayPattern: hit }),
+        setLastBacktest: (r) => set({ lastBacktest: r }),
+        setBacktestParams: (p) =>
+          set((s) => ({ backtestParams: { ...s.backtestParams, ...p } })),
         hydrateFromServer: ({ watchlists, scripts }) =>
           set((s) => ({
             watchlists: watchlists.length ? watchlists : s.watchlists,
@@ -366,6 +388,8 @@ export const useDeskStore = create<DeskState>()(
           ...s.patternSettings,
           focusId: null,
         },
+        backtestParams: s.backtestParams,
+        lastBacktest: s.lastBacktest,
       }),
     }
   )

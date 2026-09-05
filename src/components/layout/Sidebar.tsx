@@ -8,6 +8,7 @@ import { PatternPanel } from "@/components/patterns/PatternPanel";
 import { RiskPanel } from "@/components/risk/RiskPanel";
 import { IndicatorPanel } from "@/components/indicators/IndicatorPanel";
 import { ScriptEditor } from "@/components/editor/ScriptEditor";
+import { BacktestPanel } from "@/components/backtest/BacktestPanel";
 import clsx from "clsx";
 
 const TABS = [
@@ -16,6 +17,7 @@ const TABS = [
   { id: "scanner", label: "Tarayıcı" },
   { id: "heatmap", label: "Isı" },
   { id: "patterns", label: "Formasyon" },
+  { id: "backtest", label: "Backtest" },
   { id: "risk", label: "Risk" },
   { id: "scripts", label: "Script" },
 ] as const;
@@ -43,6 +45,7 @@ export function Sidebar() {
         {sidebarTab === "scanner" && <ScannerPanel />}
         {sidebarTab === "heatmap" && <HeatmapPanel />}
         {sidebarTab === "patterns" && <PatternPanel />}
+        {sidebarTab === "backtest" && <BacktestPanel />}
         {sidebarTab === "risk" && <RiskPanel />}
         {sidebarTab === "scripts" && <ScriptEditor />}
       </div>

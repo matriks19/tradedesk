@@ -65,6 +65,7 @@ export type IndicatorCategory =
   | "levels"
   | "jurik"
   | "bigbeluga"
+  | "proreal"
   | "other";
 
 export type PriceField = "close" | "open" | "high" | "low" | "hl2" | "hlc3" | "ohlc4";
@@ -202,7 +203,26 @@ export type BuiltinIndicatorId =
   | "flowTrend"
   | "moneyFlowComposite"
   | "channelDetect"
-  | "highVolumePoints";
+  | "highVolumePoints"
+  // ProRealCode-inspired
+  | "adaptiveSupertrend"
+  | "adaptiveTrendChannel"
+  | "qualityTrendTrail"
+  | "varWeightedReg"
+  | "asymVolEnvelope"
+  | "sweepReversalMap"
+  | "initialBalance"
+  | "fibGravityClusters"
+  | "pacLiteStructure"
+  | "rsiBbCombo"
+  | "prtDmiPack"
+  | "elderImpulse"
+  | "laguerreRsi"
+  | "coralTrend"
+  | "nadarayaWatson"
+  | "schaffTrendCycle"
+  | "selfAwareTrail"
+  | "adaptiveMacd";
 
 export interface IndicatorInputDef {
   key: string;
