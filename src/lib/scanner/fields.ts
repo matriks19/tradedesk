@@ -195,6 +195,7 @@ export const SCAN_TIMEFRAMES: { value: string; label: string; minutes: number }[
   { value: "1m", label: "1m", minutes: 1 },
   { value: "3m", label: "3m", minutes: 3 },
   { value: "5m", label: "5m", minutes: 5 },
+  { value: "10m", label: "10m", minutes: 10 },
   { value: "15m", label: "15m", minutes: 15 },
   { value: "30m", label: "30m", minutes: 30 },
   { value: "1h", label: "1h (60)", minutes: 60 },

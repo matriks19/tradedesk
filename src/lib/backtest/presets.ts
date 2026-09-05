@@ -88,7 +88,7 @@ export function buildSignalContext(
     emaFast: ema(closes, fast),
     emaSlow: ema(closes, slow),
     rsi: rsi(closes, params.rsiPeriod ?? 14),
-    macd: macd(closes, 12, 26, 9),
+    macd: macd(closes, params.macdFast ?? 12, params.macdSlow ?? 26, params.macdSignal ?? 9),
     st: supertrend(candles, params.atrPeriod ?? 10, params.stMult ?? 3),
     bb: bollinger(closes, params.bbPeriod ?? 20, params.bbMult ?? 2),
     jks: jurikKaseStoch(candles, {

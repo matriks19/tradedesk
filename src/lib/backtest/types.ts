@@ -51,6 +51,9 @@ export interface BacktestParams {
   stMult?: number;
   bbPeriod?: number;
   bbMult?: number;
+  macdFast?: number;
+  macdSlow?: number;
+  macdSignal?: number;
   /** Z-score pullback */
   zLength?: number;
   regimeSMA?: number;

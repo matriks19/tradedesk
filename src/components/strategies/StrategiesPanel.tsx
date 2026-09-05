@@ -42,6 +42,7 @@ export function StrategiesPanel() {
     setSidebarTab,
   } = useDeskStore();
   const [cat, setCat] = useState<StrategyCategory | "all">("all");
+  const [tfFilter, setTfFilter] = useState<"all" | "5m" | "10m" | "15m">("all");
   const [q, setQ] = useState("");
   const [openId, setOpenId] = useState<string | null>(activeStrategyId);
   const [toast, setToast] = useState<string | null>(null);
@@ -51,6 +52,8 @@ export function StrategiesPanel() {
     const qq = q.trim().toLowerCase();
     return STRATEGY_PACKS.filter((s) => {
       if (cat !== "all" && s.category !== cat) return false;
+      if (tfFilter !== "all" && s.timeframe !== tfFilter && !s.tags.includes(tfFilter))
+        return false;
       if (!qq) return true;
       return (
         s.name.toLowerCase().includes(qq) ||
@@ -59,7 +62,7 @@ export function StrategiesPanel() {
         s.inspiredBy.toLowerCase().includes(qq)
       );
     });
-  }, [cat, q]);
+  }, [cat, tfFilter, q]);
 
   const apply = (s: StrategyPack) => {
     applyStrategyPack(s.id);
@@ -89,6 +92,18 @@ export function StrategiesPanel() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
+        <div className="flex flex-wrap gap-1">
+          {(["all", "5m", "10m", "15m"] as const).map((tf) => (
+            <button
+              key={tf}
+              type="button"
+              className={clsx("btn text-2xs", tfFilter === tf && "btn-accent")}
+              onClick={() => setTfFilter(tf)}
+            >
+              {tf === "all" ? "Tüm TF" : tf}
+            </button>
+          ))}
+        </div>
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
