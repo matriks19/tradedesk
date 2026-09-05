@@ -10,9 +10,13 @@ import {
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 import type { Exchange, Timeframe } from "@/lib/types";
 import {
+  AROON_LONG_SAMPLE,
+  DI_ADX_SAMPLE,
   PRESET_LABELS,
+  ZSCORE_PULLBACK_SAMPLE,
   exportResultJson,
   exportTradesCsv,
+  recommendedWarmup,
   runBacktest,
   type BacktestParams,
   type BacktestResult,
@@ -21,6 +25,14 @@ import {
 import clsx from "clsx";
 
 const PRESETS = Object.keys(PRESET_LABELS) as StrategyPresetId[];
+
+const SIGNAL_EXIT_PRESETS = new Set<StrategyPresetId>([
+  "zScorePullback",
+  "diAdxTrend",
+  "aroonLongTrend",
+  "jurikOsBounce",
+  "codeStrategy",
+]);
 
 export function BacktestPanel() {
   const {
@@ -34,22 +46,37 @@ export function BacktestPanel() {
   const active = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [code, setCode] = useState(
+    backtestParams.strategyCode || ZSCORE_PULLBACK_SAMPLE
+  );
   const equityRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Line"> | null>(null);
 
+  const preset = (backtestParams.preset || "zScorePullback") as StrategyPresetId;
+
   const params: BacktestParams = {
     symbol: backtestParams.symbol || active?.symbol || "BTCUSDT",
-    exchange: (backtestParams.exchange || active?.exchange || "binance") as Exchange,
-    timeframe: (backtestParams.timeframe || active?.timeframe || "15m") as Timeframe,
-    preset: backtestParams.preset || "emaCross",
-    allowShort: backtestParams.allowShort ?? true,
+    exchange: (backtestParams.exchange ||
+      active?.exchange ||
+      "binance") as Exchange,
+    timeframe: (backtestParams.timeframe ||
+      active?.timeframe ||
+      "1d") as Timeframe,
+    preset,
+    strategyCode: code,
+    allowShort: backtestParams.allowShort ?? preset !== "zScorePullback",
+    useAtrStops: backtestParams.useAtrStops ?? !SIGNAL_EXIT_PRESETS.has(preset),
+    useSignalExits: backtestParams.useSignalExits ?? true,
     slAtrMult: backtestParams.slAtrMult ?? 1.5,
     tpAtrMult: backtestParams.tpAtrMult ?? 2.5,
     positionSize: backtestParams.positionSize ?? 1000,
     commissionBps: backtestParams.commissionBps ?? 4,
-    warmup: backtestParams.warmup ?? 60,
-    fast: backtestParams.fast ?? 9,
+    warmup:
+      backtestParams.warmup ??
+      recommendedWarmup(preset, backtestParams as BacktestParams),
+    candleLimit: backtestParams.candleLimit ?? 1000,
+    fast: backtestParams.fast ?? (preset === "zScorePullback" ? 5 : 9),
     slow: backtestParams.slow ?? 21,
     rsiPeriod: backtestParams.rsiPeriod ?? 14,
     rsiOs: backtestParams.rsiOs ?? 30,
@@ -58,25 +85,66 @@ export function BacktestPanel() {
     stMult: backtestParams.stMult ?? 3,
     bbPeriod: backtestParams.bbPeriod ?? 20,
     bbMult: backtestParams.bbMult ?? 2,
+    zLength: backtestParams.zLength ?? 20,
+    regimeSMA: backtestParams.regimeSMA ?? 200,
+    entryZ: backtestParams.entryZ ?? -1.5,
+    exitZ: backtestParams.exitZ ?? 0,
+    adxPeriod: backtestParams.adxPeriod ?? 14,
+    adxMin: backtestParams.adxMin ?? 25,
+    aroonPeriod: backtestParams.aroonPeriod ?? 14,
   };
 
   const result = lastBacktest;
+
+  const patch = (p: Partial<BacktestParams>) => setBacktestParams(p);
+
+  const onPresetChange = (id: StrategyPresetId) => {
+    const next: Partial<BacktestParams> = {
+      preset: id,
+      warmup: recommendedWarmup(id, { ...params, preset: id }),
+      useAtrStops: !SIGNAL_EXIT_PRESETS.has(id),
+      useSignalExits: true,
+      allowShort: id !== "zScorePullback" && id !== "aroonLongTrend",
+    };
+    if (id === "zScorePullback") {
+      next.fast = 5;
+      next.timeframe = params.timeframe || "1d";
+      setCode(ZSCORE_PULLBACK_SAMPLE);
+      next.strategyCode = ZSCORE_PULLBACK_SAMPLE;
+    }
+    if (id === "codeStrategy" && !code.trim()) {
+      setCode(ZSCORE_PULLBACK_SAMPLE);
+      next.strategyCode = ZSCORE_PULLBACK_SAMPLE;
+    }
+    patch(next);
+  };
 
   const run = async () => {
     setRunning(true);
     setError(null);
     try {
+      const limit = Math.min(1000, Math.max(200, params.candleLimit ?? 1000));
       const res = await fetch(
-        `/api/klines?symbol=${encodeURIComponent(params.symbol)}&exchange=${params.exchange}&timeframe=${params.timeframe}&limit=500`
+        `/api/klines?symbol=${encodeURIComponent(params.symbol)}&exchange=${params.exchange}&timeframe=${params.timeframe}&limit=${limit}`
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Kline hatası");
       const candles = json.candles ?? [];
-      if (candles.length < params.warmup + 10) {
-        throw new Error("Yetersiz mum verisi");
+      const need = Math.max(params.warmup + 10, 50);
+      if (candles.length < need) {
+        throw new Error(
+          `Yetersiz mum (${candles.length}/${need}). TF büyüt veya warmup düşür.`
+        );
       }
-      const out = runBacktest(candles, params);
+      const runParams = {
+        ...params,
+        strategyCode: params.preset === "codeStrategy" ? code : params.strategyCode,
+      };
+      const out = runBacktest(candles, runParams);
       setLastBacktest(out);
+      if (out.codeWarnings?.length) {
+        setError(out.codeWarnings.join(" · "));
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -84,7 +152,6 @@ export function BacktestPanel() {
     }
   };
 
-  // Equity chart
   useEffect(() => {
     if (!equityRef.current) return;
     if (!chartRef.current) {
@@ -144,10 +211,17 @@ export function BacktestPanel() {
       ["Profit Factor", Number.isFinite(s.profitFactor) ? s.profitFactor.toFixed(2) : "∞"],
       ["Win Rate", `${(s.winRate * 100).toFixed(1)}%`],
       ["Trades", String(s.trades)],
+      ["Long / Short", `${s.longTrades} / ${s.shortTrades}`],
+      ["Long PnL", s.longNetPnl.toFixed(2)],
+      ["Short PnL", s.shortNetPnl.toFixed(2)],
+      ["Avg Win / Loss", `${s.avgWin.toFixed(2)} / ${s.avgLoss.toFixed(2)}`],
+      ["Best / Worst", `${s.bestTrade.toFixed(2)} / ${s.worstTrade.toFixed(2)}`],
       ["Max DD", `${s.maxDrawdown.toFixed(2)} (${(s.maxDrawdownPct * 100).toFixed(1)}%)`],
       ["Sharpe~", s.sharpe.toFixed(2)],
       ["Avg R", s.avgR.toFixed(2)],
       ["Expectancy", s.expectancy.toFixed(2)],
+      ["Avg bars", s.avgBarsHeld.toFixed(1)],
+      ["Candles", String(result.candleCount)],
     ];
   }, [result]);
 
@@ -165,11 +239,11 @@ export function BacktestPanel() {
     URL.revokeObjectURL(url);
   };
 
-  const patch = (p: Partial<BacktestParams>) => setBacktestParams(p);
+  const showCode = preset === "codeStrategy";
 
   return (
     <div className="flex flex-col h-full min-h-0 text-xs">
-      <div className="p-2 border-b border-desk-border space-y-2 shrink-0 overflow-y-auto max-h-[46%]">
+      <div className="p-2 border-b border-desk-border space-y-2 shrink-0 overflow-y-auto max-h-[52%]">
         <div className="grid grid-cols-2 gap-1.5">
           <label className="flex flex-col gap-0.5">
             <span className="text-desk-muted">Sembol</span>
@@ -195,7 +269,9 @@ export function BacktestPanel() {
             <select
               className="input"
               value={params.timeframe}
-              onChange={(e) => patch({ timeframe: e.target.value as Timeframe })}
+              onChange={(e) =>
+                patch({ timeframe: e.target.value as Timeframe })
+              }
             >
               {TIMEFRAMES.map((tf) => (
                 <option key={tf} value={tf}>
@@ -210,7 +286,7 @@ export function BacktestPanel() {
               className="input"
               value={params.preset}
               onChange={(e) =>
-                patch({ preset: e.target.value as StrategyPresetId })
+                onPresetChange(e.target.value as StrategyPresetId)
               }
             >
               {PRESETS.map((id) => (
@@ -221,21 +297,106 @@ export function BacktestPanel() {
             </select>
           </label>
         </div>
+
+        {preset === "zScorePullback" && (
+          <div className="grid grid-cols-3 gap-1.5">
+            <Num label="Z len" value={params.zLength!} onChange={(v) => patch({ zLength: v })} />
+            <Num label="Regime SMA" value={params.regimeSMA!} onChange={(v) => patch({ regimeSMA: v })} />
+            <Num label="Fast MA" value={params.fast!} onChange={(v) => patch({ fast: v })} />
+            <Num label="Entry Z" value={params.entryZ!} onChange={(v) => patch({ entryZ: v })} step={0.1} />
+            <Num label="Exit Z" value={params.exitZ!} onChange={(v) => patch({ exitZ: v })} step={0.1} />
+            <Num label="Mum #" value={params.candleLimit!} onChange={(v) => patch({ candleLimit: v })} step={50} />
+          </div>
+        )}
+
         <div className="grid grid-cols-3 gap-1.5">
           <Num label="SL ATR×" value={params.slAtrMult} onChange={(v) => patch({ slAtrMult: v })} step={0.1} />
           <Num label="TP ATR×" value={params.tpAtrMult} onChange={(v) => patch({ tpAtrMult: v })} step={0.1} />
           <Num label="Size" value={params.positionSize} onChange={(v) => patch({ positionSize: v })} step={100} />
           <Num label="Comm bps" value={params.commissionBps} onChange={(v) => patch({ commissionBps: v })} step={1} />
           <Num label="Warmup" value={params.warmup} onChange={(v) => patch({ warmup: v })} step={1} />
-          <label className="flex items-end gap-1 pb-1">
+          <Num label="Mum #" value={params.candleLimit ?? 1000} onChange={(v) => patch({ candleLimit: v })} step={50} />
+        </div>
+
+        <div className="flex flex-wrap gap-2 text-2xs">
+          <label className="flex items-center gap-1">
             <input
               type="checkbox"
               checked={params.allowShort}
               onChange={(e) => patch({ allowShort: e.target.checked })}
             />
-            <span>Short</span>
+            Short
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={!!params.useAtrStops}
+              onChange={(e) => patch({ useAtrStops: e.target.checked })}
+            />
+            ATR SL/TP
+          </label>
+          <label className="flex items-center gap-1">
+            <input
+              type="checkbox"
+              checked={!!params.useSignalExits}
+              onChange={(e) => patch({ useSignalExits: e.target.checked })}
+            />
+            Sinyal çıkış
           </label>
         </div>
+
+        {showCode && (
+          <div className="space-y-1">
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                className="btn text-2xs"
+                onClick={() => {
+                  setCode(ZSCORE_PULLBACK_SAMPLE);
+                  patch({ strategyCode: ZSCORE_PULLBACK_SAMPLE });
+                }}
+              >
+                Z-Score örnek
+              </button>
+              <button
+                type="button"
+                className="btn text-2xs"
+                onClick={() => {
+                  setCode(DI_ADX_SAMPLE);
+                  patch({ strategyCode: DI_ADX_SAMPLE });
+                }}
+              >
+                DI/ADX örnek
+              </button>
+              <button
+                type="button"
+                className="btn text-2xs"
+                onClick={() => {
+                  setCode(AROON_LONG_SAMPLE);
+                  patch({ strategyCode: AROON_LONG_SAMPLE });
+                }}
+              >
+                Aroon örnek
+              </button>
+            </div>
+            <textarea
+              className="input w-full font-mono text-2xs min-h-[140px] leading-snug"
+              value={code}
+              onChange={(e) => {
+                setCode(e.target.value);
+                patch({ strategyCode: e.target.value });
+              }}
+              spellCheck={false}
+              placeholder="enterLong / exitLong tanımlayan strateji kodu yapıştır…"
+            />
+            <p className="text-2xs text-desk-muted">
+              Pine-lite: plot/alert temizlenir. `enterLong` / `exitLong` /
+              `enterShort` / `exitShort` üret. `ta.sma`, `ta.stdev`,
+              `ta.crossover`, `ta.adx`, `ta.aroon` hazır.
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-1.5">
           <button
             type="button"
@@ -250,7 +411,6 @@ export function BacktestPanel() {
             className="btn"
             disabled={!result}
             onClick={() => download("csv")}
-            title="CSV"
           >
             CSV
           </button>
@@ -259,7 +419,6 @@ export function BacktestPanel() {
             className="btn"
             disabled={!result}
             onClick={() => download("json")}
-            title="JSON"
           >
             JSON
           </button>
@@ -270,7 +429,8 @@ export function BacktestPanel() {
       <div className="flex-1 min-h-0 overflow-y-auto p-2 space-y-3">
         {!result && (
           <p className="text-desk-muted text-2xs">
-            Preset seçip BTCUSDT üzerinde regime raporu üretmek için çalıştırın.
+            Z-Score Pullback, ADX/DI, Aroon veya kod yapıştırıp 1000 mumla
+            regime raporu üret.
           </p>
         )}
         {result && (
@@ -331,11 +491,37 @@ export function BacktestPanel() {
               </table>
             </section>
 
+            {result.byMonth?.length > 0 && (
+              <section>
+                <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
+                  Aylık
+                </h3>
+                <div className="max-h-28 overflow-y-auto font-mono text-2xs space-y-0.5">
+                  {result.byMonth.map((m) => (
+                    <div key={m.key} className="flex justify-between">
+                      <span>{m.key}</span>
+                      <span
+                        className={
+                          m.netPnl >= 0 ? "text-desk-up" : "text-desk-down"
+                        }
+                      >
+                        {m.trades}t {m.netPnl.toFixed(0)} (
+                        {(m.winRate * 100).toFixed(0)}%)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section>
               <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
                 Equity
               </h3>
-              <div ref={equityRef} className="h-[160px] rounded border border-desk-border" />
+              <div
+                ref={equityRef}
+                className="h-[160px] rounded border border-desk-border"
+              />
             </section>
 
             <section>
@@ -358,7 +544,13 @@ export function BacktestPanel() {
                   <div className="text-desk-muted mb-0.5">UTC Gün</div>
                   {result.byDay.map((d) => (
                     <div key={d.day} className="flex justify-between font-mono">
-                      <span>{["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"][d.day]}</span>
+                      <span>
+                        {
+                          ["Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"][
+                            d.day
+                          ]
+                        }
+                      </span>
                       <span>
                         {d.trades}t {d.netPnl.toFixed(0)}
                       </span>
@@ -391,13 +583,19 @@ export function BacktestPanel() {
                         <td
                           className={clsx(
                             "px-1 py-0.5",
-                            t.side === "long" ? "text-desk-up" : "text-desk-down"
+                            t.side === "long"
+                              ? "text-desk-up"
+                              : "text-desk-down"
                           )}
                         >
                           {t.side}
                         </td>
-                        <td className="font-mono">{t.entryPrice.toPrecision(5)}</td>
-                        <td className="font-mono">{t.exitPrice.toPrecision(5)}</td>
+                        <td className="font-mono">
+                          {t.entryPrice.toPrecision(5)}
+                        </td>
+                        <td className="font-mono">
+                          {t.exitPrice.toPrecision(5)}
+                        </td>
                         <td
                           className={clsx(
                             "font-mono",

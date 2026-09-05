@@ -36,6 +36,23 @@ export function sma(values: number[], period: number): (number | null)[] {
   return out;
 }
 
+export function stdev(values: number[], period: number): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  for (let i = period - 1; i < values.length; i++) {
+    let sum = 0;
+    for (let j = i - period + 1; j <= i; j++) sum += values[j];
+    const mean = sum / period;
+    let varSum = 0;
+    for (let j = i - period + 1; j <= i; j++) {
+      const d = values[j] - mean;
+      varSum += d * d;
+    }
+    out[i] = Math.sqrt(varSum / period);
+  }
+  return out;
+}
+
+
 export function ema(values: number[], period: number): (number | null)[] {
   const out: (number | null)[] = [];
   const k = 2 / (period + 1);

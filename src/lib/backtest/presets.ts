@@ -1,13 +1,18 @@
 import type { Candle } from "@/lib/types";
 import {
+  adx,
+  aroon,
   bollinger,
   ema,
   macd,
   rsi,
+  sma,
+  stdev,
   supertrend,
 } from "@/lib/indicators/math";
 import { jurikKaseStoch } from "@/lib/indicators/jurik";
 import type { BacktestParams, SignalFn } from "./types";
+import { runStrategyCode } from "./strategySandbox";
 
 function crossedAbove(
   a: (number | null)[],
@@ -17,7 +22,10 @@ function crossedAbove(
   if (i < 1) return false;
   if (a[i] == null || b[i] == null || a[i - 1] == null || b[i - 1] == null)
     return false;
-  return (a[i - 1] as number) <= (b[i - 1] as number) && (a[i] as number) > (b[i] as number);
+  return (
+    (a[i - 1] as number) <= (b[i - 1] as number) &&
+    (a[i] as number) > (b[i] as number)
+  );
 }
 
 function crossedBelow(
@@ -28,7 +36,10 @@ function crossedBelow(
   if (i < 1) return false;
   if (a[i] == null || b[i] == null || a[i - 1] == null || b[i - 1] == null)
     return false;
-  return (a[i - 1] as number) >= (b[i - 1] as number) && (a[i] as number) < (b[i] as number);
+  return (
+    (a[i - 1] as number) >= (b[i - 1] as number) &&
+    (a[i] as number) < (b[i] as number)
+  );
 }
 
 export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
@@ -39,8 +50,21 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   jurikKasePermission: "JurikKase Stoch Permission",
   bbBreak: "Bollinger Break",
   emaRsiConfirm: "EMA + RSI Dual Confirm",
+  zScorePullback: "Z-Score Pullback (Trend+Z)",
+  diAdxTrend: "ADX + DI± Cross",
+  aroonLongTrend: "Aroon Long/Short",
+  jurikOsBounce: "Jurik Kase OS Bounce 15–20",
+  codeStrategy: "Kod stratejisi (yapıştır)",
   custom: "Custom Rules",
 };
+
+export function recommendedWarmup(preset: BacktestParams["preset"], params: BacktestParams): number {
+  if (preset === "zScorePullback") return Math.max(params.regimeSMA ?? 200, 220);
+  if (preset === "diAdxTrend") return 60;
+  if (preset === "aroonLongTrend") return 40;
+  if (preset === "jurikOsBounce") return 80;
+  return params.warmup ?? 60;
+}
 
 export function buildSignalContext(
   candles: Candle[],
@@ -49,6 +73,17 @@ export function buildSignalContext(
   const closes = candles.map((c) => c.close);
   const fast = params.fast ?? 9;
   const slow = params.slow ?? 21;
+  const zLen = params.zLength ?? 20;
+  const regimeN = params.regimeSMA ?? 200;
+  const fastMa = params.fast ?? 5;
+  const sma20 = sma(closes, zLen);
+  const sd20 = stdev(closes, zLen);
+  const zScore = closes.map((c, i) =>
+    sma20[i] == null || sd20[i] == null || (sd20[i] as number) === 0
+      ? null
+      : (c - (sma20[i] as number)) / (sd20[i] as number)
+  );
+
   const ctx: Record<string, unknown> = {
     emaFast: ema(closes, fast),
     emaSlow: ema(closes, slow),
@@ -69,13 +104,41 @@ export function buildSignalContext(
       levelHi: 90,
       smoothMode: "jma",
     }),
+    zScore,
+    smaRegime: sma(closes, regimeN),
+    fastSMA: sma(closes, fastMa),
+    dmi: adx(candles, params.adxPeriod ?? 14),
+    aroon: aroon(candles, params.aroonPeriod ?? 14),
   };
+
+  if (params.preset === "codeStrategy" && params.strategyCode?.trim()) {
+    try {
+      const bars = runStrategyCode(params.strategyCode, candles);
+      ctx.codeBars = bars;
+      ctx.codeWarnings = bars.warnings;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      ctx.codeBars = null;
+      ctx.codeWarnings = [
+        ...(((e as { strategyWarnings?: string[] }).strategyWarnings) ?? []),
+        msg,
+      ];
+      throw e;
+    }
+  }
+
   return ctx;
 }
 
-export function getSignalFn(preset: BacktestParams["preset"], params: BacktestParams): SignalFn {
+export function getSignalFn(
+  preset: BacktestParams["preset"],
+  params: BacktestParams
+): SignalFn {
   const rsiOs = params.rsiOs ?? 30;
   const rsiOb = params.rsiOb ?? 70;
+  const entryZ = params.entryZ ?? -1.5;
+  const exitZ = params.exitZ ?? 0;
+  const adxMin = params.adxMin ?? 25;
 
   switch (preset) {
     case "emaCross":
@@ -129,8 +192,10 @@ export function getSignalFn(preset: BacktestParams["preset"], params: BacktestPa
         if (j.k[i] == null || j.d[i] == null) return {};
         const permBull = j.state[i] == null || (j.state[i] as number) >= 0;
         const permBear = j.state[i] == null || (j.state[i] as number) <= 0;
-        const long = crossedAbove(j.k, j.d, i) && (j.k[i] as number) < 45 && permBull;
-        const short = crossedBelow(j.k, j.d, i) && (j.k[i] as number) > 55 && permBear;
+        const long =
+          crossedAbove(j.k, j.d, i) && (j.k[i] as number) < 45 && permBull;
+        const short =
+          crossedBelow(j.k, j.d, i) && (j.k[i] as number) > 55 && permBear;
         return { long, short, reason: "JKS permission" };
       };
     case "bbBreak":
@@ -162,6 +227,90 @@ export function getSignalFn(preset: BacktestParams["preset"], params: BacktestPa
         const long = crossedAbove(f, s, i) && (r[i] as number) > 50;
         const short = crossedBelow(f, s, i) && (r[i] as number) < 50;
         return { long, short, reason: "EMA+RSI" };
+      };
+    case "zScorePullback":
+      return (candles, i, ctx) => {
+        const z = ctx.zScore as (number | null)[];
+        const regime = ctx.smaRegime as (number | null)[];
+        const fastS = ctx.fastSMA as (number | null)[];
+        if (z[i] == null || regime[i] == null || fastS[i] == null) return {};
+        const closes = candles.map((c) => c.close);
+        const bull = closes[i] > (regime[i] as number);
+        const long =
+          bull &&
+          (z[i] as number) < entryZ &&
+          crossedAbove(closes, fastS, i);
+        const exitLong = (z[i] as number) > exitZ;
+        return { long, exitLong, reason: "Z-Score PB" };
+      };
+    case "diAdxTrend":
+      return (_c, i, ctx) => {
+        const d = ctx.dmi as {
+          adx: (number | null)[];
+          plusDI: (number | null)[];
+          minusDI: (number | null)[];
+        };
+        if (d.adx[i] == null) return {};
+        const strong = (d.adx[i] as number) > adxMin;
+        const long = strong && crossedAbove(d.plusDI, d.minusDI, i);
+        const short = strong && crossedAbove(d.minusDI, d.plusDI, i);
+        const exitLong =
+          crossedBelow(d.plusDI, d.minusDI, i) ||
+          (d.adx[i] as number) < 20;
+        const exitShort =
+          crossedBelow(d.minusDI, d.plusDI, i) ||
+          (d.adx[i] as number) < 20;
+        return { long, short, exitLong, exitShort, reason: "ADX/DI" };
+      };
+    case "aroonLongTrend":
+      return (_c, i, ctx) => {
+        const a = ctx.aroon as {
+          up: (number | null)[];
+          down: (number | null)[];
+        };
+        if (a.up[i] == null || a.down[i] == null) return {};
+        const zoneLong =
+          (a.up[i] as number) > 70 && (a.down[i] as number) < 30;
+        const zoneShort =
+          (a.down[i] as number) > 70 && (a.up[i] as number) < 30;
+        const long = crossedAbove(a.up, a.down, i) || zoneLong;
+        const short = crossedAbove(a.down, a.up, i) || zoneShort;
+        const exitLong =
+          crossedBelow(a.up, a.down, i) || (a.up[i] as number) < 50;
+        const exitShort =
+          crossedBelow(a.down, a.up, i) || (a.down[i] as number) < 50;
+        return { long, short, exitLong, exitShort, reason: "Aroon" };
+      };
+    case "jurikOsBounce":
+      return (_c, i, ctx) => {
+        const j = ctx.jks as {
+          k: (number | null)[];
+          d: (number | null)[];
+        };
+        if (j.k[i] == null || j.d[i] == null) return {};
+        const k = j.k[i] as number;
+        const long = crossedAbove(j.k, j.d, i) && k >= 15 && k <= 20;
+        const short = crossedBelow(j.k, j.d, i) && k >= 80 && k <= 85;
+        const exitLong = k > 50 || crossedBelow(j.k, j.d, i);
+        const exitShort = k < 50 || crossedAbove(j.k, j.d, i);
+        return { long, short, exitLong, exitShort, reason: "JKS OS" };
+      };
+    case "codeStrategy":
+      return (_c, i, ctx) => {
+        const bars = ctx.codeBars as {
+          enterLong: boolean[];
+          exitLong: boolean[];
+          enterShort: boolean[];
+          exitShort: boolean[];
+        } | null;
+        if (!bars) return {};
+        return {
+          long: bars.enterLong[i],
+          short: bars.enterShort[i],
+          exitLong: bars.exitLong[i],
+          exitShort: bars.exitShort[i],
+          reason: "code",
+        };
       };
     case "custom":
     default: {

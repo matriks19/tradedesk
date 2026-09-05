@@ -10,6 +10,11 @@ export type StrategyPresetId =
   | "jurikKasePermission"
   | "bbBreak"
   | "emaRsiConfirm"
+  | "zScorePullback"
+  | "diAdxTrend"
+  | "aroonLongTrend"
+  | "jurikOsBounce"
+  | "codeStrategy"
   | "custom";
 
 export interface BacktestParams {
@@ -22,12 +27,20 @@ export interface BacktestParams {
     entryLong?: "emaCross" | "rsiOs" | "macdCross" | "stFlip";
     entryShort?: "emaCross" | "rsiOb" | "macdCross" | "stFlip";
   };
+  /** Pasted strategy source (Pine-lite / TD) when preset === codeStrategy */
+  strategyCode?: string;
   allowShort: boolean;
+  /** Use ATR-based SL/TP (can combine with signal exits) */
+  useAtrStops?: boolean;
+  /** Honor exitLong/exitShort from strategy (default true for signal strategies) */
+  useSignalExits?: boolean;
   slAtrMult: number;
   tpAtrMult: number;
   positionSize: number; // quote currency notional
   commissionBps: number;
   warmup: number;
+  /** How many candles to fetch (max ~1000) */
+  candleLimit?: number;
   /** Preset-specific knobs */
   fast?: number;
   slow?: number;
@@ -38,6 +51,15 @@ export interface BacktestParams {
   stMult?: number;
   bbPeriod?: number;
   bbMult?: number;
+  /** Z-score pullback */
+  zLength?: number;
+  regimeSMA?: number;
+  entryZ?: number;
+  exitZ?: number;
+  /** ADX / Aroon */
+  adxPeriod?: number;
+  adxMin?: number;
+  aroonPeriod?: number;
 }
 
 export interface BacktestTrade {
@@ -79,6 +101,14 @@ export interface BacktestSummary {
   avgR: number;
   expectancy: number;
   avgBarsHeld: number;
+  avgWin: number;
+  avgLoss: number;
+  longTrades: number;
+  shortTrades: number;
+  longNetPnl: number;
+  shortNetPnl: number;
+  bestTrade: number;
+  worstTrade: number;
 }
 
 export interface BacktestResult {
@@ -87,15 +117,23 @@ export interface BacktestResult {
   byRegime: RegimeStats[];
   byHour: { hour: number; trades: number; netPnl: number; winRate: number }[];
   byDay: { day: number; trades: number; netPnl: number; winRate: number }[];
+  byMonth: { key: string; trades: number; netPnl: number; winRate: number }[];
   equity: { time: number; equity: number }[];
   trades: BacktestTrade[];
   regimes: Regime[];
   ranAt: number;
   candleCount: number;
+  codeWarnings?: string[];
 }
 
 export type SignalFn = (
   candles: Candle[],
   i: number,
   ctx: Record<string, unknown>
-) => { long?: boolean; short?: boolean; reason?: string };
+) => {
+  long?: boolean;
+  short?: boolean;
+  exitLong?: boolean;
+  exitShort?: boolean;
+  reason?: string;
+};

@@ -1,7 +1,11 @@
 import type { Candle } from "@/lib/types";
 import { atr } from "@/lib/indicators/math";
 import { classifyRegimes } from "./regime";
-import { buildSignalContext, getSignalFn } from "./presets";
+import {
+  buildSignalContext,
+  getSignalFn,
+  recommendedWarmup,
+} from "./presets";
 import type {
   BacktestParams,
   BacktestResult,
@@ -28,14 +32,18 @@ function regimeStats(trades: BacktestTrade[]): RegimeStats[] {
       trades: list.length,
       wins: wins.length,
       winRate: list.length ? wins.length / list.length : 0,
-      profitFactor: grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? Infinity : 0,
+      profitFactor:
+        grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? Infinity : 0,
       avgPnl: list.length ? list.reduce((s, t) => s + t.pnl, 0) / list.length : 0,
       netPnl: list.reduce((s, t) => s + t.pnl, 0),
     };
   });
 }
 
-function summarize(trades: BacktestTrade[], equity: { equity: number }[]): BacktestSummary {
+function summarize(
+  trades: BacktestTrade[],
+  equity: { equity: number }[]
+): BacktestSummary {
   const wins = trades.filter((t) => t.pnl > 0);
   const losses = trades.filter((t) => t.pnl <= 0);
   const grossWin = wins.reduce((s, t) => s + t.pnl, 0);
@@ -50,7 +58,6 @@ function summarize(trades: BacktestTrade[], equity: { equity: number }[]): Backt
     maxDd = Math.max(maxDd, dd);
     if (peak > 0) maxDdPct = Math.max(maxDdPct, dd / peak);
   }
-  // Sharpe-ish on trade returns
   const rets = trades.map((t) => t.pnlPct);
   const mean = rets.length ? rets.reduce((a, b) => a + b, 0) / rets.length : 0;
   const variance =
@@ -65,9 +72,13 @@ function summarize(trades: BacktestTrade[], equity: { equity: number }[]): Backt
   const avgBarsHeld = trades.length
     ? trades.reduce((s, t) => s + t.barsHeld, 0) / trades.length
     : 0;
+  const longs = trades.filter((t) => t.side === "long");
+  const shorts = trades.filter((t) => t.side === "short");
+  const pnls = trades.map((t) => t.pnl);
   return {
     netPnl,
-    profitFactor: grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? Infinity : 0,
+    profitFactor:
+      grossLoss > 0 ? grossWin / grossLoss : grossWin > 0 ? Infinity : 0,
     winRate: trades.length ? wins.length / trades.length : 0,
     trades: trades.length,
     wins: wins.length,
@@ -78,6 +89,14 @@ function summarize(trades: BacktestTrade[], equity: { equity: number }[]): Backt
     avgR,
     expectancy,
     avgBarsHeld,
+    avgWin: wins.length ? grossWin / wins.length : 0,
+    avgLoss: losses.length ? -grossLoss / losses.length : 0,
+    longTrades: longs.length,
+    shortTrades: shorts.length,
+    longNetPnl: longs.reduce((s, t) => s + t.pnl, 0),
+    shortNetPnl: shorts.reduce((s, t) => s + t.pnl, 0),
+    bestTrade: pnls.length ? Math.max(...pnls) : 0,
+    worstTrade: pnls.length ? Math.min(...pnls) : 0,
   };
 }
 
@@ -85,15 +104,21 @@ export function runBacktest(
   candles: Candle[],
   params: BacktestParams
 ): BacktestResult {
-  const warmup = Math.max(1, params.warmup ?? 50);
+  const warmup = Math.max(
+    1,
+    params.warmup ?? recommendedWarmup(params.preset, params)
+  );
+  const useAtrStops = params.useAtrStops ?? true;
+  const useSignalExits = params.useSignalExits ?? true;
   const regimes = classifyRegimes(candles);
   const atrLine = atr(candles, params.atrPeriod ?? 14);
   const ctx = buildSignalContext(candles, params);
   const signalFn = getSignalFn(params.preset, params);
+  const codeWarnings = (ctx.codeWarnings as string[] | undefined) ?? undefined;
 
   const commission = (params.commissionBps ?? 0) / 10000;
-  let cash = params.positionSize * 10; // virtual account buffer
-  const startEquity = cash;
+  const startEquity = params.positionSize * 10;
+  let cash = startEquity;
   let position: {
     side: "long" | "short";
     entry: number;
@@ -109,17 +134,7 @@ export function runBacktest(
   const trades: BacktestTrade[] = [];
   const equity: { time: number; equity: number }[] = [];
 
-  const markEquity = (i: number) => {
-    let eq = cash;
-    if (position) {
-      const px = candles[i].close;
-      eq +=
-        position.side === "long"
-          ? (px - position.entry) * position.qty
-          : (position.entry - px) * position.qty;
-    }
-    equity.push({ time: candles[i].time, equity: eq });
-  };
+  const rebuildCash = () => startEquity + trades.reduce((s, t) => s + t.pnl, 0);
 
   const closePos = (i: number, price: number, reason: string) => {
     if (!position) return;
@@ -129,12 +144,6 @@ export function runBacktest(
         : (position.entry - price) * position.qty;
     const fee = (position.entry + price) * position.qty * commission;
     const pnl = pnlGross - fee;
-    cash +=
-      position.side === "long"
-        ? position.qty * price - fee
-        : position.qty * position.entry + pnlGross - fee;
-    // For short we tracked cash differently — normalize:
-    // Simpler: rebuild cash from start + closed pnls
     trades.push({
       id: uid(),
       side: position.side,
@@ -153,27 +162,51 @@ export function runBacktest(
     position = null;
   };
 
-  // Recompute cash simply from startEquity + sum of closed trade pnls each bar
-  const rebuildCash = () => startEquity + trades.reduce((s, t) => s + t.pnl, 0);
+  const markEquity = (i: number) => {
+    cash = rebuildCash();
+    let eq = cash;
+    if (position) {
+      const px = candles[i].close;
+      eq +=
+        position.side === "long"
+          ? (px - position.entry) * position.qty
+          : (position.entry - px) * position.qty;
+    }
+    equity.push({ time: candles[i].time, equity: eq });
+  };
 
   for (let i = 0; i < candles.length; i++) {
     cash = rebuildCash();
     const c = candles[i];
     const a = atrLine[i];
 
-    // Manage open position
-    if (position && a != null) {
-      if (position.side === "long") {
-        if (c.low <= position.sl) {
-          closePos(i, position.sl, "SL");
-        } else if (c.high >= position.tp) {
-          closePos(i, position.tp, "TP");
+    if (position) {
+      let closed = false;
+      if (useAtrStops && a != null) {
+        if (position.side === "long") {
+          if (c.low <= position.sl) {
+            closePos(i, position.sl, "SL");
+            closed = true;
+          } else if (c.high >= position.tp) {
+            closePos(i, position.tp, "TP");
+            closed = true;
+          }
+        } else {
+          if (c.high >= position.sl) {
+            closePos(i, position.sl, "SL");
+            closed = true;
+          } else if (c.low <= position.tp) {
+            closePos(i, position.tp, "TP");
+            closed = true;
+          }
         }
-      } else {
-        if (c.high >= position.sl) {
-          closePos(i, position.sl, "SL");
-        } else if (c.low <= position.tp) {
-          closePos(i, position.tp, "TP");
+      }
+      if (!closed && useSignalExits && i >= warmup) {
+        const sig = signalFn(candles, i, ctx);
+        if (position.side === "long" && sig.exitLong) {
+          closePos(i, c.close, "signal exit");
+        } else if (position.side === "short" && sig.exitShort) {
+          closePos(i, c.close, "signal exit");
         }
       }
     }
@@ -183,15 +216,14 @@ export function runBacktest(
       continue;
     }
 
-    if (!position && a != null && a > 0) {
+    if (!position) {
       const sig = signalFn(candles, i, ctx);
       const notional = params.positionSize;
       const qty = notional / c.close;
-      const risk = params.slAtrMult * a;
-      const reward = params.tpAtrMult * a;
+      const risk = (params.slAtrMult || 1.5) * (a && a > 0 ? a : c.close * 0.01);
+      const reward = (params.tpAtrMult || 2.5) * (a && a > 0 ? a : c.close * 0.01);
 
       if (sig.long) {
-        cash = rebuildCash();
         position = {
           side: "long",
           entry: c.close,
@@ -204,7 +236,6 @@ export function runBacktest(
           regime: regimes[i],
         };
       } else if (sig.short && params.allowShort) {
-        cash = rebuildCash();
         position = {
           side: "short",
           entry: c.close,
@@ -219,11 +250,9 @@ export function runBacktest(
       }
     }
 
-    cash = rebuildCash();
     markEquity(i);
   }
 
-  // Force close at end
   if (position) {
     const last = candles.length - 1;
     closePos(last, candles[last].close, "EOD");
@@ -231,72 +260,79 @@ export function runBacktest(
     if (equity.length) equity[equity.length - 1].equity = cash;
   }
 
-  // Rebuild equity curve cleanly from trades for consistency
   let eq = startEquity;
   let ti = 0;
   const equityClean: { time: number; equity: number }[] = [];
   for (let i = 0; i < candles.length; i++) {
-    while (ti < trades.length && trades[ti].exitTime === candles[i].time) {
+    while (ti < trades.length && trades[ti].exitTime <= candles[i].time) {
       eq += trades[ti].pnl;
       ti++;
-    }
-    // also attribute if exitTime matches (multiple)
-    while (ti < trades.length && trades[ti].exitTime <= candles[i].time) {
-      // already handled equal; for safety
-      if (trades[ti].exitTime < candles[i].time) {
-        eq += trades[ti].pnl;
-        ti++;
-      } else break;
     }
     equityClean.push({ time: candles[i].time, equity: eq });
   }
 
   const byHourMap = new Map<number, BacktestTrade[]>();
   const byDayMap = new Map<number, BacktestTrade[]>();
+  const byMonthMap = new Map<string, BacktestTrade[]>();
   for (const t of trades) {
     const d = new Date(t.entryTime * 1000);
     const h = d.getUTCHours();
     const day = d.getUTCDay();
+    const key = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`;
     if (!byHourMap.has(h)) byHourMap.set(h, []);
     if (!byDayMap.has(day)) byDayMap.set(day, []);
+    if (!byMonthMap.has(key)) byMonthMap.set(key, []);
     byHourMap.get(h)!.push(t);
     byDayMap.get(day)!.push(t);
+    byMonthMap.get(key)!.push(t);
   }
 
-  const pack = (map: Map<number, BacktestTrade[]>, keyName: "hour" | "day") =>
-    Array.from(map.entries())
-      .sort((a, b) => a[0] - b[0])
-      .map(([k, list]) => ({
-        [keyName]: k,
-        trades: list.length,
-        netPnl: list.reduce((s, t) => s + t.pnl, 0),
-        winRate: list.length
-          ? list.filter((t) => t.pnl > 0).length / list.length
-          : 0,
-      })) as { hour: number; trades: number; netPnl: number; winRate: number }[] &
-      { day: number; trades: number; netPnl: number; winRate: number }[];
+  const packHour = Array.from(byHourMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([k, list]) => ({
+      hour: k,
+      trades: list.length,
+      netPnl: list.reduce((s, t) => s + t.pnl, 0),
+      winRate: list.length
+        ? list.filter((t) => t.pnl > 0).length / list.length
+        : 0,
+    }));
+
+  const packDay = Array.from(byDayMap.entries())
+    .sort((a, b) => a[0] - b[0])
+    .map(([k, list]) => ({
+      day: k,
+      trades: list.length,
+      netPnl: list.reduce((s, t) => s + t.pnl, 0),
+      winRate: list.length
+        ? list.filter((t) => t.pnl > 0).length / list.length
+        : 0,
+    }));
+
+  const byMonth = Array.from(byMonthMap.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .map(([key, list]) => ({
+      key,
+      trades: list.length,
+      netPnl: list.reduce((s, t) => s + t.pnl, 0),
+      winRate: list.length
+        ? list.filter((t) => t.pnl > 0).length / list.length
+        : 0,
+    }));
 
   return {
     params,
     summary: summarize(trades, equityClean),
     byRegime: regimeStats(trades),
-    byHour: pack(byHourMap, "hour") as {
-      hour: number;
-      trades: number;
-      netPnl: number;
-      winRate: number;
-    }[],
-    byDay: pack(byDayMap, "day") as {
-      day: number;
-      trades: number;
-      netPnl: number;
-      winRate: number;
-    }[],
+    byHour: packHour,
+    byDay: packDay,
+    byMonth,
     equity: equityClean,
     trades,
     regimes,
     ranAt: Date.now(),
     candleCount: candles.length,
+    codeWarnings,
   };
 }
 
