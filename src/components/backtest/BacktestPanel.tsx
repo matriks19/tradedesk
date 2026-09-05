@@ -41,6 +41,16 @@ const SIGNAL_EXIT_PRESETS = new Set<StrategyPresetId>([
   "eliziEdgeExhaust",
   "hybridMacdPump",
   "hybridMacdPumpLong",
+  "shortRsiOb",
+  "shortTsiSignal",
+  "shortRsiDiv",
+  "shortTsiDiv",
+  "shortEnergyFade",
+  "earlyFisher",
+  "earlyFisherTrend",
+  "earlyStoch",
+  "earlyWaveTrend",
+  "earlyConnors",
   "codeStrategy",
 ]);
 

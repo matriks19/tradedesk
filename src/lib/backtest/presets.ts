@@ -9,6 +9,11 @@ import {
   macd,
   rsi,
   sma,
+  tsi,
+  stochastic,
+  connorsRsi,
+  wavetrend,
+  fisher,
   stdev,
   supertrend,
   vwap,
@@ -19,6 +24,36 @@ import { initialBalance } from "@/lib/indicators/proreal";
 import { jurikKaseStoch } from "@/lib/indicators/jurik";
 import type { BacktestParams, SignalFn } from "./types";
 import { runStrategyCode } from "./strategySandbox";
+
+
+function argMax(arr: number[], from: number, to: number): number {
+  let idx = from;
+  let best = -Infinity;
+  for (let i = from; i <= to; i++) {
+    if (arr[i] > best) {
+      best = arr[i];
+      idx = i;
+    }
+  }
+  return idx;
+}
+
+/** Regular bearish divergence: later price high > earlier, oscillator high lower. */
+function bearDiv(
+  priceHi: number[],
+  osc: (number | null)[],
+  i: number,
+  win = 16
+): boolean {
+  if (i < win * 2 + 2) return false;
+  const later = argMax(priceHi, i - win + 1, i);
+  const earlier = argMax(priceHi, i - win * 2 + 1, i - win);
+  if (later <= earlier) return false;
+  const oL = osc[later];
+  const oE = osc[earlier];
+  if (oL == null || oE == null) return false;
+  return priceHi[later] > priceHi[earlier] && oL < oE;
+}
 
 function crossedAbove(
   a: (number | null)[],
@@ -74,6 +109,8 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   emaCross: "EMA Cross",
   rsiOsOb: "RSI OS/OB",
   macdCross: "MACD Cross",
+  macdEma200: "MACD + EMA200 filter",
+  macdEmaStack: "MACD + EMA 50/100/200",
   supertrendFlip: "Supertrend Flip",
   jurikKasePermission: "JurikKase Stoch Permission",
   bbBreak: "Bollinger Break",
@@ -92,6 +129,16 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   eliziEdgeExhaust: "Elizi Exhaust Fade (phase=4 counter)",
   hybridMacdPump: "Hibrit MACD+Pump (seçici short)",
   hybridMacdPumpLong: "Hibrit MACD+Pump Long-only",
+  shortRsiOb: "Short RSI 70 reject",
+  shortTsiSignal: "Short TSI×signal (RSI>50)",
+  shortRsiDiv: "Short RSI bear-div + kırılım",
+  shortTsiDiv: "Short TSI bear-div + kırılım",
+  shortEnergyFade: "Short Energy Fade (RSI+TSI+Exhaust)",
+  earlyFisher: "Early Fisher cross",
+  earlyStoch: "Early Stoch extreme cross",
+  earlyWaveTrend: "Early WaveTrend extreme",
+  earlyConnors: "Early Connors RSI",
+  earlyFisherTrend: "Early Fisher + EMA200",
   codeStrategy: "Kod stratejisi (yapıştır)",
   custom: "Custom Rules",
 };
@@ -106,7 +153,7 @@ export function recommendedWarmup(
       ? Math.max(params.regimeSMA ?? 200, 220)
       : 40;
   }
-  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "eliziEdgeFire" || preset === "eliziEdgeExhaust" || preset === "hybridMacdPump" || preset === "hybridMacdPumpLong") return 60;
+  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "eliziEdgeFire" || preset === "eliziEdgeExhaust" || preset === "hybridMacdPump" || preset === "hybridMacdPumpLong" || preset === "shortRsiOb" || preset === "shortTsiSignal" || preset === "shortRsiDiv" || preset === "shortTsiDiv" || preset === "shortEnergyFade" || preset === "earlyFisher" || preset === "earlyFisherTrend" || preset === "earlyStoch" || preset === "earlyWaveTrend" || preset === "earlyConnors") return 60;
   if (preset === "aroonLongTrend") return 40;
   if (preset === "jurikOsBounce") return 80;
   if (preset === "donchianTurtle")
@@ -141,6 +188,9 @@ export function buildSignalContext(
   const ctx: Record<string, unknown> = {
     emaFast: ema(closes, fast),
     emaSlow: ema(closes, slow),
+    ema50: ema(closes, 50),
+    ema100: ema(closes, 100),
+    ema200: ema(closes, 200),
     rsi: rsi(closes, params.rsiPeriod ?? 14),
     macd: macd(
       closes,
@@ -188,6 +238,11 @@ export function buildSignalContext(
     donchianExit: priorDonchian(candles, dcExit),
     donchianLive: donchian(candles, dcEntry),
     closes,
+    tsiLine: tsi(closes, 25, 13, 7),
+    fisherOsc: fisher(closes, 10),
+    stochOsc: stochastic(candles, 14, 3),
+    wtOsc: wavetrend(candles, 10, 21),
+    connors: connorsRsi(closes, 3, 2, 100),
   };
 
   // Only compute Elizi when the preset actually uses it (avoid scanner/backtest hang tax).
@@ -195,7 +250,8 @@ export function buildSignalContext(
     params.preset === "eliziEdgeFire" ||
     params.preset === "eliziEdgeExhaust" ||
     params.preset === "hybridMacdPump" ||
-    params.preset === "hybridMacdPumpLong"
+    params.preset === "hybridMacdPumpLong" ||
+    params.preset === "shortEnergyFade"
   ) {
     ctx.elizi = eliziEdge(candles, {
       erLen: params.erLen ?? 10,
@@ -264,6 +320,41 @@ export function getSignalFn(
         const long = (r[i - 1] as number) < rsiOs && (r[i] as number) >= rsiOs;
         const short = (r[i - 1] as number) > rsiOb && (r[i] as number) <= rsiOb;
         return { long, short, reason: "RSI OS/OB" };
+      };
+
+    case "macdEma200":
+      return (candles, i, ctx) => {
+        const m = ctx.macd as {
+          macd: (number | null)[];
+          signal: (number | null)[];
+        };
+        const e200 = ctx.ema200 as (number | null)[];
+        if (e200[i] == null) return {};
+        const above = candles[i].close > (e200[i] as number);
+        const below = candles[i].close < (e200[i] as number);
+        return {
+          long: above && crossedAbove(m.macd, m.signal, i),
+          short: below && crossedBelow(m.macd, m.signal, i),
+          reason: "MACD×EMA200",
+        };
+      };
+    case "macdEmaStack":
+      return (_c, i, ctx) => {
+        const m = ctx.macd as {
+          macd: (number | null)[];
+          signal: (number | null)[];
+        };
+        const a = ctx.ema50 as (number | null)[];
+        const b = ctx.ema100 as (number | null)[];
+        const c = ctx.ema200 as (number | null)[];
+        if (a[i] == null || b[i] == null || c[i] == null) return {};
+        const bull = (a[i] as number) > (b[i] as number) && (b[i] as number) > (c[i] as number);
+        const bear = (a[i] as number) < (b[i] as number) && (b[i] as number) < (c[i] as number);
+        return {
+          long: bull && crossedAbove(m.macd, m.signal, i),
+          short: bear && crossedBelow(m.macd, m.signal, i),
+          reason: "MACD×50/100/200",
+        };
       };
     case "macdCross":
       return (_c, i, ctx) => {
@@ -800,6 +891,188 @@ export function getSignalFn(
             params.preset === "hybridMacdPumpLong"
               ? "Hybrid L (MACD/Pump)"
               : "Hybrid MACD/Pump/JKS",
+        };
+      };
+
+
+    case "shortRsiOb":
+      return (_c, i, ctx) => {
+        const r = ctx.rsi as (number | null)[];
+        if (r[i] == null || r[i - 1] == null) return {};
+        const short =
+          (r[i - 1] as number) >= 70 && (r[i] as number) < 70;
+        const exitShort = (r[i] as number) < 50;
+        return { short, exitShort, reason: "RSI70 reject" };
+      };
+    case "shortTsiSignal":
+      return (_c, i, ctx) => {
+        const t = ctx.tsiLine as {
+          tsi: (number | null)[];
+          signal: (number | null)[];
+        };
+        const r = ctx.rsi as (number | null)[];
+        if (t.tsi[i] == null || t.signal[i] == null) return {};
+        const rsiOk = r[i] == null || (r[i] as number) >= 50;
+        const tsiHigh = (t.tsi[i] as number) > 0;
+        const short =
+          crossedBelow(t.tsi, t.signal, i) && rsiOk && tsiHigh;
+        const exitShort =
+          crossedAbove(t.tsi, t.signal, i) ||
+          (t.tsi[i] as number) < 0;
+        return { short, exitShort, reason: "TSI×sig short" };
+      };
+    case "shortRsiDiv":
+      return (candles, i, ctx) => {
+        const r = ctx.rsi as (number | null)[];
+        const highs = candles.map((c) => c.high);
+        if (!bearDiv(highs, r, i, 16)) return {};
+        // Structure trigger: close below prior 3-bar low (not div-alone)
+        const floor = Math.min(
+          candles[i - 1].low,
+          candles[i - 2].low,
+          candles[i - 3].low
+        );
+        const short = candles[i].close < floor;
+        const exitShort =
+          r[i] != null && (r[i] as number) < 45;
+        return { short, exitShort, reason: "RSI div+break" };
+      };
+    case "shortTsiDiv":
+      return (candles, i, ctx) => {
+        const t = ctx.tsiLine as {
+          tsi: (number | null)[];
+          signal: (number | null)[];
+        };
+        const highs = candles.map((c) => c.high);
+        if (!bearDiv(highs, t.tsi, i, 20)) return {};
+        const floor = Math.min(
+          candles[i - 1].low,
+          candles[i - 2].low,
+          candles[i - 3].low
+        );
+        const short = candles[i].close < floor;
+        const exitShort =
+          t.tsi[i] != null &&
+          t.signal[i] != null &&
+          crossedAbove(t.tsi, t.signal, i);
+        return { short, exitShort, reason: "TSI div+break" };
+      };
+    case "shortEnergyFade":
+      return (candles, i, ctx) => {
+        const r = ctx.rsi as (number | null)[];
+        const t = ctx.tsiLine as {
+          tsi: (number | null)[];
+          signal: (number | null)[];
+        };
+        const el = ctx.elizi as
+          | {
+              phase: (number | null)[];
+              volSurprise: (number | null)[];
+              pathEfficiency: (number | null)[];
+            }
+          | undefined;
+        if (r[i] == null || t.tsi[i] == null) return {};
+        let exhaust = false;
+        if (el && el.phase[i] != null) {
+          const ph = el.phase[i] as number;
+          const phPrev = (el.phase[i - 1] as number) ?? 0;
+          exhaust = Math.abs(ph) === 4 && ph > 0 && Math.abs(phPrev) < 4;
+        }
+        const rsiHot = (r[i] as number) >= 60;
+        const tsiFade = crossedBelow(t.tsi, t.signal, i);
+        const short = (exhaust && rsiHot) || (tsiFade && rsiHot);
+        const exitShort =
+          (r[i] as number) < 50 ||
+          crossedAbove(t.tsi, t.signal, i);
+        return { short, exitShort, reason: "Energy fade" };
+      };
+
+
+    case "earlyFisher":
+      return (_c, i, ctx) => {
+        const f = ctx.fisherOsc as {
+          fisher: (number | null)[];
+          trigger: (number | null)[];
+        };
+        const long = crossedAbove(f.fisher, f.trigger, i);
+        const short = crossedBelow(f.fisher, f.trigger, i);
+        return {
+          long,
+          short,
+          exitLong: short,
+          exitShort: long,
+          reason: "Fisher early",
+        };
+      };
+    case "earlyFisherTrend":
+      return (candles, i, ctx) => {
+        const f = ctx.fisherOsc as {
+          fisher: (number | null)[];
+          trigger: (number | null)[];
+        };
+        const e200 = ctx.ema200 as (number | null)[];
+        if (!e200 || e200[i] == null) return {};
+        const above = candles[i].close > (e200[i] as number);
+        const below = candles[i].close < (e200[i] as number);
+        const long = above && crossedAbove(f.fisher, f.trigger, i);
+        const short = below && crossedBelow(f.fisher, f.trigger, i);
+        return {
+          long,
+          short,
+          exitLong: crossedBelow(f.fisher, f.trigger, i),
+          exitShort: crossedAbove(f.fisher, f.trigger, i),
+          reason: "Fisher×EMA200",
+        };
+      };
+    case "earlyStoch":
+      return (_c, i, ctx) => {
+        const s = ctx.stochOsc as { k: (number | null)[]; d: (number | null)[] };
+        if (s.k[i] == null || s.d[i] == null) return {};
+        const long =
+          crossedAbove(s.k, s.d, i) && (s.k[i] as number) < 25;
+        const short =
+          crossedBelow(s.k, s.d, i) && (s.k[i] as number) > 75;
+        return {
+          long,
+          short,
+          exitLong: crossedBelow(s.k, s.d, i) || (s.k[i] as number) > 80,
+          exitShort: crossedAbove(s.k, s.d, i) || (s.k[i] as number) < 20,
+          reason: "Stoch early",
+        };
+      };
+    case "earlyWaveTrend":
+      return (_c, i, ctx) => {
+        const w = ctx.wtOsc as {
+          wt1: (number | null)[];
+          wt2: (number | null)[];
+        };
+        if (w.wt1[i] == null || w.wt2[i] == null) return {};
+        const long =
+          crossedAbove(w.wt1, w.wt2, i) && (w.wt1[i] as number) < -50;
+        const short =
+          crossedBelow(w.wt1, w.wt2, i) && (w.wt1[i] as number) > 50;
+        return {
+          long,
+          short,
+          exitLong: crossedBelow(w.wt1, w.wt2, i) || (w.wt1[i] as number) > 45,
+          exitShort: crossedAbove(w.wt1, w.wt2, i) || (w.wt1[i] as number) < -45,
+          reason: "WT early",
+        };
+      };
+    case "earlyConnors":
+      return (_c, i, ctx) => {
+        const c = ctx.connors as (number | null)[];
+        if (c[i] == null || c[i - 1] == null) return {};
+        const long =
+          (c[i - 1] as number) < 10 && (c[i] as number) >= 10;
+        const short =
+          (c[i - 1] as number) > 90 && (c[i] as number) <= 90;
+        return {
+          long,
+          short,
+          exitLong: (c[i] as number) > 70 || ((c[i - 1] as number) < 50 && (c[i] as number) >= 50),
+          exitShort: (c[i] as number) < 30 || ((c[i - 1] as number) > 50 && (c[i] as number) <= 50),
+          reason: "CRSI early",
         };
       };
 

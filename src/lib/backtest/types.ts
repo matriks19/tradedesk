@@ -24,6 +24,18 @@ export type StrategyPresetId =
   | "eliziEdgeExhaust"
   | "hybridMacdPump"
   | "hybridMacdPumpLong"
+  | "shortRsiOb"
+  | "shortTsiSignal"
+  | "shortRsiDiv"
+  | "shortTsiDiv"
+  | "shortEnergyFade"
+  | "macdEma200"
+  | "macdEmaStack"
+  | "earlyFisher"
+  | "earlyStoch"
+  | "earlyWaveTrend"
+  | "earlyConnors"
+  | "earlyFisherTrend"
   | "codeStrategy"
   | "custom";
 

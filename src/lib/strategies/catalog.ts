@@ -3158,6 +3158,47 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     researchNote:
       "Proprietary fade — not measured WR. Regime-dependent; fails in strong trends that re-arm after fake exhaust.",
   },
+
+  {
+    id: "early_fisher_trend",
+    name: "Early Fisher + EMA200",
+    shortName: "Early·Fisher",
+    category: "high_edge",
+    inspiredBy: "10-coin 4h bakeoff Sep 2026: Fisher×EMA200 long ≈ Hybrid; shorts lose",
+    summary:
+      "Fisher cross + EMA200 trend filtresi. Long kenarı Hybrid’e yakın; short’ta Exhaust kullan.",
+    howTo: [
+      "TF 4h. Close > EMA200 ve Fisher, trigger’ı yukarı keser → long.",
+      "Short: Close < EMA200 + Fisher↓ (bakeoff’ta zayıf — tercih Exhaust).",
+      "Çıkış: Fisher ters cross. Signal-exit preset.",
+      "10 coin 4h: FisherTrend net +772 (9/10), L≈+1200 / S≈−428. Hybrid Long hâlâ #1.",
+    ],
+    timeframe: "4h",
+    allowShort: true,
+    replaceIndicators: true,
+    indicators: [
+      { type: "fisher", params: { period: 10 }, color: "#7c4dff" },
+      { type: "ema", params: { period: 200 }, color: "#90a4ae" },
+    ],
+    risk: {
+      rMultiple: 1.8,
+      tip: "Long öncelikli. Short boyut küçült veya Exhaust’a bırak.",
+    },
+    backtestPreset: "earlyFisherTrend",
+    backtestExtras: {
+      useAtrStops: false,
+      useSignalExits: true,
+      allowShort: true,
+      warmup: 60,
+      slAtrMult: 1.5,
+      tpAtrMult: 2.5,
+    },
+    tags: ["high_edge", "fisher", "early", "4h", "long"],
+    edgeScore: 84,
+    researchNote:
+      "10 USDT pairs 4h ~1000 bars: earlyFisherTrend +772 (9/10). Raw Fisher / Stoch / WT / Connors net negative; Exhaust still only +short book.",
+  },
+
   {
     id: "elizi_htf_align",
     name: "Elizi HTF Align — 1h swing fire",
