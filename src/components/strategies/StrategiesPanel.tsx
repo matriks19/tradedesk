@@ -5,6 +5,7 @@ import { useDeskStore } from "@/store/desk";
 import {
   CATEGORY_LABELS,
   KILLZONES_TR,
+  STRATEGY_CATEGORY_ORDER,
   STRATEGY_PACKS,
   type StrategyCategory,
   type StrategyPack,
@@ -35,12 +36,15 @@ function nowInKillzone(): string | null {
   return null;
 }
 
+function packSortKey(s: StrategyPack): number {
+  const catRank = STRATEGY_CATEGORY_ORDER.indexOf(s.category);
+  const cat = catRank < 0 ? 99 : catRank;
+  const edge = s.edgeScore ?? (s.category === "high_edge" ? 50 : 0);
+  return cat * 1000 - edge;
+}
+
 export function StrategiesPanel() {
-  const {
-    activeStrategyId,
-    applyStrategyPack,
-    setSidebarTab,
-  } = useDeskStore();
+  const { activeStrategyId, applyStrategyPack, setSidebarTab } = useDeskStore();
   const [cat, setCat] = useState<StrategyCategory | "all">("all");
   const [tfFilter, setTfFilter] = useState<"all" | "5m" | "10m" | "15m">("all");
   const [q, setQ] = useState("");
@@ -50,17 +54,27 @@ export function StrategiesPanel() {
 
   const list = useMemo(() => {
     const qq = q.trim().toLowerCase();
-    return STRATEGY_PACKS.filter((s) => {
+    const filtered = STRATEGY_PACKS.filter((s) => {
       if (cat !== "all" && s.category !== cat) return false;
-      if (tfFilter !== "all" && s.timeframe !== tfFilter && !s.tags.includes(tfFilter))
+      if (
+        tfFilter !== "all" &&
+        s.timeframe !== tfFilter &&
+        !s.tags.includes(tfFilter)
+      )
         return false;
       if (!qq) return true;
       return (
         s.name.toLowerCase().includes(qq) ||
         s.summary.toLowerCase().includes(qq) ||
         s.tags.some((t) => t.toLowerCase().includes(qq)) ||
-        s.inspiredBy.toLowerCase().includes(qq)
+        s.inspiredBy.toLowerCase().includes(qq) ||
+        (s.researchNote?.toLowerCase().includes(qq) ?? false)
       );
+    });
+    return filtered.sort((a, b) => {
+      const d = packSortKey(a) - packSortKey(b);
+      if (d !== 0) return d;
+      return a.name.localeCompare(b.name, "tr");
     });
   }, [cat, tfFilter, q]);
 
@@ -83,12 +97,13 @@ export function StrategiesPanel() {
           )}
         </div>
         <p className="text-2xs text-desk-muted leading-snug">
-          YouTube / retail playbook’lardan derlendi. Tek tık: grafik göstergeleri
-          + TF + risk ipucu + backtest/tarayıcı bağlantısı.
+          YouTube / retail playbook'lardan derlendi. Tek tık: grafik
+          göstergeleri + TF + risk + backtest/tarayıcı. ★ Yüksek başarı =
+          literatür iddiası — ölçülmüş win-rate değil.
         </p>
         <input
           className="input w-full text-2xs"
-          placeholder="Ara: ORB, ICT, Z-Score, Aroon…"
+          placeholder="Ara: ORB, RSI2, Turtle, ICT, Jurik…"
           value={q}
           onChange={(e) => setQ(e.target.value)}
         />
@@ -112,14 +127,22 @@ export function StrategiesPanel() {
           >
             Tümü
           </button>
-          {(Object.keys(CATEGORY_LABELS) as StrategyCategory[]).map((c) => (
+          {STRATEGY_CATEGORY_ORDER.map((c) => (
             <button
               key={c}
               type="button"
-              className={clsx("btn text-2xs", cat === c && "btn-accent")}
+              className={clsx(
+                "btn text-2xs",
+                cat === c && "btn-accent",
+                c === "high_edge" &&
+                  cat !== c &&
+                  "border border-amber-500/40 text-amber-400/90"
+              )}
               onClick={() => setCat(c)}
             >
-              {CATEGORY_LABELS[c]}
+              {c === "high_edge"
+                ? `★ ${CATEGORY_LABELS[c]}`
+                : CATEGORY_LABELS[c]}
             </button>
           ))}
         </div>
@@ -130,12 +153,14 @@ export function StrategiesPanel() {
         {list.map((s) => {
           const open = openId === s.id;
           const active = activeStrategyId === s.id;
+          const lit = s.literatureEstimate;
           return (
             <div
               key={s.id}
               className={clsx(
                 "border rounded border-desk-border/60 p-2 space-y-1.5",
-                active && "border-desk-accent/60 bg-desk-elevated/40"
+                active && "border-desk-accent/60 bg-desk-elevated/40",
+                s.category === "high_edge" && !active && "border-amber-500/25"
               )}
             >
               <div className="flex items-start gap-2">
@@ -171,7 +196,14 @@ export function StrategiesPanel() {
                 </button>
               </div>
               <div className="flex flex-wrap gap-1">
-                <span className="text-2xs px-1 rounded bg-desk-elevated text-desk-muted">
+                <span
+                  className={clsx(
+                    "text-2xs px-1 rounded bg-desk-elevated",
+                    s.category === "high_edge"
+                      ? "text-amber-400/90"
+                      : "text-desk-muted"
+                  )}
+                >
                   {CATEGORY_LABELS[s.category]}
                 </span>
                 <span className="text-2xs px-1 rounded bg-desk-elevated text-desk-muted">
@@ -186,13 +218,26 @@ export function StrategiesPanel() {
                   </span>
                 ))}
               </div>
+              {lit && (lit.winRateHint || lit.expectancyHint) && (
+                <div className="text-2xs text-amber-400/75 leading-snug">
+                  {lit.winRateHint && <span>Lit. WR: {lit.winRateHint}</span>}
+                  {lit.winRateHint && lit.expectancyHint && " · "}
+                  {lit.expectancyHint && (
+                    <span>Expectancy: {lit.expectancyHint}</span>
+                  )}
+                  <span className="block text-desk-muted/90 mt-0.5">
+                    {lit.disclaimer ??
+                      "Literatür/topluluk iddiası — ölçülmüş TradeDesk WR değil"}
+                  </span>
+                </div>
+              )}
               {open && (
                 <div className="space-y-1.5 pt-1 border-t border-desk-border/40">
                   <p className="text-2xs text-desk-muted italic">
                     Kaynak ilham: {s.inspiredBy}
                   </p>
                   {s.researchNote && (
-                    <p className="text-2xs text-amber-400/80 leading-snug">
+                    <p className="text-2xs text-amber-400/80 leading-snug rounded bg-amber-500/5 px-1.5 py-1 border border-amber-500/20">
                       Araştırma notu: {s.researchNote}
                     </p>
                   )}
@@ -225,7 +270,7 @@ export function StrategiesPanel() {
                           setSidebarTab("backtest");
                         }}
                       >
-                        Backtest’e git
+                        Backtest'e git
                       </button>
                     )}
                     {(s.scannerPresets?.length || s.scannerChips?.length) && (
@@ -257,7 +302,24 @@ export function StrategiesPanel() {
           );
         })}
         {!list.length && (
-          <p className="text-2xs text-desk-muted">Eşleşen strateji yok.</p>
+          <div className="rounded border border-desk-border/50 p-3 space-y-1">
+            <p className="text-2xs text-desk-muted">Eşleşen strateji yok.</p>
+            <p className="text-2xs text-desk-muted/80">
+              TF veya kategori filtresini gevşet; ★ Yüksek başarı tüm TF'lerde
+              (1d RSI2, 4h kanal…) listelenir — 5m filtresi onları gizler.
+            </p>
+            <button
+              type="button"
+              className="btn text-2xs"
+              onClick={() => {
+                setCat("high_edge");
+                setTfFilter("all");
+                setQ("");
+              }}
+            >
+              ★ Yüksek başarı'yı göster
+            </button>
+          </div>
         )}
 
         <section className="pt-2 border-t border-desk-border/40 space-y-1">

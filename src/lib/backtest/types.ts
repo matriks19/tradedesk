@@ -14,6 +14,11 @@ export type StrategyPresetId =
   | "diAdxTrend"
   | "aroonLongTrend"
   | "jurikOsBounce"
+  | "orbVwapFiltered"
+  | "vwapBounce"
+  | "rsi2MeanRev"
+  | "donchianTurtle"
+  | "supertrendAdx"
   | "codeStrategy"
   | "custom";
 
@@ -63,6 +68,15 @@ export interface BacktestParams {
   adxPeriod?: number;
   adxMin?: number;
   aroonPeriod?: number;
+  /** ORB / session */
+  orbBars?: number;
+  /** Donchian / Turtle */
+  donchianPeriod?: number;
+  donchianExitPeriod?: number;
+  /** RSI2 (+ optional SMA regime filter) */
+  requireRegimeAbove?: boolean;
+  /** VWAP bounce: max distance from VWAP as fraction of ATR (default 0.35) */
+  vwapTouchAtr?: number;
 }
 
 export interface BacktestTrade {

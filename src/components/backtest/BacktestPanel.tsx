@@ -31,6 +31,11 @@ const SIGNAL_EXIT_PRESETS = new Set<StrategyPresetId>([
   "diAdxTrend",
   "aroonLongTrend",
   "jurikOsBounce",
+  "orbVwapFiltered",
+  "vwapBounce",
+  "rsi2MeanRev",
+  "donchianTurtle",
+  "supertrendAdx",
   "codeStrategy",
 ]);
 
@@ -104,7 +109,7 @@ export function BacktestPanel() {
       warmup: recommendedWarmup(id, { ...params, preset: id }),
       useAtrStops: !SIGNAL_EXIT_PRESETS.has(id),
       useSignalExits: true,
-      allowShort: id !== "zScorePullback" && id !== "aroonLongTrend",
+      allowShort: id !== "zScorePullback" && id !== "aroonLongTrend" && id !== "rsi2MeanRev",
     };
     if (id === "zScorePullback") {
       next.fast = 5;

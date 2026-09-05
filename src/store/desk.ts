@@ -397,20 +397,39 @@ export const useDeskStore = create<DeskState>()(
           if (!pack) return;
           set((s) => {
             const paneId = s.activePaneId;
-            const indicators: IndicatorInstance[] = pack.indicators.map((spec) => {
+            const indicators: IndicatorInstance[] = [];
+            for (const spec of pack.indicators) {
               const meta = BUILTIN_META[spec.type];
+              if (!meta) continue; // skip unknown ids — validatePacks catches these
               const base = defaultsFor(spec.type);
-              const inst: IndicatorInstance = {
+              indicators.push({
                 id: uid("ind"),
                 type: spec.type,
-                name: meta?.label ?? spec.type,
+                name: meta.label,
                 params: { ...base, ...(spec.params ?? {}) },
                 visible: true,
                 color: spec.color,
                 source: { type: "price", field: "close" },
-              };
-              return inst;
-            });
+              });
+            }
+            // Reset preset knobs so prior pack extras (e.g. rsiPeriod:2) do not leak
+            const nextBacktest = {
+              symbol: s.backtestParams.symbol,
+              exchange: s.backtestParams.exchange,
+              timeframe: pack.timeframe as never,
+              preset: (pack.backtestPreset ??
+                s.backtestParams.preset) as never,
+              allowShort: pack.allowShort,
+              slAtrMult: 1.5,
+              tpAtrMult: 2.5,
+              positionSize: s.backtestParams.positionSize,
+              commissionBps: s.backtestParams.commissionBps,
+              warmup: 60,
+              useAtrStops: true,
+              useSignalExits: true,
+              strategyCode: s.backtestParams.strategyCode,
+              ...(pack.backtestExtras ?? {}),
+            };
             return {
               activeStrategyId: pack.id,
               showRiskLines: true,
@@ -420,13 +439,7 @@ export const useDeskStore = create<DeskState>()(
               },
               pendingScannerPresets: pack.scannerPresets ?? null,
               pendingScannerChips: pack.scannerChips ?? null,
-              backtestParams: {
-                ...s.backtestParams,
-                preset: pack.backtestPreset ?? s.backtestParams.preset,
-                allowShort: pack.allowShort,
-                timeframe: pack.timeframe as never,
-                ...(pack.backtestExtras ?? {}),
-              },
+              backtestParams: nextBacktest,
               panes: s.panes.map((p) => {
                 if (p.id !== paneId) return p;
                 return {

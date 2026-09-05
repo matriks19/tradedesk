@@ -271,6 +271,27 @@ export const SCANNER_PRESETS: Record<
     description: "Güçlü trend (ADX)",
     filters: [{ type: "adxAbove", value: 25 }],
   },
+  rsi2_oversold: {
+    label: "RSI(2) < 10",
+    description: "Connors-style RSI(2) aşırı satım (period=2)",
+    filters: [{ type: "rsi", op: "lt", value: 10, period: 2 }],
+  },
+  rsi2_sma200: {
+    label: "RSI(2)<10 + SMA200 üstü",
+    description: "RSI(2) OS + bull regime (SMA200)",
+    filters: [
+      { type: "rsi", op: "lt", value: 10, period: 2 },
+      { type: "priceVsSma", period: 200, side: "above" },
+    ],
+  },
+  st_adx_long: {
+    label: "ST flip + ADX>25",
+    description: "Supertrend bullish flip and ADX strength",
+    filters: [
+      { type: "supertrendFlip", direction: "bull" },
+      { type: "adxAbove", value: 25 },
+    ],
+  },
   aroon_long: {
     label: "Aroon long",
     description: "Aroon Up↑Down kesişim (Aaron long tarzı)",

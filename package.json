@@ -2,12 +2,14 @@
   "name": "tradedesk",
   "version": "1.0.0",
   "private": true,
-  "description": "TradeDesk — TradingView-class web terminal (Binance + BIST)",
+  "description": "TradeDesk \u2014 TradingView-class web terminal (Binance + BIST)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "smoke:packs": "node scripts/smoke-strategy-packs.mjs",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "lightweight-charts": "^4.2.1",
