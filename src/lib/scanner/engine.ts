@@ -1,5 +1,7 @@
 import type { Candle, Exchange, TickerQuote } from "@/lib/types";
 import {
+  adx,
+  aroon,
   atr,
   bollinger,
   closes,
@@ -10,6 +12,7 @@ import {
   stochastic,
   supertrend,
 } from "@/lib/indicators/math";
+import { jurikKaseStoch, jurikStoch } from "@/lib/indicators/jurik";
 
 export type ScannerFilter =
   | { type: "rsi"; op: "lt" | "gt"; value: number; period?: number }
@@ -22,6 +25,34 @@ export type ScannerFilter =
   | { type: "supertrendFlip"; direction: "bull" | "bear"; period?: number; mult?: number }
   | { type: "atrPctHigh"; minPct: number; period?: number }
   | { type: "stoch"; zone: "oversold" | "overbought"; kPeriod?: number; level?: number }
+  | {
+      type: "stochCross";
+      direction: "bull" | "bear";
+      /** Cross must land with %K inside [zoneLo, zoneHi] (e.g. 15–20 OS bounce). */
+      zoneLo?: number;
+      zoneHi?: number;
+    }
+  | {
+      type: "jurikStochCross";
+      direction: "bull" | "bear";
+      variant?: "jurik" | "kase";
+      zoneLo?: number;
+      zoneHi?: number;
+    }
+  | { type: "diCross"; direction: "bull" | "bear"; period?: number }
+  | { type: "adxAbove"; value: number; period?: number }
+  | {
+      type: "aroonCross";
+      direction: "bull" | "bear";
+      period?: number;
+    }
+  | {
+      type: "aroonLong";
+      /** Aroon Up above / Down below thresholds (classic Aroon long). */
+      upMin?: number;
+      downMax?: number;
+      period?: number;
+    }
   | { type: "consecBars"; color: "green" | "red"; count: number }
   | { type: "nearHod"; pct?: number }
   | { type: "nearLod"; pct?: number }
@@ -163,6 +194,98 @@ export const SCANNER_PRESETS: Record<
       { type: "stoch", zone: "oversold" },
     ],
   },
+  jurik_stoch_os_up: {
+    label: "Jurik Stoch 15–20 ↑",
+    description: "Jurik %K, %D’yi yukarı keser; kesim 15–20 OS bandında",
+    filters: [
+      {
+        type: "jurikStochCross",
+        direction: "bull",
+        variant: "jurik",
+        zoneLo: 15,
+        zoneHi: 20,
+      },
+    ],
+  },
+  jurik_kase_os_up: {
+    label: "Jurik Kase 15–20 ↑",
+    description: "Jurik Kase %K↑%D, 15–20 bandı (piyasada sık aranan OS bounce)",
+    filters: [
+      {
+        type: "jurikStochCross",
+        direction: "bull",
+        variant: "kase",
+        zoneLo: 15,
+        zoneHi: 20,
+      },
+    ],
+  },
+  jurik_stoch_ob_down: {
+    label: "Jurik Stoch 80–85 ↓",
+    description: "Jurik %K↓%D overbought 80–85",
+    filters: [
+      {
+        type: "jurikStochCross",
+        direction: "bear",
+        variant: "jurik",
+        zoneLo: 80,
+        zoneHi: 85,
+      },
+    ],
+  },
+  stoch_os_cross_up: {
+    label: "Stoch OS ↑ kesim",
+    description: "Klasik Stoch %K↑%D, 15–25 bandı",
+    filters: [
+      { type: "stochCross", direction: "bull", zoneLo: 15, zoneHi: 25 },
+    ],
+  },
+  di_plus_cross_up: {
+    label: "DI+ ↑ DI−",
+    description: "+DI, −DI’yi yukarı keser (DMI bull)",
+    filters: [{ type: "diCross", direction: "bull" }],
+  },
+  di_minus_cross_up: {
+    label: "DI− ↑ DI+",
+    description: "−DI, +DI’yi yukarı keser (DMI bear)",
+    filters: [{ type: "diCross", direction: "bear" }],
+  },
+  adx_trend_di_bull: {
+    label: "ADX>25 + DI+↑",
+    description: "Trend gücü ADX>25 ve +DI −DI üstü kesişim",
+    filters: [
+      { type: "adxAbove", value: 25 },
+      { type: "diCross", direction: "bull" },
+    ],
+  },
+  adx_trend_di_bear: {
+    label: "ADX>25 + DI−↑",
+    description: "ADX>25 ve −DI +DI üstü kesişim",
+    filters: [
+      { type: "adxAbove", value: 25 },
+      { type: "diCross", direction: "bear" },
+    ],
+  },
+  adx_strong: {
+    label: "ADX > 25",
+    description: "Güçlü trend (ADX)",
+    filters: [{ type: "adxAbove", value: 25 }],
+  },
+  aroon_long: {
+    label: "Aroon long",
+    description: "Aroon Up↑Down kesişim (Aaron long tarzı)",
+    filters: [{ type: "aroonCross", direction: "bull" }],
+  },
+  aroon_short: {
+    label: "Aroon short",
+    description: "Aroon Down↑Up kesişim",
+    filters: [{ type: "aroonCross", direction: "bear" }],
+  },
+  aroon_long_zone: {
+    label: "Aroon Up>70 Down<30",
+    description: "Klasik Aroon long zone (güçlü uptrend)",
+    filters: [{ type: "aroonLong", upMin: 70, downMax: 30 }],
+  },
 };
 
 const CANDLE_FILTERS = new Set([
@@ -175,10 +298,52 @@ const CANDLE_FILTERS = new Set([
   "supertrendFlip",
   "atrPctHigh",
   "stoch",
+  "stochCross",
+  "jurikStochCross",
+  "diCross",
+  "adxAbove",
+  "aroonCross",
+  "aroonLong",
   "consecBars",
   "priceVsSma",
   "rsiDivergence",
 ]);
+
+
+function crossedAbove(
+  a: (number | null)[],
+  b: (number | null)[]
+): boolean {
+  const i = a.length - 1;
+  if (i < 1) return false;
+  const a0 = a[i - 1];
+  const a1 = a[i];
+  const b0 = b[i - 1];
+  const b1 = b[i];
+  if (a0 == null || a1 == null || b0 == null || b1 == null) return false;
+  return a0 <= b0 && a1 > b1;
+}
+
+function crossedBelow(
+  a: (number | null)[],
+  b: (number | null)[]
+): boolean {
+  const i = a.length - 1;
+  if (i < 1) return false;
+  const a0 = a[i - 1];
+  const a1 = a[i];
+  const b0 = b[i - 1];
+  const b1 = b[i];
+  if (a0 == null || a1 == null || b0 == null || b1 == null) return false;
+  return a0 >= b0 && a1 < b1;
+}
+
+function inZone(v: number | null | undefined, lo: number, hi: number): boolean {
+  if (v == null) return false;
+  const a = Math.min(lo, hi);
+  const b = Math.max(lo, hi);
+  return v >= a && v <= b;
+}
 
 export function filtersNeedCandles(filters: ScannerFilter[]): boolean {
   return filters.some((f) => CANDLE_FILTERS.has(f.type));
@@ -355,7 +520,78 @@ export function matchFilters(
       if (f.side === "above" && !(last > v)) return { ok: false, note: "" };
       if (f.side === "below" && !(last < v)) return { ok: false, note: "" };
       notes.push(`vs SMA${f.period} ${f.side}`);
+    } else if (f.type === "stochCross") {
+      if (!candles || candles.length < 30) return { ok: false, note: "" };
+      const s = stochastic(candles, 14, 3);
+      const bull = crossedAbove(s.k, s.d);
+      const bear = crossedBelow(s.k, s.d);
+      if (f.direction === "bull" && !bull) return { ok: false, note: "" };
+      if (f.direction === "bear" && !bear) return { ok: false, note: "" };
+      const k = s.k[s.k.length - 1];
+      const lo = f.zoneLo;
+      const hi = f.zoneHi;
+      if (lo != null && hi != null && !inZone(k, lo, hi))
+        return { ok: false, note: "" };
+      notes.push(
+        f.direction === "bull"
+          ? `Stoch↑ ${k != null ? k.toFixed(0) : ""}`
+          : `Stoch↓ ${k != null ? k.toFixed(0) : ""}`
+      );
+    } else if (f.type === "jurikStochCross") {
+      if (!candles || candles.length < 40) return { ok: false, note: "" };
+      const variant = f.variant ?? "kase";
+      const s =
+        variant === "jurik" ? jurikStoch(candles) : jurikKaseStoch(candles);
+      const bull = crossedAbove(s.k, s.d);
+      const bear = crossedBelow(s.k, s.d);
+      if (f.direction === "bull" && !bull) return { ok: false, note: "" };
+      if (f.direction === "bear" && !bear) return { ok: false, note: "" };
+      const k = s.k[s.k.length - 1];
+      const lo = f.zoneLo;
+      const hi = f.zoneHi;
+      if (lo != null && hi != null && !inZone(k, lo, hi))
+        return { ok: false, note: "" };
+      const tag = variant === "jurik" ? "JStoch" : "JKase";
+      notes.push(
+        f.direction === "bull"
+          ? `${tag}↑ ${k != null ? k.toFixed(0) : ""}`
+          : `${tag}↓ ${k != null ? k.toFixed(0) : ""}`
+      );
+    } else if (f.type === "diCross") {
+      if (!candles || candles.length < 40) return { ok: false, note: "" };
+      const d = adx(candles, f.period ?? 14);
+      const bull = crossedAbove(d.plusDI, d.minusDI);
+      const bear = crossedAbove(d.minusDI, d.plusDI);
+      if (f.direction === "bull" && !bull) return { ok: false, note: "" };
+      if (f.direction === "bear" && !bear) return { ok: false, note: "" };
+      notes.push(f.direction === "bull" ? "DI+↑DI−" : "DI−↑DI+");
+    } else if (f.type === "adxAbove") {
+      if (!candles || candles.length < 40) return { ok: false, note: "" };
+      const d = adx(candles, f.period ?? 14);
+      const v = d.adx[d.adx.length - 1];
+      if (v == null || !(v > f.value)) return { ok: false, note: "" };
+      notes.push(`ADX ${v.toFixed(0)}`);
+    } else if (f.type === "aroonCross") {
+      if (!candles || candles.length < 30) return { ok: false, note: "" };
+      const a = aroon(candles, f.period ?? 14);
+      const bull = crossedAbove(a.up, a.down);
+      const bear = crossedAbove(a.down, a.up);
+      if (f.direction === "bull" && !bull) return { ok: false, note: "" };
+      if (f.direction === "bear" && !bear) return { ok: false, note: "" };
+      notes.push(f.direction === "bull" ? "Aroon↑ long" : "Aroon↓ short");
+    } else if (f.type === "aroonLong") {
+      if (!candles || candles.length < 30) return { ok: false, note: "" };
+      const a = aroon(candles, f.period ?? 14);
+      const i = a.up.length - 1;
+      const up = a.up[i];
+      const down = a.down[i];
+      const upMin = f.upMin ?? 70;
+      const downMax = f.downMax ?? 30;
+      if (up == null || down == null) return { ok: false, note: "" };
+      if (!(up >= upMin && down <= downMax)) return { ok: false, note: "" };
+      notes.push(`Aroon ${up.toFixed(0)}/${down.toFixed(0)}`);
     } else if (f.type === "rsiDivergence") {
+
       if (!candles || candles.length < 40) return { ok: false, note: "" };
       const lookback = f.lookback ?? 20;
       const c = closes(candles);

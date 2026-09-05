@@ -1,6 +1,8 @@
 import type { Candle } from "@/lib/types";
 import type { TechnicalFieldId } from "./fields";
 import {
+  adx,
+  aroon,
   atr,
   awesomeOsc,
   bbPercentB,
@@ -29,6 +31,7 @@ import {
   vwma,
   williamsR,
 } from "@/lib/indicators/math";
+import { jurikKaseStoch, jurikStoch } from "@/lib/indicators/jurik";
 
 function fillNull(n: number): (number | null)[] {
   return new Array(n).fill(null);
@@ -385,6 +388,36 @@ export function computeFieldSeries(
       break;
     case "osc_rating":
       series = oscRating(candles);
+      break;
+    case "adx":
+      series = adx(candles, 14).adx;
+      break;
+    case "plus_di":
+      series = adx(candles, 14).plusDI;
+      break;
+    case "minus_di":
+      series = adx(candles, 14).minusDI;
+      break;
+    case "aroon_up":
+      series = aroon(candles, 14).up;
+      break;
+    case "aroon_down":
+      series = aroon(candles, 14).down;
+      break;
+    case "aroon_osc":
+      series = aroon(candles, 14).osc;
+      break;
+    case "jurik_stoch_k":
+      series = jurikStoch(candles).k;
+      break;
+    case "jurik_stoch_d":
+      series = jurikStoch(candles).d;
+      break;
+    case "jurik_kase_k":
+      series = jurikKaseStoch(candles).k;
+      break;
+    case "jurik_kase_d":
+      series = jurikKaseStoch(candles).d;
       break;
     default:
       series = fillNull(n);

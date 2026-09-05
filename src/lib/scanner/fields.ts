@@ -68,7 +68,17 @@ export type TechnicalFieldId =
   | "pat_engulf_bull"
   | "pat_engulf_bear"
   | "ma_rating"
-  | "osc_rating";
+  | "osc_rating"
+  | "adx"
+  | "plus_di"
+  | "minus_di"
+  | "aroon_up"
+  | "aroon_down"
+  | "aroon_osc"
+  | "jurik_stoch_k"
+  | "jurik_stoch_d"
+  | "jurik_kase_k"
+  | "jurik_kase_d";
 
 export interface TechnicalFieldDef {
   id: TechnicalFieldId;
@@ -153,6 +163,16 @@ export const TECHNICAL_FIELDS: TechnicalFieldDef[] = [
     defaultValue: 1,
     keywords: "oscillator rating heuristic",
   },
+  { id: "adx", label: "ADX (14)", group: "Trend", defaultCompare: "value", defaultValue: 25, keywords: "adx trend strength" },
+  { id: "plus_di", label: "+DI (14)", group: "Trend", defaultCompare: "value", defaultValue: 25, keywords: "di+ dmi directional" },
+  { id: "minus_di", label: "−DI (14)", group: "Trend", defaultCompare: "value", defaultValue: 25, keywords: "di- dmi directional" },
+  { id: "aroon_up", label: "Aroon Up", group: "Trend", defaultCompare: "value", defaultValue: 70, keywords: "aroon aaron up" },
+  { id: "aroon_down", label: "Aroon Down", group: "Trend", defaultCompare: "value", defaultValue: 30, keywords: "aroon aaron down" },
+  { id: "aroon_osc", label: "Aroon Osc", group: "Trend", defaultCompare: "value", defaultValue: 0, keywords: "aroon oscillator" },
+  { id: "jurik_stoch_k", label: "Jurik Stoch %K", group: "Jurik", defaultCompare: "value", defaultValue: 20, keywords: "jurik stoch kase" },
+  { id: "jurik_stoch_d", label: "Jurik Stoch %D", group: "Jurik", defaultCompare: "value", defaultValue: 20, keywords: "jurik stoch" },
+  { id: "jurik_kase_k", label: "Jurik Kase %K", group: "Jurik", defaultCompare: "value", defaultValue: 20, keywords: "jurik kase stoch" },
+  { id: "jurik_kase_d", label: "Jurik Kase %D", group: "Jurik", defaultCompare: "value", defaultValue: 20, keywords: "jurik kase stoch" },
 ];
 
 export const FILTER_CONDITIONS: { id: FilterCondition; label: string }[] = [
