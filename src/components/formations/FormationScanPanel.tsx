@@ -36,6 +36,8 @@ type Row = AdvancedPatternHit & {
 
 export function FormationScanPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
+  const setActivePane = useDeskStore((s) => s.setActivePane);
+  const activePaneId = useDeskStore((s) => s.activePaneId);
   const setOverlayPattern = useDeskStore((s) => s.setOverlayPattern);
   const setPatternFocus = useDeskStore((s) => s.setPatternFocus);
   const setSidebarTab = useDeskStore((s) => s.setSidebarTab);
@@ -171,13 +173,13 @@ export function FormationScanPanel() {
   ]);
 
   const openHit = (h: Row) => {
-    openSymbolInActive(
-      h.symbol,
-      h.exchange,
-      h.scale === "major" && h.timeframe ? h.timeframe : undefined
-    );
+    setActivePane(activePaneId);
+    // Switch TF before drawing — majör 1D/3D/1W and minör scan TF alike.
+    const tf = h.timeframe || (h.scale === "major" ? undefined : timeframe);
+    openSymbolInActive(h.symbol, h.exchange, tf);
     const ph = toPatternHit(h);
-    setOverlayPattern(ph);
+    // Prefer pattern TF on the hit so ChartPane can wait for matching candles.
+    setOverlayPattern(tf && !ph.timeframe ? { ...ph, timeframe: tf } : ph);
     setPatternFocus(ph.id);
     setSidebarTab("patterns");
   };

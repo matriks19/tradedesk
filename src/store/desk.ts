@@ -207,7 +207,9 @@ export const useDeskStore = create<DeskState>()(
             ),
           })),
         openSymbolInActive: (symbol, exchange, timeframe) => {
-          const { activePaneId, updatePane } = get();
+          const { activePaneId, updatePane, setActivePane } = get();
+          // Keep focus on the pane we are opening into so overlay draws (active-only).
+          setActivePane(activePaneId);
           updatePane(activePaneId, {
             symbol,
             exchange,

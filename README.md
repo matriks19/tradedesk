@@ -52,6 +52,8 @@ Orders, Pine parity, licensed BIST live feed, drawings, alerts, cloud sync.
 Detects and **draws on chart**: double top/bottom, H&S / inverse H&S, ascending/descending/symmetric triangles, flag/pennant sketch, HH/HL structure, breakout boxes, engulfing.
 - Canvas overlay (trendlines, boxes, necklines, labels) + candle markers
 - Formasyonlar panel: click a hit to highlight drawings; tunable swing / twin tolerance / box lookback
+- Selecting a scan hit switches symbol/TF, waits for klines, then scrolls to the pattern span and redraws (XABCD/PRZ/TP)
+- Hard refresh clears the in-memory overlay (not persisted); watchlists/scripts reload from `/api/store` — that is not a full reset
 
 ## TD Script
 Small DSL (`//@version=td1`), compiles to JS sandbox:

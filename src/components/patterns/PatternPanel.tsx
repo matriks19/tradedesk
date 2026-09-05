@@ -22,6 +22,7 @@ const SCALE_CHIPS: { id: FormationScaleMode; label: string }[] = [
 export function PatternPanel() {
   const panes = useDeskStore((s) => s.panes);
   const activePaneId = useDeskStore((s) => s.activePaneId);
+  const setActivePane = useDeskStore((s) => s.setActivePane);
   const patternSettings = useDeskStore((s) => s.patternSettings);
   const setPatternSettings = useDeskStore((s) => s.setPatternSettings);
   const setPatternFocus = useDeskStore((s) => s.setPatternFocus);
@@ -51,11 +52,13 @@ export function PatternPanel() {
   }, [patterns, patternSettings.formationScale]);
 
   const openHit = (h: PatternHit) => {
-    setOverlayPattern(h);
-    setPatternFocus(h.id);
-    if (h.scale === "major" && h.timeframe && pane) {
+    if (pane) setActivePane(pane.id);
+    // Switch TF first when pattern was detected on another period, then overlay.
+    if (h.timeframe && pane && String(pane.timeframe) !== String(h.timeframe)) {
       updatePane(pane.id, { timeframe: h.timeframe });
     }
+    setOverlayPattern(h);
+    setPatternFocus(h.id);
   };
 
   const cancelScan = useCallback(() => {
@@ -220,7 +223,9 @@ export function PatternPanel() {
           <div className="text-xs font-medium">Formasyonlar — {pane?.symbol}</div>
           <p className="text-2xs text-desk-muted">
             Minör: grafik TF. Majör: 1D / 3D / 1W (yüksek swing). Tara ile tarayın;
-            tıklayınca çizilir, majörde TF o periyoda geçer.
+            tıklayınca çizilir, majörde TF o periyoda geçer. Hard refresh overlay&apos;i
+            temizler (pane/layout localStorage&apos;da kalır); izleme listesi ve
+            scriptler /api/store üzerinden yeniden yüklenir — sıfırlanma değil.
           </p>
 
           <div className="flex gap-1 flex-wrap">

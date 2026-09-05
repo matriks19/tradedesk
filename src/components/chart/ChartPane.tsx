@@ -20,7 +20,7 @@ import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 import { SymbolSearch } from "@/components/chart/SymbolSearch";
 import { IndicatorMenu } from "@/components/indicators/IndicatorMenu";
 import { Badge } from "@/components/ui/Badge";
-import { usePatternOverlay } from "@/components/chart/PatternOverlay";
+import { usePatternOverlay, TD_OVERLAY_REDRAW } from "@/components/chart/PatternOverlay";
 import { normalizeTimeframe } from "@/lib/data/timeframes";
 import clsx from "clsx";
 
@@ -118,10 +118,14 @@ export function ChartPane({ pane, compact }: Props) {
     showRiskLines,
     patternSettings,
     overlayPattern,
+    setOverlayPattern,
+    setPatternFocus,
     recentCustomTimeframes,
     addRecentCustomTimeframe,
   } = useDeskStore();
   const [customTfDraft, setCustomTfDraft] = useState("");
+  const [overlayEpoch, setOverlayEpoch] = useState(0);
+  const [overlayDrawnMsg, setOverlayDrawnMsg] = useState(false);
 
   const { candles, loading, error, delayed, note } = useKlines(
     pane.symbol,
@@ -137,13 +141,96 @@ export function ChartPane({ pane, compact }: Props) {
     [overlayPattern]
   );
 
+  const candleTimes = useMemo(
+    () => candles.map((c) => c.time),
+    [candles]
+  );
+
   usePatternOverlay({
     chart: chartReady ? chartRef.current : null,
     series: chartReady ? candleRef.current : null,
     patterns: active ? overlayPatterns : [],
     focusId: active ? patternSettings.focusId : null,
     container: chartReady ? containerRef.current : null,
+    candleTimes: active ? candleTimes : [],
+    overlayEpoch,
   });
+
+  // After symbol/TF change, wait for candles then scroll to pattern span and force redraw.
+  // Keyed so live WS candle ticks do not keep resetting the visible range.
+  const overlaySettleKey = overlayPattern
+    ? `${overlayPattern.id}|${pane.symbol}|${pane.timeframe}|${candles.length > 0 ? 1 : 0}`
+    : "";
+  const lastOverlaySettleRef = useRef("");
+
+  useEffect(() => {
+    if (!active || !overlayPattern || !candles.length || !chartRef.current) {
+      if (!overlayPattern) {
+        lastOverlaySettleRef.current = "";
+        setOverlayDrawnMsg(false);
+      }
+      return;
+    }
+    // If pattern carries a TF, wait until pane matches (openSymbolInActive already switched).
+    if (
+      overlayPattern.timeframe &&
+      String(pane.timeframe) !== String(overlayPattern.timeframe)
+    ) {
+      return;
+    }
+    if (lastOverlaySettleRef.current === overlaySettleKey) return;
+
+    const chart = chartRef.current;
+    const t0 = overlayPattern.tStart;
+    const t1 = overlayPattern.tEnd;
+    const span = Math.abs(t1 - t0);
+    const pad = Math.max(span * 0.15, 60 * 60); // ≥1h pad
+    const from = (Math.min(t0, t1) - pad) as import("lightweight-charts").Time;
+    const to = (Math.max(t0, t1) + pad) as import("lightweight-charts").Time;
+
+    let applied = false;
+    const apply = () => {
+      if (applied) return;
+      applied = true;
+      lastOverlaySettleRef.current = overlaySettleKey;
+      try {
+        chart.timeScale().setVisibleRange({ from, to });
+      } catch {
+        try {
+          chart.timeScale().fitContent();
+        } catch {
+          /* */
+        }
+      }
+      setOverlayEpoch((n) => n + 1);
+      window.dispatchEvent(new Event(TD_OVERLAY_REDRAW));
+      setOverlayDrawnMsg(true);
+    };
+
+    // Double rAF + short timeout: allow candle setData to paint first
+    let raf2 = 0;
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(apply);
+    });
+    const t = window.setTimeout(apply, 150);
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+      clearTimeout(t);
+      // If cancelled before apply, allow a later effect to retry the same key.
+      if (!applied && lastOverlaySettleRef.current === overlaySettleKey) {
+        lastOverlaySettleRef.current = "";
+      }
+    };
+  }, [
+    active,
+    overlayPattern,
+    overlaySettleKey,
+    candles.length,
+    pane.timeframe,
+    pane.symbol,
+    chartReady,
+  ]);
 
   const destroySubChart = useCallback((id: string) => {
     const chart = subChartsRef.current.get(id);
@@ -537,8 +624,13 @@ export function ChartPane({ pane, compact }: Props) {
       }))
     );
     // Keep oscillator panes locked after candle reload
-    requestAnimationFrame(() => syncLogicalRanges(chartRef.current));
-  }, [candles, syncLogicalRanges]);
+    requestAnimationFrame(() => {
+      syncLogicalRanges(chartRef.current);
+      if (overlayPattern) {
+        window.dispatchEvent(new Event(TD_OVERLAY_REDRAW));
+      }
+    });
+  }, [candles, syncLogicalRanges, overlayPattern]);
 
   // Main overlays
   useEffect(() => {
@@ -746,6 +838,26 @@ export function ChartPane({ pane, compact }: Props) {
         )}
         {oscCount > 0 && (
           <span className="text-2xs text-desk-muted">{oscCount} osc</span>
+        )}
+        {active && overlayPattern && (
+          <>
+            <Badge tone="accent">
+              {overlayDrawnMsg ? "Formasyon çizildi" : "Formasyon…"}
+            </Badge>
+            <button
+              type="button"
+              className="btn px-1.5 text-2xs"
+              title="Formasyon overlay temizle"
+              onClick={(e) => {
+                e.stopPropagation();
+                setOverlayPattern(null);
+                setPatternFocus(null);
+                setOverlayDrawnMsg(false);
+              }}
+            >
+              ✕
+            </button>
+          </>
         )}
         {last && (
           <span
