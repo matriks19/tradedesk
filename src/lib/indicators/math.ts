@@ -2038,5 +2038,624 @@ export function pivotStandard(candles: Candle[]) {
   return pivotClassic(candles);
 }
 
+
+// ——— Niche / az bilinen göstergeler ———
+
+/** Stochastic Momentum Index (Blau): double-smoothed close vs HL midpoint. */
+export function smi(
+  candles: Candle[],
+  qLength = 14,
+  rLength = 20,
+  signalPeriod = 5
+): { smi: (number | null)[]; signal: (number | null)[] } {
+  const n = candles.length;
+  const rel: number[] = new Array(n).fill(0);
+  const range: number[] = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    if (i < qLength - 1) continue;
+    let hh = -Infinity;
+    let ll = Infinity;
+    for (let j = i - qLength + 1; j <= i; j++) {
+      hh = Math.max(hh, candles[j].high);
+      ll = Math.min(ll, candles[j].low);
+    }
+    rel[i] = candles[i].close - (hh + ll) / 2;
+    range[i] = hh - ll;
+  }
+  const smoothRel = ema(
+    ema(rel, rLength).map((v) => v ?? 0),
+    rLength
+  );
+  const smoothRange = ema(
+    ema(range, rLength).map((v) => v ?? 0),
+    rLength
+  );
+  const line: (number | null)[] = new Array(n).fill(null);
+  for (let i = 0; i < n; i++) {
+    if (i < qLength + 2 * rLength - 3) continue;
+    const sr = smoothRange[i];
+    const sd = smoothRel[i];
+    if (sr == null || sd == null || sr === 0) {
+      line[i] = sr === 0 ? 0 : null;
+      continue;
+    }
+    line[i] = (100 * (sd as number)) / ((sr as number) / 2);
+  }
+  const filled = line.map((v) => v ?? 0);
+  const signal = ema(filled, signalPeriod).map((v, i) =>
+    line[i] == null ? null : v
+  );
+  return { smi: line, signal };
+}
+
+/**
+ * Coppock Curve: WMA of (ROC long + ROC short).
+ * Classic monthly 14+11 / WMA10; crypto/intraday defaults 14+11 / WMA10.
+ */
+export function coppock(
+  values: number[],
+  rocLong = 14,
+  rocShort = 11,
+  wmaPeriod = 10
+): (number | null)[] {
+  const r1 = roc(values, rocLong);
+  const r2 = roc(values, rocShort);
+  const sum = values.map((_, i) =>
+    r1[i] != null && r2[i] != null
+      ? (r1[i] as number) + (r2[i] as number)
+      : null
+  );
+  const filled = sum.map((v) => v ?? 0);
+  return wma(filled, wmaPeriod).map((v, i) => (sum[i] == null ? null : v));
+}
+
+/**
+ * VIDYA — Variable Index Dynamic Average (Chande).
+ * sc = EMA_alpha * |CMO| / 100; VIDYA = sc*price + (1-sc)*prev.
+ */
+export function vidya(values: number[], period = 14): (number | null)[] {
+  const out: (number | null)[] = new Array(values.length).fill(null);
+  const c = cmoSeries(values, period);
+  const alpha = 2 / (period + 1);
+  let prev: number | null = null;
+  for (let i = 0; i < values.length; i++) {
+    if (c[i] == null) continue;
+    const sc = alpha * (Math.abs(c[i] as number) / 100);
+    if (prev == null) {
+      prev = values[i];
+      out[i] = prev;
+    } else {
+      prev = sc * values[i] + (1 - sc) * prev;
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+
+/** FRAMA — Fractal Adaptive Moving Average (Ehlers). */
+export function frama(values: number[], period = 16): (number | null)[] {
+  const n = values.length;
+  const out: (number | null)[] = new Array(n).fill(null);
+  const p = Math.max(4, period - (period % 2)); // even
+  const half = p / 2;
+  let prev: number | null = null;
+  for (let i = 0; i < n; i++) {
+    if (i < p - 1) continue;
+    let hi1 = -Infinity,
+      lo1 = Infinity,
+      hi2 = -Infinity,
+      lo2 = Infinity,
+      hi3 = -Infinity,
+      lo3 = Infinity;
+    for (let j = i - half + 1; j <= i; j++) {
+      hi1 = Math.max(hi1, values[j]);
+      lo1 = Math.min(lo1, values[j]);
+    }
+    for (let j = i - p + 1; j <= i - half; j++) {
+      hi2 = Math.max(hi2, values[j]);
+      lo2 = Math.min(lo2, values[j]);
+    }
+    for (let j = i - p + 1; j <= i; j++) {
+      hi3 = Math.max(hi3, values[j]);
+      lo3 = Math.min(lo3, values[j]);
+    }
+    const n1 = (hi1 - lo1) / half;
+    const n2 = (hi2 - lo2) / half;
+    const n3 = (hi3 - lo3) / p;
+    let alpha = 1;
+    if (n1 > 0 && n2 > 0 && n3 > 0) {
+      const dim = (Math.log(n1 + n2) - Math.log(n3)) / Math.log(2);
+      alpha = Math.exp(-4.6 * (dim - 1));
+      alpha = Math.max(0.01, Math.min(1, alpha));
+    }
+    if (prev == null) {
+      prev = values[i];
+      out[i] = prev;
+    } else {
+      prev = alpha * values[i] + (1 - alpha) * prev;
+      out[i] = prev;
+    }
+  }
+  return out;
+}
+
+/**
+ * Squeeze Momentum (TTM / LazyBear): BB inside KC + linreg momentum hist.
+ * squeeze: 1=on, 0=off, -1=no squeeze state unused — we use 1/0.
+ */
+export function squeezeMomentum(
+  candles: Candle[],
+  length = 20,
+  bbMult = 2,
+  kcMult = 1.5
+): {
+  mom: (number | null)[];
+  squeeze: (number | null)[];
+} {
+  const closes = candles.map((c) => c.close);
+  const bb = bollinger(closes, length, bbMult);
+  // KC mid = SMA(close); range = SMA(TR) — LazyBear style
+  const mid = sma(closes, length);
+  const trs: number[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    const prev = i > 0 ? candles[i - 1].close : candles[i].close;
+    trs.push(
+      Math.max(
+        candles[i].high - candles[i].low,
+        Math.abs(candles[i].high - prev),
+        Math.abs(candles[i].low - prev)
+      )
+    );
+  }
+  const rangema = sma(trs, length);
+  const upperKC = mid.map((m, i) =>
+    m != null && rangema[i] != null ? m + kcMult * (rangema[i] as number) : null
+  );
+  const lowerKC = mid.map((m, i) =>
+    m != null && rangema[i] != null ? m - kcMult * (rangema[i] as number) : null
+  );
+  const squeeze: (number | null)[] = candles.map((_, i) => {
+    if (
+      bb.upper[i] == null ||
+      bb.lower[i] == null ||
+      upperKC[i] == null ||
+      lowerKC[i] == null
+    )
+      return null;
+    const on =
+      (bb.lower[i] as number) > (lowerKC[i] as number) &&
+      (bb.upper[i] as number) < (upperKC[i] as number);
+    return on ? 1 : 0;
+  });
+  // momentum source: close - avg(avg(highest,lowest), sma)
+  const hi = highest(
+    candles.map((c) => c.high),
+    length
+  );
+  const lo = lowest(
+    candles.map((c) => c.low),
+    length
+  );
+  const delta = closes.map((c, i) => {
+    if (hi[i] == null || lo[i] == null || mid[i] == null) return null;
+    const meanHL = ((hi[i] as number) + (lo[i] as number)) / 2;
+    const basis = (meanHL + (mid[i] as number)) / 2;
+    return c - basis;
+  });
+  const filled = delta.map((v) => v ?? 0);
+  const mom = linreg(filled, length).map((v, i) =>
+    delta[i] == null ? null : v
+  );
+  return { mom, squeeze };
+}
+
+/**
+ * SoftTrend — soft ATR trend filter (TV Soft Trend Filter style).
+ * Soft EMA basis ± ATR bands; trail ratchets gently with direction.
+ */
+export function softTrend(
+  candles: Candle[],
+  period = 20,
+  atrPeriod = 14,
+  mult = 1.5
+): {
+  line: (number | null)[];
+  upper: (number | null)[];
+  lower: (number | null)[];
+  dir: (number | null)[];
+} {
+  const src = candles.map((c) => c.close);
+  const basis = ema(src, period);
+  const a = atr(candles, atrPeriod);
+  const n = candles.length;
+  const upper: (number | null)[] = new Array(n).fill(null);
+  const lower: (number | null)[] = new Array(n).fill(null);
+  const line: (number | null)[] = new Array(n).fill(null);
+  const dir: (number | null)[] = new Array(n).fill(null);
+  let prevU = 0;
+  let prevL = 0;
+  let prevDir: 1 | -1 = 1;
+  let prevLine = 0;
+  for (let i = 0; i < n; i++) {
+    if (basis[i] == null || a[i] == null) continue;
+    let u = (basis[i] as number) + mult * (a[i] as number);
+    let l = (basis[i] as number) - mult * (a[i] as number);
+    // soft ratchet: bands only loosen in trend direction
+    if (i > 0 && dir[i - 1] != null) {
+      if (prevDir === 1) {
+        l = Math.max(l, prevL);
+        u = Math.max(u, prevU * 0.985 + u * 0.015); // soft drift
+      } else {
+        u = Math.min(u, prevU);
+        l = Math.min(l, prevL * 0.985 + l * 0.015);
+      }
+    }
+    let d: 1 | -1 = prevDir;
+    if (candles[i].close > u) d = 1;
+    else if (candles[i].close < l) d = -1;
+    const st = d === 1 ? l : u;
+    upper[i] = u;
+    lower[i] = l;
+    line[i] = st;
+    dir[i] = d;
+    prevU = u;
+    prevL = l;
+    prevDir = d;
+    prevLine = st;
+  }
+  void prevLine;
+  return { line, upper, lower, dir };
+}
+
+/**
+ * VFI — Volume Flow Indicator (Insynda / LazyBear style).
+ */
+export function vfi(
+  candles: Candle[],
+  period = 130,
+  coef = 0.2,
+  vcoef = 2.5,
+  signalPeriod = 5
+): { vfi: (number | null)[]; signal: (number | null)[] } {
+  const n = candles.length;
+  const typical = candles.map((c) => (c.high + c.low + c.close) / 3);
+  const inter: number[] = [0];
+  for (let i = 1; i < n; i++) {
+    const prev = typical[i - 1];
+    inter.push(
+      prev > 0 && typical[i] > 0 ? Math.log(typical[i]) - Math.log(prev) : 0
+    );
+  }
+  const vol = candles.map((c) => c.volume);
+  const vave = sma(vol, period);
+  const interSd = stdev(inter, 30);
+  const raw: (number | null)[] = new Array(n).fill(null);
+  // rolling sum of signed capped volume / vave
+  const signed: number[] = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const cutoff =
+      interSd[i] != null
+        ? coef * (interSd[i] as number) * typical[i]
+        : 0;
+    const mf = typical[i] - typical[i - 1];
+    const vmax =
+      i > 0 && vave[i - 1] != null ? (vave[i - 1] as number) * vcoef : vol[i];
+    const vc = Math.min(vol[i], vmax);
+    signed[i] = mf > cutoff ? vc : mf < -cutoff ? -vc : 0;
+  }
+  let sum = 0;
+  for (let i = 0; i < n; i++) {
+    sum += signed[i];
+    if (i >= period) sum -= signed[i - period];
+    if (i >= period && vave[i] != null && (vave[i] as number) !== 0) {
+      raw[i] = sum / (vave[i] as number);
+    }
+  }
+  const filled = raw.map((v) => v ?? 0);
+  const signal = ema(filled, signalPeriod).map((v, i) =>
+    raw[i] == null ? null : v
+  );
+  return { vfi: raw, signal };
+}
+
+/**
+ * Waddah Attar Explosion: MACD-delta trend vs BB width explosion line.
+ */
+export function waddahAttar(
+  values: number[],
+  candles: Candle[],
+  fast = 20,
+  slow = 40,
+  bbPeriod = 20,
+  bbMult = 2,
+  sensitivity = 150
+): {
+  up: (number | null)[];
+  down: (number | null)[];
+  explosion: (number | null)[];
+  deadZone: (number | null)[];
+} {
+  const ef = ema(values, fast);
+  const es = ema(values, slow);
+  const macdLine = values.map((_, i) =>
+    ef[i] != null && es[i] != null
+      ? (ef[i] as number) - (es[i] as number)
+      : null
+  );
+  const t1 = macdLine.map((v, i) => {
+    if (v == null || i === 0 || macdLine[i - 1] == null) return null;
+    return (v - (macdLine[i - 1] as number)) * sensitivity;
+  });
+  const bb = bollinger(values, bbPeriod, bbMult);
+  const explosion = bb.upper.map((u, i) =>
+    u != null && bb.lower[i] != null ? u - (bb.lower[i] as number) : null
+  );
+  // dead zone ≈ RMA(TR, 100) * 3.7 — use SMA ATR proxy
+  const a = atr(candles, 100);
+  const deadZone = a.map((v) => (v == null ? null : v * 3.7));
+  const up = t1.map((v) => (v != null && v >= 0 ? v : v == null ? null : 0));
+  const down = t1.map((v) =>
+    v != null && v < 0 ? -v : v == null ? null : 0
+  );
+  return { up, down, explosion, deadZone };
+}
+
+/**
+ * HalfTrend (ATR channel / Everget-style).
+ * Amplitude swings + ATR deviation channel; flips on close beyond channel.
+ */
+export function halfTrend(
+  candles: Candle[],
+  amplitude = 2,
+  channelDeviation = 2,
+  atrPeriod = 100
+): {
+  ht: (number | null)[];
+  atrHigh: (number | null)[];
+  atrLow: (number | null)[];
+  dir: (number | null)[];
+} {
+  const n = candles.length;
+  const amp = Math.max(1, Math.floor(amplitude));
+  const a = atr(candles, atrPeriod);
+  const highma = sma(
+    candles.map((c) => c.high),
+    amp
+  );
+  const lowma = sma(
+    candles.map((c) => c.low),
+    amp
+  );
+  const ht: (number | null)[] = new Array(n).fill(null);
+  const atrHigh: (number | null)[] = new Array(n).fill(null);
+  const atrLow: (number | null)[] = new Array(n).fill(null);
+  const dirOut: (number | null)[] = new Array(n).fill(null);
+
+  let trend = 0; // 0 bull, 1 bear
+  let nextTrend = 0;
+  let maxLowPrice = candles[0]?.low ?? 0;
+  let minHighPrice = candles[0]?.high ?? 0;
+  let up = 0;
+  let down = 0;
+
+  for (let i = 0; i < n; i++) {
+    const highPrice = (() => {
+      let h = -Infinity;
+      const from = Math.max(0, i - amp + 1);
+      for (let j = from; j <= i; j++) h = Math.max(h, candles[j].high);
+      return h;
+    })();
+    const lowPrice = (() => {
+      let l = Infinity;
+      const from = Math.max(0, i - amp + 1);
+      for (let j = from; j <= i; j++) l = Math.min(l, candles[j].low);
+      return l;
+    })();
+
+    if (nextTrend === 1) {
+      maxLowPrice = Math.max(lowPrice, maxLowPrice);
+      if (
+        highma[i] != null &&
+        (highma[i] as number) < maxLowPrice &&
+        candles[i].close < candles[Math.max(0, i - 1)].low
+      ) {
+        trend = 1;
+        nextTrend = 0;
+        minHighPrice = highPrice;
+      }
+    } else {
+      minHighPrice = Math.min(highPrice, minHighPrice);
+      if (
+        lowma[i] != null &&
+        (lowma[i] as number) > minHighPrice &&
+        candles[i].close > candles[Math.max(0, i - 1)].high
+      ) {
+        trend = 0;
+        nextTrend = 1;
+        maxLowPrice = lowPrice;
+      }
+    }
+
+    const atr2 =
+      a[i] != null ? ((a[i] as number) / 2) * channelDeviation : null;
+    if (trend === 0) {
+      if (i > 0 && dirOut[i - 1] === 0) up = Math.max(maxLowPrice, up);
+      else up = maxLowPrice;
+      down = atr2 != null ? up - atr2 * 2 : up;
+    } else {
+      if (i > 0 && dirOut[i - 1] === 1) down = Math.min(minHighPrice, down);
+      else down = minHighPrice;
+      up = atr2 != null ? down + atr2 * 2 : down;
+    }
+
+    const arrow =
+      trend === 0 ? up : down;
+    ht[i] = i >= amp && a[i] != null ? arrow : null;
+    atrHigh[i] = ht[i] != null && atr2 != null ? (ht[i] as number) + atr2 : null;
+    atrLow[i] = ht[i] != null && atr2 != null ? (ht[i] as number) - atr2 : null;
+    dirOut[i] = ht[i] != null ? trend : null;
+  }
+  return { ht, atrHigh, atrLow, dir: dirOut };
+}
+
+/** SSL Channel — SMA(high)/SMA(low) semaphore levels. */
+export function sslChannel(
+  candles: Candle[],
+  period = 10
+): {
+  sslUp: (number | null)[];
+  sslDown: (number | null)[];
+  dir: (number | null)[];
+} {
+  const smaHigh = sma(
+    candles.map((c) => c.high),
+    period
+  );
+  const smaLow = sma(
+    candles.map((c) => c.low),
+    period
+  );
+  const n = candles.length;
+  const sslUp: (number | null)[] = new Array(n).fill(null);
+  const sslDown: (number | null)[] = new Array(n).fill(null);
+  const dir: (number | null)[] = new Array(n).fill(null);
+  let hlv = 0;
+  for (let i = 0; i < n; i++) {
+    if (smaHigh[i] == null || smaLow[i] == null) continue;
+    if (candles[i].close > (smaHigh[i] as number)) hlv = 1;
+    else if (candles[i].close < (smaLow[i] as number)) hlv = -1;
+    dir[i] = hlv;
+    sslDown[i] = hlv < 0 ? smaHigh[i] : smaLow[i];
+    sslUp[i] = hlv < 0 ? smaLow[i] : smaHigh[i];
+  }
+  return { sslUp, sslDown, dir };
+}
+
+/**
+ * Range Filter (Ehlers / popular TV Range Filter).
+ * EMA-smoothed absolute change * mult as range; sticky filter + bands.
+ */
+export function rangeFilter(
+  values: number[],
+  period = 20,
+  mult = 2.5
+): {
+  filter: (number | null)[];
+  upper: (number | null)[];
+  lower: (number | null)[];
+  dir: (number | null)[];
+} {
+  const n = values.length;
+  const absChange = values.map((v, i) =>
+    i === 0 ? 0 : Math.abs(v - values[i - 1])
+  );
+  const avrng = ema(absChange, period);
+  const wper = period * 2 - 1;
+  const smrng = ema(
+    avrng.map((v) => v ?? 0),
+    wper
+  ).map((v, i) => (avrng[i] == null ? null : (v as number) * mult));
+
+  const filter: (number | null)[] = new Array(n).fill(null);
+  const upper: (number | null)[] = new Array(n).fill(null);
+  const lower: (number | null)[] = new Array(n).fill(null);
+  const dir: (number | null)[] = new Array(n).fill(null);
+  let filt = values[0] ?? 0;
+  let upward = 0;
+  let downward = 0;
+  for (let i = 0; i < n; i++) {
+    if (smrng[i] == null) continue;
+    const r = smrng[i] as number;
+    const x = values[i];
+    if (x - r > filt) filt = x - r;
+    else if (x + r < filt) filt = x + r;
+    // else keep filt
+    if (i > 0 && filter[i - 1] != null) {
+      if (filt > (filter[i - 1] as number)) {
+        upward = upward + 1;
+        downward = 0;
+      } else if (filt < (filter[i - 1] as number)) {
+        downward = downward + 1;
+        upward = 0;
+      }
+    }
+    filter[i] = filt;
+    upper[i] = filt + r;
+    lower[i] = filt - r;
+    dir[i] = upward > 0 ? 1 : downward > 0 ? -1 : 0;
+  }
+  return { filter, upper, lower, dir };
+}
+
+/** Choppiness Index — high = choppy range, low = trending. */
+export function choppiness(candles: Candle[], period = 14): (number | null)[] {
+  const out: (number | null)[] = new Array(candles.length).fill(null);
+  const trs: number[] = [];
+  for (let i = 0; i < candles.length; i++) {
+    const prev = i > 0 ? candles[i - 1].close : candles[i].close;
+    trs.push(
+      Math.max(
+        candles[i].high - candles[i].low,
+        Math.abs(candles[i].high - prev),
+        Math.abs(candles[i].low - prev)
+      )
+    );
+  }
+  for (let i = period - 1; i < candles.length; i++) {
+    let sumTr = 0;
+    let hh = -Infinity;
+    let ll = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      sumTr += trs[j];
+      hh = Math.max(hh, candles[j].high);
+      ll = Math.min(ll, candles[j].low);
+    }
+    const range = hh - ll;
+    if (range <= 0) {
+      out[i] = 100;
+      continue;
+    }
+    out[i] =
+      (100 * Math.log10(sumTr / range)) / Math.log10(period);
+  }
+  return out;
+}
+
+/** Balance of Power — (C-O)/(H-L); optional SMA smooth. */
+export function bop(
+  candles: Candle[],
+  smooth = 14
+): (number | null)[] {
+  const raw = candles.map((c) => {
+    const den = c.high - c.low;
+    return den === 0 ? 0 : (c.close - c.open) / den;
+  });
+  if (smooth <= 1) return raw;
+  return sma(raw, smooth);
+}
+
+/** Elder Ray — Bull Power / Bear Power vs EMA. */
+export function elderRay(
+  candles: Candle[],
+  period = 13
+): {
+  bull: (number | null)[];
+  bear: (number | null)[];
+  ema: (number | null)[];
+} {
+  const e = ema(
+    candles.map((c) => c.close),
+    period
+  );
+  const bull = candles.map((c, i) =>
+    e[i] == null ? null : c.high - (e[i] as number)
+  );
+  const bear = candles.map((c, i) =>
+    e[i] == null ? null : c.low - (e[i] as number)
+  );
+  return { bull, bear, ema: e };
+}
+
+
 // silence unused helper warning
 void sessionPivotBase;

@@ -98,6 +98,20 @@ import {
   wma,
   zigzag,
   zlema,
+  smi,
+  coppock,
+  vidya,
+  frama,
+  squeezeMomentum,
+  softTrend,
+  vfi,
+  waddahAttar,
+  halfTrend,
+  sslChannel,
+  rangeFilter,
+  choppiness,
+  bop,
+  elderRay,
 } from "./math";
 import {
   adaptiveJma,
@@ -239,6 +253,8 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "tma", label: "Triangular MA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "tma", inputs: [num("period", "Period", 20), src()] },
   { id: "vma", label: "Variable MA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "vma", inputs: [num("period", "Period", 20), src()] },
   { id: "zlema", label: "Zero Lag EMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "zlema", inputs: [num("period", "Period", 20), src()] },
+  { id: "vidya", label: "VIDYA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "vidya", inputs: [num("period", "Period", 14), src()] },
+  { id: "frama", label: "FRAMA", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "frama", inputs: [num("period", "Period", 16), src()] },
   { id: "maCross", label: "MA Cross", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "fast", inputs: [num("fast", "Fast", 9), num("slow", "Slow", 21), src()] },
 
   // —— Bantlar / Kanallar (bands)
@@ -271,6 +287,12 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "dpo", label: "DPO", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "dpo", inputs: [num("period", "Period", 21), src()] },
   { id: "kst", label: "Know Sure Thing", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "kst", inputs: [num("sig", "Signal", 9), src()] },
   { id: "rvi", label: "RVI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rvi", inputs: [num("period", "Period", 10)] },
+  { id: "smi", label: "SMI (Stokastik Momentum)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "smi", inputs: [num("qLength", "Q Length", 14), num("rLength", "R Length", 20), num("signal", "Signal", 5)] },
+  { id: "coppock", label: "Coppock Curve", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "coppock", inputs: [num("rocLong", "ROC Long", 14), num("rocShort", "ROC Short", 11), num("wmaPeriod", "WMA", 10), src()] },
+  { id: "squeezeMomentum", label: "Squeeze Momentum", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "mom", inputs: [num("length", "Length", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("kcMult", "KC Mult", 1.5, 0.5, 10, 0.1)] },
+  { id: "waddahAttar", label: "Waddah Attar Explosion", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "up", inputs: [num("fast", "Fast EMA", 20), num("slow", "Slow EMA", 40), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("sensitivity", "Sensitivity", 150, 1, 500, 1), src()] },
+  { id: "bop", label: "Balance of Power", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "bop", inputs: [num("smooth", "Smooth", 14)] },
+  { id: "elderRay", label: "Elder Ray", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "bull", inputs: [num("period", "EMA Period", 13)] },
 
   // —— Trend
   { id: "supertrend", label: "Supertrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "st", inputs: [num("period", "ATR Period", 10), num("mult", "Multiplier", 3, 0.5, 20, 0.1)] },
@@ -282,6 +304,10 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "chandelier", label: "Chandelier Exit", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "long", inputs: [num("period", "Period", 22), num("mult", "Mult", 3, 0.5, 20, 0.1)] },
   { id: "trendStrength", label: "Trend Strength", category: "trend", pane: "sub", acceptsSeries: true, primarySeriesKey: "ts", inputs: [num("period", "Period", 20), src()] },
   { id: "heikinAshiSmooth", label: "Heikin-Ashi Smooth", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ha", inputs: [num("period", "Period", 10)] },
+  { id: "softTrend", label: "SoftTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "line", inputs: [num("period", "EMA Period", 20), num("atrPeriod", "ATR Period", 14), num("mult", "ATR Mult", 1.5, 0.5, 10, 0.1)] },
+  { id: "halfTrend", label: "HalfTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ht", inputs: [num("amplitude", "Amplitude", 2), num("channelDeviation", "Channel Dev", 2, 0.5, 10, 0.1), num("atrPeriod", "ATR Period", 100)] },
+  { id: "sslChannel", label: "SSL Channel", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "sslUp", inputs: [num("period", "Period", 10)] },
+  { id: "rangeFilter", label: "Range Filter", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "filter", inputs: [num("period", "Period", 20), num("mult", "Mult", 2.5, 0.1, 20, 0.1), src()] },
 
   // —— Volatilite
   { id: "atr", label: "ATR", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "atr", inputs: [num("period", "Period", 14)] },
@@ -294,6 +320,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "bbPercentB", label: "Bollinger %B", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "pctb", inputs: [num("period", "Period", 20), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
   { id: "trueRange", label: "True Range", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "tr", inputs: [] },
   { id: "stddev", label: "Standard Deviation", category: "volatility", pane: "sub", acceptsSeries: true, primarySeriesKey: "sd", inputs: [num("period", "Period", 20), src()] },
+  { id: "choppiness", label: "Choppiness Index", category: "volatility", pane: "sub", acceptsSeries: false, primarySeriesKey: "chop", inputs: [num("period", "Period", 14)] },
 
   // —— Hacim
   { id: "obv", label: "OBV", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "obv", inputs: [] },
@@ -309,6 +336,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "klinger", label: "Klinger (simplified)", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "kvo", inputs: [num("fast", "Fast", 34), num("slow", "Slow", 55), num("signal", "Signal", 13)] },
   { id: "netVolume", label: "Net Volume", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "nv", inputs: [] },
   { id: "volumeDelta", label: "Volume Delta", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "vd", inputs: [] },
+  { id: "vfi", label: "VFI (Volume Flow)", category: "volume", pane: "sub", acceptsSeries: false, primarySeriesKey: "vfi", inputs: [num("period", "Period", 130), num("coef", "Coef", 0.2, 0.01, 5, 0.01), num("vcoef", "Vol Coef", 2.5, 0.5, 10, 0.1), num("signal", "Signal", 5)] },
 
   // —— Bill Williams
   { id: "awesomeOsc", label: "Awesome Oscillator", category: "bill_williams", pane: "sub", acceptsSeries: false, primarySeriesKey: "ao", inputs: [] },
@@ -1851,6 +1879,148 @@ export function computeBuiltin(
           hist(inst, "hist", "sub", "#26a69a", candles, m.hist, "Hist"),
         ],
         { macd: m.macd, sig: m.sig, hist: m.hist }
+      );
+      break;
+    }
+    case "smi": {
+      const s = smi(candles, n(p, "qLength", 14), n(p, "rLength", 20), n(p, "signal", 5));
+      push(
+        [
+          line(inst, "smi", "sub", "#2962ff", candles, s.smi, "SMI"),
+          line(inst, "sig", "sub", "#ff6d00", candles, s.signal, "Signal"),
+        ],
+        { smi: s.smi, signal: s.signal }
+      );
+      break;
+    }
+    case "coppock": {
+      const v = coppock(values, n(p, "rocLong", 14), n(p, "rocShort", 11), n(p, "wmaPeriod", 10));
+      push([line(inst, "coppock", "sub", color, candles, v, "Coppock")], { coppock: v });
+      break;
+    }
+    case "vidya": {
+      const period = n(p, "period", 14);
+      const v = vidya(values, period);
+      push([line(inst, "vidya", "main", color, candles, v, `VIDYA(${period})`)], { vidya: v });
+      break;
+    }
+    case "frama": {
+      const period = n(p, "period", 16);
+      const v = frama(values, period);
+      push([line(inst, "frama", "main", color, candles, v, `FRAMA(${period})`)], { frama: v });
+      break;
+    }
+    case "squeezeMomentum": {
+      const s = squeezeMomentum(candles, n(p, "length", 20), n(p, "bbMult", 2), n(p, "kcMult", 1.5));
+      push(
+        [
+          hist(inst, "mom", "sub", "#2962ff", candles, s.mom, "Squeeze Mom"),
+          line(inst, "sqz", "sub", "#ffeb3b", candles, s.squeeze, "Squeeze On"),
+        ],
+        { mom: s.mom, squeeze: s.squeeze }
+      );
+      break;
+    }
+    case "softTrend": {
+      const s = softTrend(candles, n(p, "period", 20), n(p, "atrPeriod", 14), n(p, "mult", 1.5));
+      push(
+        [
+          line(inst, "line", "main", color, candles, s.line, "SoftTrend"),
+          line(inst, "up", "main", "#ef535088", candles, s.upper, "ST Up"),
+          line(inst, "lo", "main", "#26a69a88", candles, s.lower, "ST Low"),
+        ],
+        { line: s.line, upper: s.upper, lower: s.lower, dir: s.dir }
+      );
+      break;
+    }
+    case "vfi": {
+      const v = vfi(candles, n(p, "period", 130), n(p, "coef", 0.2), n(p, "vcoef", 2.5), n(p, "signal", 5));
+      push(
+        [
+          line(inst, "vfi", "sub", "#2962ff", candles, v.vfi, "VFI"),
+          line(inst, "sig", "sub", "#ff6d00", candles, v.signal, "Signal"),
+        ],
+        { vfi: v.vfi, signal: v.signal }
+      );
+      break;
+    }
+    case "waddahAttar": {
+      const w = waddahAttar(
+        values,
+        candles,
+        n(p, "fast", 20),
+        n(p, "slow", 40),
+        n(p, "bbPeriod", 20),
+        n(p, "bbMult", 2),
+        n(p, "sensitivity", 150)
+      );
+      push(
+        [
+          hist(inst, "up", "sub", "#26a69a", candles, w.up, "WAE Up"),
+          hist(inst, "down", "sub", "#ef5350", candles, w.down, "WAE Down"),
+          line(inst, "exp", "sub", "#ffeb3b", candles, w.explosion, "Explosion"),
+          line(inst, "dz", "sub", "#78909c", candles, w.deadZone, "Dead Zone"),
+        ],
+        { up: w.up, down: w.down, explosion: w.explosion, deadZone: w.deadZone }
+      );
+      break;
+    }
+    case "halfTrend": {
+      const h = halfTrend(candles, n(p, "amplitude", 2), n(p, "channelDeviation", 2), n(p, "atrPeriod", 100));
+      push(
+        [
+          line(inst, "ht", "main", color, candles, h.ht, "HalfTrend"),
+          line(inst, "ah", "main", "#ef535088", candles, h.atrHigh, "HT High"),
+          line(inst, "al", "main", "#26a69a88", candles, h.atrLow, "HT Low"),
+        ],
+        { ht: h.ht, atrHigh: h.atrHigh, atrLow: h.atrLow, dir: h.dir }
+      );
+      break;
+    }
+    case "sslChannel": {
+      const s = sslChannel(candles, n(p, "period", 10));
+      push(
+        [
+          line(inst, "sslUp", "main", "#26a69a", candles, s.sslUp, "SSL Up"),
+          line(inst, "sslDown", "main", "#ef5350", candles, s.sslDown, "SSL Down"),
+        ],
+        { sslUp: s.sslUp, sslDown: s.sslDown, dir: s.dir }
+      );
+      break;
+    }
+    case "rangeFilter": {
+      const r = rangeFilter(values, n(p, "period", 20), n(p, "mult", 2.5));
+      push(
+        [
+          line(inst, "filter", "main", color, candles, r.filter, "Range Filter"),
+          line(inst, "up", "main", "#ef535088", candles, r.upper, "RF Up"),
+          line(inst, "lo", "main", "#26a69a88", candles, r.lower, "RF Low"),
+        ],
+        { filter: r.filter, upper: r.upper, lower: r.lower, dir: r.dir }
+      );
+      break;
+    }
+    case "choppiness": {
+      const period = n(p, "period", 14);
+      const v = choppiness(candles, period);
+      push([line(inst, "chop", "sub", color, candles, v, `CHOP(${period})`)], { chop: v });
+      break;
+    }
+    case "bop": {
+      const smooth = n(p, "smooth", 14);
+      const v = bop(candles, smooth);
+      push([line(inst, "bop", "sub", color, candles, v, `BOP(${smooth})`)], { bop: v });
+      break;
+    }
+    case "elderRay": {
+      const e = elderRay(candles, n(p, "period", 13));
+      push(
+        [
+          hist(inst, "bull", "sub", "#26a69a", candles, e.bull, "Bull Power"),
+          hist(inst, "bear", "sub", "#ef5350", candles, e.bear, "Bear Power"),
+          line(inst, "ema", "main", "#78909c", candles, e.ema, "Elder EMA"),
+        ],
+        { bull: e.bull, bear: e.bear, ema: e.ema }
       );
       break;
     }

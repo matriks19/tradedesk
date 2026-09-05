@@ -230,7 +230,22 @@ export type BuiltinIndicatorId =
   | "nadarayaWatson"
   | "schaffTrendCycle"
   | "selfAwareTrail"
-  | "adaptiveMacd";
+  | "adaptiveMacd"
+  // Niche / az bilinen
+  | "smi"
+  | "coppock"
+  | "vidya"
+  | "frama"
+  | "squeezeMomentum"
+  | "softTrend"
+  | "vfi"
+  | "waddahAttar"
+  | "halfTrend"
+  | "sslChannel"
+  | "rangeFilter"
+  | "choppiness"
+  | "bop"
+  | "elderRay";
 
 export interface IndicatorInputDef {
   key: string;
