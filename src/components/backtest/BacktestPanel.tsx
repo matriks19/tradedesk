@@ -223,24 +223,22 @@ export function BacktestPanel() {
         ? "∞"
         : fmt(pfRaw);
     return [
-      ["Net PnL", fmt(s.netPnl)],
-      ["Profit Factor", pfStr],
-      ["Win Rate", `${(num(s.winRate) * 100).toFixed(1)}%`],
-      ["Trades", String(num(s.trades))],
-      ["Long / Short", `${num(s.longTrades)} / ${num(s.shortTrades)}`],
-      ["Long PnL", fmt(s.longNetPnl)],
-      ["Short PnL", fmt(s.shortNetPnl)],
-      ["Avg Win / Loss", `${fmt(s.avgWin)} / ${fmt(s.avgLoss)}`],
-      ["Best / Worst", `${fmt(s.bestTrade)} / ${fmt(s.worstTrade)}`],
-      [
-        "Max DD",
-        `${fmt(s.maxDrawdown)} (${(num(s.maxDrawdownPct) * 100).toFixed(1)}%)`,
-      ],
-      ["Sharpe~", fmt(s.sharpe)],
-      ["Avg R", fmt(s.avgR)],
-      ["Expectancy", fmt(s.expectancy)],
-      ["Avg bars", fmt(s.avgBarsHeld, 1)],
-      ["Candles", String(result.candleCount ?? 0)],
+      ["PnL", fmt(s.netPnl)],
+      ["PF", pfStr],
+      ["WR", `${(num(s.winRate) * 100).toFixed(1)}%`],
+      ["N", String(num(s.trades))],
+      ["L/S", `${num(s.longTrades)}/${num(s.shortTrades)}`],
+      ["L pnl", fmt(s.longNetPnl)],
+      ["S pnl", fmt(s.shortNetPnl)],
+      ["W/L", `${fmt(s.avgWin)}/${fmt(s.avgLoss)}`],
+      ["Best", fmt(s.bestTrade)],
+      ["Worst", fmt(s.worstTrade)],
+      ["DD", `${fmt(s.maxDrawdown)} (${(num(s.maxDrawdownPct) * 100).toFixed(0)}%)`],
+      ["Sharpe", fmt(s.sharpe)],
+      ["R", fmt(s.avgR)],
+      ["Exp", fmt(s.expectancy)],
+      ["Bars", fmt(s.avgBarsHeld, 1)],
+      ["Mum", String(result.candleCount ?? 0)],
     ];
   }, [result]);
 
@@ -261,7 +259,7 @@ export function BacktestPanel() {
   const showCode = preset === "codeStrategy";
 
   return (
-    <div className="flex flex-col h-full min-h-0 text-xs">
+    <div className="flex flex-col h-full min-h-0 text-2xs">
       <div className="p-2 border-b border-desk-border space-y-2 shrink-0 overflow-y-auto max-h-[52%]">
         <div className="grid grid-cols-2 gap-1.5">
           <label className="flex flex-col gap-0.5">
@@ -458,7 +456,7 @@ export function BacktestPanel() {
               <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
                 Özet
               </h3>
-              <div className="grid grid-cols-2 gap-x-2 gap-y-0.5 font-mono">
+              <div className="grid grid-cols-2 gap-x-1.5 gap-y-0 font-mono text-3xs leading-tight">
                 {summaryRows.map(([k, v]) => (
                   <div key={k} className="flex justify-between gap-2">
                     <span className="text-desk-muted">{k}</span>
@@ -472,7 +470,7 @@ export function BacktestPanel() {
               <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
                 Regime (Bull / Bear / Range)
               </h3>
-              <table className="w-full text-2xs">
+              <table className="w-full text-3xs leading-tight">
                 <thead>
                   <tr className="text-desk-muted text-left">
                     <th className="py-0.5">Regime</th>
@@ -515,7 +513,7 @@ export function BacktestPanel() {
                 <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
                   Aylık
                 </h3>
-                <div className="max-h-28 overflow-y-auto font-mono text-2xs space-y-0.5">
+                <div className="max-h-28 overflow-y-auto font-mono text-3xs leading-tight space-y-0">
                   {result.byMonth.map((m) => (
                     <div key={m.key} className="flex justify-between">
                       <span>{m.key}</span>
@@ -547,7 +545,7 @@ export function BacktestPanel() {
               <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
                 Saat / Gün
               </h3>
-              <div className="grid grid-cols-2 gap-2 text-2xs">
+              <div className="grid grid-cols-2 gap-1.5 text-3xs leading-tight">
                 <div>
                   <div className="text-desk-muted mb-0.5">UTC Saat</div>
                   {result.byHour.slice(0, 8).map((h) => (
@@ -584,7 +582,7 @@ export function BacktestPanel() {
                 Trade Log ({result.trades.length})
               </h3>
               <div className="max-h-[220px] overflow-auto border border-desk-border rounded">
-                <table className="w-full text-2xs">
+                <table className="w-full text-3xs leading-tight">
                   <thead className="sticky top-0 bg-desk-panel">
                     <tr className="text-desk-muted text-left">
                       <th className="px-1 py-0.5">Side</th>

@@ -25,6 +25,7 @@ const config: Config = {
       },
       fontSize: {
         "2xs": ["0.65rem", { lineHeight: "0.9rem" }],
+        "3xs": ["0.55rem", { lineHeight: "0.72rem" }],
       },
     },
   },
