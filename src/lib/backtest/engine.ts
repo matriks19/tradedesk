@@ -100,6 +100,44 @@ function summarize(
   };
 }
 
+
+/** Fill missing summary fields from older persisted results (localStorage). */
+export function normalizeBacktestResult(r: BacktestResult): BacktestResult {
+  const s = r?.summary ?? ({} as BacktestSummary);
+  const n = (v: unknown, d = 0) =>
+    typeof v === "number" && Number.isFinite(v) ? v : d;
+  const pf = s.profitFactor;
+  const profitFactor =
+    typeof pf === "number" && !Number.isFinite(pf) && pf > 0
+      ? Infinity
+      : n(pf);
+  return {
+    ...r,
+    summary: {
+      netPnl: n(s.netPnl),
+      profitFactor,
+      winRate: n(s.winRate),
+      trades: n(s.trades),
+      wins: n(s.wins),
+      losses: n(s.losses),
+      maxDrawdown: n(s.maxDrawdown),
+      maxDrawdownPct: n(s.maxDrawdownPct),
+      sharpe: n(s.sharpe),
+      avgR: n(s.avgR),
+      expectancy: n(s.expectancy),
+      avgBarsHeld: n(s.avgBarsHeld),
+      avgWin: n(s.avgWin),
+      avgLoss: n(s.avgLoss),
+      longTrades: n(s.longTrades),
+      shortTrades: n(s.shortTrades),
+      longNetPnl: n(s.longNetPnl),
+      shortNetPnl: n(s.shortNetPnl),
+      bestTrade: n(s.bestTrade),
+      worstTrade: n(s.worstTrade),
+    },
+  };
+}
+
 export function runBacktest(
   candles: Candle[],
   params: BacktestParams

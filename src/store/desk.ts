@@ -18,7 +18,8 @@ import type {
 } from "@/lib/types";
 import { NATIVE_TIMEFRAMES, normalizeTimeframe } from "@/lib/data/timeframes";
 import type { PatternHit } from "@/lib/patterns/types";
-import type { BacktestParams, BacktestResult } from "@/lib/backtest";
+import type { BacktestParams, BacktestResult } from "@/lib/backtest"
+import { normalizeBacktestResult } from "@/lib/backtest";;
 import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
 import { strategyById } from "@/lib/strategies";
 
@@ -390,7 +391,8 @@ export const useDeskStore = create<DeskState>()(
             patternSettings: { ...s.patternSettings, focusId: id },
           })),
         setOverlayPattern: (hit) => set({ overlayPattern: hit }),
-        setLastBacktest: (r) => set({ lastBacktest: r }),
+        setLastBacktest: (r) =>
+          set({ lastBacktest: r ? normalizeBacktestResult(r) : null }),
 
         applyStrategyPack: (strategyId) => {
           const pack = strategyById(strategyId);
@@ -473,6 +475,11 @@ export const useDeskStore = create<DeskState>()(
     },
     {
       name: "tradedesk-v1",
+      onRehydrateStorage: () => (state) => {
+        if (state?.lastBacktest) {
+          state.lastBacktest = normalizeBacktestResult(state.lastBacktest);
+        }
+      },
       partialize: (s) => ({
         layoutMode: s.layoutMode,
         panes: s.panes,

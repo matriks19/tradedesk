@@ -212,24 +212,35 @@ export function BacktestPanel() {
   }, [result]);
 
   const summaryRows = useMemo(() => {
-    if (!result) return [];
+    if (!result?.summary) return [];
     const s = result.summary;
+    const num = (v: unknown, d = 0) =>
+      typeof v === "number" && Number.isFinite(v) ? v : d;
+    const fmt = (v: unknown, digits = 2) => num(v).toFixed(digits);
+    const pfRaw = s.profitFactor;
+    const pfStr =
+      typeof pfRaw === "number" && !Number.isFinite(pfRaw) && (pfRaw as number) > 0
+        ? "∞"
+        : fmt(pfRaw);
     return [
-      ["Net PnL", s.netPnl.toFixed(2)],
-      ["Profit Factor", Number.isFinite(s.profitFactor) ? s.profitFactor.toFixed(2) : "∞"],
-      ["Win Rate", `${(s.winRate * 100).toFixed(1)}%`],
-      ["Trades", String(s.trades)],
-      ["Long / Short", `${s.longTrades} / ${s.shortTrades}`],
-      ["Long PnL", s.longNetPnl.toFixed(2)],
-      ["Short PnL", s.shortNetPnl.toFixed(2)],
-      ["Avg Win / Loss", `${s.avgWin.toFixed(2)} / ${s.avgLoss.toFixed(2)}`],
-      ["Best / Worst", `${s.bestTrade.toFixed(2)} / ${s.worstTrade.toFixed(2)}`],
-      ["Max DD", `${s.maxDrawdown.toFixed(2)} (${(s.maxDrawdownPct * 100).toFixed(1)}%)`],
-      ["Sharpe~", s.sharpe.toFixed(2)],
-      ["Avg R", s.avgR.toFixed(2)],
-      ["Expectancy", s.expectancy.toFixed(2)],
-      ["Avg bars", s.avgBarsHeld.toFixed(1)],
-      ["Candles", String(result.candleCount)],
+      ["Net PnL", fmt(s.netPnl)],
+      ["Profit Factor", pfStr],
+      ["Win Rate", `${(num(s.winRate) * 100).toFixed(1)}%`],
+      ["Trades", String(num(s.trades))],
+      ["Long / Short", `${num(s.longTrades)} / ${num(s.shortTrades)}`],
+      ["Long PnL", fmt(s.longNetPnl)],
+      ["Short PnL", fmt(s.shortNetPnl)],
+      ["Avg Win / Loss", `${fmt(s.avgWin)} / ${fmt(s.avgLoss)}`],
+      ["Best / Worst", `${fmt(s.bestTrade)} / ${fmt(s.worstTrade)}`],
+      [
+        "Max DD",
+        `${fmt(s.maxDrawdown)} (${(num(s.maxDrawdownPct) * 100).toFixed(1)}%)`,
+      ],
+      ["Sharpe~", fmt(s.sharpe)],
+      ["Avg R", fmt(s.avgR)],
+      ["Expectancy", fmt(s.expectancy)],
+      ["Avg bars", fmt(s.avgBarsHeld, 1)],
+      ["Candles", String(result.candleCount ?? 0)],
     ];
   }, [result]);
 
