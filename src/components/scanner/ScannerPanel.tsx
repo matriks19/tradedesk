@@ -33,7 +33,7 @@ import type { Candle, Timeframe, TickerQuote } from "@/lib/types";
 import clsx from "clsx";
 
 type SortKey = "rsi" | "changePct" | "volume" | "symbol";
-type UiMode = "presets" | "advanced";
+type OpenSection = "advanced" | "presets" | "extra" | null;
 
 const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "rsi30", label: "RSI<30", filter: { type: "rsi", op: "lt", value: 30 } },
@@ -62,7 +62,8 @@ export function ScannerPanel() {
   const [selectedPresets, setSelectedPresets] = useState<string[]>([]);
   const [extraFilters, setExtraFilters] = useState<string[]>([]);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilter[]>([]);
-  const [uiMode, setUiMode] = useState<UiMode>("advanced");
+  /** Filter editors collapsed by default so scan results stay visible. */
+  const [openSection, setOpenSection] = useState<OpenSection>(null);
   const [exchange, setExchange] = useState<"binance" | "bist">("binance");
   const [timeframe, setTimeframe] = useState<Timeframe>("15m");
   const [universeN, setUniverseN] = useState(60);
@@ -454,22 +455,37 @@ export function ScannerPanel() {
         </button>
       </div>
 
-      <div className="flex gap-1 text-2xs">
+      <div className="flex gap-1 text-2xs flex-wrap items-center">
         <button
           type="button"
-          className={clsx("btn text-2xs", uiMode === "advanced" && "btn-accent")}
-          onClick={() => setUiMode("advanced")}
+          className={clsx("btn text-2xs", openSection === "advanced" && "btn-accent")}
+          onClick={() =>
+            setOpenSection((s) => (s === "advanced" ? null : "advanced"))
+          }
         >
-          Advanced Filters
+          Advanced {openSection === "advanced" ? "▾" : "▸"}
         </button>
         <button
           type="button"
-          className={clsx("btn text-2xs", uiMode === "presets" && "btn-accent")}
-          onClick={() => setUiMode("presets")}
+          className={clsx("btn text-2xs", openSection === "presets" && "btn-accent")}
+          onClick={() =>
+            setOpenSection((s) => (s === "presets" ? null : "presets"))
+          }
         >
-          Presets
+          Presets{selectedPresets.length ? ` (${selectedPresets.length})` : ""}{" "}
+          {openSection === "presets" ? "▾" : "▸"}
         </button>
-        <span className="text-desk-muted self-center ml-1">
+        <button
+          type="button"
+          className={clsx("btn text-2xs", openSection === "extra" && "btn-accent")}
+          onClick={() =>
+            setOpenSection((s) => (s === "extra" ? null : "extra"))
+          }
+        >
+          Ek filtre{extraFilters.length ? ` (${extraFilters.length})` : ""}{" "}
+          {openSection === "extra" ? "▾" : "▸"}
+        </button>
+        <span className="text-desk-muted self-center">
           Aktif: {activeFilterCount}
         </span>
         <button
@@ -519,15 +535,15 @@ export function ScannerPanel() {
         </div>
       )}
 
-      {uiMode === "advanced" ? (
-        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 min-h-0">
+      {openSection === "advanced" && (
+        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 max-h-56 overflow-y-auto shrink-0">
           <input
             className="input text-2xs w-full"
             placeholder="Teknik alan ara… (RSI, MACD, Bollinger…)"
             value={fieldSearch}
             onChange={(e) => setFieldSearch(e.target.value)}
           />
-          <div className="max-h-24 overflow-y-auto flex flex-col gap-0.5">
+          <div className="max-h-20 overflow-y-auto flex flex-col gap-0.5">
             {filteredFieldList.map((f) => (
               <button
                 key={f.id}
@@ -655,12 +671,14 @@ export function ScannerPanel() {
             </span>
           </div>
         </div>
-      ) : (
-        <>
+      )}
+
+      {openSection === "presets" && (
+        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 max-h-40 overflow-y-auto shrink-0">
           <div className="text-2xs text-desk-muted">
             Preset galerisi (çoklu; advanced ile AND)
           </div>
-          <div className="flex flex-wrap gap-1 max-h-28 overflow-y-auto">
+          <div className="flex flex-wrap gap-1">
             {Object.entries(SCANNER_PRESETS).map(([id, p]) => (
               <button
                 key={id}
@@ -676,6 +694,22 @@ export function ScannerPanel() {
               </button>
             ))}
           </div>
+          <div className="flex gap-1 items-center pt-1 border-t border-desk-border/30">
+            <input
+              className="input flex-1 text-2xs"
+              placeholder="İsimli preset kaydet…"
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+            />
+            <button type="button" className="btn text-2xs" onClick={saveNamedPreset}>
+              Kaydet
+            </button>
+          </div>
+        </div>
+      )}
+
+      {openSection === "extra" && (
+        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 max-h-32 overflow-y-auto shrink-0">
           <div className="text-2xs text-desk-muted">Ek filtreler</div>
           <div className="flex flex-wrap gap-1">
             {FILTER_CHIPS.map((c) => (
@@ -692,20 +726,10 @@ export function ScannerPanel() {
               </button>
             ))}
           </div>
-        </>
+        </div>
       )}
 
-      <div className="flex gap-1 items-center">
-        <input
-          className="input flex-1 text-2xs"
-          placeholder="İsimli preset kaydet…"
-          value={saveName}
-          onChange={(e) => setSaveName(e.target.value)}
-        />
-        <button type="button" className="btn text-2xs" onClick={saveNamedPreset}>
-          Kaydet
-        </button>
-      </div>
+
 
       {exchange === "bist" && (
         <p className="text-2xs text-desk-warn">
@@ -759,7 +783,7 @@ export function ScannerPanel() {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="flex-1 min-h-[10rem] overflow-y-auto">
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 px-2 py-1 text-2xs text-desk-muted border-b border-desk-border/40 sticky top-0 bg-desk-bg">
           <span>Sembol</span>
           <span>%Δ</span>
