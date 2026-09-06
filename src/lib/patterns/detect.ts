@@ -10,6 +10,11 @@ import { enrichFlagTriangleHits } from "./shtFlagTriangle";
 import { detectThreeDrives } from "./threeDrives";
 import { detectBreakoutFvgRetest } from "./breakoutFvgRetest";
 import { detectInversionFvg } from "./inversionFvg";
+import { detectSmcModels } from "./smcModels";
+import { detectQuasimodo } from "./quasimodo";
+import { detectMavkCluster } from "./mavkCluster";
+import { detectBistCycle } from "./bistCycle";
+import { detectCloudTouch } from "./cloudTouch";
 
 const DEFAULTS: Required<DetectOptions> = {
   swingStrength: 2,
@@ -199,11 +204,26 @@ export function detectPatterns(
   if (enabled(opts, "inversion_fvg")) {
     hits.push(...detectInversionFvg(candles, { swingStrength: opts.swingStrength }));
   }
+  if (enabled(opts, "smc_model")) {
+    hits.push(...detectSmcModels(candles, { swingStrength: opts.swingStrength }));
+  }
+  if (enabled(opts, "quasimodo")) {
+    hits.push(...detectQuasimodo(candles, { swingStrength: opts.swingStrength }));
+  }
+  if (enabled(opts, "mavk_cluster")) {
+    hits.push(...detectMavkCluster(candles));
+  }
+  if (enabled(opts, "bist_cycle")) {
+    hits.push(...detectBistCycle(candles));
+  }
+  if (enabled(opts, "cloud_touch")) {
+    hits.push(...detectCloudTouch(candles));
+  }
 
   const enriched = enrichFlagTriangleHits(candles, hits);
   return enriched
     .sort((a, b) => b.confidence - a.confidence || b.tEnd - a.tEnd)
-    .slice(0, 28);
+    .slice(0, 36);
 }
 
 function detectStructure(

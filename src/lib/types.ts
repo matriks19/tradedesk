@@ -261,6 +261,9 @@ export type BuiltinIndicatorId =
   | "ifvgRsi"
   | "ifvgSmi"
   | "ifvgJurikStoch"
+  // MAVK / R²
+  | "mavkRibbon"
+  | "rSquared"
   // Elizi Lab
   | "eliziEdge";
 

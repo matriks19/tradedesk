@@ -178,6 +178,7 @@ import {
   pliDeltaHybrid,
 } from "./median";
 import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi, computeIfvgJurikStoch } from "./ifvg";
+import { computeMavkIndicator, computeRSquaredIndicator } from "./mavk";
 import { rsiBreakMarkerSeries } from "@/lib/scanner/rsiScan";
 import { macdCrossMarkerSeries } from "@/lib/scanner/macdScan";
 
@@ -434,12 +435,16 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "pliChannel", label: "PLI Kanal (oran)", category: "bands", pane: "main", acceptsSeries: true, primarySeriesKey: "upper", description: "TradingView percentile_linear_interpolation kanalı; oran=upper/lower−1 (daralma = squeeze). Go-10-Pli tarzı.", inputs: [num("length", "Uzunluk", 50), num("x", "Percentil X", 5, 0.5, 40, 0.5), src()] },
   { id: "pliDeltaHybrid", label: "PLI×Delta Hibrit", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "oran", description: "PLI daralma (oran) × işaretli bar delta hacmi. Squeeze sonrası kırılım/sekme + destekleyici delta. Skor 0–100.", inputs: [num("length", "PLI Uzunluk", 50), num("x", "Percentil X", 5, 0.5, 40, 0.5), num("deltaSmooth", "Delta EMA", 5), num("narrowLookback", "Daralma Lookback", 50), num("narrowPct", "Daralma %", 25, 5, 50, 1), num("narrowMemory", "Daralma Bellek", 5)] },
 
-  // —— Elizi Lab
+  // —— IFVG
   { id: "ifvgZones", label: "IFVG Bölgeler", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "zoneTop", description: "Inversion FVG bölgeleri + retest AL/SAT. Formasyon IFVG taraması ile birlikte kullanılabilir (grafikte stack + backtest AND preset).", inputs: [num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30), num("zoneExtend", "Zone Extend", 8)] },
   { id: "ifvgRsi", label: "IFVG×RSI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rsi", description: "IFVG uygulanmış RSI: tam RSI + bias bağlamı (rsiIfvg) + IFVG retest × OS/OB teyit sinyalleri. Formasyon IFVG taraması ile birlikte kullanılabilir. (İkincil — tercih: IFVG×SMI)", inputs: [num("rsiPeriod", "RSI Periyot", 14), num("os", "OS", 35, 1, 50, 1), num("ob", "OB", 65, 50, 99, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
   { id: "ifvgSmi", label: "IFVG×SMI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "smi", description: "IFVG uygulanmış SMI (Blau): smi+signal + bias bağlamı (smiIfvg) + IFVG retest × SMI/signal cross teyit (playbook SMI Long tarzı, soft ≤0/≥0 seviye). Tercih edilen IFVG confluence.", inputs: [num("k", "SMI K", 14), num("d", "SMI D", 20), num("ema", "Signal EMA", 5), num("os", "OS", -40, -100, 0, 1), num("ob", "OB", 40, 0, 100, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
   { id: "ifvgJurikStoch", label: "IFVG×Jurik Kase", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: "IFVG uygulanmış Loxx Jurik Kase Stochastic (jurikKaseStoch k/d; 2× JFKPS+ADX: Periyot 18, Cycle 10, Smoothing 6, JMA 20, Phase 0). AL: IFVG bull retest × K 20↑ kırılım (önceki K≤20, şimdi K>20). SAT: IFVG bear retest × K 80↓ kırılım (önceki K≥80, şimdi K<80). Pane: OS/OB + breakUp20/breakDn20/breakUp80/breakDn80 işaretleri. İsteğe bağlı K/D cross (useKdCross, varsayılan kapalı).", inputs: [num("kLen", "Periyot", 18), num("cycle", "Synthetic/Cycle", 10), num("dLen", "Smoothing", 6), num("jmaLen", "Jurik Smoothing", 20), num("phase", "Jurik Phase", 0, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("os", "OS", 20, 1, 50, 1), num("ob", "OB", 80, 50, 99, 1), num("useKdCross", "K/D Cross", 0, 0, 1, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
 
+  { id: "mavkRibbon", label: "MAVK Şerit", category: "ma", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", description: "Çoklu EMA/SMA şerit (8/13/21/34/55/89). Küme: (max-min)/fiyat ≤ eşik. Formasyon MAVK taraması ile birlikte.", inputs: [num("p1", "MA1", 8), num("p2", "MA2", 13), num("p3", "MA3", 21), num("p4", "MA4", 34), num("p5", "MA5", 55), num("p6", "MA6", 89), num("clusterPct", "Küme %", 1.5, 0.2, 5, 0.1), num("useSma", "SMA (0=EMA)", 0, 0, 1, 1)] },
+  { id: "rSquared", label: "R-Squared", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "r2", description: "Kapanış üzerinde lineer regresyon R² (0–1). Düşük R² (~0.15–0.3) sonra yükseliş + MAVK küme = tarama sinyali.", inputs: [num("period", "Lookback", 30)] },
+
+  // —— Elizi Lab
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — DI-anchored coherence + surprise + DI acceleration before ADX confirms. Default pane: Temp/±E/Faz; Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
 ];
 
@@ -2480,6 +2485,61 @@ export function computeBuiltin(
       break;
     }
 
+    case "mavkRibbon": {
+      const s = computeMavkIndicator(candles, {
+        p1: n(p, "p1", 8),
+        p2: n(p, "p2", 13),
+        p3: n(p, "p3", 21),
+        p4: n(p, "p4", 34),
+        p5: n(p, "p5", 55),
+        p6: n(p, "p6", 89),
+        clusterPct: n(p, "clusterPct", 1.5) / 100,
+        useSma: n(p, "useSma", 0) >= 1,
+      });
+      const clusterHist = s.clustered.map((v) => (v === 1 ? 1 : null));
+      push(
+        [
+          line(inst, "ma1", "main", "#42a5f5", candles, s.ma1, "MA1"),
+          line(inst, "ma2", "main", "#26a69a", candles, s.ma2, "MA2"),
+          line(inst, "ma3", "main", "#66bb6a", candles, s.ma3, "MA3"),
+          line(inst, "ma4", "main", "#ffa726", candles, s.ma4, "MA4"),
+          line(inst, "ma5", "main", "#ef5350", candles, s.ma5, "MA5"),
+          line(inst, "ma6", "main", "#ab47bc", candles, s.ma6, "MA6"),
+          line(inst, "upper", "main", "#7e57c288", candles, s.upper, "Üst"),
+          line(inst, "lower", "main", "#7e57c288", candles, s.lower, "Alt"),
+          line(inst, "mid", "main", "#7e57c2", candles, s.mid, "MAVK Mid"),
+          hist(inst, "cluster", "main", "#ab47bc55", candles, clusterHist, "Küme"),
+        ],
+        {
+          ma1: s.ma1,
+          ma2: s.ma2,
+          ma3: s.ma3,
+          ma4: s.ma4,
+          ma5: s.ma5,
+          ma6: s.ma6,
+          upper: s.upper,
+          lower: s.lower,
+          mid: s.mid,
+          clusterPct: s.clusterPct,
+          clustered: s.clustered,
+        }
+      );
+      break;
+    }
+    case "rSquared": {
+      const s = computeRSquaredIndicator(candles, n(p, "period", 30));
+      const riseHist = s.rising.map((v) => (v === 1 ? 1 : null));
+      push(
+        [
+          line(inst, "r2", "sub", "#7e57c2", candles, s.r2, "R²"),
+          line(inst, "low", "sub", "#26a69a88", candles, s.low, "Düşük"),
+          line(inst, "mid", "sub", "#90a4ae55", candles, s.mid, "0.5"),
+          hist(inst, "rising", "sub", "#26a69a", candles, riseHist, "↑"),
+        ],
+        { r2: s.r2, rising: s.rising }
+      );
+      break;
+    }
     case "eliziEdge": {
       const ee = eliziEdge(candles, {
         erLen: n(p, "erLen", 10),

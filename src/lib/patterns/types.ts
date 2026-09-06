@@ -48,6 +48,11 @@ export interface PatternHit {
     | "three_drives"
     | "breakout_fvg_retest"
     | "inversion_fvg"
+    | "smc_model"
+    | "quasimodo"
+    | "mavk_cluster"
+    | "bist_cycle"
+    | "cloud_touch"
     | "advanced";
   label: string;
   detail: string;
@@ -74,7 +79,21 @@ export interface PatternHit {
       | "al_tetiklendi"
       | "sat_tetiklendi"
       | "inversion"
-      | "choch";
+      | "choch"
+      | "forming"
+      | "active"
+      | "target_hit"
+      | "mss"
+      | "sweep"
+      | "poi"
+      | "qml"
+      | "cluster"
+      | "phase2"
+      | "phase3"
+      | "phase4"
+      | "phase5"
+      | "phase6"
+      | "cloud";
     score: number; // 0-100
     contractionPct?: number;
     breakoutPrice?: number;
@@ -89,7 +108,12 @@ export interface PatternHit {
       | "triangle"
       | "three_drives"
       | "breakout_fvg_retest"
-      | "inversion_fvg";
+      | "inversion_fvg"
+      | "smc_model"
+      | "quasimodo"
+      | "mavk_cluster"
+      | "bist_cycle"
+      | "cloud_touch";
     /** Three Drives / Üç İtiş */
     przLow?: number;
     przHigh?: number;
@@ -116,6 +140,21 @@ export interface PatternHit {
     sweep?: boolean;
     chochPrice?: number;
     riskR?: number;
+    /** SMC / QM / MAVK / BIST / Cloud */
+    model?: string;
+    modelId?: 1 | 2 | 3 | 4;
+    stage?: string;
+    qml?: number;
+    oteLow?: number;
+    oteHigh?: number;
+    poiTop?: number;
+    poiBot?: number;
+    boxHigh?: number;
+    boxLow?: number;
+    r2?: number;
+    clusterPct?: number;
+    bistPhase?: number;
+    cloudSide?: "lower" | "upper";
   };
 }
 

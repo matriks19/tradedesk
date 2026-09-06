@@ -16,6 +16,11 @@ import { passesShtFilter } from "@/lib/patterns/shtFlagTriangle";
 import { passesThreeDrivesFilter } from "@/lib/patterns/threeDrives";
 import { passesBreakoutFvgRetestFilter } from "@/lib/patterns/breakoutFvgRetest";
 import { passesInversionFvgFilter } from "@/lib/patterns/inversionFvg";
+import { passesSmcFilter } from "@/lib/patterns/smcModels";
+import { passesQuasimodoFilter } from "@/lib/patterns/quasimodo";
+import { passesMavkFilter } from "@/lib/patterns/mavkCluster";
+import { passesBistCycleFilter } from "@/lib/patterns/bistCycle";
+import { passesCloudTouchFilter } from "@/lib/patterns/cloudTouch";
 import type { PatternHit } from "@/lib/patterns/types";
 import { mapPool } from "@/lib/scanner/engine";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
@@ -27,13 +32,34 @@ const FAMILY_OPTS: { id: AdvancedPatternFamily; label: string }[] = [
   { id: "structure", label: "Yapı BOS/CHOCH" },
 ];
 
-const STAGE_TR: Record<PatternStage, string> = {
+const STAGE_TR: Record<string, string> = {
   forming: "oluşuyor",
   prz: "PRZ",
   retest: "retest",
   active: "aktif",
   target_hit: "hedef✓",
   invalid: "geçersiz",
+  olusum: "oluşum",
+  kirilim: "kırılım",
+  konsolidasyon: "konsolidasyon",
+  breakout: "kırılım",
+  fvg: "FVG",
+  confirmation: "onay",
+  al_tetiklendi: "AL",
+  sat_tetiklendi: "SAT",
+  inversion: "inversiyon",
+  choch: "CHoCH",
+  mss: "MSS",
+  sweep: "süpürme",
+  poi: "POI",
+  qml: "QML",
+  cluster: "küme",
+  phase2: "faz2",
+  phase3: "faz3",
+  phase4: "faz4",
+  phase5: "faz5",
+  phase6: "faz6",
+  cloud: "cloud",
 };
 
 type Row = {
@@ -54,6 +80,11 @@ type Row = {
   threeDrives?: boolean;
   bfr?: boolean;
   ifvg?: boolean;
+  smc?: boolean;
+  qm?: boolean;
+  mavk?: boolean;
+  bist?: boolean;
+  cloud?: boolean;
   barsAgo?: number;
   stage?: PatternStage | string;
 };
@@ -65,11 +96,12 @@ function keepClassicFresh(
   activeOnly: boolean
 ): boolean {
   if (!activeOnly) return true;
-  const st = h.meta?.status;
+  const st = h.meta?.status ?? h.meta?.stage;
+  if (st === "target_hit") return false;
   const tp1 = h.meta?.tp1 ?? h.meta?.targetPrice;
   const last = candles[candles.length - 1];
   if (!last) return true;
-  if (st === "al_tetiklendi" || st === "sat_tetiklendi") {
+  if (st === "al_tetiklendi" || st === "sat_tetiklendi" || st === "active") {
     if (tp1 != null) {
       if (h.bias === "bull" && last.high >= tp1) return false;
       if (h.bias === "bear" && last.low <= tp1) return false;
@@ -114,6 +146,11 @@ export function FormationScanPanel() {
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
   const [ifvgFocus, setIfvgFocus] = useState(false);
+  const [smcFocus, setSmcFocus] = useState(false);
+  const [qmFocus, setQmFocus] = useState(false);
+  const [mavkFocus, setMavkFocus] = useState(false);
+  const [bistFocus, setBistFocus] = useState(false);
+  const [cloudFocus, setCloudFocus] = useState(false);
   /** Default ON: only forming/prz/retest/active — drop target_hit */
   const [activeOnly, setActiveOnly] = useState(true);
   const [running, setRunning] = useState(false);
@@ -128,9 +165,20 @@ export function FormationScanPanel() {
   };
 
   const run = useCallback(async () => {
-    if (!families.length && !shtFocus && !tdFocus && !bfrFocus && !ifvgFocus) {
+    if (
+      !families.length &&
+      !shtFocus &&
+      !tdFocus &&
+      !bfrFocus &&
+      !ifvgFocus &&
+      !smcFocus &&
+      !qmFocus &&
+      !mavkFocus &&
+      !bistFocus &&
+      !cloudFocus
+    ) {
       setStatus(
-        "En az bir formasyon ailesi, SHT Flama/Üçgen, Üç İtiş, Breakout·FVG·Retest veya IFVG seçin"
+        "En az bir formasyon ailesi veya çip seçin (IFVG / SMC / QM / MAVK / BIST …)"
       );
       return;
     }
@@ -226,6 +274,11 @@ export function FormationScanPanel() {
                   three_drives: false,
                   breakout_fvg_retest: false,
                   inversion_fvg: false,
+                  smc_model: false,
+                  quasimodo: false,
+                  mavk_cluster: false,
+                  bist_cycle: false,
+                  cloud_touch: false,
                 },
               }).filter((h) => passesShtFilter(h, 60));
               for (const h of classic.slice(0, 2)) {
@@ -267,6 +320,11 @@ export function FormationScanPanel() {
                   engulfing: false,
                   breakout_fvg_retest: false,
                   inversion_fvg: false,
+                  smc_model: false,
+                  quasimodo: false,
+                  mavk_cluster: false,
+                  bist_cycle: false,
+                  cloud_touch: false,
                 },
               }).filter((h) => passesThreeDrivesFilter(h, 60));
               for (const h of tds.slice(0, 2)) {
@@ -299,6 +357,11 @@ export function FormationScanPanel() {
                 enable: {
                   breakout_fvg_retest: true,
                   inversion_fvg: false,
+                  smc_model: false,
+                  quasimodo: false,
+                  mavk_cluster: false,
+                  bist_cycle: false,
+                  cloud_touch: false,
                   three_drives: false,
                   flag: false,
                   pennant: false,
@@ -342,6 +405,11 @@ export function FormationScanPanel() {
                 swingStrength: job.swing,
                 enable: {
                   inversion_fvg: true,
+                  smc_model: false,
+                  quasimodo: false,
+                  mavk_cluster: false,
+                  bist_cycle: false,
+                  cloud_touch: false,
                   breakout_fvg_retest: false,
                   three_drives: false,
                   flag: false,
@@ -382,6 +450,251 @@ export function FormationScanPanel() {
                 });
               }
             }
+            if (smcFocus) {
+              const smcs = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  smc_model: true,
+                  quasimodo: false,
+                  mavk_cluster: false,
+                  bist_cycle: false,
+                  cloud_touch: false,
+                  inversion_fvg: false,
+                  breakout_fvg_retest: false,
+                  three_drives: false,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              })
+                .filter((h) => passesSmcFilter(h, 55))
+                .filter((h) => keepClassicFresh(h, candles, activeOnly));
+              for (const h of smcs.slice(0, 2)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.entry,
+                  tp1: h.meta?.tp1,
+                  sl: h.meta?.stop,
+                  barsAgo: h.meta?.barsAgo,
+                  stage: h.meta?.stage ?? h.meta?.status,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  smc: true,
+                });
+              }
+            }
+            if (qmFocus) {
+              const qms = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  quasimodo: true,
+                  smc_model: false,
+                  mavk_cluster: false,
+                  bist_cycle: false,
+                  cloud_touch: false,
+                  inversion_fvg: false,
+                  breakout_fvg_retest: false,
+                  three_drives: false,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              })
+                .filter((h) => passesQuasimodoFilter(h, 55))
+                .filter((h) => keepClassicFresh(h, candles, activeOnly));
+              for (const h of qms.slice(0, 2)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.entry,
+                  tp1: h.meta?.tp1,
+                  sl: h.meta?.stop,
+                  barsAgo: h.meta?.barsAgo,
+                  stage: h.meta?.stage ?? h.meta?.status,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  qm: true,
+                });
+              }
+            }
+            if (mavkFocus) {
+              const mavks = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  mavk_cluster: true,
+                  smc_model: false,
+                  quasimodo: false,
+                  bist_cycle: false,
+                  cloud_touch: false,
+                  inversion_fvg: false,
+                  breakout_fvg_retest: false,
+                  three_drives: false,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              })
+                .filter((h) => passesMavkFilter(h, 55))
+                .filter((h) => keepClassicFresh(h, candles, activeOnly));
+              for (const h of mavks.slice(0, 2)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.entry,
+                  tp1: h.meta?.tp1,
+                  sl: h.meta?.stop,
+                  barsAgo: h.meta?.barsAgo,
+                  stage: h.meta?.stage ?? h.meta?.status,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  mavk: true,
+                });
+              }
+            }
+            if (bistFocus) {
+              const bists = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  bist_cycle: true,
+                  smc_model: false,
+                  quasimodo: false,
+                  mavk_cluster: false,
+                  cloud_touch: false,
+                  inversion_fvg: false,
+                  breakout_fvg_retest: false,
+                  three_drives: false,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              })
+                .filter((h) => passesBistCycleFilter(h, 50))
+                .filter((h) => keepClassicFresh(h, candles, activeOnly));
+              for (const h of bists.slice(0, 1)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.entry,
+                  tp1: h.meta?.tp1,
+                  sl: h.meta?.stop,
+                  barsAgo: h.meta?.barsAgo,
+                  stage: h.meta?.stage ?? h.meta?.status,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  bist: true,
+                });
+              }
+            }
+            if (cloudFocus) {
+              const clouds = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  cloud_touch: true,
+                  smc_model: false,
+                  quasimodo: false,
+                  mavk_cluster: false,
+                  bist_cycle: false,
+                  inversion_fvg: false,
+                  breakout_fvg_retest: false,
+                  three_drives: false,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              })
+                .filter((h) => passesCloudTouchFilter(h, 55))
+                .filter((h) => keepClassicFresh(h, candles, activeOnly));
+              for (const h of clouds.slice(0, 1)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.entry,
+                  tp1: h.meta?.tp1,
+                  sl: h.meta?.stop,
+                  barsAgo: h.meta?.barsAgo,
+                  stage: h.meta?.stage ?? h.meta?.status,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  cloud: true,
+                });
+              }
+            }
           } catch {
             /* skip */
           }
@@ -410,6 +723,11 @@ export function FormationScanPanel() {
     tdFocus,
     bfrFocus,
     ifvgFocus,
+    smcFocus,
+    qmFocus,
+    mavkFocus,
+    bistFocus,
+    cloudFocus,
     activeOnly,
     patternSettings.swingStrength,
   ]);
@@ -510,6 +828,46 @@ export function FormationScanPanel() {
         >
           Inversion FVG (IFVG)
         </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", smcFocus && "btn-accent")}
+          onClick={() => setSmcFocus((v) => !v)}
+          title="SMC modelleri: POI+süp+MSS+FVG · +IDM · +OTE · BOX — erken/retest tercih"
+        >
+          SMC
+        </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", qmFocus && "btn-accent")}
+          onClick={() => setQmFocus((v) => !v)}
+          title="Quasimodo · Quick Retest QML · ENTRY/SL/TP"
+        >
+          QM
+        </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", mavkFocus && "btn-accent")}
+          onClick={() => setMavkFocus((v) => !v)}
+          title="MAVK küme (EMA şerit) + R² düşükten yükseliş"
+        >
+          MAVK
+        </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", bistFocus && "btn-accent")}
+          onClick={() => setBistFocus((v) => !v)}
+          title="BIST 6 adımlı döngü · faz 2–3 giriş izle · 4–5 temkin · 6 çıkış"
+        >
+          BIST Döngü
+        </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", cloudFocus && "btn-accent")}
+          onClick={() => setCloudFocus((v) => !v)}
+          title="Cloud/ribbon touch · Donchian/MA zarf + RSI OS/OB küme"
+        >
+          Cloud Touch
+        </button>
       </div>
       {status && <p className="text-2xs text-desk-muted">{status}</p>}
       {running && (
@@ -562,12 +920,17 @@ export function FormationScanPanel() {
               {r.threeDrives ? "Üç İtiş · " : ""}
               {r.bfr ? "BFR · " : ""}
               {r.ifvg ? (r.label.includes("Süp") ? "IFVG·Süp · " : "IFVG · ") : ""}
+              {r.smc ? "SMC · " : ""}
+              {r.qm ? "QM · " : ""}
+              {r.mavk ? "MAVK · " : ""}
+              {r.bist ? "BIST · " : ""}
+              {r.cloud ? "Cloud · " : ""}
               {r.entry != null ? `E ${fmt(r.entry)}` : ""}
               {r.sl != null ? ` · SL ${fmt(r.sl)}` : ""}
               {r.tp1 != null
                 ? ` · ${
-                    r.sht || r.threeDrives || r.bfr || r.ifvg
-                      ? r.bfr || r.ifvg
+                    r.sht || r.threeDrives || r.bfr || r.ifvg || r.smc || r.qm || r.mavk || r.bist || r.cloud
+                      ? r.bfr || r.ifvg || r.smc || r.qm || r.mavk || r.bist || r.cloud
                         ? "TP1"
                         : "Hedef"
                       : "TP1"
