@@ -170,6 +170,13 @@ import {
 } from "./proreal";
 import { adxPumpRadar } from "./adxPump";
 import { eliziEdge } from "./eliziEdge";
+import {
+  rollingMedian,
+  madBands,
+  medianChannel,
+  pliChannel,
+  pliDeltaHybrid,
+} from "./median";
 
 export interface PlotSeries {
   id: string;
@@ -415,6 +422,13 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "schaffTrendCycle", label: "Schaff Trend Cycle", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "stc", description: CRED_PROREAL, inputs: [num("period", "Cycle", 10), num("fast", "Fast", 23), num("slow", "Slow", 50), src()] },
   { id: "selfAwareTrail", label: "Self-Aware Trend Trail", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "trail", description: CRED_PROREAL, inputs: [num("atrLen", "ATR", 10), num("mult", "Mult", 3, 0.5, 10, 0.1), num("qiLen", "QI Length", 14)] },
   { id: "adaptiveMacd", label: "Adaptive MACD", category: "proreal", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: CRED_PROREAL, inputs: [num("baseFast", "Base Fast", 12), num("baseSlow", "Base Slow", 26), num("signal", "Signal", 9), src()] },
+
+  // —— Medyan / PLI (robust)
+  { id: "rollingMedian", label: "Medyan (Rolling)", category: "ma", pane: "main", acceptsSeries: true, primarySeriesKey: "median", description: "Kayan medyan — ortalamaya göre aykırı değerlere dirençli.", inputs: [num("period", "Periyot", 20), src()] },
+  { id: "madBands", label: "MAD Bantları", category: "bands", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: "Medyan ± k·1.4826·MAD — BB yerine robust bant.", inputs: [num("period", "Periyot", 20), num("mult", "Çarpan", 2, 0.5, 10, 0.1), num("outerMult", "Dış Çarpan", 3, 0.5, 10, 0.1), src()] },
+  { id: "medianChannel", label: "Medyan Kanal", category: "bands", pane: "main", acceptsSeries: false, primarySeriesKey: "medClose", description: "Yüksek/düşük/kapanış kayan medyan kanalı.", inputs: [num("period", "Periyot", 20)] },
+  { id: "pliChannel", label: "PLI Kanal (oran)", category: "bands", pane: "main", acceptsSeries: true, primarySeriesKey: "upper", description: "TradingView percentile_linear_interpolation kanalı; oran=upper/lower−1 (daralma = squeeze). Go-10-Pli tarzı.", inputs: [num("length", "Uzunluk", 50), num("x", "Percentil X", 5, 0.5, 40, 0.5), src()] },
+  { id: "pliDeltaHybrid", label: "PLI×Delta Hibrit", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "oran", description: "PLI daralma (oran) × işaretli bar delta hacmi. Squeeze sonrası kırılım/sekme + destekleyici delta. Skor 0–100.", inputs: [num("length", "PLI Uzunluk", 50), num("x", "Percentil X", 5, 0.5, 40, 0.5), num("deltaSmooth", "Delta EMA", 5), num("narrowLookback", "Daralma Lookback", 50), num("narrowPct", "Daralma %", 25, 5, 50, 1), num("narrowMemory", "Daralma Bellek", 5)] },
 
   // —— Elizi Lab
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — DI-anchored coherence + surprise + DI acceleration before ADX confirms. Default pane: Temp/±E/Faz; Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
@@ -2083,6 +2097,95 @@ export function computeBuiltin(
       const smooth = n(p, "smooth", 14);
       const v = bop(candles, smooth);
       push([line(inst, "bop", "sub", color, candles, v, `BOP(${smooth})`)], { bop: v });
+      break;
+    }
+
+    case "rollingMedian": {
+      const period = n(p, "period", 20);
+      const v = rollingMedian(values, period);
+      push([line(inst, "median", "main", color, candles, v, `Medyan(${period})`)], { median: v });
+      break;
+    }
+    case "madBands": {
+      const period = n(p, "period", 20);
+      const mult = n(p, "mult", 2);
+      const outerMult = n(p, "outerMult", 3);
+      const b = madBands(values, period, mult, outerMult);
+      push(
+        [
+          line(inst, "mid", "main", "#2962ff", candles, b.mid, "MAD Mid"),
+          line(inst, "up", "main", "#ef5350", candles, b.upper, "MAD Up"),
+          line(inst, "lo", "main", "#26a69a", candles, b.lower, "MAD Low"),
+          line(inst, "oup", "main", "#ef535055", candles, b.outerUpper, "MAD Outer Up"),
+          line(inst, "olo", "main", "#26a69a55", candles, b.outerLower, "MAD Outer Low"),
+        ],
+        { mid: b.mid, upper: b.upper, lower: b.lower, outerUpper: b.outerUpper, outerLower: b.outerLower, mad: b.mad }
+      );
+      break;
+    }
+    case "medianChannel": {
+      const period = n(p, "period", 20);
+      const ch = medianChannel(candles, period);
+      push(
+        [
+          line(inst, "medHigh", "main", "#ef5350", candles, ch.medHigh, "Med High"),
+          line(inst, "medClose", "main", "#2962ff", candles, ch.medClose, "Med Close"),
+          line(inst, "medLow", "main", "#26a69a", candles, ch.medLow, "Med Low"),
+        ],
+        { medHigh: ch.medHigh, medLow: ch.medLow, medClose: ch.medClose }
+      );
+      break;
+    }
+    case "pliChannel": {
+      const length = n(p, "length", 50);
+      const x = n(p, "x", 5);
+      const ch = pliChannel(values, length, x);
+      push(
+        [
+          line(inst, "upper", "main", "#ef5350", candles, ch.upper, `PLI Up(${100 - x})`),
+          line(inst, "lower", "main", "#26a69a", candles, ch.lower, `PLI Lo(${x})`),
+          line(inst, "oran", "sub", "#e040fb", candles, ch.oran, "oran (genişlik)"),
+        ],
+        { upper: ch.upper, lower: ch.lower, oran: ch.oran }
+      );
+      break;
+    }
+    case "pliDeltaHybrid": {
+      const h = pliDeltaHybrid(candles, {
+        length: n(p, "length", 50),
+        x: n(p, "x", 5),
+        deltaSmooth: n(p, "deltaSmooth", 5),
+        narrowLookback: n(p, "narrowLookback", 50),
+        narrowPct: n(p, "narrowPct", 25),
+        narrowMemory: n(p, "narrowMemory", 5),
+      });
+      // bar tint via signed hist (bias) + oran sub + score
+      const longHist = h.longSignal.map((v) => (v === 1 ? 1 : null));
+      const shortHist = h.shortSignal.map((v) => (v === 1 ? -1 : null));
+      push(
+        [
+          line(inst, "oran", "sub", "#e040fb", candles, h.oran, "oran"),
+          hist(inst, "deltaEma", "sub", "#42a5f5", candles, h.deltaEma, "ΔVol EMA"),
+          line(inst, "score", "sub", "#ffeb3b", candles, h.score, "Skor"),
+          hist(inst, "narrow", "sub", "#90a4ae88", candles, h.narrow, "Daralma"),
+          hist(inst, "longSig", "sub", "#26a69a", candles, longHist, "Long"),
+          hist(inst, "shortSig", "sub", "#ef5350", candles, shortHist, "Short"),
+          line(inst, "upper", "main", "#ef535088", candles, h.upper, "PLI Up"),
+          line(inst, "lower", "main", "#26a69a88", candles, h.lower, "PLI Lo"),
+        ],
+        {
+          upper: h.upper,
+          lower: h.lower,
+          oran: h.oran,
+          deltaVol: h.deltaVol,
+          deltaEma: h.deltaEma,
+          narrow: h.narrow,
+          longSignal: h.longSignal,
+          shortSignal: h.shortSignal,
+          score: h.score,
+          barBias: h.barBias,
+        }
+      );
       break;
     }
 

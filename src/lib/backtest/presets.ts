@@ -55,6 +55,13 @@ import {
 } from "@/lib/indicators/math";
 import { adxPumpRadar } from "@/lib/indicators/adxPump";
 import { eliziEdge } from "@/lib/indicators/eliziEdge";
+import {
+  madBands,
+  medianChannel,
+  pliChannel,
+  pliDeltaHybrid,
+  rollingMedian,
+} from "@/lib/indicators/median";
 import { orderBlocks, fairValueGaps, bosChoch } from "@/lib/indicators/beluga";
 import { diagonalSr } from "@/lib/indicators/diagonalSr";
 import { initialBalance, laguerreRsi, schaffTrendCycle, elderImpulse, coralTrend } from "@/lib/indicators/proreal";
@@ -276,6 +283,10 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   stDivFirefly: "ST×Firefly bi · setup",
   stDivFireflyLong: "ST×Firefly Long · 1s",
   oscSqueezeLong: "Squeeze Fire Long · 1s/4s",
+  pliBreakLong: "PLI Break Long · medyan/PLI",
+  pliDeltaHybridLong: "PLI×Delta Hibrit Long",
+  madBandsLong: "MAD Bant Long",
+  medianCrossLong: "Medyan Cross Long",
   oscWaddah: "Waddah Attar",
   oscSmi: "SMI (Blau) · 4s",
   oscStochRsi: "Stoch RSI",
@@ -304,6 +315,7 @@ export function recommendedWarmup(
   if (preset === "bayesKernelOr" || preset === "bayesKernelAnd" || preset === "bayesKernelHybrid") return 80;
   if (preset === "gainzAlgoV2" || preset === "gainzAlgoV2Long") return 30;
   if (preset === "eliziNexus" || preset === "eliziNexus1h" || preset === "eliziNexus4h" || preset === "eliziNexusSoft1h" || preset === "eliziNexusSoft4h") return 80;
+  if (preset === "pliBreakLong" || preset === "pliDeltaHybridLong" || preset === "madBandsLong" || preset === "medianCrossLong") return 80;
   if (preset === "klingerLong" || preset === "squeezeLong" || preset === "halfTrendLong" || preset === "coralLong" || preset === "alligatorLong" || preset === "kstLong" || preset === "trixLong" || preset === "rviLong" || preset === "aoLong" || preset === "uoLong" || preset === "dpoLong" || preset === "ppoLong" || preset === "oscSqueezeLong") return 60;
   if (preset === "smcFvg" || preset === "smcFvgLong" || preset === "ictOb" || preset === "ictObLong" || preset === "ictBosLong" || preset === "vortexCross" || preset === "vortexLong" || preset === "forceIndex" || preset === "forceLong" || preset === "cmfZero" || preset === "cmfLong" || preset === "vidyaCross" || preset === "vidyaLong" || preset === "framaCross" || preset === "framaLong" || preset === "sslChannel" || preset === "sslLong" || preset === "vfiCross" || preset === "vfiLong" || preset === "elderImpulse" || preset === "elderLong" || preset === "cmoZero" || preset === "cmoLong" || preset === "massBulge" || preset === "bopZero" || preset === "bopLong") return 40;
   if (preset === "aroonLongTrend") return 40;
@@ -398,6 +410,10 @@ export function buildSignalContext(
     uoOsc: ultimateOsc(candles),
     ppoOsc: ppo(closes, 12, 26, 9),
     fireflyOsc: fireflyOscillator(candles, 10, 3, false),
+    rollingMed: rollingMedian(closes, 20),
+    madBand: madBands(closes, 20, 2, 3),
+    medChannel: medianChannel(candles, 20),
+    pliCh: pliChannel(closes, 50, 5),
     stDiv: supertrendDivWeighted(candles, 10, 3, 5, 0.35, 50, 14),
     st: supertrend(candles, params.atrPeriod ?? 10, params.stMult ?? 3),
     bb: bollinger(closes, params.bbPeriod ?? 20, params.bbMult ?? 2),
@@ -487,6 +503,20 @@ export function buildSignalContext(
   };
 
   // Only compute Elizi when the preset actually uses it (avoid scanner/backtest hang tax).
+  if (
+    params.preset === "pliDeltaHybridLong" ||
+    params.preset === "pliBreakLong"
+  ) {
+    ctx.pliHybrid = pliDeltaHybrid(candles, {
+      length: 50,
+      x: 5,
+      deltaSmooth: 5,
+      narrowLookback: 50,
+      narrowPct: 25,
+      narrowMemory: 5,
+    });
+  }
+
   if (
     params.preset === "eliziEdgeFire" ||
     params.preset === "eliziEdgeExhaust" ||
@@ -3164,6 +3194,84 @@ export function getSignalFn(
           exitShort: s.buy[i] || ffBull || (s.direction[i] === 1),
           reason: "ST×Firefly",
         };
+      };
+
+
+    case "pliBreakLong":
+      return (candles, i, ctx) => {
+        const ch = (ctx.pliHybrid ?? ctx.pliCh) as {
+          upper: (number | null)[];
+          lower: (number | null)[];
+        } | undefined;
+        if (!ch || ch.upper[i] == null || ch.upper[i - 1] == null) return {};
+        const c = candles[i].close;
+        const cPrev = candles[i - 1].close;
+        const long =
+          cPrev <= (ch.upper[i - 1] as number) && c > (ch.upper[i] as number);
+        const exitLong =
+          ch.lower[i] != null &&
+          cPrev >= (ch.lower[i - 1] as number) &&
+          c < (ch.lower[i] as number);
+        return { long, short: false, exitLong, reason: "PLI break L" };
+      };
+    case "pliDeltaHybridLong":
+      return (_c, i, ctx) => {
+        const h = ctx.pliHybrid as {
+          longSignal: (number | null)[];
+          shortSignal: (number | null)[];
+          score: (number | null)[];
+          narrow: (number | null)[];
+          upper: (number | null)[];
+          lower: (number | null)[];
+          deltaEma: (number | null)[];
+        };
+        if (!h || h.longSignal[i] == null) return {};
+        const long = h.longSignal[i] === 1;
+        // exit on short hybrid or close under lower after non-narrow
+        const exitLong =
+          h.shortSignal[i] === 1 ||
+          (h.lower[i] != null &&
+            _c[i].close < (h.lower[i] as number) &&
+            h.narrow[i] !== 1);
+        return { long, short: false, exitLong, reason: "PLI×Δ L" };
+      };
+    case "madBandsLong":
+      return (candles, i, ctx) => {
+        const b = ctx.madBand as {
+          mid: (number | null)[];
+          upper: (number | null)[];
+          lower: (number | null)[];
+        };
+        if (!b || b.lower[i] == null || b.mid[i] == null || b.lower[i - 1] == null)
+          return {};
+        const c = candles[i].close;
+        const cPrev = candles[i - 1].close;
+        // bounce: was at/under lower, closes back above lower toward mid
+        if (b.mid[i - 1] == null) return {};
+        const bounce =
+          cPrev <= (b.lower[i - 1] as number) * 1.002 &&
+          c > (b.lower[i] as number) &&
+          c < (b.mid[i] as number) * 1.01;
+        const crossMid =
+          cPrev <= (b.mid[i - 1] as number) && c > (b.mid[i] as number);
+        const long = bounce || crossMid;
+        const exitLong =
+          b.upper[i] != null &&
+          ((cPrev >= (b.upper[i - 1] as number) && c < (b.upper[i] as number)) ||
+            c < (b.mid[i] as number));
+        return { long, short: false, exitLong, reason: "MAD L" };
+      };
+    case "medianCrossLong":
+      return (candles, i, ctx) => {
+        const m =
+          (ctx.medChannel as { medClose: (number | null)[] })?.medClose ??
+          (ctx.rollingMed as (number | null)[]);
+        if (!m || m[i] == null || m[i - 1] == null) return {};
+        const c = candles[i].close;
+        const cPrev = candles[i - 1].close;
+        const long = cPrev <= (m[i - 1] as number) && c > (m[i] as number);
+        const exitLong = cPrev >= (m[i - 1] as number) && c < (m[i] as number);
+        return { long, short: false, exitLong, reason: "Med cross L" };
       };
 
     case "codeStrategy":

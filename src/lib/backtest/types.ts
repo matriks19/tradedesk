@@ -143,6 +143,10 @@ export type StrategyPresetId =
   | "stDivWeighted"
   | "fireflyLong"
   | "oscSqueezeLong"
+  | "pliBreakLong"
+  | "pliDeltaHybridLong"
+  | "madBandsLong"
+  | "medianCrossLong"
   | "codeStrategy"
   | "custom";
 

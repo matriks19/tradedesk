@@ -37,3 +37,35 @@ Bakeoff: Crypto10, signal-exit, long-only (aksi yazılmadıkça). Net ≈ 10 coi
 
 
 Not: ST Div-Weighted MPO4 yerine RSI pivot divergence kullanır (orijinal kapalı). Short sleeve toksik — long-only kullan.
+
+
+## Medyan / PLI
+
+Ortalama tabanlı bantlar (BB) spike’a zayıf → **medyan / MAD / PLI** tercih.
+
+| İndikatör | Ne | UI |
+|---|---|---|
+| Medyan (Rolling) | Kayan medyan | Ana panel |
+| MAD Bantları | med ± k·1.4826·MAD | Ana panel bant |
+| Medyan Kanal | med high/low/close | Ana panel |
+| PLI Kanal (oran) | TV PLI üst/alt; **oran**=genişlik | Ana + oran alt panel |
+| PLI×Delta Hibrit | daralma × işaretli Δhacim | oran/Δ/skor alt; sinyaller hist |
+
+Backtest presetleri: `pliBreakLong`, `pliDeltaHybridLong`, `madBandsLong`, `medianCrossLong`.
+
+Crypto10 bakeoff (signal-exit, long-only, Sep 2026):
+
+| TF | Preset | Net≈ | tr |
+|---|---|---:|---:|
+| 1h | PLI Break Long | 2174 | 78 |
+| 1h | PLI×Delta Hibrit Long | 2013 | 406 |
+| 1h | Medyan Cross Long | 1591 | 632 |
+| 1h | MAD Bant Long | −155 | 1124 |
+| 4h | **PLI×Delta Hibrit Long** | **2199** | 404 |
+| 4h | PLI Break Long | 1466 | 79 |
+| 4h | Medyan Cross Long | 698 | 659 |
+| 4h | MAD Bant Long | −1198 | 992 |
+
+Not: MAD Long overtrade — filtre/sıkılık lazım. PLI×Δ 4h’de SMI’ye yakın (SMI≈2945). BB Break tr≈10 şişik — playbook kral listesine koyma.
+Pine referans: Go-10-Pli (dg_factor) — `oran = p1/p2 - 1`, long=crossover(close,p1).
+

@@ -249,6 +249,12 @@ export type BuiltinIndicatorId =
   | "bop"
   | "elderRay"
   | "adxPumpRadar"
+  // Median / percentile (robust)
+  | "rollingMedian"
+  | "madBands"
+  | "medianChannel"
+  | "pliChannel"
+  | "pliDeltaHybrid"
   // Elizi Lab
   | "eliziEdge";
 

@@ -3614,6 +3614,37 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     ],
   },
 
+  {
+    id: "pli_delta_hybrid",
+    name: "PLI×Delta Hibrit (Medyan/PLI)",
+    shortName: "PLIΔ",
+    category: "niche",
+    inspiredBy:
+      "Go-10-Pli (dg_factor) percentile kanal + TradeDesk median/MAD + işaretli bar delta hacim hibriti",
+    summary:
+      "Ortalama yerine PLI kanal daralması (oran) + delta hacim. Squeeze sonrası üst kırılım/alt sekme ve destekleyici Δ. Skor 0–100.",
+    howTo: [
+      "İndikatörler → PLI×Delta Hibrit veya PLI Kanal (oran) / MAD Bantları / Medyan.",
+      "oran düşüşü = daralma (squeeze). Kırılım: close > PLI üst + ΔEMA>0.",
+      "Backtest: pliDeltaHybridLong · pliBreakLong · madBandsLong · medianCrossLong.",
+      "Playbook: «Medyan / PLI» — mean-based BB yerine robust bantlar.",
+    ],
+    timeframe: "1h",
+    allowShort: false,
+    replaceIndicators: true,
+    backtestPreset: "pliDeltaHybridLong",
+    indicators: [
+      { type: "pliDeltaHybrid", params: { length: 50, x: 5, deltaSmooth: 5 } },
+      { type: "madBands", params: { period: 20, mult: 2 }, color: "#7e57c2" },
+    ],
+    risk: {
+      rMultiple: 2,
+      tip: "Daralma yokken kırılım zorlama. ΔEMA tersken long kapalı tut.",
+    },
+    tags: ["PLI", "medyan", "MAD", "delta", "squeeze", "niche", "robust"],
+  },
+
+
 ];
 
 export function strategyById(id: string): StrategyPack | undefined {
