@@ -11,6 +11,10 @@ import {
   isShtFlagTriangleType,
   passesShtFilter,
 } from "@/lib/patterns/shtFlagTriangle";
+import {
+  isThreeDrivesType,
+  passesThreeDrivesFilter,
+} from "@/lib/patterns/threeDrives";
 import clsx from "clsx";
 
 export function PatternPanel() {
@@ -26,6 +30,7 @@ export function PatternPanel() {
   const [patterns, setPatterns] = useState<PatternHit[]>([]);
   const [mode, setMode] = useState<"chart" | "scan">("scan");
   const [shtFocus, setShtFocus] = useState(false);
+  const [tdFocus, setTdFocus] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, label: "" });
   const [status, setStatus] = useState("");
@@ -122,8 +127,14 @@ export function PatternPanel() {
       }
       all.sort((a, b) => b.confidence - a.confidence);
       let filtered = all;
-      if (shtFocus) {
+      if (shtFocus && tdFocus) {
+        filtered = all.filter(
+          (h) => passesShtFilter(h, 60) || passesThreeDrivesFilter(h, 60)
+        );
+      } else if (shtFocus) {
         filtered = all.filter((h) => passesShtFilter(h, 60));
+      } else if (tdFocus) {
+        filtered = all.filter((h) => passesThreeDrivesFilter(h, 60));
       }
       const sliced = filtered.slice(0, 40);
       setPatterns(sliced);
@@ -143,6 +154,7 @@ export function PatternPanel() {
     patternSettings.twinTol,
     patternSettings.boxLookback,
     shtFocus,
+    tdFocus,
   ]);
 
   return (
@@ -227,6 +239,14 @@ export function PatternPanel() {
             >
               SHT Flama/Üçgen
             </button>
+            <button
+              type="button"
+              className={clsx("btn text-2xs", tdFocus && "btn-accent")}
+              onClick={() => setTdFocus((v) => !v)}
+              title="Üç İtiş / Three Drives · filtre UYGUN veya skor≥60"
+            >
+              Three Drives / Üç İtiş
+            </button>
           </div>
 
           <div className="flex gap-1">
@@ -308,7 +328,11 @@ export function PatternPanel() {
                     <span className="text-desk-muted">Skor</span>
                     <span>{h.meta.score}</span>
                     <span className="text-desk-muted">Daralma%</span>
-                    <span>{h.meta.contractionPct.toFixed(1)}</span>
+                    <span>
+                      {h.meta.contractionPct != null
+                        ? h.meta.contractionPct.toFixed(1)
+                        : "—"}
+                    </span>
                     <span className="text-desk-muted">Kırılım</span>
                     <span>
                       {h.meta.breakoutPrice != null
@@ -325,6 +349,68 @@ export function PatternPanel() {
                     <span>
                       {h.meta.rsi != null ? h.meta.rsi.toFixed(0) : "—"}/
                       {h.meta.adx != null ? h.meta.adx.toFixed(0) : "—"}
+                    </span>
+                    <span className="text-desk-muted">Filtre</span>
+                    <span
+                      className={
+                        h.meta.filterOk ? "text-desk-up" : "text-desk-down"
+                      }
+                    >
+                      {h.meta.filterOk ? "UYGUN" : "DEĞİL"}
+                    </span>
+                  </div>
+                )}
+                {h.meta && isThreeDrivesType(h.type) && (
+                  <div className="mt-1.5 grid grid-cols-4 gap-x-1 gap-y-0.5 text-2xs font-mono border-t border-desk-border/40 pt-1">
+                    <span className="text-desk-muted">Durum</span>
+                    <span className={h.meta.status === "kirilim" ? "text-desk-up" : ""}>
+                      {h.meta.status === "kirilim" ? "KIRILIM" : "Oluşum"}
+                    </span>
+                    <span className="text-desk-muted">Skor</span>
+                    <span>{h.meta.score}</span>
+                    <span className="text-desk-muted">Fib A/C</span>
+                    <span>
+                      {h.meta.fibRetraceA != null
+                        ? h.meta.fibRetraceA.toFixed(3)
+                        : "—"}
+                      /
+                      {h.meta.fibRetraceC != null
+                        ? h.meta.fibRetraceC.toFixed(3)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">Ext D2/D3</span>
+                    <span>
+                      {h.meta.fibExtD2 != null
+                        ? h.meta.fibExtD2.toFixed(3)
+                        : "—"}
+                      /
+                      {h.meta.fibExtD3 != null
+                        ? h.meta.fibExtD3.toFixed(3)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">Fiyat sim</span>
+                    <span>
+                      {h.meta.priceSymRatio != null
+                        ? h.meta.priceSymRatio.toFixed(2)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">Zaman sim</span>
+                    <span>
+                      {h.meta.timeSymRatio != null
+                        ? h.meta.timeSymRatio.toFixed(2)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">PRZ</span>
+                    <span>
+                      {h.meta.przLow != null && h.meta.przHigh != null
+                        ? `${fmtMetaPx(h.meta.przLow)}-${fmtMetaPx(h.meta.przHigh)}`
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">Hedef</span>
+                    <span>
+                      {h.meta.targetPrice != null
+                        ? fmtMetaPx(h.meta.targetPrice)
+                        : "—"}
                     </span>
                     <span className="text-desk-muted">Filtre</span>
                     <span

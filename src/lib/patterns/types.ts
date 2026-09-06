@@ -45,6 +45,7 @@ export interface PatternHit {
     | "pennant"
     | "breakout_box"
     | "engulfing"
+    | "three_drives"
     | "advanced";
   label: string;
   detail: string;
@@ -62,14 +63,23 @@ export interface PatternHit {
   meta?: {
     status: "olusum" | "kirilim";
     score: number; // 0-100
-    contractionPct: number;
+    contractionPct?: number;
     breakoutPrice?: number;
     targetPrice?: number;
     rsi?: number;
     adx?: number;
     filterOk?: boolean;
     fibs?: { level: number; price: number }[];
-    kind?: "flag" | "pennant" | "triangle";
+    kind?: "flag" | "pennant" | "triangle" | "three_drives";
+    /** Three Drives / Üç İtiş */
+    przLow?: number;
+    przHigh?: number;
+    timeSymRatio?: number; // bars(C→D3) / bars(A→D2)
+    priceSymRatio?: number; // |C→D3| / |A→D2|
+    fibRetraceA?: number;
+    fibRetraceC?: number;
+    fibExtD2?: number;
+    fibExtD3?: number;
   };
 }
 

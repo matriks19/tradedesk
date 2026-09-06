@@ -3503,6 +3503,37 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     tags: ["SHT", "flama", "üçgen", "flag", "pennant", "FIBO", "niche", "açık_yaklaşım"],
   },
 
+  {
+    id: "three_drives",
+    name: "Three Drives / Üç İtiş",
+    shortName: "Üçİtiş",
+    category: "niche",
+    inspiredBy:
+      "Klasik Three Drives (Scott Carney / harmonic literature) — açık kural seti; kapalı kaynak kopyası değildir.",
+    summary:
+      "Üç itiş + A/C düzeltmeleri: Fib ~0.618/0.786, D2/D3 uzatı ~1.272/1.618, fiyat/zaman simetrisi, Drive3=PRZ izleme bölgesi, skor 0–100. Formasyon paneli · Three Drives / Üç İtiş çipi.",
+    howTo: [
+      "Formasyonlar → Aktif grafik veya Formasyon Tara → «Three Drives / Üç İtiş» çipi.",
+      "Ayı: D1<D2<D3 (yükselen tepeler); Boğa: D1>D2>D3 (alçalan dipler).",
+      "PRZ = Drive3 civarı — otomatik giriş değil, izleme bölgesi.",
+      "Hedef: C / A seviyeleri veya ölçülü move. Filtre UYGUN: skor≥60 + Fib tolerans.",
+      "Görsel zigzag D1-A-D2-C-D3 + PRZ kutusu + HEDEF çizgisi.",
+    ],
+    timeframe: "1h",
+    allowShort: true,
+    replaceIndicators: true,
+    indicators: [
+      { type: "rsi", params: { period: 14 } },
+      { type: "atr", params: { period: 14 } },
+      { type: "ema", params: { period: 21 }, color: "#42a5f5" },
+    ],
+    risk: {
+      rMultiple: 2,
+      tip: "Drive3 PRZ'de teyit (mum/hacim) olmadan girmeyin. Zorlama Fib'lerde skor düşer.",
+    },
+    tags: ["three_drives", "üç_itiş", "harmonic", "PRZ", "FIBO", "niche", "formasyon"],
+  },
+
 ];
 
 export function strategyById(id: string): StrategyPack | undefined {

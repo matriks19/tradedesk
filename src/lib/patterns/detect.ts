@@ -7,6 +7,7 @@ import type {
 } from "./types";
 import { findSwings, lastN } from "./swings";
 import { enrichFlagTriangleHits } from "./shtFlagTriangle";
+import { detectThreeDrives } from "./threeDrives";
 
 const DEFAULTS: Required<DetectOptions> = {
   swingStrength: 2,
@@ -187,11 +188,14 @@ export function detectPatterns(
   if (enabled(opts, "engulfing")) {
     hits.push(...detectEngulfing(candles));
   }
+  if (enabled(opts, "three_drives")) {
+    hits.push(...detectThreeDrives(candles, opts.swingStrength));
+  }
 
   const enriched = enrichFlagTriangleHits(candles, hits);
   return enriched
     .sort((a, b) => b.confidence - a.confidence || b.tEnd - a.tEnd)
-    .slice(0, 24);
+    .slice(0, 28);
 }
 
 function detectStructure(

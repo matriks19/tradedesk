@@ -11,6 +11,7 @@ import {
 } from "@/lib/patterns/advanced";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { passesShtFilter } from "@/lib/patterns/shtFlagTriangle";
+import { passesThreeDrivesFilter } from "@/lib/patterns/threeDrives";
 import type { PatternHit } from "@/lib/patterns/types";
 import { mapPool } from "@/lib/scanner/engine";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
@@ -37,6 +38,7 @@ type Row = {
   /** underlying hit for overlay */
   _hit: AdvancedPatternHit | PatternHit;
   sht?: boolean;
+  threeDrives?: boolean;
 };
 
 export function FormationScanPanel() {
@@ -56,6 +58,7 @@ export function FormationScanPanel() {
     "liquidity",
   ]);
   const [shtFocus, setShtFocus] = useState(false);
+  const [tdFocus, setTdFocus] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [rows, setRows] = useState<Row[]>([]);
@@ -68,8 +71,8 @@ export function FormationScanPanel() {
   };
 
   const run = useCallback(async () => {
-    if (!families.length && !shtFocus) {
-      setStatus("En az bir formasyon ailesi veya SHT Flama/Üçgen seçin");
+    if (!families.length && !shtFocus && !tdFocus) {
+      setStatus("En az bir formasyon ailesi, SHT Flama/Üçgen veya Üç İtiş seçin");
       return;
     }
     setRunning(true);
@@ -156,6 +159,7 @@ export function FormationScanPanel() {
                   inv_head_shoulders: false,
                   breakout_box: false,
                   engulfing: false,
+                  three_drives: false,
                 },
               }).filter((h) => passesShtFilter(h, 60));
               for (const h of classic.slice(0, 2)) {
@@ -175,6 +179,48 @@ export function FormationScanPanel() {
                 });
               }
             }
+            if (tdFocus) {
+              const tds = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  three_drives: true,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              }).filter((h) => passesThreeDrivesFilter(h, 60));
+              for (const h of tds.slice(0, 2)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: undefined,
+                  prz:
+                    h.meta?.przLow != null && h.meta?.przHigh != null
+                      ? { low: h.meta.przLow, high: h.meta.przHigh }
+                      : undefined,
+                  tp1: h.meta?.targetPrice,
+                  sl: undefined,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  threeDrives: true,
+                });
+              }
+            }
           } catch {
             /* skip */
           }
@@ -190,7 +236,7 @@ export function FormationScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [exchange, timeframe, families, shtFocus, patternSettings.swingStrength]);
+  }, [exchange, timeframe, families, shtFocus, tdFocus, patternSettings.swingStrength]);
 
   const openHit = (h: Row) => {
     setActivePane(activePaneId);
@@ -256,6 +302,14 @@ export function FormationScanPanel() {
         >
           SHT Flama/Üçgen
         </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", tdFocus && "btn-accent")}
+          onClick={() => setTdFocus((v) => !v)}
+          title="Three Drives / Üç İtiş · UYGUN veya skor≥60"
+        >
+          Three Drives / Üç İtiş
+        </button>
       </div>
       {status && <p className="text-2xs text-desk-muted">{status}</p>}
       {running && (
@@ -299,10 +353,10 @@ export function FormationScanPanel() {
             </div>
             <div className="text-2xs text-desk-muted font-mono truncate">
               {r.timeframe ? `${r.timeframe} · ` : ""}
-              {r.sht ? "SHT · " : ""}
+              {r.sht ? "SHT · " : ""}{r.threeDrives ? "Üç İtiş · " : ""}
               {r.entry != null ? `E ${fmt(r.entry)}` : ""}
               {r.prz ? ` · PRZ ${fmt(r.prz.low)}-${fmt(r.prz.high)}` : ""}
-              {r.tp1 != null ? ` · ${r.sht ? "Hedef" : "TP1"} ${fmt(r.tp1)}` : ""}
+              {r.tp1 != null ? ` · ${r.sht || r.threeDrives ? "Hedef" : "TP1"} ${fmt(r.tp1)}` : ""}
               {r.sl != null ? ` · SL ${fmt(r.sl)}` : ""}
             </div>
           </button>
