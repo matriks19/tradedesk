@@ -218,7 +218,7 @@ export function RsiScanPanel() {
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">RSI Tarama (30 / 50 / 70)</div>
       <p className="text-2xs text-desk-muted">
-        İndikatörler + Formasyon→RSI ile aynı mantık (RSI Kırılım 30/50/70).
+        İndikatörler + Osilatör→RSI ile aynı mantık (RSI Kırılım 30/50/70).
         Çoklu TF; tıklayınca grafik + osilatör açılır.
       </p>
 
@@ -388,7 +388,7 @@ export function RsiScanPanel() {
               setStatus(`${n} alarm eklendi (+%3)`);
             }}
           >
-            Seçilenlere alarm (+%3)
+            Sonuçlara alarm (+%3)
           </button>
         </div>
       )}

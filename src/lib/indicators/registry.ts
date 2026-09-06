@@ -283,10 +283,10 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
 
   // —— Momentum / Osilatörler
   { id: "rsi", label: "RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", inputs: [num("period", "Period", 14), src()] },
-  { id: "rsiLevelBreaks", label: "RSI Kırılım (30/50/70)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", description: "RSI + 30/50/70 yatay seviyeler + kırılım işaretleri. Formasyon→RSI tarama ile aynı mantık (detectRsiBreaks).", inputs: [num("period", "Periyot", 14), num("lvl30", "Seviye 1", 30, 1, 99, 1), num("lvl50", "Seviye 2", 50, 1, 99, 1), num("lvl70", "Seviye 3", 70, 1, 99, 1), num("showMarkers", "İşaretler", 1, 0, 1, 1), src()] },
+  { id: "rsiLevelBreaks", label: "RSI Kırılım (30/50/70)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", description: "RSI + 30/50/70 yatay seviyeler + kırılım işaretleri. Osilatör→RSI tarama ile aynı mantık (detectRsiBreaks).", inputs: [num("period", "Periyot", 14), num("lvl30", "Seviye 1", 30, 1, 99, 1), num("lvl50", "Seviye 2", 50, 1, 99, 1), num("lvl70", "Seviye 3", 70, 1, 99, 1), num("showMarkers", "İşaretler", 1, 0, 1, 1), src()] },
   { id: "stochastic", label: "Stochastic", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("kPeriod", "%K Period", 14), num("dPeriod", "%D Period", 3)] },
   { id: "stochRsi", label: "Stoch RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("rsiPeriod", "RSI Period", 14), num("stochPeriod", "Stoch Period", 14), num("kSmooth", "K Smooth", 3), num("dSmooth", "D Smooth", 3), src()] },
-  { id: "macd", label: "MACD (kesişim işaretli)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: "MACD + sinyal + hist + AL/SAT kesişim işaretleri. Formasyon→MACD tarama ile aynı mantık (detectMacdCross).", inputs: [num("fast", "Fast", 12), num("slow", "Slow", 26), num("signal", "Signal", 9), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1), src()] },
+  { id: "macd", label: "MACD (kesişim işaretli)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: "MACD + sinyal + hist + AL/SAT kesişim işaretleri. Osilatör→MACD tarama ile aynı mantık (detectMacdCross).", inputs: [num("fast", "Fast", 12), num("slow", "Slow", 26), num("signal", "Signal", 9), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1), src()] },
   { id: "cci", label: "CCI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "cci", inputs: [num("period", "Period", 20)] },
   { id: "roc", label: "ROC", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "roc", inputs: [num("period", "Period", 12), src()] },
   { id: "momentum", label: "Momentum", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "mom", inputs: [num("period", "Period", 10), src()] },
@@ -816,7 +816,7 @@ export function computeBuiltin(
       const lvl70 = n(p, "lvl70", 70);
       const showMarkers = n(p, "showMarkers", 1) !== 0;
       const levels = [lvl30, lvl50, lvl70];
-      // Same cross rules as Formasyon→RSI (detectRsiBreaks) when on price source
+      // Same cross rules as Osilatör→RSI (detectRsiBreaks) when on price source
       const markers =
         inst.source?.type !== "indicator"
           ? rsiBreakMarkerSeries(candles, { period, levels })
@@ -905,7 +905,7 @@ export function computeBuiltin(
       const slow = n(p, "slow", 26);
       const sigP = n(p, "signal", 9);
       const showMarkers = n(p, "showMarkers", 1) !== 0;
-      // Prefer shared scan helper when on price (keeps chart ≡ Formasyon→MACD)
+      // Prefer shared scan helper when on price (keeps chart ≡ Osilatör→MACD)
       const fromScan =
         inst.source?.type !== "indicator"
           ? macdCrossMarkerSeries(candles, {

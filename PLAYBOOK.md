@@ -85,8 +85,8 @@ Aynı sinyal üç yüzeyde:
 
 | Sinyal | Osilatör (alt panel) | İndikatörler menü | Formasyon tarama |
 |---|---|---|---|
-| RSI 30/50/70 kırılım | **RSI Kırılım (30/50/70)** (`rsiLevelBreaks`) | aynı id | Formasyon→**RSI** (`detectRsiBreaks`) |
-| MACD×sinyal kesişim | **MACD (kesişim işaretli)** (`macd`) | aynı id | Formasyon→**MACD** (`detectMacdCross`) |
+| RSI 30/50/70 kırılım | **RSI Kırılım (30/50/70)** (`rsiLevelBreaks`) | aynı id | Formasyon→Osilatör→**RSI** (`detectRsiBreaks`) |
+| MACD×sinyal kesişim | **MACD (kesişim işaretli)** (`macd`) | aynı id | Formasyon→Osilatör→**MACD** (`detectMacdCross`) |
 
 Satır tıklanınca grafik + ilgili osilatör otomatik eklenir. Strateji paketleri: `rsi_kirilim_tarama`, `macd_kesisim`, `osc_scan_pack`.
 

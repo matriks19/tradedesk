@@ -95,7 +95,7 @@ type Row = {
   stage?: PatternStage | string;
 };
 
-/** Prefer retest / pre-target; drop triggers already past TP1 when activeOnly */
+/** Prefer early/retest; drop target_hit and any setup already past TP1 when activeOnly */
 function keepClassicFresh(
   h: PatternHit,
   candles: Candle[],
@@ -107,27 +107,10 @@ function keepClassicFresh(
   const tp1 = h.meta?.tp1 ?? h.meta?.targetPrice;
   const last = candles[candles.length - 1];
   if (!last) return true;
-  if (st === "al_tetiklendi" || st === "sat_tetiklendi" || st === "active") {
-    if (tp1 != null) {
-      if (h.bias === "bull" && last.high >= tp1) return false;
-      if (h.bias === "bear" && last.low <= tp1) return false;
-    }
-    // still pre-TP1 — keep as active-ish
-    return true;
-  }
-  // Prefer retest / choch / fvg / confirmation / inversion / konsolidasyon
-  if (
-    st === "retest" ||
-    st === "choch" ||
-    st === "fvg" ||
-    st === "confirmation" ||
-    st === "inversion" ||
-    st === "konsolidasyon" ||
-    st === "olusum" ||
-    st === "kirilim" ||
-    st === "breakout"
-  ) {
-    return true;
+  // Covers retest/early stages that never flip status to target_hit
+  if (tp1 != null) {
+    if (h.bias === "bull" && last.high >= tp1) return false;
+    if (h.bias === "bear" && last.low <= tp1) return false;
   }
   return true;
 }

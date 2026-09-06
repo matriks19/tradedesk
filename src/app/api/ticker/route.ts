@@ -44,7 +44,10 @@ export async function GET(req: NextRequest) {
           })
         )
       ).filter(Boolean);
-      return NextResponse.json({ quotes, delayed: false, market });
+      const anyPerp = parts.some((s) => isBinancePerp(s));
+      const allPerp = parts.length > 0 && parts.every((s) => isBinancePerp(s));
+      const resolvedMarket = allPerp ? "perp" : anyPerp ? "mixed" : "spot";
+      return NextResponse.json({ quotes, delayed: false, market: resolvedMarket });
     }
     const quotes = await BinanceProvider.getTicker24h(undefined, {
       market: market === "perp" ? "perp" : "spot",

@@ -619,6 +619,10 @@ export const useDeskStore = create<DeskState>()(
               }
             }
             if (!symbol) continue;
+            // .P / USDT always Binance — avoid BIST mismatch on perp imports
+            if (/\.P$/i.test(symbol) || /USDT$/i.test(symbol)) {
+              exchange = "binance";
+            }
             if (!parsed.some((p) => p.symbol === symbol && p.exchange === exchange)) {
               parsed.push({ symbol, exchange });
             }

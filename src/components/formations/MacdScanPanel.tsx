@@ -191,7 +191,7 @@ export function MacdScanPanel() {
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">MACD Tarama (15–240)</div>
       <p className="text-2xs text-desk-muted">
-        İndikatörler + MACD sekmesi ile aynı mantık (kesişim işaretli).
+        İndikatörler + Osilatör→MACD ile aynı mantık (kesişim işaretli).
         Çoklu TF; tıklayınca grafik + MACD osilatörü açılır.
       </p>
 
@@ -338,7 +338,7 @@ export function MacdScanPanel() {
               setStatus(`${n} alarm eklendi (+%3)`);
             }}
           >
-            Seçilenlere alarm (+%3)
+            Sonuçlara alarm (+%3)
           </button>
         </div>
       )}

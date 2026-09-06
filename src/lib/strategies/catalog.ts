@@ -3800,12 +3800,12 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     name: "RSI Kırılım Tarama",
     shortName: "RSI↑↓",
     category: "momentum",
-    inspiredBy: "Klasik RSI 30/50/70 seviye kırılımı (TradeDesk Formasyon→RSI)",
+    inspiredBy: "Klasik RSI 30/50/70 seviye kırılımı (TradeDesk Osilatör→RSI)",
     summary:
       "RSI(14) + 30/50/70 yatay seviyeler + kırılım işaretleri. Tarama ile aynı sinyal.",
     howTo: [
       "İndikatörler → RSI Kırılım (30/50/70) — alt panel osilatör.",
-      "Formasyon → RSI sekmesi ile aynı detectRsiBreaks mantığı.",
+      "Formasyon → Osilatör → RSI ile aynı detectRsiBreaks mantığı.",
       "↑ yeşil / ↓ kırmızı spike = seviye kırılımı.",
       "Seviye girişleri düzenlenebilir (varsayılan 30/50/70).",
     ],
@@ -3820,7 +3820,7 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     ],
     risk: {
       rMultiple: 1.5,
-      tip: "Tek başına RSI kırılımı zayıf — trend/MA veya hacim teyidi ekle. Formasyon→RSI ile tara.",
+      tip: "Tek başına RSI kırılımı zayıf — trend/MA veya hacim teyidi ekle. Osilatör→RSI ile tara.",
     },
     tags: ["RSI", "kırılım", "osilatör", "tarama", "30/50/70"],
   },
@@ -3830,12 +3830,12 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     name: "MACD Kesişim",
     shortName: "MACD×",
     category: "momentum",
-    inspiredBy: "Klasik MACD/sinyal kesişimi (TradeDesk Formasyon→MACD)",
+    inspiredBy: "Klasik MACD/sinyal kesişimi (TradeDesk Osilatör→MACD)",
     summary:
       "MACD (kesişim işaretli): hist + çizgi + sinyal + AL/SAT marker. Tarama ile aynı mantık.",
     howTo: [
       "İndikatörler → MACD (kesişim işaretli).",
-      "Formasyon → MACD sekmesi ile aynı detectMacdCross mantığı.",
+      "Formasyon → Osilatör → MACD ile aynı detectMacdCross mantığı.",
       "Yeşil spike = AL (MACD↑sinyal); kırmızı = SAT.",
       "showMarkers=0 ile klasik MACD (işaretsiz) kullanılabilir.",
     ],
@@ -3851,7 +3851,7 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     ],
     risk: {
       rMultiple: 1.5,
-      tip: "Range’de MACD gürültülü — VWAP/EMA filtre ekle. Formasyon→MACD ile tara.",
+      tip: "Range’de MACD gürültülü — VWAP/EMA filtre ekle. Osilatör→MACD ile tara.",
     },
     backtestPreset: "macdCross",
     tags: ["MACD", "kesişim", "osilatör", "tarama"],
@@ -3864,10 +3864,10 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     category: "momentum",
     inspiredBy: "TradeDesk birleşik osilatör = indikatör = tarama (RSI kırılım + MACD×)",
     summary:
-      "RSI Kırılım (30/50/70) + MACD kesişim işaretli. Aynı sinyal üç yerde: osilatör, İndikatörler, Formasyon tarama.",
+      "RSI Kırılım (30/50/70) + MACD kesişim işaretli. Aynı sinyal üç yerde: osilatör, İndikatörler, Formasyon→Osilatör tarama.",
     howTo: [
       "Paket uygula → iki alt panel (RSI kırılım + MACD).",
-      "Formasyon → RSI / MACD sekmeleri ile tara; satıra tıklayınca aynı id’ler açılır.",
+      "Formasyon → Osilatör → RSI / MACD ile tara; satıra tıklayınca aynı id’ler açılır.",
       "Playbook: «aynı sinyal = grafik osilatör = tarama».",
     ],
     timeframe: "1h",

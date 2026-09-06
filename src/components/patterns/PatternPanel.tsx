@@ -26,6 +26,11 @@ import {
   isInversionFvgType,
   passesInversionFvgFilter,
 } from "@/lib/patterns/inversionFvg";
+import { passesSmcFilter } from "@/lib/patterns/smcModels";
+import { passesQuasimodoFilter } from "@/lib/patterns/quasimodo";
+import { passesMavkFilter } from "@/lib/patterns/mavkCluster";
+import { passesBistCycleFilter } from "@/lib/patterns/bistCycle";
+import { passesCloudTouchFilter } from "@/lib/patterns/cloudTouch";
 import clsx from "clsx";
 
 export function PatternPanel() {
@@ -45,6 +50,12 @@ export function PatternPanel() {
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
   const [ifvgFocus, setIfvgFocus] = useState(false);
+  const [smcFocus, setSmcFocus] = useState(false);
+  const [qmFocus, setQmFocus] = useState(false);
+  const [mavkFocus, setMavkFocus] = useState(false);
+  const [bistFocus, setBistFocus] = useState(false);
+  const [cloudFocus, setCloudFocus] = useState(false);
+  const [modelsOpen, setModelsOpen] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, label: "" });
   const [status, setStatus] = useState("");
@@ -141,14 +152,38 @@ export function PatternPanel() {
       }
       all.sort((a, b) => b.confidence - a.confidence);
       let filtered = all;
-      const focusOn = shtFocus || tdFocus || bfrFocus || ifvgFocus;
+      const focusOn =
+        shtFocus ||
+        tdFocus ||
+        bfrFocus ||
+        ifvgFocus ||
+        smcFocus ||
+        qmFocus ||
+        mavkFocus ||
+        bistFocus ||
+        cloudFocus;
       if (focusOn) {
         filtered = all.filter((h) => {
           const okSht = shtFocus && passesShtFilter(h, 60);
           const okTd = tdFocus && passesThreeDrivesFilter(h, 60);
           const okBfr = bfrFocus && passesBreakoutFvgRetestFilter(h, 60);
           const okIfvg = ifvgFocus && passesInversionFvgFilter(h, 55);
-          return okSht || okTd || okBfr || okIfvg;
+          const okSmc = smcFocus && passesSmcFilter(h, 55);
+          const okQm = qmFocus && passesQuasimodoFilter(h, 55);
+          const okMavk = mavkFocus && passesMavkFilter(h, 55);
+          const okBist = bistFocus && passesBistCycleFilter(h, 50);
+          const okCloud = cloudFocus && passesCloudTouchFilter(h, 55);
+          return (
+            okSht ||
+            okTd ||
+            okBfr ||
+            okIfvg ||
+            okSmc ||
+            okQm ||
+            okMavk ||
+            okBist ||
+            okCloud
+          );
         });
       }
       const sliced = filtered.slice(0, 40);
@@ -172,13 +207,18 @@ export function PatternPanel() {
     tdFocus,
     bfrFocus,
     ifvgFocus,
+    smcFocus,
+    qmFocus,
+    mavkFocus,
+    bistFocus,
+    cloudFocus,
   ]);
 
   return (
     <div className="flex flex-col h-full min-h-0">
       <p className="text-2xs text-desk-muted px-2 pt-2 pb-0">
-        SMC/QM/MAVK chip’leri Formasyon’da; MACD/RSI Osilatör’de; sektör taraması
-        Sektör sekmesinde.
+        Formasyon modelleri burada ve Formasyon Tara’da; MACD/RSI Osilatör’de;
+        sektör taraması Sektör sekmesinde.
       </p>
       <div className="flex gap-1 p-2 pb-0">
         <button
@@ -289,7 +329,7 @@ export function PatternPanel() {
             </label>
           </div>
 
-          <div className="flex flex-wrap gap-1">
+          <div className="flex flex-wrap gap-1 items-center">
             <button
               type="button"
               className={clsx("btn text-2xs", shtFocus && "btn-accent")}
@@ -322,7 +362,63 @@ export function PatternPanel() {
             >
               Inversion FVG (IFVG)
             </button>
+            <button
+              type="button"
+              className={clsx(
+                "btn text-2xs",
+                (smcFocus || qmFocus || mavkFocus || bistFocus || cloudFocus) &&
+                  "btn-accent"
+              )}
+              onClick={() => setModelsOpen((v) => !v)}
+              title="SMC / QM / MAVK / BIST / Cloud"
+            >
+              Modeller {modelsOpen ? "▴" : "▾"}
+            </button>
           </div>
+          {modelsOpen && (
+            <div className="flex flex-wrap gap-1 border border-desk-border/50 rounded p-1.5">
+              <button
+                type="button"
+                className={clsx("btn text-2xs", smcFocus && "btn-accent")}
+                onClick={() => setSmcFocus((v) => !v)}
+                title="SMC"
+              >
+                SMC
+              </button>
+              <button
+                type="button"
+                className={clsx("btn text-2xs", qmFocus && "btn-accent")}
+                onClick={() => setQmFocus((v) => !v)}
+                title="Quasimodo"
+              >
+                QM
+              </button>
+              <button
+                type="button"
+                className={clsx("btn text-2xs", mavkFocus && "btn-accent")}
+                onClick={() => setMavkFocus((v) => !v)}
+                title="MAVK"
+              >
+                MAVK
+              </button>
+              <button
+                type="button"
+                className={clsx("btn text-2xs", bistFocus && "btn-accent")}
+                onClick={() => setBistFocus((v) => !v)}
+                title="BIST döngü"
+              >
+                BIST Döngü
+              </button>
+              <button
+                type="button"
+                className={clsx("btn text-2xs", cloudFocus && "btn-accent")}
+                onClick={() => setCloudFocus((v) => !v)}
+                title="Cloud Touch"
+              >
+                Cloud Touch
+              </button>
+            </div>
+          )}
 
           <div className="flex gap-1">
             <button

@@ -434,6 +434,7 @@ export function passesQuasimodoFilter(
   if (h.type !== "quasimodo") return false;
   const score = h.meta?.score ?? h.confidence * 100;
   if (score < minScore) return false;
-  if (h.meta?.stage === "target_hit") return false;
+  const st = h.meta?.stage ?? h.meta?.status;
+  if (st === "target_hit") return false;
   return true;
 }

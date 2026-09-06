@@ -13,6 +13,7 @@ import { mapPool } from "@/lib/scanner/engine";
 import { detectMacdCross } from "@/lib/scanner/macdScan";
 import { detectRsiBreakFreshest } from "@/lib/scanner/rsiScan";
 import { detectPatterns } from "@/lib/patterns/detect";
+import type { PatternHit } from "@/lib/patterns/types";
 import { passesInversionFvgFilter } from "@/lib/patterns/inversionFvg";
 import { passesSmcFilter } from "@/lib/patterns/smcModels";
 import { passesQuasimodoFilter } from "@/lib/patterns/quasimodo";
@@ -35,10 +36,16 @@ type HitRow = {
   label: string;
   detail: string;
   bias?: string;
+  kind: ScanKind;
+  /** Pattern overlay (IFVG / SMC / QM) — drawn on open */
+  pattern?: PatternHit;
 };
 
 export function SectorScanPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
+  const setOverlayPattern = useDeskStore((s) => s.setOverlayPattern);
+  const setPatternFocus = useDeskStore((s) => s.setPatternFocus);
+  const addIndicator = useDeskStore((s) => s.addIndicator);
   const watchlists = useDeskStore((s) => s.watchlists);
   const createWatchlist = useDeskStore((s) => s.createWatchlist);
   const importWatchlistSymbols = useDeskStore((s) => s.importWatchlistSymbols);
@@ -173,6 +180,7 @@ export function SectorScanPanel() {
                 label: hit.bias === "bull" ? "MACD AL" : "MACD SAT",
                 detail: `${hit.barsAgo} mum · hist ${hit.hist.toFixed(4)}`,
                 bias: hit.bias,
+                kind: "macd",
               });
             } else if (scanKind === "rsi") {
               const hit = detectRsiBreakFreshest(candles, {
@@ -186,6 +194,7 @@ export function SectorScanPanel() {
                 label: `RSI ${hit.level} ${hit.direction === "up" ? "↑" : "↓"}`,
                 detail: `RSI ${hit.rsi.toFixed(1)} · ${hit.barsAgo} mum`,
                 bias: hit.direction === "up" ? "bull" : "bear",
+                kind: "rsi",
               });
             } else {
               const enable = {
@@ -222,12 +231,22 @@ export function SectorScanPanel() {
                     ? classic.filter((h) => passesSmcFilter(h, 55))
                     : classic.filter((h) => passesQuasimodoFilter(h, 55));
               for (const h of filtered.slice(0, 1)) {
+                const ph: PatternHit = {
+                  ...h,
+                  id: `${timeframe}_${h.id}`,
+                  timeframe,
+                  label: h.label.includes("·")
+                    ? h.label
+                    : `${h.label} · ${timeframe}`,
+                };
                 out.push({
-                  id: `${q.symbol}_${h.id}`,
+                  id: `${q.symbol}_${ph.id}`,
                   symbol: q.symbol,
-                  label: h.label,
-                  detail: h.detail,
-                  bias: h.bias,
+                  label: ph.label,
+                  detail: ph.detail,
+                  bias: ph.bias,
+                  kind: scanKind,
+                  pattern: ph,
                 });
               }
             }
@@ -303,6 +322,31 @@ export function SectorScanPanel() {
     setSeedMsg(
       `Sektör listeleri: ${r.created} oluşturuldu, ${r.skipped} zaten vardı`
     );
+  };
+
+  const openHit = (h: HitRow) => {
+    openSymbolInActive(h.symbol, "bist", timeframe);
+    if (h.pattern) {
+      setOverlayPattern(h.pattern);
+      setPatternFocus(h.pattern.id);
+      return;
+    }
+    setOverlayPattern(null);
+    setPatternFocus(null);
+    const s = useDeskStore.getState();
+    const pane = s.panes.find((p) => p.id === s.activePaneId) ?? s.panes[0];
+    if (!pane) return;
+    if (h.kind === "macd" && !pane.indicators.some((i) => i.type === "macd")) {
+      addIndicator(pane.id, "macd");
+    }
+    if (
+      h.kind === "rsi" &&
+      !pane.indicators.some(
+        (i) => i.type === "rsiLevelBreaks" || i.type === "rsi"
+      )
+    ) {
+      addIndicator(pane.id, "rsiLevelBreaks");
+    }
   };
 
   return (
@@ -547,7 +591,7 @@ export function SectorScanPanel() {
                 <button
                   type="button"
                   className="flex-1 text-left"
-                  onClick={() => openSymbolInActive(h.symbol, "bist", timeframe)}
+                  onClick={() => openHit(h)}
                 >
                   <div className="text-xs">
                     <span className="font-medium">{h.symbol}</span>{" "}

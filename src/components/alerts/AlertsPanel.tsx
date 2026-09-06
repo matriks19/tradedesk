@@ -45,9 +45,14 @@ export function AlertsPanel() {
   const submit = () => {
     const p = Number(price);
     if (!symbol.trim() || !Number.isFinite(p) || p <= 0) return;
+    const sym = symbol.trim().toUpperCase();
+    // Force Binance for perps / USDT pairs (prevents .P on BIST mismatch)
+    const ex: Exchange =
+      /\.P$/i.test(sym) || /USDT$/i.test(sym) ? "binance" : exchange;
+    if (ex !== exchange) setExchange(ex);
     addAlert({
-      symbol: symbol.trim().toUpperCase(),
-      exchange,
+      symbol: sym,
+      exchange: ex,
       condition,
       price: p,
       note: note.trim() || undefined,
