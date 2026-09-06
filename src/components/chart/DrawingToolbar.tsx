@@ -8,7 +8,7 @@ const TOOLS: { id: DrawTool; label: string; title: string }[] = [
   { id: "cursor", label: "↖", title: "İmleç" },
   { id: "hline", label: "H", title: "Yatay çizgi" },
   { id: "trend", label: "/", title: "Trend" },
-  { id: "fib", label: "Fib", title: "Fibonacci" },
+  { id: "fib", label: "Fib", title: "Fibonacci — 2 tık: swing high → low" },
   { id: "measure", label: "Δ", title: "Ölçü" },
   { id: "rect", label: "▭", title: "Dikdörtgen" },
 ];
@@ -17,6 +17,7 @@ export function DrawingToolbar({ paneId }: { paneId: string }) {
   const activeDrawTool = useDeskStore((s) => s.activeDrawTool);
   const setActiveDrawTool = useDeskStore((s) => s.setActiveDrawTool);
   const clearPaneDrawings = useDeskStore((s) => s.clearPaneDrawings);
+  const clearPaneIndicators = useDeskStore((s) => s.clearPaneIndicators);
 
   return (
     <div
@@ -31,7 +32,11 @@ export function DrawingToolbar({ paneId }: { paneId: string }) {
             "btn px-1.5 text-2xs min-w-[1.5rem]",
             activeDrawTool === t.id && "btn-accent"
           )}
-          title={t.title}
+          title={
+            t.id === "fib" && activeDrawTool === "fib"
+              ? "2 tık: swing high → low"
+              : t.title
+          }
           onClick={() => setActiveDrawTool(t.id)}
         >
           {t.label}
@@ -44,6 +49,14 @@ export function DrawingToolbar({ paneId }: { paneId: string }) {
         onClick={() => clearPaneDrawings(paneId)}
       >
         ⌫
+      </button>
+      <button
+        type="button"
+        className="btn px-1.5 text-2xs"
+        title="Bu panedeki tüm göstergeleri temizle"
+        onClick={() => clearPaneIndicators(paneId)}
+      >
+        Göstergeleri temizle
       </button>
     </div>
   );

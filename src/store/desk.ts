@@ -112,6 +112,7 @@ interface DeskState {
     parentId?: string
   ) => void;
   removeIndicator: (paneId: string, indicatorId: string) => void;
+  clearPaneIndicators: (paneId: string) => void;
   updateIndicatorParams: (
     paneId: string,
     indId: string,
@@ -323,6 +324,12 @@ export const useDeskStore = create<DeskState>()(
                 indicators: p.indicators.filter((i) => !removeIds.has(i.id)),
               };
             }),
+          })),
+        clearPaneIndicators: (paneId) =>
+          set((s) => ({
+            panes: s.panes.map((p) =>
+              p.id === paneId ? { ...p, indicators: [] } : p
+            ),
           })),
         updateIndicatorParams: (paneId, indId, params) =>
           set((s) => ({

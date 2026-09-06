@@ -738,6 +738,8 @@ export function ChartPane({ pane, compact }: Props) {
         const s = main.addHistogramSeries({
           color: p.color,
           priceFormat: { type: "price", precision: 4, minMove: 0.0001 },
+          priceLineVisible: false,
+          lastValueVisible: false,
         });
         s.setData(p.data as never);
         mainOverlayRefs.current.set(p.id, s);
@@ -747,7 +749,7 @@ export function ChartPane({ pane, compact }: Props) {
           lineWidth: 2,
           title: p.title,
           priceLineVisible: false,
-          lastValueVisible: true,
+          lastValueVisible: false,
         });
         s.setData(p.data as never);
         mainOverlayRefs.current.set(p.id, s);
@@ -780,6 +782,8 @@ export function ChartPane({ pane, compact }: Props) {
             color: p.color,
             priceFormat: { type: "price", precision: 4, minMove: 0.0001 },
             title: p.title,
+            priceLineVisible: false,
+            lastValueVisible: false,
           });
           s.setData(p.data as never);
           seriesMap.set(p.id, s);
@@ -789,7 +793,7 @@ export function ChartPane({ pane, compact }: Props) {
             lineWidth: 2,
             title: p.title,
             priceLineVisible: false,
-            lastValueVisible: true,
+            lastValueVisible: false,
           });
           s.setData(p.data as never);
           seriesMap.set(p.id, s);
@@ -936,8 +940,8 @@ export function ChartPane({ pane, compact }: Props) {
             </Badge>
             <button
               type="button"
-              className="btn px-1.5 text-2xs"
-              title="Formasyon overlay temizle"
+              className="btn btn-accent px-1.5 text-2xs"
+              title="Formasyon overlay kapat"
               onClick={(e) => {
                 e.stopPropagation();
                 setOverlayPattern(null);
@@ -945,7 +949,7 @@ export function ChartPane({ pane, compact }: Props) {
                 setOverlayDrawnMsg(false);
               }}
             >
-              ✕
+              Formasyon overlay kapat
             </button>
           </>
         )}

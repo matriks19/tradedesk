@@ -7,6 +7,7 @@ import type { Candle, ChartDrawing, DrawTool } from "@/lib/types";
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const DEFAULT_COLOR = "#f5a623";
+const MARKER_COLOR = "#00e5ff";
 
 interface Props {
   paneId: string;
@@ -109,9 +110,16 @@ function snapDrawPoint(
 
 export function DrawingOverlay({ paneId, chart, series, container, ready, candles }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const captureRef = useRef<HTMLCanvasElement | null>(null);
   const pendingRef = useRef<{ time: number; price: number } | null>(null);
   const [draft, setDraft] = useState<{ time: number; price: number } | null>(null);
+  const [statusFlash, setStatusFlash] = useState<string | null>(null);
   const hoverRef = useRef<{ time: number; price: number } | null>(null);
+  /** Live ticks must not re-bind subscribeClick — read latest candles via ref. */
+  const candlesRef = useRef(candles);
+  candlesRef.current = candles;
+  const lastClickAtRef = useRef(0);
+  const statusTimerRef = useRef<number | null>(null);
 
   const drawings = useDeskStore((s) =>
     s.drawings.filter((d) => d.paneId === paneId)
@@ -119,6 +127,15 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
   const activeDrawTool = useDeskStore((s) => s.activeDrawTool);
   const addDrawing = useDeskStore((s) => s.addDrawing);
   const setActiveDrawTool = useDeskStore((s) => s.setActiveDrawTool);
+
+  const flashStatus = useCallback((msg: string) => {
+    setStatusFlash(msg);
+    if (statusTimerRef.current != null) window.clearTimeout(statusTimerRef.current);
+    statusTimerRef.current = window.setTimeout(() => {
+      setStatusFlash(null);
+      statusTimerRef.current = null;
+    }, 1600);
+  }, []);
 
   const drawAll = useCallback(() => {
     const canvas = canvasRef.current;
@@ -191,6 +208,38 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
       const y = series.priceToCoordinate(price);
       if (x == null || y == null) return null;
       return { x: x as number, y: y as number };
+    };
+
+    const paintMarker = (time: number, price: number, color = MARKER_COLOR) => {
+      const x = timeToX(time);
+      const y = priceToY(price);
+      if (x == null || y == null) return;
+      ctx.save();
+      ctx.globalAlpha = 1;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([]);
+      // bright circle
+      ctx.beginPath();
+      ctx.arc(x, y, 6, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(0, 229, 255, 0.25)";
+      ctx.fill();
+      ctx.strokeStyle = color;
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+      ctx.fillStyle = color;
+      ctx.fill();
+      // crosshair
+      const arm = 10;
+      ctx.beginPath();
+      ctx.moveTo(x - arm, y);
+      ctx.lineTo(x + arm, y);
+      ctx.moveTo(x, y - arm);
+      ctx.lineTo(x, y + arm);
+      ctx.stroke();
+      ctx.restore();
     };
 
     const paint = (d: ChartDrawing, alpha = 1) => {
@@ -311,12 +360,13 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
 
     // draft preview
     const tool = activeDrawTool;
-    if (tool !== "cursor" && pendingRef.current && hoverRef.current) {
+    const pending = pendingRef.current;
+    if (tool !== "cursor" && pending && hoverRef.current) {
       const preview: ChartDrawing = {
         id: "draft",
         paneId,
         tool: tool as Exclude<DrawTool, "cursor">,
-        points: [pendingRef.current, hoverRef.current],
+        points: [pending, hoverRef.current],
         color: DEFAULT_COLOR,
       };
       if (tool === "hline") {
@@ -336,8 +386,41 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
       );
     }
 
+    // First-point always visible while waiting for second click (even with no hover yet)
+    if (tool !== "cursor" && tool !== "hline" && pending) {
+      paintMarker(pending.time, pending.price);
+      ctx.globalAlpha = 1;
+      ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+      const banner =
+        tool === "fib"
+          ? "Fib: 2. nokta için tıkla (Esc iptal)"
+          : `${tool}: 2. nokta için tıkla (Esc iptal)`;
+      const tw = ctx.measureText(banner).width;
+      ctx.fillStyle = "rgba(18, 22, 28, 0.85)";
+      ctx.fillRect(6, 6, tw + 14, 22);
+      ctx.strokeStyle = MARKER_COLOR;
+      ctx.lineWidth = 1;
+      ctx.strokeRect(6, 6, tw + 14, 22);
+      ctx.fillStyle = MARKER_COLOR;
+      ctx.fillText(banner, 13, 21);
+    }
+
+    if (statusFlash) {
+      ctx.globalAlpha = 1;
+      ctx.font = "11px ui-sans-serif, system-ui, sans-serif";
+      const tw = ctx.measureText(statusFlash).width;
+      const y0 = pending && tool !== "cursor" && tool !== "hline" ? 34 : 6;
+      ctx.fillStyle = "rgba(18, 22, 28, 0.9)";
+      ctx.fillRect(6, y0, tw + 14, 22);
+      ctx.strokeStyle = "#7CFC98";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(6, y0, tw + 14, 22);
+      ctx.fillStyle = "#7CFC98";
+      ctx.fillText(statusFlash, 13, y0 + 15);
+    }
+
     ctx.globalAlpha = 1;
-  }, [chart, series, container, drawings, activeDrawTool, paneId]);
+  }, [chart, series, container, drawings, activeDrawTool, paneId, draft, statusFlash]);
 
   // canvas mount (re-attach if LWC wipes children)
   useEffect(() => {
@@ -372,6 +455,11 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
       if (!canvasRef.current || canvasRef.current.parentElement !== container) {
         ensure();
         drawAll();
+      }
+      // re-append capture if LWC wiped it
+      const cap = captureRef.current;
+      if (cap && cap.parentElement !== container && container.contains(canvasRef.current!)) {
+        container.appendChild(cap);
       }
     });
     mo.observe(container, { childList: true });
@@ -434,24 +522,28 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
     return () => window.removeEventListener("keydown", onKey);
   }, [setActiveDrawTool, drawAll]);
 
-  // Click handler via LWC subscribeClick
+  // Clear pending when switching tools (do NOT depend on drawAll — first click sets draft)
+  const prevToolRef = useRef(activeDrawTool);
   useEffect(() => {
-    if (!chart || !series) return;
+    if (prevToolRef.current === activeDrawTool) return;
+    prevToolRef.current = activeDrawTool;
+    pendingRef.current = null;
+    setDraft(null);
+    hoverRef.current = null;
+    drawAll();
+  }, [activeDrawTool, drawAll]);
 
-    const onClick = (param: MouseEventParams) => {
+  const handleDrawPoint = useCallback(
+    (rawTime: number, rawPrice: number) => {
       const tool = useDeskStore.getState().activeDrawTool;
       if (tool === "cursor") return;
-      if (!param.point) return;
+      if (!chart || !series) return;
 
-      const rawPrice = series.coordinateToPrice(param.point.y);
-      let time = timeToNumber(param.time ?? null);
-      if (time == null) {
-        const t = chart.timeScale().coordinateToTime(param.point.x);
-        time = timeToNumber(t);
-      }
-      if (rawPrice == null || time == null) return;
-      // Magnet to candle wick tips (high/low) so Fib/trend land on swings
-      const snapped = snapDrawPoint(candles, time, Number(rawPrice), tool);
+      const now = performance.now();
+      if (now - lastClickAtRef.current < 50) return; // dedupe LWC + pointer
+      lastClickAtRef.current = now;
+
+      const snapped = snapDrawPoint(candlesRef.current, rawTime, rawPrice, tool);
       const { time: snapTime, price } = snapped;
 
       if (tool === "hline") {
@@ -464,12 +556,14 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
         setActiveDrawTool("cursor");
         pendingRef.current = null;
         setDraft(null);
+        flashStatus("Yatay çizgi eklendi");
         return;
       }
 
       if (!pendingRef.current) {
         pendingRef.current = { time: snapTime, price };
         setDraft({ time: snapTime, price });
+        drawAll();
         return;
       }
 
@@ -516,6 +610,29 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
       setDraft(null);
       hoverRef.current = null;
       setActiveDrawTool("cursor");
+      if (tool === "fib") flashStatus("Fibonacci eklendi");
+      else flashStatus("Çizim eklendi");
+    },
+    [chart, series, paneId, addDrawing, setActiveDrawTool, drawAll, flashStatus]
+  );
+
+  // Click handler via LWC subscribeClick — do NOT depend on candles (live ticks)
+  useEffect(() => {
+    if (!chart || !series) return;
+
+    const onClick = (param: MouseEventParams) => {
+      const tool = useDeskStore.getState().activeDrawTool;
+      if (tool === "cursor") return;
+      if (!param.point) return;
+
+      const rawPrice = series.coordinateToPrice(param.point.y);
+      let time = timeToNumber(param.time ?? null);
+      if (time == null) {
+        const t = chart.timeScale().coordinateToTime(param.point.x);
+        time = timeToNumber(t);
+      }
+      if (rawPrice == null || time == null) return;
+      handleDrawPoint(time, Number(rawPrice));
     };
 
     const onMove = (param: MouseEventParams) => {
@@ -530,7 +647,7 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
       }
       if (rawPrice == null || time == null) return;
       // Preview also snaps so Fib draft matches final wick tips
-      hoverRef.current = snapDrawPoint(candles, time, Number(rawPrice), tool);
+      hoverRef.current = snapDrawPoint(candlesRef.current, time, Number(rawPrice), tool);
       drawAll();
     };
 
@@ -544,7 +661,99 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
         /* */
       }
     };
-  }, [chart, series, paneId, candles, addDrawing, setActiveDrawTool, drawAll]);
+  }, [chart, series, handleDrawPoint, drawAll]);
+
+  // Pointer capture fallback — reliable on mobile / when LWC click is silent
+  useEffect(() => {
+    if (!container || !chart || !series) return;
+
+    const removeCapture = () => {
+      const cap = captureRef.current;
+      if (cap) {
+        try {
+          cap.remove();
+        } catch {
+          /* */
+        }
+      }
+      captureRef.current = null;
+    };
+
+    if (activeDrawTool === "cursor") {
+      removeCapture();
+      return;
+    }
+
+    let cap = captureRef.current;
+    if (!cap || cap.parentElement !== container) {
+      removeCapture();
+      cap = document.createElement("canvas");
+      cap.style.position = "absolute";
+      cap.style.inset = "0";
+      cap.style.width = "100%";
+      cap.style.height = "100%";
+      cap.style.zIndex = "7";
+      cap.style.pointerEvents = "auto";
+      cap.style.cursor = "crosshair";
+      cap.style.background = "transparent";
+      container.style.position = "relative";
+      container.appendChild(cap);
+      captureRef.current = cap;
+    }
+
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0 && e.pointerType === "mouse") return;
+      e.preventDefault();
+      e.stopPropagation();
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const t = chart.timeScale().coordinateToTime(x);
+      const time = timeToNumber(t);
+      const rawPrice = series.coordinateToPrice(y);
+      if (time == null || rawPrice == null) return;
+      handleDrawPoint(time, Number(rawPrice));
+    };
+
+    const onPointerMove = (e: PointerEvent) => {
+      const tool = useDeskStore.getState().activeDrawTool;
+      if (tool === "cursor") return;
+      const rect = container.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const t = chart.timeScale().coordinateToTime(x);
+      const time = timeToNumber(t);
+      const rawPrice = series.coordinateToPrice(y);
+      if (time == null || rawPrice == null) return;
+      hoverRef.current = snapDrawPoint(candlesRef.current, time, Number(rawPrice), tool);
+      drawAll();
+    };
+
+    cap.addEventListener("pointerdown", onPointerDown);
+    cap.addEventListener("pointermove", onPointerMove);
+    return () => {
+      cap?.removeEventListener("pointerdown", onPointerDown);
+      cap?.removeEventListener("pointermove", onPointerMove);
+      // keep capture node until tool switches to cursor (cleanup below on tool change)
+      if (useDeskStore.getState().activeDrawTool === "cursor") removeCapture();
+    };
+  }, [container, chart, series, activeDrawTool, ready, handleDrawPoint, drawAll]);
+
+  // cleanup capture + status timer on unmount
+  useEffect(() => {
+    return () => {
+      if (statusTimerRef.current != null) window.clearTimeout(statusTimerRef.current);
+      const cap = captureRef.current;
+      if (cap) {
+        try {
+          cap.remove();
+        } catch {
+          /* */
+        }
+      }
+      captureRef.current = null;
+    };
+  }, []);
 
   // pointer cursor hint when tool active
   useEffect(() => {
@@ -555,9 +764,6 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
       if (container) container.style.cursor = "";
     };
   }, [container, activeDrawTool]);
-
-  // silence unused draft warning for future extensions
-  void draft;
 
   return null;
 }
