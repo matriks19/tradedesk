@@ -151,3 +151,38 @@ export function detectEliziEdgeCross(
 
   return null;
 }
+
+/**
+ * Full-series ±E cross markers — same rules as detectEliziEdgeCross primary.
+ * crossUp/crossDn are 1 on cross bars, null otherwise (chart markers / hist).
+ */
+export function eliziCrossMarkerSeries(
+  candles: Candle[],
+  opts: EliziEdgeParams = {}
+): {
+  edgeUp: (number | null)[];
+  edgeDown: (number | null)[];
+  edgeTemp: (number | null)[];
+  phase: (number | null)[];
+  bias: (number | null)[];
+  crossUp: (number | null)[];
+  crossDn: (number | null)[];
+} {
+  const ee = eliziEdge(candles, opts);
+  const n = ee.edgeUp.length;
+  const crossUp: (number | null)[] = Array(n).fill(null);
+  const crossDn: (number | null)[] = Array(n).fill(null);
+  for (let i = 1; i < n; i++) {
+    if (crossedAboveAt(ee.edgeUp, ee.edgeDown, i)) crossUp[i] = 1;
+    if (crossedBelowAt(ee.edgeUp, ee.edgeDown, i)) crossDn[i] = 1;
+  }
+  return {
+    edgeUp: ee.edgeUp,
+    edgeDown: ee.edgeDown,
+    edgeTemp: ee.edgeTemp,
+    phase: ee.phase,
+    bias: ee.bias,
+    crossUp,
+    crossDn,
+  };
+}

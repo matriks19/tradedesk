@@ -816,6 +816,13 @@ export function ChartPane({ pane, compact }: Props) {
           lastValueVisible: false,
         });
         s.setData(p.data as never);
+        if (p.markers?.length) {
+          try {
+            s.setMarkers(p.markers as never);
+          } catch {
+            /* */
+          }
+        }
         mainOverlayRefs.current.set(p.id, s);
       } else {
         const s = main.addLineSeries({
@@ -826,6 +833,13 @@ export function ChartPane({ pane, compact }: Props) {
           lastValueVisible: false,
         });
         s.setData(p.data as never);
+        if (p.markers?.length) {
+          try {
+            s.setMarkers(p.markers as never);
+          } catch {
+            /* */
+          }
+        }
         mainOverlayRefs.current.set(p.id, s);
       }
     }
@@ -860,6 +874,13 @@ export function ChartPane({ pane, compact }: Props) {
             lastValueVisible: false,
           });
           s.setData(p.data as never);
+          if (p.markers?.length) {
+            try {
+              s.setMarkers(p.markers as never);
+            } catch {
+              /* */
+            }
+          }
           seriesMap.set(p.id, s);
         } else {
           const s = chart.addLineSeries({
@@ -870,6 +891,13 @@ export function ChartPane({ pane, compact }: Props) {
             lastValueVisible: false,
           });
           s.setData(p.data as never);
+          if (p.markers?.length) {
+            try {
+              s.setMarkers(p.markers as never);
+            } catch {
+              /* */
+            }
+          }
           seriesMap.set(p.id, s);
         }
       }

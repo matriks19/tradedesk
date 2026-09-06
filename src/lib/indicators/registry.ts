@@ -181,6 +181,15 @@ import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi, computeIfvgJurikStoc
 import { computeMavkIndicator, computeRSquaredIndicator } from "./mavk";
 import { rsiBreakMarkerSeries } from "@/lib/scanner/rsiScan";
 import { macdCrossMarkerSeries } from "@/lib/scanner/macdScan";
+import { eliziCrossMarkerSeries } from "@/lib/scanner/eliziScan";
+
+export type PlotMarker = {
+  time: number;
+  position: "aboveBar" | "belowBar";
+  color: string;
+  shape: "circle" | "square" | "arrowUp" | "arrowDown";
+  text: string;
+};
 
 export interface PlotSeries {
   id: string;
@@ -188,7 +197,7 @@ export interface PlotSeries {
   type: "line" | "histogram";
   color: string;
   /** Prefer one point per candle; omit `value` for LWC whitespace (keeps time indices synced). */
-  data: ({ time: number; value: number } | { time: number })[];
+  data: ({ time: number; value: number; color?: string } | { time: number })[];
   title?: string;
   /** Key used when nesting (primary series) */
   seriesKey?: string;
@@ -196,6 +205,8 @@ export interface PlotSeries {
   paneGroup?: string;
   /** Owning indicator instance id */
   indicatorId?: string;
+  /** Lightweight-charts series markers (AL/SAT etc.) */
+  markers?: PlotMarker[];
 }
 
 const SOURCE_OPTIONS = [
@@ -445,7 +456,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "rSquared", label: "R-Squared", category: "trend", pane: "sub", acceptsSeries: false, primarySeriesKey: "r2", description: "Kapanış üzerinde lineer regresyon R² (0–1). Düşük R² (~0.15–0.3) sonra yükseliş + MAVK küme = tarama sinyali.", inputs: [num("period", "Lookback", 30)] },
 
   // —— Elizi Lab
-  { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — DI-anchored coherence + surprise + DI acceleration before ADX confirms. Default pane: Temp/±E/Faz; Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
+  { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab — soft Temp hist + ±E lines; AL/SAT at +E/−E cross (below/above bar). Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
 ];
 
 export const BUILTIN_META: Record<BuiltinIndicatorId, IndicatorMeta> =
@@ -2541,7 +2552,7 @@ export function computeBuiltin(
       break;
     }
     case "eliziEdge": {
-      const ee = eliziEdge(candles, {
+      const eliziParams = {
         erLen: n(p, "erLen", 10),
         atrLen: n(p, "atrLen", 14),
         adxPeriod: n(p, "adxPeriod", 14),
@@ -2557,39 +2568,129 @@ export function computeBuiltin(
         fireTemp: n(p, "fireTemp", 62),
         armedTemp: n(p, "armedTemp", 48),
         probeTemp: n(p, "probeTemp", 32),
-      });
+      };
+      const ee = eliziEdge(candles, eliziParams);
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      // ±E cross flags (same rules as eliziCrossMarkerSeries / detectEliziEdgeCross)
+      const crosses = (() => {
+        const nBars = ee.edgeUp.length;
+        const crossUp: (number | null)[] = Array(nBars).fill(null);
+        const crossDn: (number | null)[] = Array(nBars).fill(null);
+        for (let i = 1; i < nBars; i++) {
+          const a0 = ee.edgeUp[i - 1];
+          const a1 = ee.edgeUp[i];
+          const b0 = ee.edgeDown[i - 1];
+          const b1 = ee.edgeDown[i];
+          if (a0 == null || a1 == null || b0 == null || b1 == null) continue;
+          if (a0 <= b0 && a1 > b1) crossUp[i] = 1;
+          if (a0 >= b0 && a1 < b1) crossDn[i] = 1;
+        }
+        return { crossUp, crossDn };
+      })();
       const detailOn = String(p.detailMode ?? "0") === "1";
+      // Soft palette (pastel / translucent — not neon)
+      const SOFT_TEMP_UP = "#a5d6a755";
+      const SOFT_TEMP_DN = "#ef9a9a55";
+      const SOFT_TEMP_FLAT = "#b39ddb44";
+      const SOFT_PHASE = "#ce93d844";
+      const SOFT_UP = "#81c784";
+      const SOFT_DN = "#e57373";
       // Scale for readable shared pane (0–100-ish)
       const coh100 = ee.coherence.map((v) => (v == null ? null : v * 100));
       const surScaled = ee.volSurprise.map((v) =>
         v == null ? null : Math.min(v * 40, 100)
       );
       const phaseScaled = ee.phase.map((v) => (v == null ? null : v * 20));
+      // Soft hist: tint by bias (bull mint / bear coral / flat lavender)
+      const tempHist = hist(inst, "edgeTemp", "sub", SOFT_TEMP_FLAT, candles, ee.edgeTemp, "Edge Temp");
+      tempHist.data = tempHist.data.map((pt, i) => {
+        if (!("value" in pt) || pt.value == null) return pt;
+        const b = ee.bias[i];
+        const c =
+          b != null && b > 0
+            ? SOFT_TEMP_UP
+            : b != null && b < 0
+              ? SOFT_TEMP_DN
+              : SOFT_TEMP_FLAT;
+        return { time: pt.time, value: pt.value, color: c };
+      });
+      const phaseHist = hist(inst, "phase", "sub", SOFT_PHASE, candles, phaseScaled, "Faz");
+      phaseHist.data = phaseHist.data.map((pt) => {
+        if (!("value" in pt) || pt.value == null) return pt;
+        return { time: pt.time, value: pt.value, color: SOFT_PHASE };
+      });
+      const upLine = line(inst, "edgeUp", "sub", SOFT_UP, candles, ee.edgeUp, "Elizi +E");
+      const markers: PlotMarker[] = [];
+      if (showMarkers) {
+        for (let i = 0; i < candles.length; i++) {
+          const t = candles[i]!.time;
+          if (crosses.crossUp[i] === 1) {
+            markers.push({
+              time: t,
+              position: "belowBar",
+              color: SOFT_UP,
+              shape: "arrowUp",
+              text: "AL",
+            });
+          }
+          if (crosses.crossDn[i] === 1) {
+            markers.push({
+              time: t,
+              position: "aboveBar",
+              color: SOFT_DN,
+              shape: "arrowDown",
+              text: "SAT",
+            });
+          }
+        }
+        markers.sort((a, b) => a.time - b.time);
+        upLine.markers = markers;
+      }
+      // Transparent main-pane series so AL/SAT also sits on price bars
+      // (PatternOverlay owns candle setMarkers; this series is independent).
+      const priceAnchor = candles.map((c, i) => {
+        if (crosses.crossUp[i] === 1) return c.low;
+        if (crosses.crossDn[i] === 1) return c.high;
+        return null;
+      });
+      const priceMarks = line(
+        inst,
+        "crossMark",
+        "main",
+        "rgba(0,0,0,0)",
+        candles,
+        priceAnchor,
+        ""
+      );
+      if (showMarkers && markers.length) {
+        priceMarks.markers = markers;
+      }
       const primary: PlotSeries[] = [
-        hist(inst, "edgeTemp", "sub", color, candles, ee.edgeTemp, "Edge Temp"),
-        line(inst, "edgeUp", "sub", "#69f0ae", candles, ee.edgeUp, "Elizi +E"),
-        line(inst, "edgeDown", "sub", "#ff5252", candles, ee.edgeDown, "Elizi −E"),
-        hist(inst, "phase", "sub", "#e040fb88", candles, phaseScaled, "Faz"),
+        tempHist,
+        upLine,
+        line(inst, "edgeDown", "sub", SOFT_DN, candles, ee.edgeDown, "Elizi −E"),
+        phaseHist,
+        ...(showMarkers && markers.length ? [priceMarks] : []),
       ];
       const detail: PlotSeries[] = detailOn
         ? [
-            line(inst, "coherence", "sub", "#ce93d8", candles, coh100, "Uyum"),
-            line(inst, "surprise", "sub", "#ffab40", candles, surScaled, "Sürpriz"),
+            line(inst, "coherence", "sub", "#ce93d8aa", candles, coh100, "Uyum"),
+            line(inst, "surprise", "sub", "#ffcc80aa", candles, surScaled, "Sürpriz"),
             line(
               inst,
               "efficiency",
               "sub",
-              "#90a4ae",
+              "#90a4ae99",
               candles,
               ee.pathEfficiency.map((v) => (v == null ? null : v * 100)),
               "Verim"
             ),
-            line(inst, "diAccel", "sub", "#00e5ff", candles, ee.diAccel, "DI İvme"),
+            line(inst, "diAccel", "sub", "#80deea", candles, ee.diAccel, "DI İvme"),
             line(
               inst,
               "flowAgree",
               "sub",
-              "#aed581",
+              "#c5e1a5",
               candles,
               ee.flowAgree.map((v) => (v == null ? null : v * 50)),
               "Akış"
@@ -2614,6 +2715,8 @@ export function computeBuiltin(
         adx: ee.adx,
         plusDI: ee.plusDI,
         minusDI: ee.minusDI,
+        crossUp: crosses.crossUp,
+        crossDn: crosses.crossDn,
       });
       break;
     }
