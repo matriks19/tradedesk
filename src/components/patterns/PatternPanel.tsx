@@ -5,6 +5,7 @@ import { useDeskStore } from "@/store/desk";
 import type { PatternHit } from "@/lib/patterns/types";
 import type { Candle } from "@/lib/types";
 import { FormationScanPanel } from "@/components/formations/FormationScanPanel";
+import { MacdScanPanel } from "@/components/formations/MacdScanPanel";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
 import {
@@ -36,7 +37,7 @@ export function PatternPanel() {
   const updatePane = useDeskStore((s) => s.updatePane);
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [patterns, setPatterns] = useState<PatternHit[]>([]);
-  const [mode, setMode] = useState<"chart" | "scan">("scan");
+  const [mode, setMode] = useState<"chart" | "scan" | "macd">("scan");
   const [shtFocus, setShtFocus] = useState(false);
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
@@ -178,7 +179,15 @@ export function PatternPanel() {
           className={clsx("btn text-2xs flex-1", mode === "scan" && "btn-accent")}
           onClick={() => setMode("scan")}
         >
-          Formasyon Tara
+          Formasyon
+        </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs flex-1", mode === "macd" && "btn-accent")}
+          onClick={() => setMode("macd")}
+          title="MACD Tarama (15–240)"
+        >
+          MACD
         </button>
         <button
           type="button"
@@ -190,6 +199,8 @@ export function PatternPanel() {
       </div>
       {mode === "scan" ? (
         <FormationScanPanel />
+      ) : mode === "macd" ? (
+        <MacdScanPanel />
       ) : (
         <div className="flex flex-col h-full min-h-0 p-2 gap-2">
           <div className="text-xs font-medium">Formasyonlar — {pane?.symbol}</div>
