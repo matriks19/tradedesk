@@ -663,7 +663,7 @@ export function buildSignalContext(
       ctx.ifvgJurikStoch = computeIfvgJurikStoch(candles, {
         kLen: 28,
         dLen: 6,
-        jmaLen: 16,
+        jmaLen: 20,
         phase: 50,
         power: 2,
         os: 20,

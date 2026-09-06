@@ -3702,7 +3702,7 @@ export const STRATEGY_PACKS: StrategyPack[] = [
       },
       {
         type: "ifvgJurikStoch",
-        params: { kLen: 28, dLen: 6, jmaLen: 16, phase: 50, power: 2, os: 20, ob: 80, softMid: 1 },
+        params: { kLen: 28, dLen: 6, jmaLen: 20, phase: 50, power: 2, os: 20, ob: 80, softMid: 1 },
       },
     ],
     risk: {
