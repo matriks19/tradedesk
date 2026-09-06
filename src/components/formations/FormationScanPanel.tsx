@@ -12,6 +12,7 @@ import {
 import { detectPatterns } from "@/lib/patterns/detect";
 import { passesShtFilter } from "@/lib/patterns/shtFlagTriangle";
 import { passesThreeDrivesFilter } from "@/lib/patterns/threeDrives";
+import { passesBreakoutFvgRetestFilter } from "@/lib/patterns/breakoutFvgRetest";
 import type { PatternHit } from "@/lib/patterns/types";
 import { mapPool } from "@/lib/scanner/engine";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
@@ -39,6 +40,7 @@ type Row = {
   _hit: AdvancedPatternHit | PatternHit;
   sht?: boolean;
   threeDrives?: boolean;
+  bfr?: boolean;
 };
 
 export function FormationScanPanel() {
@@ -59,6 +61,7 @@ export function FormationScanPanel() {
   ]);
   const [shtFocus, setShtFocus] = useState(false);
   const [tdFocus, setTdFocus] = useState(false);
+  const [bfrFocus, setBfrFocus] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [rows, setRows] = useState<Row[]>([]);
@@ -71,8 +74,10 @@ export function FormationScanPanel() {
   };
 
   const run = useCallback(async () => {
-    if (!families.length && !shtFocus && !tdFocus) {
-      setStatus("En az bir formasyon ailesi, SHT Flama/Üçgen veya Üç İtiş seçin");
+    if (!families.length && !shtFocus && !tdFocus && !bfrFocus) {
+      setStatus(
+        "En az bir formasyon ailesi, SHT Flama/Üçgen, Üç İtiş veya Breakout·FVG·Retest seçin"
+      );
       return;
     }
     setRunning(true);
@@ -160,6 +165,7 @@ export function FormationScanPanel() {
                   breakout_box: false,
                   engulfing: false,
                   three_drives: false,
+                  breakout_fvg_retest: false,
                 },
               }).filter((h) => passesShtFilter(h, 60));
               for (const h of classic.slice(0, 2)) {
@@ -197,6 +203,7 @@ export function FormationScanPanel() {
                   inv_head_shoulders: false,
                   breakout_box: false,
                   engulfing: false,
+                  breakout_fvg_retest: false,
                 },
               }).filter((h) => passesThreeDrivesFilter(h, 60));
               for (const h of tds.slice(0, 2)) {
@@ -221,6 +228,45 @@ export function FormationScanPanel() {
                 });
               }
             }
+            if (bfrFocus) {
+              const bfrs = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  breakout_fvg_retest: true,
+                  three_drives: false,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              }).filter((h) => passesBreakoutFvgRetestFilter(h, 60));
+              for (const h of bfrs.slice(0, 2)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.entry,
+                  tp1: h.meta?.tp1,
+                  sl: h.meta?.stop,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  bfr: true,
+                });
+              }
+            }
           } catch {
             /* skip */
           }
@@ -236,7 +282,7 @@ export function FormationScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [exchange, timeframe, families, shtFocus, tdFocus, patternSettings.swingStrength]);
+  }, [exchange, timeframe, families, shtFocus, tdFocus, bfrFocus, patternSettings.swingStrength]);
 
   const openHit = (h: Row) => {
     setActivePane(activePaneId);
@@ -310,6 +356,14 @@ export function FormationScanPanel() {
         >
           Three Drives / Üç İtiş
         </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", bfrFocus && "btn-accent")}
+          onClick={() => setBfrFocus((v) => !v)}
+          title="Breakout · FVG · Retest · onay · skor≥60"
+        >
+          Breakout·FVG·Retest
+        </button>
       </div>
       {status && <p className="text-2xs text-desk-muted">{status}</p>}
       {running && (
@@ -353,10 +407,10 @@ export function FormationScanPanel() {
             </div>
             <div className="text-2xs text-desk-muted font-mono truncate">
               {r.timeframe ? `${r.timeframe} · ` : ""}
-              {r.sht ? "SHT · " : ""}{r.threeDrives ? "Üç İtiş · " : ""}
+              {r.sht ? "SHT · " : ""}{r.threeDrives ? "Üç İtiş · " : ""}{r.bfr ? "BFR · " : ""}
               {r.entry != null ? `E ${fmt(r.entry)}` : ""}
               {r.prz ? ` · PRZ ${fmt(r.prz.low)}-${fmt(r.prz.high)}` : ""}
-              {r.tp1 != null ? ` · ${r.sht || r.threeDrives ? "Hedef" : "TP1"} ${fmt(r.tp1)}` : ""}
+              {r.tp1 != null ? ` · ${r.sht || r.threeDrives || r.bfr ? (r.bfr ? "TP1" : "Hedef") : "TP1"} ${fmt(r.tp1)}` : ""}
               {r.sl != null ? ` · SL ${fmt(r.sl)}` : ""}
             </div>
           </button>

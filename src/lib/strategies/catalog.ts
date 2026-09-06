@@ -3574,6 +3574,46 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     tags: ["three_drives", "üç_itiş", "harmonic", "PRZ", "FIBO", "niche", "formasyon"],
   },
 
+  {
+    id: "breakout_fvg_retest",
+    name: "Breakout · FVG · Retest",
+    shortName: "BFR",
+    category: "niche",
+    inspiredBy:
+      "Klasik konsolidasyon kırılımı + Fair Value Gap + retest/onay yapısı (SMC/ICT tarzı açık kurallar) — kapalı kaynak kopyası değildir.",
+    summary:
+      "Konsolidasyon kutusu → güçlü kırılım (hacim) → FVG → RH/FVG retest → onay mumu → AL/SAT. Skor 0–100, TP1/2/3 (range ×1 / 1.618 / 2.618). Formasyon paneli · Breakout·FVG·Retest çipi.",
+    howTo: [
+      "Formasyonlar → Aktif grafik veya Formasyon Tara → «Breakout·FVG·Retest» çipi.",
+      "Boğa: yatay kutu → close > RH + gövde gücü → bullish FVG → low RH/FVG'ye dokunur ve tutar → boğa mum / AL.",
+      "Ayı: mirror (RL kırılımı + bearish FVG + retest + SAT).",
+      "Stop: FVG altı / RH altı (boğa). TP: range yüksekliği ×1 / 1.618 / 2.618.",
+      "Filtre UYGUN: skor≥60 + FVG + retest (tercihen onay). BIST ve crypto taraması aynı çiple.",
+    ],
+    timeframe: "1h",
+    allowShort: true,
+    replaceIndicators: true,
+    indicators: [
+      { type: "rsi", params: { period: 14 } },
+      { type: "atr", params: { period: 14 } },
+      { type: "ema", params: { period: 21 }, color: "#42a5f5" },
+      { type: "volumeOsc", params: { shortPeriod: 5, longPeriod: 20 } },
+    ],
+    risk: {
+      rMultiple: 2,
+      tip: "Retest tutmazsa girmeyin. Hacim kırılımda zayıfsa skor düşer. Onay mumu bekleyin.",
+    },
+    tags: [
+      "breakout",
+      "FVG",
+      "retest",
+      "konsolidasyon",
+      "SMC",
+      "niche",
+      "formasyon",
+    ],
+  },
+
 ];
 
 export function strategyById(id: string): StrategyPack | undefined {

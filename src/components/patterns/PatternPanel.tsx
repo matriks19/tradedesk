@@ -15,6 +15,10 @@ import {
   isThreeDrivesType,
   passesThreeDrivesFilter,
 } from "@/lib/patterns/threeDrives";
+import {
+  isBreakoutFvgRetestType,
+  passesBreakoutFvgRetestFilter,
+} from "@/lib/patterns/breakoutFvgRetest";
 import clsx from "clsx";
 
 export function PatternPanel() {
@@ -31,6 +35,7 @@ export function PatternPanel() {
   const [mode, setMode] = useState<"chart" | "scan">("scan");
   const [shtFocus, setShtFocus] = useState(false);
   const [tdFocus, setTdFocus] = useState(false);
+  const [bfrFocus, setBfrFocus] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, label: "" });
   const [status, setStatus] = useState("");
@@ -127,14 +132,14 @@ export function PatternPanel() {
       }
       all.sort((a, b) => b.confidence - a.confidence);
       let filtered = all;
-      if (shtFocus && tdFocus) {
-        filtered = all.filter(
-          (h) => passesShtFilter(h, 60) || passesThreeDrivesFilter(h, 60)
-        );
-      } else if (shtFocus) {
-        filtered = all.filter((h) => passesShtFilter(h, 60));
-      } else if (tdFocus) {
-        filtered = all.filter((h) => passesThreeDrivesFilter(h, 60));
+      const focusOn = shtFocus || tdFocus || bfrFocus;
+      if (focusOn) {
+        filtered = all.filter((h) => {
+          const okSht = shtFocus && passesShtFilter(h, 60);
+          const okTd = tdFocus && passesThreeDrivesFilter(h, 60);
+          const okBfr = bfrFocus && passesBreakoutFvgRetestFilter(h, 60);
+          return okSht || okTd || okBfr;
+        });
       }
       const sliced = filtered.slice(0, 40);
       setPatterns(sliced);
@@ -155,6 +160,7 @@ export function PatternPanel() {
     patternSettings.boxLookback,
     shtFocus,
     tdFocus,
+    bfrFocus,
   ]);
 
   return (
@@ -246,6 +252,14 @@ export function PatternPanel() {
               title="Üç İtiş / Three Drives · filtre UYGUN veya skor≥60"
             >
               Three Drives / Üç İtiş
+            </button>
+            <button
+              type="button"
+              className={clsx("btn text-2xs", bfrFocus && "btn-accent")}
+              onClick={() => setBfrFocus((v) => !v)}
+              title="Breakout · FVG · Retest · onay · skor≥60"
+            >
+              Breakout·FVG·Retest
             </button>
           </div>
 
@@ -411,6 +425,86 @@ export function PatternPanel() {
                       {h.meta.targetPrice != null
                         ? fmtMetaPx(h.meta.targetPrice)
                         : "—"}
+                    </span>
+                    <span className="text-desk-muted">Filtre</span>
+                    <span
+                      className={
+                        h.meta.filterOk ? "text-desk-up" : "text-desk-down"
+                      }
+                    >
+                      {h.meta.filterOk ? "UYGUN" : "DEĞİL"}
+                    </span>
+                  </div>
+                )}
+                {h.meta && isBreakoutFvgRetestType(h.type) && (
+                  <div className="mt-1.5 grid grid-cols-4 gap-x-1 gap-y-0.5 text-2xs font-mono border-t border-desk-border/40 pt-1">
+                    <span className="text-desk-muted">Durum</span>
+                    <span
+                      className={
+                        h.meta.status === "al_tetiklendi" ||
+                        h.meta.status === "confirmation"
+                          ? "text-desk-up"
+                          : ""
+                      }
+                    >
+                      {(
+                        {
+                          konsolidasyon: "Konsolidasyon",
+                          breakout: "Breakout",
+                          fvg: "FVG",
+                          retest: "Retest",
+                          confirmation: "Onay",
+                          al_tetiklendi:
+                            h.bias === "bull" ? "AL tetiklendi" : "SAT tetiklendi",
+                          olusum: "Oluşum",
+                          kirilim: "KIRILIM",
+                        } as Record<string, string>
+                      )[h.meta.status] ?? h.meta.status}
+                    </span>
+                    <span className="text-desk-muted">Skor</span>
+                    <span>{h.meta.score}</span>
+                    <span className="text-desk-muted">RH/RL</span>
+                    <span>
+                      {h.meta.rangeHigh != null
+                        ? fmtMetaPx(h.meta.rangeHigh)
+                        : "—"}
+                      /
+                      {h.meta.rangeLow != null
+                        ? fmtMetaPx(h.meta.rangeLow)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">FVG</span>
+                    <span>
+                      {h.meta.fvgBot != null && h.meta.fvgTop != null
+                        ? `${fmtMetaPx(h.meta.fvgBot)}-${fmtMetaPx(h.meta.fvgTop)}`
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">Retest</span>
+                    <span>
+                      {h.meta.retestPrice != null
+                        ? fmtMetaPx(h.meta.retestPrice)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">Entry/SL</span>
+                    <span>
+                      {h.meta.entry != null ? fmtMetaPx(h.meta.entry) : "—"}/
+                      {h.meta.stop != null ? fmtMetaPx(h.meta.stop) : "—"}
+                    </span>
+                    <span className="text-desk-muted">TP1/2/3</span>
+                    <span>
+                      {h.meta.tp1 != null ? fmtMetaPx(h.meta.tp1) : "—"}/
+                      {h.meta.tp2 != null ? fmtMetaPx(h.meta.tp2) : "—"}/
+                      {h.meta.tp3 != null ? fmtMetaPx(h.meta.tp3) : "—"}
+                    </span>
+                    <span className="text-desk-muted">Mum önce</span>
+                    <span>
+                      {h.meta.barsAgo != null ? h.meta.barsAgo : "—"}{" "}
+                      {h.bias === "bull" ? "AL" : h.bias === "bear" ? "SAT" : ""}
+                    </span>
+                    <span className="text-desk-muted">Hacim/RSI</span>
+                    <span>
+                      {h.meta.volOk ? "OK" : "—"}/
+                      {h.meta.rsi != null ? h.meta.rsi.toFixed(0) : "—"}
                     </span>
                     <span className="text-desk-muted">Filtre</span>
                     <span

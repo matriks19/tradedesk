@@ -46,6 +46,7 @@ export interface PatternHit {
     | "breakout_box"
     | "engulfing"
     | "three_drives"
+    | "breakout_fvg_retest"
     | "advanced";
   label: string;
   detail: string;
@@ -61,7 +62,15 @@ export interface PatternHit {
   timeframe?: string;
   /** SHT-style flama/üçgen quality overlay (open approximation) */
   meta?: {
-    status: "olusum" | "kirilim";
+    status:
+      | "olusum"
+      | "kirilim"
+      | "konsolidasyon"
+      | "breakout"
+      | "fvg"
+      | "retest"
+      | "confirmation"
+      | "al_tetiklendi";
     score: number; // 0-100
     contractionPct?: number;
     breakoutPrice?: number;
@@ -70,7 +79,12 @@ export interface PatternHit {
     adx?: number;
     filterOk?: boolean;
     fibs?: { level: number; price: number }[];
-    kind?: "flag" | "pennant" | "triangle" | "three_drives";
+    kind?:
+      | "flag"
+      | "pennant"
+      | "triangle"
+      | "three_drives"
+      | "breakout_fvg_retest";
     /** Three Drives / Üç İtiş */
     przLow?: number;
     przHigh?: number;
@@ -80,6 +94,19 @@ export interface PatternHit {
     fibRetraceC?: number;
     fibExtD2?: number;
     fibExtD3?: number;
+    /** Breakout → FVG → Retest */
+    rangeHigh?: number;
+    rangeLow?: number;
+    fvgTop?: number;
+    fvgBot?: number;
+    retestPrice?: number;
+    entry?: number;
+    stop?: number;
+    tp1?: number;
+    tp2?: number;
+    tp3?: number;
+    barsAgo?: number;
+    volOk?: boolean;
   };
 }
 

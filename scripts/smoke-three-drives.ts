@@ -99,6 +99,7 @@ const wired = detectPatterns(candles, {
     inv_head_shoulders: false,
     breakout_box: false,
     engulfing: false,
+    breakout_fvg_retest: false,
   },
 }).filter((h) => h.type === "three_drives");
 if (!wired.length) {
