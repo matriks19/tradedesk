@@ -417,7 +417,7 @@ export function FormationScanPanel() {
           type="button"
           className={clsx("btn text-2xs", ifvgFocus && "btn-accent")}
           onClick={() => setIfvgFocus((v) => !v)}
-          title="Inversion FVG · süpürme · CHoCH · retest · skor≥55"
+          title="Inversion FVG · süpürme · CHoCH · retest · skor≥55 — İndikatörler: IFVG Bölgeler + IFVG×RSI ile birlikte kullanılabilir"
         >
           Inversion FVG (IFVG)
         </button>

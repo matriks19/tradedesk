@@ -147,6 +147,9 @@ export type StrategyPresetId =
   | "pliDeltaHybridLong"
   | "madBandsLong"
   | "medianCrossLong"
+  | "ifvgLong"
+  | "ifvgRsiLong"
+  | "ifvgRsiBi"
   | "codeStrategy"
   | "custom";
 

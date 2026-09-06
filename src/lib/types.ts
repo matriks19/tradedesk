@@ -255,6 +255,9 @@ export type BuiltinIndicatorId =
   | "medianChannel"
   | "pliChannel"
   | "pliDeltaHybrid"
+  // IFVG (Inversion FVG)
+  | "ifvgZones"
+  | "ifvgRsi"
   // Elizi Lab
   | "eliziEdge";
 

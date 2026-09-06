@@ -177,6 +177,7 @@ import {
   pliChannel,
   pliDeltaHybrid,
 } from "./median";
+import { computeIfvgSeries, computeIfvgRsi } from "./ifvg";
 
 export interface PlotSeries {
   id: string;
@@ -431,6 +432,8 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "pliDeltaHybrid", label: "PLI×Delta Hibrit", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "oran", description: "PLI daralma (oran) × işaretli bar delta hacmi. Squeeze sonrası kırılım/sekme + destekleyici delta. Skor 0–100.", inputs: [num("length", "PLI Uzunluk", 50), num("x", "Percentil X", 5, 0.5, 40, 0.5), num("deltaSmooth", "Delta EMA", 5), num("narrowLookback", "Daralma Lookback", 50), num("narrowPct", "Daralma %", 25, 5, 50, 1), num("narrowMemory", "Daralma Bellek", 5)] },
 
   // —— Elizi Lab
+  { id: "ifvgZones", label: "IFVG Bölgeler", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "zoneTop", description: "Inversion FVG bölgeleri + retest AL/SAT. Formasyon IFVG taraması ile birlikte kullanılabilir (grafikte stack + backtest AND preset).", inputs: [num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30), num("zoneExtend", "Zone Extend", 8)] },
+  { id: "ifvgRsi", label: "IFVG×RSI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rsi", description: "IFVG uygulanmış RSI: tam RSI + bias bağlamı (rsiIfvg) + IFVG retest × OS/OB teyit sinyalleri. Formasyon IFVG taraması ile birlikte kullanılabilir.", inputs: [num("rsiPeriod", "RSI Periyot", 14), num("os", "OS", 35, 1, 50, 1), num("ob", "OB", 65, 50, 99, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — DI-anchored coherence + surprise + DI acceleration before ADX confirms. Default pane: Temp/±E/Faz; Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
 ];
 
@@ -2189,6 +2192,79 @@ export function computeBuiltin(
       break;
     }
 
+    case "ifvgZones": {
+      const s = computeIfvgSeries(candles, {
+        swingStrength: n(p, "swingStrength", 2),
+        maxInvLookforward: n(p, "maxInvLookforward", 40),
+        maxRetestLookforward: n(p, "maxRetestLookforward", 30),
+        zoneExtend: n(p, "zoneExtend", 8),
+        lookbackFvgs: 0,
+        maxHits: 0,
+      });
+      const longHist = s.longSignal.map((v) => (v === 1 ? 1 : null));
+      const shortHist = s.shortSignal.map((v) => (v === 1 ? -1 : null));
+      const biasHist = s.bias.map((v) => (v == null || v === 0 ? null : v));
+      push(
+        [
+          line(inst, "zoneTop", "main", "#7e57c2", candles, s.zoneTop, "IFVG Top"),
+          line(inst, "zoneBot", "main", "#7e57c288", candles, s.zoneBot, "IFVG Bot"),
+          hist(inst, "bias", "main", "#ab47bc55", candles, biasHist, "Bias"),
+          hist(inst, "longSig", "main", "#26a69a", candles, longHist, "AL"),
+          hist(inst, "shortSig", "main", "#ef5350", candles, shortHist, "SAT"),
+          hist(inst, "inverted", "main", "#7e57c2", candles, s.inverted, "INV"),
+          hist(inst, "sweep", "main", "#ffb74d", candles, s.sweep, "Süpürme"),
+        ],
+        {
+          zoneTop: s.zoneTop,
+          zoneBot: s.zoneBot,
+          bias: s.bias,
+          inverted: s.inverted,
+          sweep: s.sweep,
+          longSignal: s.longSignal,
+          shortSignal: s.shortSignal,
+          score: s.score,
+          entry: s.entry,
+          stop: s.stop,
+          tp1: s.tp1,
+        }
+      );
+      break;
+    }
+    case "ifvgRsi": {
+      const s = computeIfvgRsi(candles, {
+        rsiPeriod: n(p, "rsiPeriod", 14),
+        os: n(p, "os", 35),
+        ob: n(p, "ob", 65),
+        swingStrength: n(p, "swingStrength", 2),
+        maxInvLookforward: n(p, "maxInvLookforward", 40),
+        maxRetestLookforward: n(p, "maxRetestLookforward", 30),
+        lookbackFvgs: 0,
+        maxHits: 0,
+      });
+      const osLine = candles.map(() => s.os as number | null);
+      const obLine = candles.map(() => s.ob as number | null);
+      const longHist = s.longSignal.map((v) => (v === 1 ? 1 : null));
+      const shortHist = s.shortSignal.map((v) => (v === 1 ? -1 : null));
+      push(
+        [
+          line(inst, "rsi", "sub", color, candles, s.rsi, "RSI"),
+          line(inst, "rsiIfvg", "sub", "#7e57c2", candles, s.rsiIfvg, "RSI·IFVG"),
+          line(inst, "os", "sub", "#26a69a88", candles, osLine, "OS"),
+          line(inst, "ob", "sub", "#ef535088", candles, obLine, "OB"),
+          hist(inst, "longSig", "sub", "#26a69a", candles, longHist, "AL"),
+          hist(inst, "shortSig", "sub", "#ef5350", candles, shortHist, "SAT"),
+          line(inst, "score", "sub", "#ffeb3b55", candles, s.score, "Skor"),
+        ],
+        {
+          rsi: s.rsi,
+          rsiIfvg: s.rsiIfvg,
+          longSignal: s.longSignal,
+          shortSignal: s.shortSignal,
+          score: s.score,
+        }
+      );
+      break;
+    }
     case "eliziEdge": {
       const ee = eliziEdge(candles, {
         erLen: n(p, "erLen", 10),

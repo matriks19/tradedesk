@@ -62,6 +62,7 @@ import {
   pliDeltaHybrid,
   rollingMedian,
 } from "@/lib/indicators/median";
+import { computeIfvgSeries, computeIfvgRsi } from "@/lib/indicators/ifvg";
 import { orderBlocks, fairValueGaps, bosChoch } from "@/lib/indicators/beluga";
 import { diagonalSr } from "@/lib/indicators/diagonalSr";
 import { initialBalance, laguerreRsi, schaffTrendCycle, elderImpulse, coralTrend } from "@/lib/indicators/proreal";
@@ -287,6 +288,9 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   pliDeltaHybridLong: "PLI×Delta Hibrit Long",
   madBandsLong: "MAD Bant Long",
   medianCrossLong: "Medyan Cross Long",
+  ifvgLong: "IFVG Long (retest)",
+  ifvgRsiLong: "IFVG×RSI Long",
+  ifvgRsiBi: "IFVG×RSI Bi",
   oscWaddah: "Waddah Attar",
   oscSmi: "SMI (Blau) · 4s",
   oscStochRsi: "Stoch RSI",
@@ -316,6 +320,7 @@ export function recommendedWarmup(
   if (preset === "gainzAlgoV2" || preset === "gainzAlgoV2Long") return 30;
   if (preset === "eliziNexus" || preset === "eliziNexus1h" || preset === "eliziNexus4h" || preset === "eliziNexusSoft1h" || preset === "eliziNexusSoft4h") return 80;
   if (preset === "pliBreakLong" || preset === "pliDeltaHybridLong" || preset === "madBandsLong" || preset === "medianCrossLong") return 80;
+  if (preset === "ifvgLong" || preset === "ifvgRsiLong" || preset === "ifvgRsiBi") return 80;
   if (preset === "klingerLong" || preset === "squeezeLong" || preset === "halfTrendLong" || preset === "coralLong" || preset === "alligatorLong" || preset === "kstLong" || preset === "trixLong" || preset === "rviLong" || preset === "aoLong" || preset === "uoLong" || preset === "dpoLong" || preset === "ppoLong" || preset === "oscSqueezeLong") return 60;
   if (preset === "smcFvg" || preset === "smcFvgLong" || preset === "ictOb" || preset === "ictObLong" || preset === "ictBosLong" || preset === "vortexCross" || preset === "vortexLong" || preset === "forceIndex" || preset === "forceLong" || preset === "cmfZero" || preset === "cmfLong" || preset === "vidyaCross" || preset === "vidyaLong" || preset === "framaCross" || preset === "framaLong" || preset === "sslChannel" || preset === "sslLong" || preset === "vfiCross" || preset === "vfiLong" || preset === "elderImpulse" || preset === "elderLong" || preset === "cmoZero" || preset === "cmoLong" || preset === "massBulge" || preset === "bopZero" || preset === "bopLong") return 40;
   if (preset === "aroonLongTrend") return 40;
@@ -614,6 +619,27 @@ export function buildSignalContext(
       }
     }
     ctx.gainzAlgo = { buy, sell };
+  }
+
+  if (
+    params.preset === "ifvgLong" ||
+    params.preset === "ifvgRsiLong" ||
+    params.preset === "ifvgRsiBi"
+  ) {
+    ctx.ifvg = computeIfvgSeries(candles, {
+      lookbackFvgs: 0,
+      maxHits: 0,
+      requireEntry: false,
+    });
+    if (params.preset === "ifvgRsiLong" || params.preset === "ifvgRsiBi") {
+      ctx.ifvgRsi = computeIfvgRsi(candles, {
+        rsiPeriod: params.rsiPeriod ?? 14,
+        os: params.rsiOs ?? 35,
+        ob: params.rsiOb ?? 65,
+        lookbackFvgs: 0,
+        maxHits: 0,
+      });
+    }
   }
 
   if (params.preset === "codeStrategy" && params.strategyCode?.trim()) {
@@ -3273,6 +3299,108 @@ export function getSignalFn(
         const exitLong = cPrev >= (m[i - 1] as number) && c < (m[i] as number);
         return { long, short: false, exitLong, reason: "Med cross L" };
       };
+
+    case "ifvgLong": {
+      let activeTp1: number | null = null;
+      return (candles, i, ctx) => {
+        const s = ctx.ifvg as {
+          longSignal: (number | null)[];
+          shortSignal: (number | null)[];
+          tp1: (number | null)[];
+          bias: (number | null)[];
+        };
+        if (!s) return {};
+        if (s.longSignal[i] === 1) {
+          activeTp1 = s.tp1[i] ?? null;
+          return { long: true, short: false, reason: "IFVG L" };
+        }
+        const hitTp =
+          activeTp1 != null && candles[i].high >= activeTp1;
+        const exitLong =
+          s.shortSignal[i] === 1 ||
+          hitTp ||
+          s.bias[i] === -1;
+        if (exitLong) activeTp1 = null;
+        return { long: false, short: false, exitLong, reason: "IFVG L" };
+      };
+    }
+    case "ifvgRsiLong": {
+      let activeTp1: number | null = null;
+      return (candles, i, ctx) => {
+        const s = ctx.ifvgRsi as {
+          longSignal: (number | null)[];
+          shortSignal: (number | null)[];
+        };
+        const z = ctx.ifvg as {
+          tp1: (number | null)[];
+          bias: (number | null)[];
+          shortSignal: (number | null)[];
+        };
+        if (!s) return {};
+        if (s.longSignal[i] === 1) {
+          activeTp1 = z?.tp1?.[i] ?? null;
+          return { long: true, short: false, reason: "IFVG×RSI L" };
+        }
+        const hitTp =
+          activeTp1 != null && candles[i].high >= activeTp1;
+        const exitLong =
+          s.shortSignal[i] === 1 ||
+          z?.shortSignal?.[i] === 1 ||
+          hitTp ||
+          z?.bias?.[i] === -1;
+        if (exitLong) activeTp1 = null;
+        return { long: false, short: false, exitLong, reason: "IFVG×RSI L" };
+      };
+    }
+    case "ifvgRsiBi": {
+      let activeTp1: number | null = null;
+      let side: "long" | "short" | null = null;
+      return (candles, i, ctx) => {
+        const s = ctx.ifvgRsi as {
+          longSignal: (number | null)[];
+          shortSignal: (number | null)[];
+        };
+        const z = ctx.ifvg as {
+          tp1: (number | null)[];
+        };
+        if (!s) return {};
+        if (s.longSignal[i] === 1) {
+          activeTp1 = z?.tp1?.[i] ?? null;
+          side = "long";
+          return {
+            long: true,
+            short: false,
+            exitShort: true,
+            reason: "IFVG×RSI",
+          };
+        }
+        if (s.shortSignal[i] === 1) {
+          activeTp1 = z?.tp1?.[i] ?? null;
+          side = "short";
+          return {
+            long: false,
+            short: true,
+            exitLong: true,
+            reason: "IFVG×RSI",
+          };
+        }
+        const hitTpLong =
+          side === "long" &&
+          activeTp1 != null &&
+          candles[i].high >= activeTp1;
+        const hitTpShort =
+          side === "short" &&
+          activeTp1 != null &&
+          candles[i].low <= activeTp1;
+        const exitLong = hitTpLong || false;
+        const exitShort = hitTpShort || false;
+        if (exitLong || exitShort) {
+          activeTp1 = null;
+          side = null;
+        }
+        return { long: false, short: false, exitLong, exitShort, reason: "IFVG×RSI" };
+      };
+    }
 
     case "codeStrategy":
       return (_c, i, ctx) => {

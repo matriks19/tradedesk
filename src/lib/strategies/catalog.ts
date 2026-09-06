@@ -3615,6 +3615,56 @@ export const STRATEGY_PACKS: StrategyPack[] = [
   },
 
   {
+    id: "ifvg_rsi_confluence",
+    name: "IFVG × RSI Confluence",
+    shortName: "IFVG·RSI",
+    category: "smc_ict",
+    inspiredBy:
+      "ICT / Pinkman Inversion FVG + RSI OS/OB teyit — TradeDesk Formasyon IFVG + indikatör stack",
+    summary:
+      "IFVG Bölgeler (main) + IFVG×RSI (sub) birlikte. Retest AL + RSI≤OS (veya OS çıkışı). Formasyon IFVG taraması ile aynı çekirdek mantık.",
+    howTo: [
+      "İndikatörler → «IFVG Bölgeler» (main) ve «IFVG×RSI» (sub) — ikisini birden açın (stack).",
+      "Formasyonlar → Inversion FVG (IFVG) çipi ile aynı sinyalleri tarayın.",
+      "Backtest: ifvgLong · ifvgRsiLong · ifvgRsiBi (AND confluence). Karşılaştır: rsiOsOb.",
+      "Long: IFVG bull retest + RSI≤OS veya OS'den yukarı cross. Short: mirror (OB).",
+    ],
+    timeframe: "1h",
+    allowShort: true,
+    replaceIndicators: true,
+    backtestPreset: "ifvgRsiLong",
+    backtestExtras: {
+      useAtrStops: false,
+      useSignalExits: true,
+      allowShort: false,
+      rsiPeriod: 14,
+      rsiOs: 35,
+      rsiOb: 65,
+    },
+    indicators: [
+      {
+        type: "ifvgZones",
+        params: {
+          swingStrength: 2,
+          maxInvLookforward: 40,
+          maxRetestLookforward: 30,
+          zoneExtend: 8,
+        },
+        color: "#7e57c2",
+      },
+      {
+        type: "ifvgRsi",
+        params: { rsiPeriod: 14, os: 35, ob: 65 },
+      },
+    ],
+    risk: {
+      rMultiple: 1.5,
+      tip: "Zone kırılırsa (close alt/üst) setup iptal. Sadece IFVG retest + RSI teyit ile girin.",
+    },
+    tags: ["IFVG", "RSI", "SMC", "ICT", "confluence", "inversion", "niche"],
+  },
+
+  {
     id: "pli_delta_hybrid",
     name: "PLI×Delta Hibrit (Medyan/PLI)",
     shortName: "PLIΔ",

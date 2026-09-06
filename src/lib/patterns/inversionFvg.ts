@@ -47,6 +47,31 @@ export type InversionFvgOpts = {
   swingStrength?: number;
   maxInvLookforward?: number;
   maxRetestLookforward?: number;
+  /** Bars of FVG history to scan ending near the last bar. Default 120. Use 0 for full series. */
+  lookbackFvgs?: number;
+  /** Cap returned setups (pattern UI default 12). Use 0 for unlimited. */
+  maxHits?: number;
+  /** Only setups that reached retest/trigger (indicator/backtest). Default false. */
+  requireEntry?: boolean;
+};
+
+/** Lightweight IFVG setup with bar indices — shared by pattern UI + indicators. */
+export type IfvgSetup = {
+  bull: boolean;
+  fvgIndex: number;
+  fvgTop: number;
+  fvgBot: number;
+  invIdx: number;
+  retestIdx?: number;
+  triggerIdx?: number;
+  sweep: boolean;
+  sweepIdx?: number;
+  extreme: number;
+  structureTp: number;
+  score: number;
+  entry: number;
+  stop: number;
+  tp1: number;
 };
 
 function uid(prefix: string): string {
@@ -198,6 +223,43 @@ function scoreSeq(s: Seq, status: IfvgStatus): { score: number; filterOk: boolea
     score >= MIN_SCORE_FILTER &&
     (triggered || highQuality || (s.retestIdx != null && score >= 65));
   return { score, filterOk };
+}
+
+
+function pricesFromSeq(candles: Candle[], s: Seq): Pick<IfvgSetup, "entry" | "stop" | "tp1" | "score"> {
+  const status = statusOf(s);
+  const { score } = scoreSeq(s, status);
+  const bull = s.bull;
+  const fvgTop = s.fvg.top;
+  const fvgBot = s.fvg.bot;
+  const fvgMid = (fvgTop + fvgBot) / 2;
+  const entry =
+    s.retestIdx != null ? fvgMid : candles[s.invIdx].close;
+  const stopBuf = Math.max((fvgTop - fvgBot) * 0.15, Math.abs(entry) * 0.0005);
+  const stop = bull ? s.extreme - stopBuf : s.extreme + stopBuf;
+  const risk = Math.abs(entry - stop) || Math.abs(entry) * 0.01;
+  const tp1 = s.structureTp;
+  const tp1Ok = bull ? tp1 > entry : tp1 < entry;
+  const tp1Final = tp1Ok ? tp1 : bull ? entry + risk : entry - risk;
+  return { entry, stop, tp1: tp1Final, score };
+}
+
+function seqToSetup(candles: Candle[], s: Seq): IfvgSetup {
+  const p = pricesFromSeq(candles, s);
+  return {
+    bull: s.bull,
+    fvgIndex: s.fvg.index,
+    fvgTop: s.fvg.top,
+    fvgBot: s.fvg.bot,
+    invIdx: s.invIdx,
+    retestIdx: s.retestIdx,
+    triggerIdx: s.triggerIdx,
+    sweep: s.sweep,
+    sweepIdx: s.sweepIdx,
+    extreme: s.extreme,
+    structureTp: s.structureTp,
+    ...p,
+  };
 }
 
 function buildHit(candles: Candle[], s: Seq): PatternHit {
@@ -423,20 +485,22 @@ function buildHit(candles: Candle[], s: Seq): PatternHit {
 }
 
 /**
- * Detect Inversion FVG setups on a candle series (any TF).
- * Only returns sequences that reached at least inversion.
+ * Collect Inversion FVG setups (bar indices). TF-agnostic.
+ * Pattern UI uses a recent lookback; indicators/backtest use full series.
  */
-export function detectInversionFvg(
+export function findInversionFvgSetups(
   candles: Candle[],
   opts: InversionFvgOpts = {}
-): PatternHit[] {
+): IfvgSetup[] {
   if (candles.length < 40) return [];
 
   const swingStrength = opts.swingStrength ?? SWING_STRENGTH;
   const maxInv = opts.maxInvLookforward ?? MAX_INV_LOOKFORWARD;
   const maxRetest = opts.maxRetestLookforward ?? MAX_RETEST_LOOKFORWARD;
+  const lookbackFvgs = opts.lookbackFvgs ?? 120;
+  const maxHits = opts.maxHits ?? 12;
+  const requireEntry = opts.requireEntry ?? false;
 
-  // Keep beluga FVG path warm / consistent with BFR
   void fairValueGaps(candles, 12);
 
   const n = candles.length;
@@ -444,19 +508,17 @@ export function detectInversionFvg(
   const highs = swings.filter((s) => s.kind === "high");
   const lows = swings.filter((s) => s.kind === "low");
 
-  // Scan FVG formation in a recent window (leave room for inversion + retest)
-  const fvgFrom = Math.max(2, n - 120);
+  const fvgFrom =
+    lookbackFvgs <= 0 ? 2 : Math.max(2, n - lookbackFvgs);
   const fvgTo = Math.max(2, n - 3);
   const gaps = findClassicFvgs(candles, fvgFrom, fvgTo).filter((g) => {
     const mid = (g.top + g.bot) / 2 || 1;
     return (g.top - g.bot) / mid >= MIN_FVG_PCT;
   });
 
-  const hits: PatternHit[] = [];
+  const seqs: Seq[] = [];
 
   for (const fvg of gaps) {
-    // Bullish IFVG starts from a *bearish* classic FVG (fails as resistance).
-    // Bearish IFVG starts from a *bullish* classic FVG (fails as support).
     const bullIfvg = !fvg.bull;
 
     const invEnd = Math.min(n - 1, fvg.index + maxInv);
@@ -464,7 +526,6 @@ export function detectInversionFvg(
     for (let i = fvg.index + 1; i <= invEnd; i++) {
       const c = candles[i];
       if (bullIfvg) {
-        // Close fully above FVG top
         if (c.close > fvg.top) {
           invIdx = i;
           break;
@@ -478,7 +539,6 @@ export function detectInversionFvg(
     }
     if (invIdx < 0) continue;
 
-    // Liquidity sweep before inversion: wick beyond recent swing, close back inside
     let sweep = false;
     let sweepIdx: number | undefined;
     let sweepPrice: number | undefined;
@@ -491,14 +551,12 @@ export function detectInversionFvg(
     );
 
     if (bullIfvg) {
-      // Prior liquidity: swing low strictly before the 3-candle FVG
       const priorLows = recentLows.filter((s) => s.index < fvg.index - 2);
       const refLow =
         priorLows.length > 0
           ? priorLows.reduce((m, x) => (x.price < m.price ? x : m))
           : null;
       if (refLow) {
-        // Include invIdx: same-bar sweep wick + inversion close is valid
         for (let i = fvg.index - 1; i <= invIdx; i++) {
           if (i < 0) continue;
           const c = candles[i];
@@ -510,7 +568,6 @@ export function detectInversionFvg(
           }
         }
       }
-      // Fallback: wick beyond pre-FVG local min (exclude FVG triplet itself)
       if (!sweep) {
         let localMin = Infinity;
         for (let i = sweepFrom; i < fvg.index - 2; i++) {
@@ -518,7 +575,6 @@ export function detectInversionFvg(
         }
         if (Number.isFinite(localMin) && localMin < Infinity) {
           const pen = Math.abs(localMin) * 0.001;
-          // Stricter than swing path: need a bar before inversion
           for (let i = fvg.index - 1; i < invIdx; i++) {
             if (i < 0) continue;
             const c = candles[i];
@@ -570,11 +626,9 @@ export function detectInversionFvg(
       }
     }
 
-    // CHoCH: close beyond recent swing of the prior trend
     let chochIdx: number | undefined;
     let chochPrice: number | undefined;
     if (bullIfvg) {
-      // Local structure: most recent swing high before FVG (not max of whole drop)
       const preHighs = highs.filter(
         (s) => s.index >= Math.max(0, fvg.index - 25) && s.index < fvg.index
       );
@@ -582,7 +636,6 @@ export function detectInversionFvg(
       if (preHighs.length > 0) {
         swingH = preHighs[preHighs.length - 1].price;
       } else {
-        // Local lower-high zone just before FVG (downtrend structure)
         const winFrom = Math.max(0, fvg.index - 8);
         swingH = Math.max(
           ...candles.slice(winFrom, fvg.index).map((c) => c.high)
@@ -635,22 +688,16 @@ export function detectInversionFvg(
       }
     }
 
-    // Absolute extreme for stop
     const extFrom = sweepIdx ?? Math.max(0, fvg.index - 5);
     let extreme = bullIfvg
-      ? Math.min(
-          ...candles.slice(extFrom, invIdx + 1).map((c) => c.low)
-        )
-      : Math.max(
-          ...candles.slice(extFrom, invIdx + 1).map((c) => c.high)
-        );
+      ? Math.min(...candles.slice(extFrom, invIdx + 1).map((c) => c.low))
+      : Math.max(...candles.slice(extFrom, invIdx + 1).map((c) => c.high));
     if (sweep && sweepPrice != null) {
       extreme = bullIfvg
         ? Math.min(extreme, sweepPrice)
         : Math.max(extreme, sweepPrice);
     }
 
-    // Structure TP1: start of the drop (prior swing high) / rally (prior swing low)
     let structureTp: number;
     if (bullIfvg) {
       const dropStartHighs = highs.filter(
@@ -678,7 +725,6 @@ export function detectInversionFvg(
             );
     }
 
-    // Retest after inversion: touch/enter IFVG zone
     let retestIdx: number | undefined;
     let triggerIdx: number | undefined;
     const retestEnd = Math.min(n - 1, invIdx + maxRetest);
@@ -688,11 +734,9 @@ export function detectInversionFvg(
       if (!touches) continue;
 
       if (bullIfvg) {
-        // Prefer hold: close back above mid / not closing fully back below bot
         const holds = c.close >= fvg.bot;
         if (!holds) continue;
         retestIdx = i;
-        // Trigger = retest bar that holds, or next bullish confirmation
         if (c.close > c.open || c.close >= (fvg.top + fvg.bot) / 2) {
           triggerIdx = i;
         } else if (i + 1 <= retestEnd) {
@@ -726,7 +770,9 @@ export function detectInversionFvg(
       }
     }
 
-    const seq: Seq = {
+    if (requireEntry && retestIdx == null && triggerIdx == null) continue;
+
+    seqs.push({
       bull: bullIfvg,
       fvg,
       invIdx,
@@ -739,23 +785,71 @@ export function detectInversionFvg(
       sweepPrice,
       extreme,
       structureTp,
-    };
-    hits.push(buildHit(candles, seq));
+    });
   }
 
-  hits.sort((a, b) => b.confidence - a.confidence || b.tEnd - a.tEnd);
+  const setups = seqs.map((s) => seqToSetup(candles, s));
+  setups.sort((a, b) => b.score - a.score || b.invIdx - a.invIdx);
+
   const seen = new Set<string>();
-  const out: PatternHit[] = [];
-  for (const h of hits) {
-    const key = `${h.bias}_${Math.round((h.meta?.fvgTop ?? 0) * 1e4)}_${Math.round(
-      (h.meta?.fvgBot ?? 0) * 1e4
-    )}_${h.meta?.status}`;
+  const out: IfvgSetup[] = [];
+  for (const h of setups) {
+    const status =
+      h.triggerIdx != null
+        ? h.bull
+          ? "al"
+          : "sat"
+        : h.retestIdx != null
+          ? "retest"
+          : "inv";
+    const key = `${h.bull ? "b" : "s"}_${Math.round(h.fvgTop * 1e4)}_${Math.round(
+      h.fvgBot * 1e4
+    )}_${status}`;
     if (seen.has(key)) continue;
     seen.add(key);
     out.push(h);
-    if (out.length >= 12) break;
+    if (maxHits > 0 && out.length >= maxHits) break;
   }
   return out;
+}
+
+/**
+ * Detect Inversion FVG setups on a candle series (any TF).
+ * Only returns sequences that reached at least inversion.
+ */
+export function detectInversionFvg(
+  candles: Candle[],
+  opts: InversionFvgOpts = {}
+): PatternHit[] {
+  const setups = findInversionFvgSetups(candles, {
+    ...opts,
+    lookbackFvgs: opts.lookbackFvgs ?? 120,
+    maxHits: opts.maxHits ?? 12,
+  });
+  // Rebuild Seq-compatible hits via detect path: map setups back through buildHit
+  // by re-running a thin Seq from setup fields.
+  const hits: PatternHit[] = [];
+  for (const u of setups) {
+    const seq: Seq = {
+      bull: u.bull,
+      fvg: {
+        index: u.fvgIndex,
+        top: u.fvgTop,
+        bot: u.fvgBot,
+        bull: !u.bull,
+      },
+      invIdx: u.invIdx,
+      retestIdx: u.retestIdx,
+      triggerIdx: u.triggerIdx,
+      sweep: u.sweep,
+      sweepIdx: u.sweepIdx,
+      extreme: u.extreme,
+      structureTp: u.structureTp,
+    };
+    hits.push(buildHit(candles, seq));
+  }
+  hits.sort((a, b) => b.confidence - a.confidence || b.tEnd - a.tEnd);
+  return hits;
 }
 
 export function isInversionFvgType(type: PatternHit["type"]): boolean {
