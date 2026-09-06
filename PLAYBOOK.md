@@ -69,3 +69,9 @@ Crypto10 bakeoff (signal-exit, long-only, Sep 2026):
 Not: MAD Long overtrade — filtre/sıkılık lazım. PLI×Δ 4h’de SMI’ye yakın (SMI≈2945). BB Break tr≈10 şişik — playbook kral listesine koyma.
 Pine referans: Go-10-Pli (dg_factor) — `oran = p1/p2 - 1`, long=crossover(close,p1).
 
+
+
+## Formasyon — Inversion FVG (IFVG)
+
+Bar-based ICT setup (her TF): klasik FVG fail → mum gap’i kapatır (inversion) → rol flip + CHoCH → IFVG retest’te AL/SAT.
+Süpürme (likidite wick) + inversion birlikte → skor boost (`IFVG·Süp`). UI: Formasyon Tara / Aktif grafik çipi.

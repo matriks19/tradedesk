@@ -13,6 +13,7 @@ import { detectPatterns } from "@/lib/patterns/detect";
 import { passesShtFilter } from "@/lib/patterns/shtFlagTriangle";
 import { passesThreeDrivesFilter } from "@/lib/patterns/threeDrives";
 import { passesBreakoutFvgRetestFilter } from "@/lib/patterns/breakoutFvgRetest";
+import { passesInversionFvgFilter } from "@/lib/patterns/inversionFvg";
 import type { PatternHit } from "@/lib/patterns/types";
 import { mapPool } from "@/lib/scanner/engine";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
@@ -41,6 +42,8 @@ type Row = {
   sht?: boolean;
   threeDrives?: boolean;
   bfr?: boolean;
+  ifvg?: boolean;
+  barsAgo?: number;
 };
 
 export function FormationScanPanel() {
@@ -62,6 +65,7 @@ export function FormationScanPanel() {
   const [shtFocus, setShtFocus] = useState(false);
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
+  const [ifvgFocus, setIfvgFocus] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [rows, setRows] = useState<Row[]>([]);
@@ -74,9 +78,9 @@ export function FormationScanPanel() {
   };
 
   const run = useCallback(async () => {
-    if (!families.length && !shtFocus && !tdFocus && !bfrFocus) {
+    if (!families.length && !shtFocus && !tdFocus && !bfrFocus && !ifvgFocus) {
       setStatus(
-        "En az bir formasyon ailesi, SHT Flama/Üçgen, Üç İtiş veya Breakout·FVG·Retest seçin"
+        "En az bir formasyon ailesi, SHT Flama/Üçgen, Üç İtiş, Breakout·FVG·Retest veya IFVG seçin"
       );
       return;
     }
@@ -166,6 +170,7 @@ export function FormationScanPanel() {
                   engulfing: false,
                   three_drives: false,
                   breakout_fvg_retest: false,
+                  inversion_fvg: false,
                 },
               }).filter((h) => passesShtFilter(h, 60));
               for (const h of classic.slice(0, 2)) {
@@ -204,6 +209,7 @@ export function FormationScanPanel() {
                   breakout_box: false,
                   engulfing: false,
                   breakout_fvg_retest: false,
+                  inversion_fvg: false,
                 },
               }).filter((h) => passesThreeDrivesFilter(h, 60));
               for (const h of tds.slice(0, 2)) {
@@ -233,6 +239,7 @@ export function FormationScanPanel() {
                 swingStrength: job.swing,
                 enable: {
                   breakout_fvg_retest: true,
+                  inversion_fvg: false,
                   three_drives: false,
                   flag: false,
                   pennant: false,
@@ -267,6 +274,48 @@ export function FormationScanPanel() {
                 });
               }
             }
+            if (ifvgFocus) {
+              const ifvgs = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  inversion_fvg: true,
+                  breakout_fvg_retest: false,
+                  three_drives: false,
+                  flag: false,
+                  pennant: false,
+                  triangle_asc: false,
+                  triangle_desc: false,
+                  triangle_sym: false,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              }).filter((h) => passesInversionFvgFilter(h, 55));
+              for (const h of ifvgs.slice(0, 2)) {
+                const tag = h.meta?.sweep ? "IFVG·Süp" : "IFVG";
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label.includes("IFVG") ? h.label : `${tag} · ${h.label}`,
+                  confidence:
+                    h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.entry,
+                  tp1: h.meta?.tp1,
+                  sl: h.meta?.stop,
+                  barsAgo: h.meta?.barsAgo,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  ifvg: true,
+                });
+              }
+            }
           } catch {
             /* skip */
           }
@@ -282,7 +331,7 @@ export function FormationScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [exchange, timeframe, families, shtFocus, tdFocus, bfrFocus, patternSettings.swingStrength]);
+  }, [exchange, timeframe, families, shtFocus, tdFocus, bfrFocus, ifvgFocus, patternSettings.swingStrength]);
 
   const openHit = (h: Row) => {
     setActivePane(activePaneId);
@@ -364,6 +413,14 @@ export function FormationScanPanel() {
         >
           Breakout·FVG·Retest
         </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", ifvgFocus && "btn-accent")}
+          onClick={() => setIfvgFocus((v) => !v)}
+          title="Inversion FVG · süpürme · CHoCH · retest · skor≥55"
+        >
+          Inversion FVG (IFVG)
+        </button>
       </div>
       {status && <p className="text-2xs text-desk-muted">{status}</p>}
       {running && (
@@ -407,11 +464,14 @@ export function FormationScanPanel() {
             </div>
             <div className="text-2xs text-desk-muted font-mono truncate">
               {r.timeframe ? `${r.timeframe} · ` : ""}
-              {r.sht ? "SHT · " : ""}{r.threeDrives ? "Üç İtiş · " : ""}{r.bfr ? "BFR · " : ""}
+              {r.sht ? "SHT · " : ""}{r.threeDrives ? "Üç İtiş · " : ""}{r.bfr ? "BFR · " : ""}{r.ifvg ? (r.label.includes("Süp") ? "IFVG·Süp · " : "IFVG · ") : ""}
               {r.entry != null ? `E ${fmt(r.entry)}` : ""}
               {r.prz ? ` · PRZ ${fmt(r.prz.low)}-${fmt(r.prz.high)}` : ""}
-              {r.tp1 != null ? ` · ${r.sht || r.threeDrives || r.bfr ? (r.bfr ? "TP1" : "Hedef") : "TP1"} ${fmt(r.tp1)}` : ""}
+              {r.tp1 != null ? ` · ${r.sht || r.threeDrives || r.bfr || r.ifvg ? (r.bfr || r.ifvg ? "TP1" : "Hedef") : "TP1"} ${fmt(r.tp1)}` : ""}
               {r.sl != null ? ` · SL ${fmt(r.sl)}` : ""}
+              {r.ifvg && r.barsAgo != null
+                ? ` · ${r.barsAgo} mum önce ${r.direction === "bear" ? "SAT" : "AL"}`
+                : ""}
             </div>
           </button>
         ))}

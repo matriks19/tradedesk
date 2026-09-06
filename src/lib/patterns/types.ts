@@ -47,6 +47,7 @@ export interface PatternHit {
     | "engulfing"
     | "three_drives"
     | "breakout_fvg_retest"
+    | "inversion_fvg"
     | "advanced";
   label: string;
   detail: string;
@@ -70,7 +71,10 @@ export interface PatternHit {
       | "fvg"
       | "retest"
       | "confirmation"
-      | "al_tetiklendi";
+      | "al_tetiklendi"
+      | "sat_tetiklendi"
+      | "inversion"
+      | "choch";
     score: number; // 0-100
     contractionPct?: number;
     breakoutPrice?: number;
@@ -84,7 +88,8 @@ export interface PatternHit {
       | "pennant"
       | "triangle"
       | "three_drives"
-      | "breakout_fvg_retest";
+      | "breakout_fvg_retest"
+      | "inversion_fvg";
     /** Three Drives / Üç İtiş */
     przLow?: number;
     przHigh?: number;
@@ -107,6 +112,10 @@ export interface PatternHit {
     tp3?: number;
     barsAgo?: number;
     volOk?: boolean;
+    /** Inversion FVG */
+    sweep?: boolean;
+    chochPrice?: number;
+    riskR?: number;
   };
 }
 

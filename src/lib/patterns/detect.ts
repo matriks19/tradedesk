@@ -9,6 +9,7 @@ import { findSwings, lastN } from "./swings";
 import { enrichFlagTriangleHits } from "./shtFlagTriangle";
 import { detectThreeDrives } from "./threeDrives";
 import { detectBreakoutFvgRetest } from "./breakoutFvgRetest";
+import { detectInversionFvg } from "./inversionFvg";
 
 const DEFAULTS: Required<DetectOptions> = {
   swingStrength: 2,
@@ -194,6 +195,9 @@ export function detectPatterns(
   }
   if (enabled(opts, "breakout_fvg_retest")) {
     hits.push(...detectBreakoutFvgRetest(candles));
+  }
+  if (enabled(opts, "inversion_fvg")) {
+    hits.push(...detectInversionFvg(candles, { swingStrength: opts.swingStrength }));
   }
 
   const enriched = enrichFlagTriangleHits(candles, hits);
