@@ -1,5 +1,5 @@
 /**
- * Crypto10 bakeoff: IFVG gates — Jurik Stoch vs SMI vs RSI (1h + 4h).
+ * Crypto10 bakeoff: IFVG gates — Jurik Kase Stoch (2×) vs SMI vs RSI (1h + 4h).
  * Signal-exit. Playbook TF focus: 4h verdict.
  * Run: npx --yes tsx scripts/compare-ifvg-jurik.ts
  */
@@ -256,7 +256,7 @@ function verdict(
         : j4.wr === r4.wr && j4.net === r4.net
           ? "ties"
           : "trails";
-    verdictLine = `VERDICT (4h playbook): Jurik as IFVG gate ${jurikVsSmi} SMI and ${jurikVsRsi} RSI on WR/net. Best gate on 4h: ${best}. Chart stack: IFVG Bölgeler + IFVG×${best === "Jurik" ? "Jurik Stoch" : best === "SMI" ? "SMI" : "RSI"}; presets ifvgJurikStochLong / ifvgSmiLong / ifvgRsiLong.`;
+    verdictLine = `VERDICT (4h playbook): Jurik Kase as IFVG gate ${jurikVsSmi} SMI and ${jurikVsRsi} RSI on WR/net. Best gate on 4h: ${best}. Chart stack: IFVG Bölgeler + IFVG×${best === "Jurik" ? "Jurik Kase" : best === "SMI" ? "SMI" : "RSI"}; presets ifvgJurikStochLong / ifvgSmiLong / ifvgRsiLong.`;
   }
   lines.push("");
   lines.push(verdictLine);

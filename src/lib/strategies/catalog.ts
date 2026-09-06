@@ -3666,18 +3666,19 @@ export const STRATEGY_PACKS: StrategyPack[] = [
 
   {
     id: "ifvg_jurik_stoch_confluence",
-    name: "IFVG × Jurik Stoch Confluence",
-    shortName: "IFVG·Jurik",
+    name: "IFVG × Jurik Kase Confluence",
+    shortName: "IFVG·JKase",
     category: "smc_ict",
     inspiredBy:
-      "ICT / Pinkman Inversion FVG + community Jurik Stochastic (k/d JMA) — bakeoff vs SMI/RSI gates",
+      "ICT / Pinkman Inversion FVG + Loxx Jurik Kase Stochastic (2× JFKPS+ADX mobile: 18/10/6/20/phase0) — bakeoff vs SMI/RSI gates",
     summary:
-      "IFVG Bölgeler (main) + IFVG×Jurik Stoch (sub). Retest AL + K cross above D (soft K<50) veya OS (20) yükseliş. Formasyon IFVG ile aynı çekirdek.",
+      "IFVG Bölgeler (main) + IFVG×Jurik Kase (sub). Retest AL + K cross above D (soft K<50) veya OS (20) yükseliş. Formasyon IFVG ile aynı çekirdek.",
     howTo: [
-      "İndikatörler → «IFVG Bölgeler» (main) ve «IFVG×Jurik Stoch» (sub) — ikisini birden açın (stack).",
+      "İndikatörler → «IFVG Bölgeler» (main) ve «IFVG×Jurik Kase» (sub) — ikisini birden açın (stack).",
       "Formasyonlar → Inversion FVG (IFVG) çipi ile aynı sinyalleri tarayın.",
       "Backtest: ifvgJurikStochLong · ifvgJurikStochBi. Karşılaştır: ifvgSmiLong · ifvgRsiLong · smiLongOnly.",
       "Long: IFVG bull retest + K/D cross up (K<50 soft) veya OS (20) yükseliş. Short: mirror (OB 80).",
+      "Params 2× screenshot: Periyot 18, Cycle 10, Smoothing 6, Jurik Smoothing 20, Phase 0.",
       "Çıkış: K cross below D veya karşı IFVG / TP1.",
     ],
     timeframe: "1h",
@@ -3702,14 +3703,14 @@ export const STRATEGY_PACKS: StrategyPack[] = [
       },
       {
         type: "ifvgJurikStoch",
-        params: { kLen: 28, dLen: 6, jmaLen: 20, phase: 50, power: 2, os: 20, ob: 80, softMid: 1 },
+        params: { cycle: 10, kLen: 18, dLen: 6, jmaLen: 20, phase: 0, power: 2, os: 20, ob: 80, softMid: 1 },
       },
     ],
     risk: {
       rMultiple: 1.5,
-      tip: "Zone kırılırsa setup iptal. Sadece IFVG retest + Jurik Stoch teyit ile girin. Oscillator: jurikStoch (k/d), not Kase.",
+      tip: "Zone kırılırsa setup iptal. Sadece IFVG retest + Jurik Kase Stoch teyit ile girin. Oscillator: jurikKaseStoch (k/d), 2× mobile defaults.",
     },
-    tags: ["IFVG", "Jurik", "Stochastic", "SMC", "ICT", "confluence", "inversion", "niche"],
+    tags: ["IFVG", "Jurik", "Kase", "Stochastic", "SMC", "ICT", "confluence", "inversion", "niche"],
   },
 
   {

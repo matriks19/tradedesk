@@ -293,8 +293,8 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   ifvgRsiBi: "IFVG×RSI Bi",
   ifvgSmiLong: "IFVG×SMI Long",
   ifvgSmiBi: "IFVG×SMI Bi",
-  ifvgJurikStochLong: "IFVG×Jurik Stoch Long",
-  ifvgJurikStochBi: "IFVG×Jurik Stoch Bi",
+  ifvgJurikStochLong: "IFVG×Jurik Kase Long",
+  ifvgJurikStochBi: "IFVG×Jurik Kase Bi",
   oscWaddah: "Waddah Attar",
   oscSmi: "SMI (Blau) · 4s",
   oscStochRsi: "Stoch RSI",
@@ -324,7 +324,8 @@ export function recommendedWarmup(
   if (preset === "gainzAlgoV2" || preset === "gainzAlgoV2Long") return 30;
   if (preset === "eliziNexus" || preset === "eliziNexus1h" || preset === "eliziNexus4h" || preset === "eliziNexusSoft1h" || preset === "eliziNexusSoft4h") return 80;
   if (preset === "pliBreakLong" || preset === "pliDeltaHybridLong" || preset === "madBandsLong" || preset === "medianCrossLong") return 80;
-  if (preset === "ifvgLong" || preset === "ifvgRsiLong" || preset === "ifvgRsiBi" || preset === "ifvgSmiLong" || preset === "ifvgSmiBi" || preset === "ifvgJurikStochLong" || preset === "ifvgJurikStochBi") return 120;
+  if (preset === "ifvgJurikStochLong" || preset === "ifvgJurikStochBi") return 150;
+  if (preset === "ifvgLong" || preset === "ifvgRsiLong" || preset === "ifvgRsiBi" || preset === "ifvgSmiLong" || preset === "ifvgSmiBi") return 120;
   if (preset === "klingerLong" || preset === "squeezeLong" || preset === "halfTrendLong" || preset === "coralLong" || preset === "alligatorLong" || preset === "kstLong" || preset === "trixLong" || preset === "rviLong" || preset === "aoLong" || preset === "uoLong" || preset === "dpoLong" || preset === "ppoLong" || preset === "oscSqueezeLong") return 60;
   if (preset === "smcFvg" || preset === "smcFvgLong" || preset === "ictOb" || preset === "ictObLong" || preset === "ictBosLong" || preset === "vortexCross" || preset === "vortexLong" || preset === "forceIndex" || preset === "forceLong" || preset === "cmfZero" || preset === "cmfLong" || preset === "vidyaCross" || preset === "vidyaLong" || preset === "framaCross" || preset === "framaLong" || preset === "sslChannel" || preset === "sslLong" || preset === "vfiCross" || preset === "vfiLong" || preset === "elderImpulse" || preset === "elderLong" || preset === "cmoZero" || preset === "cmoLong" || preset === "massBulge" || preset === "bopZero" || preset === "bopLong") return 40;
   if (preset === "aroonLongTrend") return 40;
@@ -661,10 +662,11 @@ export function buildSignalContext(
     }
     if (params.preset === "ifvgJurikStochLong" || params.preset === "ifvgJurikStochBi") {
       ctx.ifvgJurikStoch = computeIfvgJurikStoch(candles, {
-        kLen: 28,
+        cycle: 10,
+        kLen: 18,
         dLen: 6,
         jmaLen: 20,
-        phase: 50,
+        phase: 0,
         power: 2,
         os: 20,
         ob: 80,

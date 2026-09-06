@@ -1,5 +1,5 @@
 /**
- * IFVG chart series + IFVG-gated RSI/SMI/Jurik Stoch — shared with Formasyon IFVG scanner.
+ * IFVG chart series + IFVG-gated RSI/SMI/Jurik Kase Stoch — shared with Formasyon IFVG scanner.
  * One detect pass via findInversionFvgSetups (full history for indicators).
  */
 import type { Candle } from "@/lib/types";
@@ -9,7 +9,7 @@ import {
   type InversionFvgOpts,
 } from "@/lib/patterns/inversionFvg";
 import { rsi as rsiCalc, smi as smiCalc } from "./math";
-import { jurikStoch } from "./jurik";
+import { jurikKaseStoch } from "./jurik";
 
 export type IfvgSeries = {
   zoneTop: (number | null)[];
@@ -359,12 +359,15 @@ export type IfvgJurikStochSeries = {
 };
 
 export type IfvgJurikStochOpts = IfvgSeriesOpts & {
-  /** Stochastic %K lookback. Default 28 (2× jurikStoch preset — slower IFVG gate). */
+  /** Kase synthetic permission cycle / multiplier. Default 10 (2× mobile JFKPS+ADX base 5). */
+  cycle?: number;
+  /** Stochastic %K lookback (Periyot). Default 18 (2× base 9). */
   kLen?: number;
-  /** %D SMA of smoothed K. Default 6 (2×). */
+  /** %D SMA of smoothed K (Smoothing Period). Default 6 (2× base 3). */
   dLen?: number;
-  /** JMA smooth length on raw K. Default 20 (Jurik smooth contribution). */
+  /** JMA smooth length (Jurik Smoothing). Default 20 (2× base 10). */
   jmaLen?: number;
+  /** Jurik Phase. Default 0 (screenshot). */
   phase?: number;
   power?: number;
   /** Oversold guide (0–100). Default 20. */
@@ -379,13 +382,13 @@ export type IfvgJurikStochOpts = IfvgSeriesOpts & {
 };
 
 /**
- * IFVG-applied Jurik Stochastic.
+ * IFVG-applied Loxx Jurik Kase Stochastic.
  *
- * Oscillator choice: **`jurikStoch`** (not `jurikKaseStoch`). Both expose k/d-like
- * lines; IFVG gate uses 2× %K/%D of the "Jurik Stochastic" registry preset
- * (kLen=28, dLen=6) plus jmaLen=20 on a classic 0–100 scale — natural for OS≈20 / OB≈80 and
- * mid-50 soft filter. Kase variant adds permission-OHLC / dual-cycle richness
- * but different defaults; keep confluence gates aligned with plain Jurik Stoch.
+ * Oscillator: **`jurikKaseStoch`** (not plain `jurikStoch`). Defaults are **2×** of the
+ * mobile JFKPS+ADX → KASE STOCHASTIC SETTINGS screenshot:
+ * Periyot 9→18 (`kLen`), Synthetic Multiplier 5→10 (`cycle`), Smoothing Period 3→6
+ * (`dLen`), Jurik Smoothing 10→20 (`jmaLen`), Jurik Phase 0→0 (`phase`). Power 2.
+ * Gate uses k vs d crosses on classic 0–100 scale — OS≈20 / OB≈80 and mid-50 soft filter.
  *
  * Long: IFVG bull retest AND (K cross above D [soft K<50] OR K rising from OS
  * / leave OS). Short: mirror (cross below D / from OB).
@@ -395,16 +398,25 @@ export function computeIfvgJurikStoch(
   opts: IfvgJurikStochOpts = {}
 ): IfvgJurikStochSeries {
   const n = candles.length;
-  const kLen = opts.kLen ?? 28;
+  const cycle = opts.cycle ?? 10;
+  const kLen = opts.kLen ?? 18;
   const dLen = opts.dLen ?? 6;
   const jmaLen = opts.jmaLen ?? 20;
-  const phase = opts.phase ?? 50;
+  const phase = opts.phase ?? 0;
   const power = opts.power ?? 2;
   const os = opts.os ?? 20;
   const ob = opts.ob ?? 80;
   const softMid = opts.softMid ?? true;
 
-  const { k, d } = jurikStoch(candles, kLen, dLen, jmaLen, phase, power, "jma");
+  const { k, d } = jurikKaseStoch(candles, {
+    cycle,
+    kLen,
+    dLen,
+    jmaLen,
+    phase,
+    power,
+    smoothMode: "jma",
+  });
   const kIfvg = fillNull(n);
   const longSignal = fillNull(n);
   const shortSignal = fillNull(n);
