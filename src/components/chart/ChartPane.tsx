@@ -63,9 +63,9 @@ function chartOptions(height: number, width: number, showTime: boolean) {
       secondsVisible: false,
       visible: showTime,
       // Comfortable default density; initial range is set after setData.
-      barSpacing: 10,
+      barSpacing: 8,
       minBarSpacing: 2,
-      rightOffset: 8,
+      rightOffset: 12,
     },
     handleScroll: {
       mouseWheel: true,
@@ -106,9 +106,12 @@ export function ChartPane({ pane, compact }: Props) {
   >(new Map());
   const subContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const priceLinesRef = useRef<IPriceLine[]>([]);
-  /** First open / symbol·TF change: show at least ~20 bars (target last 80). */
+  /** First open / symbol·TF change: target last ~80–120 bars (not full history). */
   const INITIAL_VISIBLE_BARS = 80;
   const dataViewKeyRef = useRef("");
+  /** Re-apply visible range after first real layout / symbol·TF change. */
+  const needsInitialFitRef = useRef(true);
+  const lastSizeRef = useRef({ width: 0, height: 0 });
   /** Ignore range events shortly after programmatic setVisibleLogicalRange. */
   const programmaticUntil = useRef(0);
   const lastSyncedRange = useRef<LogicalRange | null>(null);
@@ -136,6 +139,8 @@ export function ChartPane({ pane, compact }: Props) {
   const [customTfDraft, setCustomTfDraft] = useState("");
   const [overlayEpoch, setOverlayEpoch] = useState(0);
   const [overlayDrawnMsg, setOverlayDrawnMsg] = useState(false);
+  const overlayPatternRef = useRef(overlayPattern);
+  overlayPatternRef.current = overlayPattern;
 
   const { candles, loading, error, delayed, note } = useKlines(
     pane.symbol,
@@ -301,6 +306,55 @@ export function ChartPane({ pane, compact }: Props) {
     }
   }, [rangesNearlyEqual]);
 
+  /** Fit last ~40–120 bars + price autoScale; fallback fitContent. Returns success. */
+  const applyInitialView = useCallback((main: IChartApi): boolean => {
+    if (overlayPatternRef.current) return false;
+    const series = candleRef.current;
+    if (!series) return false;
+    let n = 0;
+    try {
+      n = series.data().length;
+    } catch {
+      return false;
+    }
+    if (n < 1) return false;
+
+    // Prefer ~80–120 bars of history (not fitContent full series).
+    const visible = Math.min(120, Math.max(40, Math.min(n, Math.max(INITIAL_VISIBLE_BARS, 120))));
+    const from = Math.max(0, n - visible);
+    const to = n + 4; // small right pad so last bar isn't edge-glued
+
+    programmaticUntil.current = performance.now() + 120;
+    try {
+      const range = { from, to } as LogicalRange;
+      main.timeScale().setVisibleLogicalRange(range);
+      lastSyncedRange.current = range;
+      try {
+        main.priceScale("right").applyOptions({ autoScale: true });
+      } catch {
+        /* */
+      }
+      return true;
+    } catch {
+      try {
+        main.timeScale().fitContent();
+        try {
+          main.priceScale("right").applyOptions({ autoScale: true });
+        } catch {
+          /* */
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  }, []);
+
+  const applyInitialViewRef = useRef(applyInitialView);
+  applyInitialViewRef.current = applyInitialView;
+  const syncLogicalRangesRef = useRef(syncLogicalRanges);
+  syncLogicalRangesRef.current = syncLogicalRanges;
+
   // Main chart init
   useEffect(() => {
     if (!containerRef.current) return;
@@ -319,21 +373,49 @@ export function ChartPane({ pane, compact }: Props) {
       priceFormat: { type: "volume" },
       priceScaleId: "vol",
     });
+    // Keep candles off the pane edges; volume stays on its own scale.
+    chart.priceScale("right").applyOptions({
+      scaleMargins: { top: 0.08, bottom: 0.18 },
+      autoScale: true,
+    });
     chart.priceScale("vol").applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
     });
     chartRef.current = chart;
     candleRef.current = candlesSeries;
     volRef.current = volumeSeries;
+    needsInitialFitRef.current = true;
+    lastSizeRef.current = { width: width || 0, height: height || 0 };
     setChartReady((n) => n + 1);
 
     const ro = new ResizeObserver(() => {
       if (!containerRef.current || !chartRef.current) return;
       const size = pixelSize(containerRef.current);
+      const prev = lastSizeRef.current;
+      const grewFromTiny =
+        (prev.width < 80 || prev.height < 80) &&
+        size.width >= 80 &&
+        size.height >= 80;
       chartRef.current.applyOptions({
         width: size.width,
         height: size.height,
       });
+      lastSizeRef.current = size;
+
+      if (
+        (needsInitialFitRef.current || grewFromTiny) &&
+        size.width >= 80 &&
+        size.height >= 80
+      ) {
+        const main = chartRef.current;
+        requestAnimationFrame(() => {
+          if (!chartRef.current || chartRef.current !== main) return;
+          if (applyInitialViewRef.current(main)) {
+            needsInitialFitRef.current = false;
+            syncLogicalRangesRef.current(main);
+          }
+        });
+      }
     });
     ro.observe(el);
 
@@ -598,33 +680,46 @@ export function ChartPane({ pane, compact }: Props) {
     const shouldResetView = dataViewKeyRef.current !== viewKey;
     if (shouldResetView) {
       dataViewKeyRef.current = viewKey;
+      needsInitialFitRef.current = true;
     }
-    requestAnimationFrame(() => {
+
+    let raf2 = 0;
+    let timeoutId = 0;
+    const tryApply = () => {
       const main = chartRef.current;
-      if (main && shouldResetView && !overlayPattern) {
-        const n = candles.length;
-        const visible = Math.min(INITIAL_VISIBLE_BARS, Math.max(20, n));
-        const from = Math.max(0, n - visible);
-        const to = n + 5; // right padding so last bar isn't glued to the edge
-        programmaticUntil.current = performance.now() + 100;
-        try {
-          const range = { from, to } as LogicalRange;
-          main.timeScale().setVisibleLogicalRange(range);
-          lastSyncedRange.current = range;
-        } catch {
-          try {
-            main.timeScale().fitContent();
-          } catch {
-            /* */
-          }
+      if (!main || !shouldResetView || overlayPattern) return;
+      const el = containerRef.current;
+      if (!el) return;
+      const size = pixelSize(el);
+      if (size.width < 80 || size.height < 80) return; // wait for ResizeObserver
+      if (applyInitialView(main)) {
+        needsInitialFitRef.current = false;
+      }
+    };
+
+    const raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        tryApply();
+        syncLogicalRanges(chartRef.current);
+        if (overlayPattern) {
+          window.dispatchEvent(new Event(TD_OVERLAY_REDRAW));
         }
-      }
-      syncLogicalRanges(chartRef.current);
-      if (overlayPattern) {
-        window.dispatchEvent(new Event(TD_OVERLAY_REDRAW));
-      }
+      });
     });
-  }, [candles, syncLogicalRanges, overlayPattern, pane.symbol, pane.timeframe]);
+    // Layout may settle slightly after paint (flex/grid).
+    timeoutId = window.setTimeout(() => {
+      if (needsInitialFitRef.current && shouldResetView && !overlayPattern) {
+        tryApply();
+        syncLogicalRanges(chartRef.current);
+      }
+    }, 80);
+
+    return () => {
+      cancelAnimationFrame(raf1);
+      if (raf2) cancelAnimationFrame(raf2);
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [candles, syncLogicalRanges, applyInitialView, overlayPattern, pane.symbol, pane.timeframe]);
 
   // Main overlays
   useEffect(() => {
