@@ -177,7 +177,7 @@ import {
   pliChannel,
   pliDeltaHybrid,
 } from "./median";
-import { computeIfvgSeries, computeIfvgRsi } from "./ifvg";
+import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi } from "./ifvg";
 
 export interface PlotSeries {
   id: string;
@@ -433,7 +433,8 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
 
   // —— Elizi Lab
   { id: "ifvgZones", label: "IFVG Bölgeler", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "zoneTop", description: "Inversion FVG bölgeleri + retest AL/SAT. Formasyon IFVG taraması ile birlikte kullanılabilir (grafikte stack + backtest AND preset).", inputs: [num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30), num("zoneExtend", "Zone Extend", 8)] },
-  { id: "ifvgRsi", label: "IFVG×RSI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rsi", description: "IFVG uygulanmış RSI: tam RSI + bias bağlamı (rsiIfvg) + IFVG retest × OS/OB teyit sinyalleri. Formasyon IFVG taraması ile birlikte kullanılabilir.", inputs: [num("rsiPeriod", "RSI Periyot", 14), num("os", "OS", 35, 1, 50, 1), num("ob", "OB", 65, 50, 99, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
+  { id: "ifvgRsi", label: "IFVG×RSI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rsi", description: "IFVG uygulanmış RSI: tam RSI + bias bağlamı (rsiIfvg) + IFVG retest × OS/OB teyit sinyalleri. Formasyon IFVG taraması ile birlikte kullanılabilir. (İkincil — tercih: IFVG×SMI)", inputs: [num("rsiPeriod", "RSI Periyot", 14), num("os", "OS", 35, 1, 50, 1), num("ob", "OB", 65, 50, 99, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
+  { id: "ifvgSmi", label: "IFVG×SMI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "smi", description: "IFVG uygulanmış SMI (Blau): smi+signal + bias bağlamı (smiIfvg) + IFVG retest × SMI/signal cross teyit (playbook SMI Long tarzı, soft ≤0/≥0 seviye). Tercih edilen IFVG confluence.", inputs: [num("k", "SMI K", 14), num("d", "SMI D", 20), num("ema", "Signal EMA", 5), num("os", "OS", -40, -100, 0, 1), num("ob", "OB", 40, 0, 100, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — DI-anchored coherence + surprise + DI acceleration before ADX confirms. Default pane: Temp/±E/Faz; Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
 ];
 
@@ -2258,6 +2259,47 @@ export function computeBuiltin(
         {
           rsi: s.rsi,
           rsiIfvg: s.rsiIfvg,
+          longSignal: s.longSignal,
+          shortSignal: s.shortSignal,
+          score: s.score,
+        }
+      );
+      break;
+    }
+    case "ifvgSmi": {
+      const s = computeIfvgSmi(candles, {
+        k: n(p, "k", 14),
+        d: n(p, "d", 20),
+        ema: n(p, "ema", 5),
+        os: n(p, "os", -40),
+        ob: n(p, "ob", 40),
+        swingStrength: n(p, "swingStrength", 2),
+        maxInvLookforward: n(p, "maxInvLookforward", 40),
+        maxRetestLookforward: n(p, "maxRetestLookforward", 30),
+        lookbackFvgs: 0,
+        maxHits: 0,
+      });
+      const osLine = candles.map(() => s.os as number | null);
+      const obLine = candles.map(() => s.ob as number | null);
+      const zeroLine = candles.map(() => 0 as number | null);
+      const longHist = s.longSignal.map((v) => (v === 1 ? 1 : null));
+      const shortHist = s.shortSignal.map((v) => (v === 1 ? -1 : null));
+      push(
+        [
+          line(inst, "smi", "sub", color, candles, s.smi, "SMI"),
+          line(inst, "sig", "sub", "#ff6d00", candles, s.signal, "Signal"),
+          line(inst, "smiIfvg", "sub", "#7e57c2", candles, s.smiIfvg, "SMI·IFVG"),
+          line(inst, "os", "sub", "#26a69a88", candles, osLine, "OS"),
+          line(inst, "ob", "sub", "#ef535088", candles, obLine, "OB"),
+          line(inst, "zero", "sub", "#787b8655", candles, zeroLine, "0"),
+          hist(inst, "longSig", "sub", "#26a69a", candles, longHist, "AL"),
+          hist(inst, "shortSig", "sub", "#ef5350", candles, shortHist, "SAT"),
+          line(inst, "score", "sub", "#ffeb3b55", candles, s.score, "Skor"),
+        ],
+        {
+          smi: s.smi,
+          signal: s.signal,
+          smiIfvg: s.smiIfvg,
           longSignal: s.longSignal,
           shortSignal: s.shortSignal,
           score: s.score,

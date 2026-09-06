@@ -150,6 +150,8 @@ export type StrategyPresetId =
   | "ifvgLong"
   | "ifvgRsiLong"
   | "ifvgRsiBi"
+  | "ifvgSmiLong"
+  | "ifvgSmiBi"
   | "codeStrategy"
   | "custom";
 

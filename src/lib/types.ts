@@ -258,6 +258,7 @@ export type BuiltinIndicatorId =
   // IFVG (Inversion FVG)
   | "ifvgZones"
   | "ifvgRsi"
+  | "ifvgSmi"
   // Elizi Lab
   | "eliziEdge";
 

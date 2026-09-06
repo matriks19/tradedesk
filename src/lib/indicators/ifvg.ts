@@ -1,5 +1,5 @@
 /**
- * IFVG chart series + IFVG-gated RSI — shared with Formasyon IFVG scanner.
+ * IFVG chart series + IFVG-gated RSI/SMI — shared with Formasyon IFVG scanner.
  * One detect pass via findInversionFvgSetups (full history for indicators).
  */
 import type { Candle } from "@/lib/types";
@@ -8,7 +8,7 @@ import {
   type IfvgSetup,
   type InversionFvgOpts,
 } from "@/lib/patterns/inversionFvg";
-import { rsi as rsiCalc } from "./math";
+import { rsi as rsiCalc, smi as smiCalc } from "./math";
 
 export type IfvgSeries = {
   zoneTop: (number | null)[];
@@ -231,4 +231,116 @@ export function computeIfvgRsi(
   }
 
   return { rsi, rsiIfvg, longSignal, shortSignal, score, os, ob };
+}
+
+export type IfvgSmiSeries = {
+  smi: (number | null)[];
+  signal: (number | null)[];
+  /** SMI only while IFVG bias ≠ 0 — context paint */
+  smiIfvg: (number | null)[];
+  longSignal: (number | null)[];
+  shortSignal: (number | null)[];
+  score: (number | null)[];
+  os: number;
+  ob: number;
+};
+
+export type IfvgSmiOpts = IfvgSeriesOpts & {
+  /** SMI %K length (qLength). Default 14. */
+  k?: number;
+  /** SMI smoothing (rLength). Default 20. */
+  d?: number;
+  /** Signal EMA period. Default 5. */
+  ema?: number;
+  /** Oversold guide (e.g. -40). */
+  os?: number;
+  /** Overbought guide (e.g. 40). */
+  ob?: number;
+};
+
+/**
+ * IFVG-applied SMI: full SMI + signal + context (smiIfvg) + entries gated by
+ * IFVG retest × SMI confirm. Playbook style: prefer smi/signal cross as primary
+ * (like smiLongOnly), with soft level filter (smi ≤ 0 long / ≥ 0 short) so
+ * mid-trend retests still fire; also rising/falling from OS/OB extremes.
+ */
+export function computeIfvgSmi(
+  candles: Candle[],
+  opts: IfvgSmiOpts = {}
+): IfvgSmiSeries {
+  const n = candles.length;
+  const k = opts.k ?? 14;
+  const d = opts.d ?? 20;
+  const emaPeriod = opts.ema ?? 5;
+  const os = opts.os ?? -40;
+  const ob = opts.ob ?? 40;
+  const { smi: smiLine, signal } = smiCalc(candles, k, d, emaPeriod);
+  const smiIfvg = fillNull(n);
+  const longSignal = fillNull(n);
+  const shortSignal = fillNull(n);
+  const score = fillNull(n);
+
+  const ifvg = computeIfvgSeries(candles, opts);
+
+  for (let i = 0; i < n; i++) {
+    if (ifvg.bias[i] != null && ifvg.bias[i] !== 0 && smiLine[i] != null) {
+      smiIfvg[i] = smiLine[i];
+    }
+  }
+
+  for (let i = 1; i < n; i++) {
+    if (
+      smiLine[i] == null ||
+      smiLine[i - 1] == null ||
+      signal[i] == null ||
+      signal[i - 1] == null
+    ) {
+      continue;
+    }
+    const s = smiLine[i] as number;
+    const sp = smiLine[i - 1] as number;
+    const sig = signal[i] as number;
+    const sigp = signal[i - 1] as number;
+    const crossUp = sp <= sigp && s > sig;
+    const crossDn = sp >= sigp && s < sig;
+    const rising = s > sp;
+    const falling = s < sp;
+
+    // Primary: cross smi/signal with soft mid-level (≤0 / ≥0).
+    // Alt: rising/falling from OS/OB, or leave extreme.
+    const longSmi =
+      (crossUp && s <= 0) ||
+      (s < os && rising) ||
+      (sp < os && s >= os) ||
+      (s < 0 && rising && s >= sig);
+    const shortSmi =
+      (crossDn && s >= 0) ||
+      (s > ob && falling) ||
+      (sp > ob && s <= ob) ||
+      (s > 0 && falling && s <= sig);
+
+    if (ifvg.longSignal[i] === 1 && longSmi) {
+      longSignal[i] = 1;
+      const base = ifvg.score[i] ?? 60;
+      const bonus = crossUp ? 10 : s < os ? 8 : s < 0 ? 5 : 3;
+      score[i] = Math.min(100, Math.round(base + bonus));
+    }
+    if (ifvg.shortSignal[i] === 1 && shortSmi) {
+      shortSignal[i] = 1;
+      const base = ifvg.score[i] ?? 60;
+      const bonus = crossDn ? 10 : s > ob ? 8 : s > 0 ? 5 : 3;
+      score[i] = Math.min(100, Math.round(base + bonus));
+    }
+  }
+
+  return {
+    smi: smiLine,
+    signal,
+    smiIfvg,
+    longSignal,
+    shortSignal,
+    score,
+    os,
+    ob,
+  };
 }

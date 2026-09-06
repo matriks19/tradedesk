@@ -3614,15 +3614,64 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     ],
   },
 
+
+  {
+    id: "ifvg_smi_confluence",
+    name: "IFVG × SMI Confluence",
+    shortName: "IFVG·SMI",
+    category: "smc_ict",
+    inspiredBy:
+      "ICT / Pinkman Inversion FVG + Blau SMI cross teyit — playbook SMI Long tarzı (tercih edilen IFVG gate)",
+    summary:
+      "IFVG Bölgeler (main) + IFVG×SMI (sub) birlikte. Retest AL + SMI/signal cross (soft ≤0 seviye) veya OS'den yükseliş. Formasyon IFVG ile aynı çekirdek.",
+    howTo: [
+      "İndikatörler → «IFVG Bölgeler» (main) ve «IFVG×SMI» (sub) — ikisini birden açın (stack).",
+      "Formasyonlar → Inversion FVG (IFVG) çipi ile aynı sinyalleri tarayın.",
+      "Backtest: ifvgSmiLong · ifvgSmiBi (AND confluence). Karşılaştır: ifvgRsiLong · smiLongOnly · rsiOsOb.",
+      "Long: IFVG bull retest + SMI signal cross up (SMI≤0) veya OS (−40) yükseliş. Short: mirror.",
+      "Çıkış: SMI cross down veya karşı IFVG / TP1.",
+    ],
+    timeframe: "1h",
+    allowShort: true,
+    replaceIndicators: true,
+    backtestPreset: "ifvgSmiLong",
+    backtestExtras: {
+      useAtrStops: false,
+      useSignalExits: true,
+      allowShort: false,
+    },
+    indicators: [
+      {
+        type: "ifvgZones",
+        params: {
+          swingStrength: 2,
+          maxInvLookforward: 40,
+          maxRetestLookforward: 30,
+          zoneExtend: 8,
+        },
+        color: "#7e57c2",
+      },
+      {
+        type: "ifvgSmi",
+        params: { k: 14, d: 20, ema: 5, os: -40, ob: 40 },
+      },
+    ],
+    risk: {
+      rMultiple: 1.5,
+      tip: "Zone kırılırsa setup iptal. Sadece IFVG retest + SMI teyit ile girin. Playbook SMI Long ile aynı cross mantığı.",
+    },
+    tags: ["IFVG", "SMI", "SMC", "ICT", "confluence", "inversion", "niche", "preferred"],
+  },
+
   {
     id: "ifvg_rsi_confluence",
-    name: "IFVG × RSI Confluence",
+    name: "IFVG × RSI Confluence (ikincil)",
     shortName: "IFVG·RSI",
     category: "smc_ict",
     inspiredBy:
       "ICT / Pinkman Inversion FVG + RSI OS/OB teyit — TradeDesk Formasyon IFVG + indikatör stack",
     summary:
-      "IFVG Bölgeler (main) + IFVG×RSI (sub) birlikte. Retest AL + RSI≤OS (veya OS çıkışı). Formasyon IFVG taraması ile aynı çekirdek mantık.",
+      "İkincil pack — tercih edilen: IFVG × SMI. IFVG Bölgeler + IFVG×RSI stack. Retest AL + RSI≤OS (veya OS çıkışı).",
     howTo: [
       "İndikatörler → «IFVG Bölgeler» (main) ve «IFVG×RSI» (sub) — ikisini birden açın (stack).",
       "Formasyonlar → Inversion FVG (IFVG) çipi ile aynı sinyalleri tarayın.",

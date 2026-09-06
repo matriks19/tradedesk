@@ -75,3 +75,6 @@ Pine referans: Go-10-Pli (dg_factor) — `oran = p1/p2 - 1`, long=crossover(clos
 
 Bar-based ICT setup (her TF): klasik FVG fail → mum gap’i kapatır (inversion) → rol flip + CHoCH → IFVG retest’te AL/SAT.
 Süpürme (likidite wick) + inversion birlikte → skor boost (`IFVG·Süp`). UI: Formasyon Tara / Aktif grafik çipi.
+
+Indikatör stack: **IFVG Bölgeler** (main) + **IFVG×SMI** (sub, tercih) — retest × SMI/signal cross (soft ≤0/≥0).
+Backtest: `ifvgSmiLong` / `ifvgSmiBi`. İkincil: IFVG×RSI (`ifvgRsiLong`). Bakeoff: `npx tsx scripts/compare-ifvg-smi.ts`.
