@@ -217,6 +217,7 @@ export type BuiltinIndicatorId =
   | "adaptiveSupertrend"
   | "adaptiveTrendChannel"
   | "qualityTrendTrail"
+  | "qTrend"
   | "varWeightedReg"
   | "asymVolEnvelope"
   | "sweepReversalMap"

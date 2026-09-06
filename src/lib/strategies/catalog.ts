@@ -3426,6 +3426,51 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     researchNote: "BTC 4h yükseliş penceresinde short’u keser.",
   },
 
+
+  {
+    id: "jurik_bb_turtle",
+    name: "Jurik BB Turtle",
+    shortName: "JurikBB·Turtle",
+    category: "high_edge",
+    inspiredBy: "Jurik Bollinger (JMA±σ) as Turtle channel + optional Donchian filter",
+    summary:
+      "Fiyat çevresinde Jurik Bollinger; üst bant kırılımı long (Turtle mantığı). Jurik×Donch: Donchian breakout + JMA mid yükseliş filtresi.",
+    howTo: [
+      "BIST 1g / crypto 4h. Long: close, Jurik BB üst bandını yukarı keser.",
+      "Çıkış: mid altı veya hızlı Jurik BB alt bandı.",
+      "Alternatif jurikDonchHybrid: Donchian 20 breakout + Jurik mid yukarı + fiyat mid üstü.",
+      "BIST bakeoff: saf Turtle/Jurik Kase hâlâ daha yüksek PnL; Jurik BB Turtle daha tutarlı (+19/29).",
+    ],
+    timeframe: "1d",
+    allowShort: false,
+    replaceIndicators: true,
+    indicators: [
+      { type: "jurikBollinger", params: { period: 20, mult: 2, phase: 50, power: 2 }, color: "#7c4dff" },
+      { type: "donchian", params: { period: 20 }, color: "#90a4ae" },
+    ],
+    risk: {
+      rMultiple: 2,
+      tip: "Long-only BIST. Short için Exhaust (crypto). Band genişlerken boyut küçült.",
+    },
+    backtestPreset: "jurikBbTurtle",
+    backtestExtras: {
+      useAtrStops: false,
+      useSignalExits: true,
+      allowShort: false,
+      warmup: 60,
+      bbPeriod: 20,
+      bbMult: 2,
+      donchianPeriod: 20,
+      donchianExitPeriod: 10,
+      slAtrMult: 1.5,
+      tpAtrMult: 2.5,
+    },
+    tags: ["high_edge", "jurik", "turtle", "bollinger", "bist", "1d"],
+    edgeScore: 80,
+    researchNote:
+      "BIST30 1d: jurikBbTurtle +7208 (19/29); jurikDonchHybrid +5800; donchianTurtle +15322; jurikKase +14895. Crypto 4h: Turtle > JurikBB Turtle > Hybrid filter.",
+  },
+
 ];
 
 export function strategyById(id: string): StrategyPack | undefined {

@@ -44,6 +44,7 @@ import {
   ichimoku,
   keltner,
   klinger,
+  qTrend,
   kst,
   linreg,
   lowest,
@@ -397,6 +398,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   // —— ProRealCode tarzı
   { id: "adaptiveSupertrend", label: "Adaptive SuperTrend", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "st", description: CRED_PROREAL, inputs: [num("atrLen", "ATR Length", 10), num("baseMult", "Base Mult", 2, 0.5, 10, 0.1), num("lookback", "Cluster Lookback", 50)] },
   { id: "adaptiveTrendChannel", label: "Adaptive Trend Channel", category: "proreal", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_PROREAL, inputs: [num("period", "Period", 40), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
+  { id: "qTrend", label: "Q-Trend (Tarasenko)", category: "lab", pane: "main", acceptsSeries: false, primarySeriesKey: "trend", description: "Tarasenko Q-Trend: mid-range TL ± ATR epsilon. Video defaults ATR 40 / EMA 10.", inputs: [num("trendPeriod", "Trend Period", 200), num("atrPeriod", "ATR Period", 40), num("atrMult", "ATR Mult", 1, 0.1, 5, 0.1), num("smoothPeriod", "EMA Smooth", 10)] },
   { id: "qualityTrendTrail", label: "Quality Trend Trail", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "trail", description: CRED_PROREAL, inputs: [num("atrLen", "ATR", 14), num("mult", "Mult", 2.5, 0.5, 10, 0.1), num("qualLen", "Quality Len", 20)] },
   { id: "varWeightedReg", label: "Variance-Weighted Regression", category: "proreal", pane: "main", acceptsSeries: true, primarySeriesKey: "mid", description: CRED_PROREAL, inputs: [num("period", "Period", 30), num("mult", "Mult", 2, 0.5, 10, 0.1), src()] },
   { id: "asymVolEnvelope", label: "Asym Volatility Envelope", category: "proreal", pane: "main", acceptsSeries: false, primarySeriesKey: "mid", description: CRED_PROREAL, inputs: [num("period", "Period", 20), num("upMult", "Up Mult", 2, 0.5, 10, 0.1), num("dnMult", "Down Mult", 2, 0.5, 10, 0.1)] },
@@ -1188,6 +1190,19 @@ export function computeBuiltin(
       const period = n(p, "period", 13);
       const v = forceIndex(candles, period);
       push([hist(inst, "fi", "sub", color, candles, v, `FI(${period})`)], { fi: v });
+      break;
+    }
+    case "qTrend": {
+      const q = qTrend(candles, {
+        trendPeriod: n(p, "trendPeriod", 200),
+        atrPeriod: n(p, "atrPeriod", 40),
+        atrMult: n(p, "atrMult", 1),
+        smoothPeriod: n(p, "smoothPeriod", 10),
+      });
+      push(
+        [line(inst, "trend", "main", "#7c4dff", candles, q.trend, "Q-Trend")],
+        { trend: q.trend, dir: q.dir }
+      );
       break;
     }
     case "klinger": {

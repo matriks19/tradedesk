@@ -1,0 +1,20 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "/tmp/td-bt",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "jsx": "react-jsx",
+    "isolatedModules": false,
+    "plugins": [],
+    "incremental": false
+  },
+  "include": [
+    "src/lib/backtest/**/*.ts",
+    "src/lib/indicators/**/*.ts",
+    "src/lib/types.ts",
+    "scripts/compare-btc-4h.ts","scripts/compare-multi-4h.ts","scripts/compare-shorts-4h.ts","scripts/compare-macd-ltf.ts","scripts/compare-early-osc-4h.ts","scripts/compare-qtrend-4h.ts"
+  ],
+  "exclude": ["node_modules"]
+}

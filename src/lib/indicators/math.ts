@@ -1547,6 +1547,262 @@ export function chandelier(
   return { long, short };
 }
 
+
+
+export type KernelKind = "gaussian" | "rationalQuadratic" | "logistic" | "uniform";
+
+/** Causal (non-repaint) Nadaraya–Watson / Multi-Kernel Regression endpoint estimator. */
+export function multiKernelRegression(
+  values: number[],
+  opts: {
+    kind?: KernelKind;
+    lookback?: number;
+    bandwidth?: number;
+    alpha?: number;
+  } = {}
+): {
+  yhat: (number | null)[];
+  rising: boolean[];
+  falling: boolean[];
+} {
+  const kind = opts.kind ?? "rationalQuadratic";
+  const lookback = Math.max(5, opts.lookback ?? 8);
+  const h = Math.max(0.5, opts.bandwidth ?? 8);
+  const alpha = Math.max(0.1, opts.alpha ?? 1);
+  const n = values.length;
+  const yhat: (number | null)[] = new Array(n).fill(null);
+  const rising: boolean[] = new Array(n).fill(false);
+  const falling: boolean[] = new Array(n).fill(false);
+
+  const weight = (j: number): number => {
+    // j = bars ago (0 = current)
+    const u = j / h;
+    switch (kind) {
+      case "gaussian":
+        return Math.exp(-0.5 * u * u);
+      case "logistic":
+        return 1 / (Math.exp(u) + 2 + Math.exp(-u));
+      case "uniform":
+        return j <= h ? 1 : 0;
+      case "rationalQuadratic":
+      default:
+        return Math.pow(1 + (u * u) / (2 * alpha), -alpha);
+    }
+  };
+
+  for (let i = 0; i < n; i++) {
+    if (i < lookback) continue;
+    let num = 0;
+    let den = 0;
+    for (let j = 0; j <= lookback; j++) {
+      const w = weight(j);
+      num += values[i - j] * w;
+      den += w;
+    }
+    if (den === 0) continue;
+    yhat[i] = num / den;
+    if (i > 0 && yhat[i - 1] != null) {
+      rising[i] = (yhat[i] as number) > (yhat[i - 1] as number);
+      falling[i] = (yhat[i] as number) < (yhat[i - 1] as number);
+    }
+  }
+  return { yhat, rising, falling };
+}
+
+
+/** ChartPrime Bayesian Trend — posterior P(up) from slow/fast EMA·SMA·DEMA·VWMA + Bayes. */
+export function bayesianTrend(
+  candles: Candle[],
+  length = 60,
+  gapLength = 20,
+  gapSignals = 10
+): {
+  posterior: (number | null)[];
+  priorUp: (number | null)[];
+  likelihoodUp: (number | null)[];
+  crossUp: boolean[];
+  crossDown: boolean[];
+} {
+  const n = candles.length;
+  const gap = Math.max(10, gapSignals);
+  const fastLen = Math.max(2, length - gapLength);
+  const source = candles.map((c) => (c.high + c.low + c.close) / 3);
+  const vols = candles.map((c) => c.volume);
+
+  const emaSlow = ema(source, length);
+  const smaSlow = sma(source, length);
+  const ema1 = ema(source, length);
+  const ema2 = ema(
+    ema1.map((v, i) => (v == null ? source[i] : v)),
+    length
+  );
+  const demaRaw = ema1.map((v, i) =>
+    v == null || ema2[i] == null ? null : 2 * (v as number) - (ema2[i] as number)
+  );
+  const demaSlow = ema(
+    demaRaw.map((v, i) => (v == null ? source[i] : v)),
+    length
+  );
+  // VWMA
+  const vwma = (len: number): (number | null)[] => {
+    const out: (number | null)[] = new Array(n).fill(null);
+    for (let i = 0; i < n; i++) {
+      if (i < len - 1) continue;
+      let ns = 0;
+      let ds = 0;
+      for (let j = i - len + 1; j <= i; j++) {
+        ns += source[j] * vols[j];
+        ds += vols[j];
+      }
+      out[i] = ds === 0 ? null : ns / ds;
+    }
+    return out;
+  };
+  const vwmaSlow = vwma(length);
+
+  const emaFast = ema(source, fastLen);
+  const smaFast = sma(source, fastLen);
+  const e1f = ema(source, fastLen);
+  const e2f = ema(
+    e1f.map((v, i) => (v == null ? source[i] : v)),
+    fastLen
+  );
+  const demaRawF = e1f.map((v, i) =>
+    v == null || e2f[i] == null ? null : 2 * (v as number) - (e2f[i] as number)
+  );
+  const demaFast = ema(
+    demaRawF.map((v, i) => (v == null ? source[i] : v)),
+    fastLen
+  );
+  const vwmaFast = vwma(fastLen);
+
+  const sig = (ma: (number | null)[]): (number | null)[] => {
+    const raw: number[] = new Array(n).fill(0);
+    for (let i = 0; i < n; i++) {
+      if (ma[i] == null || i < gap) {
+        raw[i] = 0;
+        continue;
+      }
+      let score = 0;
+      for (let k = 0; k <= 9; k++) {
+        const j = i - (gap - k);
+        if (j < 0 || ma[j] == null) continue;
+        if (source[i] >= (ma[j] as number)) {
+          score = 1 - k * 0.1;
+          break;
+        }
+      }
+      raw[i] = score;
+    }
+    return ema(raw, 4);
+  };
+
+  const emaT = sig(emaSlow);
+  const smaT = sig(smaSlow);
+  const demaT = sig(demaSlow);
+  const vwmaT = sig(vwmaSlow);
+  const emaTf = sig(emaFast);
+  const smaTf = sig(smaFast);
+  const demaTf = sig(demaFast);
+  const vwmaTf = sig(vwmaFast);
+
+  const posterior: (number | null)[] = new Array(n).fill(null);
+  const priorUp: (number | null)[] = new Array(n).fill(null);
+  const likelihoodUp: (number | null)[] = new Array(n).fill(null);
+  const crossUp: boolean[] = new Array(n).fill(false);
+  const crossDown: boolean[] = new Array(n).fill(false);
+
+  for (let i = 0; i < n; i++) {
+    const vals = [emaT[i], smaT[i], demaT[i], vwmaT[i]];
+    const valsf = [emaTf[i], smaTf[i], demaTf[i], vwmaTf[i]];
+    if (vals.some((v) => v == null) || valsf.some((v) => v == null)) continue;
+    const pu = (vals as number[]).reduce((a, b) => a + b, 0) / 4;
+    const lu = (valsf as number[]).reduce((a, b) => a + b, 0) / 4;
+    const pd = 1 - pu;
+    const ld = 1 - lu;
+    const den = pu * lu + pd * ld;
+    const post = den === 0 ? 0 : (pu * lu) / den;
+    priorUp[i] = pu;
+    likelihoodUp[i] = lu;
+    posterior[i] = post;
+    if (i > 0 && posterior[i - 1] != null) {
+      const prev = posterior[i - 1] as number;
+      crossUp[i] = prev <= 0.5 && post > 0.5;
+      crossDown[i] = prev >= 0.5 && post < 0.5;
+    }
+  }
+  return { posterior, priorUp, likelihoodUp, crossUp, crossDown };
+}
+
+
+/** Zero-Lag LSMA: LSMA + (LSMA - LSMA2) */
+export function zlsma(values: number[], period = 32): (number | null)[] {
+  const lsma = linreg(values, period);
+  const filled = lsma.map((v, i) => (v == null ? values[i] : v));
+  const lsma2 = linreg(filled, period);
+  return lsma.map((v, i) =>
+    v == null || lsma2[i] == null ? null : (v as number) + ((v as number) - (lsma2[i] as number))
+  );
+}
+
+/**
+ * Chandelier Exit with direction (Everget-style).
+ * dir +1 long / -1 short; buy/sell on flip.
+ */
+export function chandelierExit(
+  candles: Candle[],
+  period = 22,
+  mult = 2,
+  useClose = true
+): {
+  longStop: (number | null)[];
+  shortStop: (number | null)[];
+  dir: (number | null)[];
+  buy: boolean[];
+  sell: boolean[];
+} {
+  const n = candles.length;
+  const a = atr(candles, Math.max(1, period));
+  const longStop: (number | null)[] = new Array(n).fill(null);
+  const shortStop: (number | null)[] = new Array(n).fill(null);
+  const dir: (number | null)[] = new Array(n).fill(null);
+  const buy: boolean[] = new Array(n).fill(false);
+  const sell: boolean[] = new Array(n).fill(false);
+  let prevDir = 1;
+  for (let i = 0; i < n; i++) {
+    if (a[i] == null || i < period - 1) continue;
+    const atrv = mult * (a[i] as number);
+    let hi = -Infinity;
+    let lo = Infinity;
+    for (let j = i - period + 1; j <= i; j++) {
+      const pxHi = useClose ? candles[j].close : candles[j].high;
+      const pxLo = useClose ? candles[j].close : candles[j].low;
+      hi = Math.max(hi, pxHi);
+      lo = Math.min(lo, pxLo);
+    }
+    let ls = hi - atrv;
+    let ss = lo + atrv;
+    const lsPrev = i > 0 && longStop[i - 1] != null ? (longStop[i - 1] as number) : ls;
+    const ssPrev = i > 0 && shortStop[i - 1] != null ? (shortStop[i - 1] as number) : ss;
+    const cPrev = i > 0 ? candles[i - 1].close : candles[i].close;
+    if (cPrev > lsPrev) ls = Math.max(ls, lsPrev);
+    if (cPrev < ssPrev) ss = Math.min(ss, ssPrev);
+    longStop[i] = ls;
+    shortStop[i] = ss;
+    let d = prevDir;
+    if (candles[i].close > ssPrev) d = 1;
+    else if (candles[i].close < lsPrev) d = -1;
+    dir[i] = d;
+    if (i > 0 && dir[i - 1] != null) {
+      buy[i] = d === 1 && (dir[i - 1] as number) === -1;
+      sell[i] = d === -1 && (dir[i - 1] as number) === 1;
+    }
+    prevDir = d;
+  }
+  return { longStop, shortStop, dir, buy, sell };
+}
+
+
 /** Trend strength via ADX-like normalized slope */
 export function trendStrength(values: number[], period = 20): (number | null)[] {
   const lr = linreg(values, period);
@@ -1709,6 +1965,95 @@ export function forceIndex(candles: Candle[], period = 13): (number | null)[] {
     i === 0 ? 0 : (c.close - candles[i - 1].close) * c.volume
   );
   return ema(raw, period);
+}
+
+
+/** Q-Trend (Tarasenko) — TL mid-range + ATR epsilon, optional EMA-smoothed source. */
+export function qTrend(
+  candles: Candle[],
+  opts: {
+    trendPeriod?: number;
+    atrPeriod?: number;
+    atrMult?: number;
+    smoothPeriod?: number;
+  } = {}
+): {
+  trend: (number | null)[];
+  dir: (number | null)[];
+  buy: boolean[];
+  sell: boolean[];
+  strongBuy: boolean[];
+  strongSell: boolean[];
+} {
+  const p = opts.trendPeriod ?? 200;
+  const atrP = opts.atrPeriod ?? 40;
+  const mult = opts.atrMult ?? 1;
+  const smooth = opts.smoothPeriod ?? 10;
+  const n = candles.length;
+  const closes = candles.map((c) => c.close);
+  const src = smooth > 1 ? ema(closes, smooth) : closes;
+  const atrLine = atr(candles, atrP);
+  const trend: (number | null)[] = new Array(n).fill(null);
+  const dir: (number | null)[] = new Array(n).fill(null);
+  const buy = new Array(n).fill(false);
+  const sell = new Array(n).fill(false);
+  const strongBuy = new Array(n).fill(false);
+  const strongSell = new Array(n).fill(false);
+  const sbHist: boolean[] = new Array(n).fill(false);
+  const ssHist: boolean[] = new Array(n).fill(false);
+  let m: number | null = null;
+  let ls = 0;
+
+  for (let i = 0; i < n; i++) {
+    const s = src[i];
+    if (s == null || i < p - 1) continue;
+    let hh = -Infinity;
+    let ll = Infinity;
+    let ok = true;
+    for (let j = i - p + 1; j <= i; j++) {
+      const v = src[j];
+      if (v == null) {
+        ok = false;
+        break;
+      }
+      if (v > hh) hh = v;
+      if (v < ll) ll = v;
+    }
+    if (!ok || !Number.isFinite(hh) || !Number.isFinite(ll)) continue;
+    const d = hh - ll;
+    const mid = (hh + ll) / 2;
+    const prevAtr = i > 0 ? atrLine[i - 1] : atrLine[i];
+    if (prevAtr == null) continue;
+    const eps = mult * prevAtr;
+    if (m == null) m = mid;
+    const bandUp = m + eps;
+    const bandDn = m - eps;
+    const changeUp = s > bandUp;
+    const changeDn = s < bandDn;
+    if (changeUp && !changeDn) m = m + eps;
+    else if (changeDn && !changeUp) m = m - eps;
+    const newLs = changeUp && !changeDn ? 1 : changeDn && !changeUp ? -1 : ls;
+    const flippedBuy = newLs === 1 && ls !== 1;
+    const flippedSell = newLs === -1 && ls !== -1;
+    buy[i] = flippedBuy;
+    sell[i] = flippedSell;
+    const sb = candles[i].open < ll + d / 8 && candles[i].open >= ll;
+    const ss = candles[i].open > hh - d / 8 && candles[i].open <= hh;
+    sbHist[i] = sb;
+    ssHist[i] = ss;
+    let strongB = false;
+    let strongS = false;
+    for (let k = 0; k <= 4; k++) {
+      if (i - k >= 0 && sbHist[i - k]) strongB = true;
+      if (i - k >= 0 && ssHist[i - k]) strongS = true;
+    }
+    strongBuy[i] = flippedBuy && strongB;
+    strongSell[i] = flippedSell && strongS;
+    trend[i] = m;
+    dir[i] = newLs === 0 ? null : newLs;
+    ls = newLs === 0 ? ls : newLs;
+  }
+  return { trend, dir, buy, sell, strongBuy, strongSell };
 }
 
 /** Klinger Volume Oscillator (simplified) */
