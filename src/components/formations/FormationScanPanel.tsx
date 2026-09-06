@@ -7,7 +7,9 @@ import {
   detectAdvanced,
   type AdvancedPatternFamily,
   type AdvancedPatternHit,
+  type PatternStage,
   toPatternHit,
+  isActiveStage,
 } from "@/lib/patterns/advanced";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { passesShtFilter } from "@/lib/patterns/shtFlagTriangle";
@@ -24,6 +26,15 @@ const FAMILY_OPTS: { id: AdvancedPatternFamily; label: string }[] = [
   { id: "liquidity", label: "Likidite" },
   { id: "structure", label: "Yapı BOS/CHOCH" },
 ];
+
+const STAGE_TR: Record<PatternStage, string> = {
+  forming: "oluşuyor",
+  prz: "PRZ",
+  retest: "retest",
+  active: "aktif",
+  target_hit: "hedef✓",
+  invalid: "geçersiz",
+};
 
 type Row = {
   id: string;
@@ -44,7 +55,44 @@ type Row = {
   bfr?: boolean;
   ifvg?: boolean;
   barsAgo?: number;
+  stage?: PatternStage | string;
 };
+
+/** Prefer retest / pre-target; drop triggers already past TP1 when activeOnly */
+function keepClassicFresh(
+  h: PatternHit,
+  candles: Candle[],
+  activeOnly: boolean
+): boolean {
+  if (!activeOnly) return true;
+  const st = h.meta?.status;
+  const tp1 = h.meta?.tp1 ?? h.meta?.targetPrice;
+  const last = candles[candles.length - 1];
+  if (!last) return true;
+  if (st === "al_tetiklendi" || st === "sat_tetiklendi") {
+    if (tp1 != null) {
+      if (h.bias === "bull" && last.high >= tp1) return false;
+      if (h.bias === "bear" && last.low <= tp1) return false;
+    }
+    // still pre-TP1 — keep as active-ish
+    return true;
+  }
+  // Prefer retest / choch / fvg / confirmation / inversion / konsolidasyon
+  if (
+    st === "retest" ||
+    st === "choch" ||
+    st === "fvg" ||
+    st === "confirmation" ||
+    st === "inversion" ||
+    st === "konsolidasyon" ||
+    st === "olusum" ||
+    st === "kirilim" ||
+    st === "breakout"
+  ) {
+    return true;
+  }
+  return true;
+}
 
 export function FormationScanPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
@@ -66,6 +114,8 @@ export function FormationScanPanel() {
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
   const [ifvgFocus, setIfvgFocus] = useState(false);
+  /** Default ON: only forming/prz/retest/active — drop target_hit */
+  const [activeOnly, setActiveOnly] = useState(true);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [rows, setRows] = useState<Row[]>([]);
@@ -133,8 +183,11 @@ export function FormationScanPanel() {
               const hits = detectAdvanced(candles, {
                 families,
                 swingStrength: job.swing,
+                includeCompleted: !activeOnly,
+                maxBarsAgo: 55,
               });
-              for (const h of hits.slice(0, 2)) {
+              for (const h of hits.slice(0, 3)) {
+                if (activeOnly && h.stage && !isActiveStage(h.stage)) continue;
                 out.push({
                   id: `${job.tf}_${h.id}`,
                   symbol: job.quote.symbol,
@@ -147,6 +200,8 @@ export function FormationScanPanel() {
                   prz: h.prz,
                   tp1: h.tp1,
                   sl: h.sl,
+                  stage: h.stage,
+                  barsAgo: h.barsAgo,
                   _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
                 });
               }
@@ -185,6 +240,8 @@ export function FormationScanPanel() {
                   entry: h.meta?.breakoutPrice,
                   tp1: h.meta?.targetPrice,
                   sl: undefined,
+                  stage: h.meta?.status,
+                  barsAgo: h.meta?.barsAgo,
                   _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
                   sht: true,
                 });
@@ -229,6 +286,8 @@ export function FormationScanPanel() {
                       : undefined,
                   tp1: h.meta?.targetPrice,
                   sl: undefined,
+                  stage: h.meta?.status,
+                  barsAgo: h.meta?.barsAgo,
                   _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
                   threeDrives: true,
                 });
@@ -255,7 +314,9 @@ export function FormationScanPanel() {
                   breakout_box: false,
                   engulfing: false,
                 },
-              }).filter((h) => passesBreakoutFvgRetestFilter(h, 60));
+              })
+                .filter((h) => passesBreakoutFvgRetestFilter(h, 60))
+                .filter((h) => keepClassicFresh(h, candles, activeOnly));
               for (const h of bfrs.slice(0, 2)) {
                 out.push({
                   id: `${job.tf}_${h.id}`,
@@ -269,6 +330,8 @@ export function FormationScanPanel() {
                   entry: h.meta?.entry,
                   tp1: h.meta?.tp1,
                   sl: h.meta?.stop,
+                  stage: h.meta?.status,
+                  barsAgo: h.meta?.barsAgo,
                   _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
                   bfr: true,
                 });
@@ -295,7 +358,9 @@ export function FormationScanPanel() {
                   breakout_box: false,
                   engulfing: false,
                 },
-              }).filter((h) => passesInversionFvgFilter(h, 55));
+              })
+                .filter((h) => passesInversionFvgFilter(h, 55))
+                .filter((h) => keepClassicFresh(h, candles, activeOnly));
               for (const h of ifvgs.slice(0, 2)) {
                 const tag = h.meta?.sweep ? "IFVG·Süp" : "IFVG";
                 out.push({
@@ -311,6 +376,7 @@ export function FormationScanPanel() {
                   tp1: h.meta?.tp1,
                   sl: h.meta?.stop,
                   barsAgo: h.meta?.barsAgo,
+                  stage: h.meta?.status,
                   _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
                   ifvg: true,
                 });
@@ -323,15 +389,30 @@ export function FormationScanPanel() {
         },
         (done, total) => setProgress({ done, total })
       );
-      out.sort((a, b) => b.confidence - a.confidence);
+      out.sort(
+        (a, b) =>
+          (a.barsAgo ?? 999) - (b.barsAgo ?? 999) || b.confidence - a.confidence
+      );
       setRows(out.slice(0, 100));
       setStatus(
-        `${out.length} formasyon · ${quotes.length} sembol · TF: ${timeframe}`
+        `${out.length} formasyon · ${quotes.length} sembol · TF: ${timeframe}${
+          activeOnly ? " · sadece aktif" : ""
+        }`
       );
     } finally {
       setRunning(false);
     }
-  }, [exchange, timeframe, families, shtFocus, tdFocus, bfrFocus, ifvgFocus, patternSettings.swingStrength]);
+  }, [
+    exchange,
+    timeframe,
+    families,
+    shtFocus,
+    tdFocus,
+    bfrFocus,
+    ifvgFocus,
+    activeOnly,
+    patternSettings.swingStrength,
+  ]);
 
   const openHit = (h: Row) => {
     setActivePane(activePaneId);
@@ -351,8 +432,8 @@ export function FormationScanPanel() {
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">Formasyon Tarama</div>
       <p className="text-2xs text-desk-muted">
-        Seçili TF üzerinde tarar. Sonuç tıklanınca grafikte XABCD + PRZ + TP/SL
-        çizilir; TF gerekirse o periyoda geçer.
+        Retest/PRZ aşamasındaki formasyonlar — hedefi dolmuşlar elenir. Tıklayınca
+        XABCD bacakları + PRZ + TP/SL.
       </p>
       <div className="flex gap-1 flex-wrap">
         <select
@@ -389,6 +470,14 @@ export function FormationScanPanel() {
             {f.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={clsx("btn text-2xs", activeOnly && "btn-accent")}
+          onClick={() => setActiveOnly((v) => !v)}
+          title="forming / PRZ / retest / aktif — hedefi dolmuşları gizle"
+        >
+          Sadece aktif (retest/PRZ)
+        </button>
         <button
           type="button"
           className={clsx("btn text-2xs", shtFocus && "btn-accent")}
@@ -450,6 +539,11 @@ export function FormationScanPanel() {
               <span className="truncate">
                 <span className="font-medium">{r.symbol}</span>{" "}
                 <span className="text-desk-muted">{r.label}</span>
+                {r.stage ? (
+                  <span className="ml-1 text-2xs px-1 rounded bg-desk-border/50">
+                    {STAGE_TR[r.stage as PatternStage] ?? r.stage}
+                  </span>
+                ) : null}
               </span>
               <span
                 className={clsx(
@@ -464,20 +558,33 @@ export function FormationScanPanel() {
             </div>
             <div className="text-2xs text-desk-muted font-mono truncate">
               {r.timeframe ? `${r.timeframe} · ` : ""}
-              {r.sht ? "SHT · " : ""}{r.threeDrives ? "Üç İtiş · " : ""}{r.bfr ? "BFR · " : ""}{r.ifvg ? (r.label.includes("Süp") ? "IFVG·Süp · " : "IFVG · ") : ""}
+              {r.sht ? "SHT · " : ""}
+              {r.threeDrives ? "Üç İtiş · " : ""}
+              {r.bfr ? "BFR · " : ""}
+              {r.ifvg ? (r.label.includes("Süp") ? "IFVG·Süp · " : "IFVG · ") : ""}
               {r.entry != null ? `E ${fmt(r.entry)}` : ""}
-              {r.prz ? ` · PRZ ${fmt(r.prz.low)}-${fmt(r.prz.high)}` : ""}
-              {r.tp1 != null ? ` · ${r.sht || r.threeDrives || r.bfr || r.ifvg ? (r.bfr || r.ifvg ? "TP1" : "Hedef") : "TP1"} ${fmt(r.tp1)}` : ""}
               {r.sl != null ? ` · SL ${fmt(r.sl)}` : ""}
-              {r.ifvg && r.barsAgo != null
-                ? ` · ${r.barsAgo} mum önce ${r.direction === "bear" ? "SAT" : "AL"}`
+              {r.tp1 != null
+                ? ` · ${
+                    r.sht || r.threeDrives || r.bfr || r.ifvg
+                      ? r.bfr || r.ifvg
+                        ? "TP1"
+                        : "Hedef"
+                      : "TP1"
+                  } ${fmt(r.tp1)}`
+                : ""}
+              {r.prz ? ` · PRZ ${fmt(r.prz.low)}-${fmt(r.prz.high)}` : ""}
+              {r.barsAgo != null
+                ? ` · ${r.barsAgo} mum önce${
+                    r.ifvg ? (r.direction === "bear" ? " SAT" : " AL") : ""
+                  }`
                 : ""}
             </div>
           </button>
         ))}
         {!rows.length && !running && (
           <div className="text-2xs text-desk-muted p-2">
-            Aile seçip Tara — seçili TF üzerinde tarar.
+            Aile seçip Tara — retest/PRZ aşamasındaki formasyonlar listelenir.
           </div>
         )}
       </div>

@@ -41,6 +41,15 @@ export type LiquidityName =
   | "equal_highs"
   | "equal_lows";
 
+/** Lifecycle of a harmonic / advanced setup relative to PRZ and targets */
+export type PatternStage =
+  | "forming"
+  | "prz"
+  | "retest"
+  | "active"
+  | "target_hit"
+  | "invalid";
+
 export interface XABCDPoint {
   label: "X" | "A" | "B" | "C" | "D" | "1" | "2" | "3" | "4" | "5";
   time: number;
@@ -69,6 +78,23 @@ export interface AdvancedPatternHit {
   tEnd: number;
   drawings: PatternDrawing[];
   timeframe?: string;
+  /** Setup lifecycle — scan prefers forming/prz/retest/active */
+  stage?: PatternStage;
+  /** Bars since signal (D / first PRZ retest / forming bar) */
+  barsAgo?: number;
+  /** When true, drawings include XA/AB/BC/CD mid-leg ratio labels */
+  legLabels?: boolean;
+}
+
+export const ACTIVE_PATTERN_STAGES: PatternStage[] = [
+  "forming",
+  "prz",
+  "retest",
+  "active",
+];
+
+export function isActiveStage(stage?: PatternStage): boolean {
+  return stage != null && ACTIVE_PATTERN_STAGES.includes(stage);
 }
 
 export function toPatternHit(a: AdvancedPatternHit): PatternHit {
