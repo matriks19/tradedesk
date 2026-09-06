@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
 import { ChartGrid } from "@/components/chart/ChartGrid";
+import { AlertWatcher } from "@/components/alerts/AlertWatcher";
 import { useDeskStore } from "@/store/desk";
 import { getPopularSeedScripts } from "@/lib/scripts/catalog";
 import type { CustomScript } from "@/lib/types";
@@ -57,6 +58,7 @@ export function TerminalShell() {
 
   return (
     <div className="h-screen w-screen flex flex-col bg-desk-bg">
+      <AlertWatcher />
       <TopBar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />

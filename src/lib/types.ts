@@ -332,3 +332,35 @@ export interface PatternSettings {
   boxLookback: number;
   focusId: string | null;
 }
+
+export type AlertCondition = "above" | "below" | "cross_above" | "cross_below";
+
+export interface PriceAlert {
+  id: string;
+  symbol: string;
+  exchange: Exchange;
+  condition: AlertCondition;
+  price: number;
+  active: boolean;
+  note?: string;
+  createdAt: number;
+  triggeredAt?: number;
+  lastPrice?: number;
+}
+
+export type DrawTool = "cursor" | "hline" | "trend" | "fib" | "measure" | "rect";
+
+export interface ChartDrawing {
+  id: string;
+  paneId: string;
+  tool: Exclude<DrawTool, "cursor">;
+  points: { time: number; price: number }[]; // 1 for hline, 2 for trend/fib/measure/rect
+  color: string;
+  label?: string;
+}
+
+export interface BotSettings {
+  webhookUrl: string;
+  enabled: boolean;
+  secret?: string;
+}

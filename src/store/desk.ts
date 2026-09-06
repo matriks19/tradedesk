@@ -4,7 +4,10 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type {
   BuiltinIndicatorId,
+  BotSettings,
+  ChartDrawing,
   CustomScript,
+  DrawTool,
   Exchange,
   IndicatorInstance,
   IndicatorSource,
@@ -12,6 +15,7 @@ import type {
   PaneConfig,
   ChartTimeframe,
   PatternSettings,
+  PriceAlert,
   RiskSettings,
   Timeframe,
   Watchlist,
@@ -57,6 +61,7 @@ interface DeskState {
     | "heatmap"
     | "patterns"
     | "risk"
+    | "alerts"
     | "scripts"
     | "indicators"
     | "backtest"
@@ -68,6 +73,10 @@ interface DeskState {
   backtestParams: Partial<BacktestParams>;
   watchlists: Watchlist[];
   activeWatchlistId: string;
+  alerts: PriceAlert[];
+  botSettings: BotSettings;
+  drawings: ChartDrawing[];
+  activeDrawTool: DrawTool;
   scripts: CustomScript[];
   risk: RiskSettings;
   showRiskLines: boolean;
@@ -127,6 +136,21 @@ interface DeskState {
   applyStrategyPack: (strategyId: string) => void;
   clearPendingScanner: () => void;
   setBacktestParams: (p: Partial<BacktestParams>) => void;
+  addAlert: (a: Omit<PriceAlert, "id" | "createdAt" | "active"> & { active?: boolean }) => void;
+  removeAlert: (id: string) => void;
+  updateAlert: (id: string, patch: Partial<PriceAlert>) => void;
+  setBotSettings: (p: Partial<BotSettings>) => void;
+  addDrawing: (d: Omit<ChartDrawing, "id"> & { id?: string }) => void;
+  removeDrawing: (id: string) => void;
+  clearPaneDrawings: (paneId: string) => void;
+  setActiveDrawTool: (t: DrawTool) => void;
+  createWatchlist: (name: string) => string;
+  importWatchlistSymbols: (
+    listId: string,
+    text: string,
+    defaultExchange: Exchange
+  ) => number;
+  deleteWatchlist: (id: string) => void;
 }
 
 export const useDeskStore = create<DeskState>()(
@@ -143,6 +167,10 @@ export const useDeskStore = create<DeskState>()(
         pendingScannerChips: null,
         watchlists: [],
         activeWatchlistId: "crypto-majors",
+        alerts: [],
+        botSettings: { webhookUrl: "", enabled: false, secret: "" },
+        drawings: [],
+        activeDrawTool: "cursor",
         scripts: [],
         risk: {
           entry: 0,
@@ -459,6 +487,112 @@ export const useDeskStore = create<DeskState>()(
           set({ pendingScannerPresets: null, pendingScannerChips: null }),
         setBacktestParams: (p) =>
           set((s) => ({ backtestParams: { ...s.backtestParams, ...p } })),
+        addAlert: (a) =>
+          set((s) => ({
+            alerts: [
+              {
+                id: uid("alert"),
+                createdAt: Date.now(),
+                active: a.active ?? true,
+                symbol: a.symbol,
+                exchange: a.exchange,
+                condition: a.condition,
+                price: a.price,
+                note: a.note,
+                lastPrice: a.lastPrice,
+                triggeredAt: a.triggeredAt,
+              },
+              ...s.alerts,
+            ],
+          })),
+        removeAlert: (id) =>
+          set((s) => ({ alerts: s.alerts.filter((x) => x.id !== id) })),
+        updateAlert: (id, patch) =>
+          set((s) => ({
+            alerts: s.alerts.map((x) => (x.id === id ? { ...x, ...patch } : x)),
+          })),
+        setBotSettings: (p) =>
+          set((s) => ({ botSettings: { ...s.botSettings, ...p } })),
+        addDrawing: (d) =>
+          set((s) => ({
+            drawings: [
+              ...s.drawings,
+              {
+                id: d.id ?? uid("draw"),
+                paneId: d.paneId,
+                tool: d.tool,
+                points: d.points,
+                color: d.color,
+                label: d.label,
+              },
+            ],
+          })),
+        removeDrawing: (id) =>
+          set((s) => ({ drawings: s.drawings.filter((x) => x.id !== id) })),
+        clearPaneDrawings: (paneId) =>
+          set((s) => ({
+            drawings: s.drawings.filter((x) => x.paneId !== paneId),
+          })),
+        setActiveDrawTool: (t) => set({ activeDrawTool: t }),
+        createWatchlist: (name) => {
+          const id = uid("wl");
+          const trimmed = name.trim() || "Liste";
+          set((s) => ({
+            watchlists: [...s.watchlists, { id, name: trimmed, symbols: [] }],
+            activeWatchlistId: id,
+          }));
+          return id;
+        },
+        importWatchlistSymbols: (listId, text, defaultExchange) => {
+          const raw = text
+            .split(/[\n,;\s]+/)
+            .map((s) => s.trim().toUpperCase())
+            .filter(Boolean);
+          const parsed: { symbol: string; exchange: Exchange }[] = [];
+          for (const tok of raw) {
+            let exchange: Exchange = defaultExchange;
+            let symbol = tok;
+            if (tok.includes(":")) {
+              const [ex, sym] = tok.split(":");
+              if (ex === "BINANCE" || ex === "BIST") {
+                exchange = ex.toLowerCase() as Exchange;
+                symbol = (sym || "").toUpperCase();
+              }
+            }
+            if (!symbol) continue;
+            if (!parsed.some((p) => p.symbol === symbol && p.exchange === exchange)) {
+              parsed.push({ symbol, exchange });
+            }
+          }
+          if (!parsed.length) return 0;
+          let added = 0;
+          set((s) => ({
+            watchlists: s.watchlists.map((w) => {
+              if (w.id !== listId) return w;
+              const existing = new Set(w.symbols.map((x) => `${x.exchange}:${x.symbol}`));
+              const next = [...w.symbols];
+              for (const p of parsed) {
+                const key = `${p.exchange}:${p.symbol}`;
+                if (existing.has(key)) continue;
+                if (next.length >= 500) break;
+                existing.add(key);
+                next.push(p);
+                added++;
+              }
+              return { ...w, symbols: next };
+            }),
+          }));
+          return added;
+        },
+        deleteWatchlist: (id) =>
+          set((s) => {
+            const watchlists = s.watchlists.filter((w) => w.id !== id);
+            const activeWatchlistId =
+              s.activeWatchlistId === id
+                ? watchlists[0]?.id ?? ""
+                : s.activeWatchlistId;
+            return { watchlists, activeWatchlistId };
+          }),
         hydrateFromServer: ({ watchlists, scripts }) =>
           set((s) => ({
             watchlists: watchlists.length ? watchlists : s.watchlists,
@@ -497,6 +631,9 @@ export const useDeskStore = create<DeskState>()(
         backtestParams: s.backtestParams,
         lastBacktest: s.lastBacktest,
         activeStrategyId: s.activeStrategyId,
+        alerts: s.alerts,
+        botSettings: s.botSettings,
+        drawings: s.drawings,
       }),
     }
   )

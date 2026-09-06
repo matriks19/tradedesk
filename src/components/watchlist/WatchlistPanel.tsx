@@ -14,6 +14,9 @@ export function WatchlistPanel() {
     openSymbolInActive,
     removeWatchlistSymbol,
     addWatchlistSymbol,
+    createWatchlist,
+    importWatchlistSymbols,
+    deleteWatchlist,
   } = useDeskStore();
   const list = watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
   const [quotes, setQuotes] = useState<Record<string, TickerQuote>>({});
@@ -21,6 +24,11 @@ export function WatchlistPanel() {
   const [browseQ, setBrowseQ] = useState("");
   const [universe, setUniverse] = useState<SymbolInfo[]>([]);
   const [univTotal, setUnivTotal] = useState(0);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState("");
+  const [bulkEx, setBulkEx] = useState<Exchange>("binance");
+  const [newListName, setNewListName] = useState("");
+  const [bulkMsg, setBulkMsg] = useState("");
 
   useEffect(() => {
     if (!list) return;
@@ -95,7 +103,7 @@ export function WatchlistPanel() {
           </button>
         ))}
       </div>
-      <div className="flex gap-1 px-2 py-1 border-b border-desk-border">
+      <div className="flex gap-1 px-2 py-1 border-b border-desk-border flex-wrap">
         <button
           type="button"
           className={clsx("btn text-2xs", browse === "binance" && "btn-accent")}
@@ -110,7 +118,91 @@ export function WatchlistPanel() {
         >
           Tüm BIST
         </button>
+        <button
+          type="button"
+          className={clsx("btn text-2xs", bulkOpen && "btn-accent")}
+          onClick={() => {
+            setBulkOpen((v) => !v);
+            setBrowse("off");
+          }}
+        >
+          Toplu
+        </button>
+        {watchlists.length > 1 && (
+          <button
+            type="button"
+            className="btn text-2xs text-desk-down"
+            title="Listeyi sil"
+            onClick={() => {
+              if (confirm(`"${list.name}" silinsin mi?`)) deleteWatchlist(list.id);
+            }}
+          >
+            Sil
+          </button>
+        )}
       </div>
+      {bulkOpen && (
+        <div className="p-2 border-b border-desk-border space-y-1.5">
+          <div className="text-2xs text-desk-muted">
+            Satır veya virgülle yapıştır · BINANCE:BTCUSDT / BIST:THYAO destekli
+          </div>
+          <textarea
+            className="input min-h-[72px] font-mono text-2xs"
+            value={bulkText}
+            onChange={(e) => setBulkText(e.target.value)}
+            placeholder={"BTCUSDT, ETHUSDT\nSOLUSDT"}
+          />
+          <div className="flex gap-1 items-center flex-wrap">
+            <select
+              className="input w-auto py-1 text-2xs"
+              value={bulkEx}
+              onChange={(e) => setBulkEx(e.target.value as Exchange)}
+            >
+              <option value="binance">Binance</option>
+              <option value="bist">BIST</option>
+            </select>
+            <button
+              type="button"
+              className="btn btn-accent text-2xs"
+              onClick={() => {
+                const n = importWatchlistSymbols(list.id, bulkText, bulkEx);
+                setBulkMsg(`${n} sembol işlendi`);
+                setBulkText("");
+              }}
+            >
+              İçe aktar
+            </button>
+          </div>
+          <div className="flex gap-1 items-center flex-wrap">
+            <input
+              className="input flex-1 text-2xs"
+              placeholder="Yeni liste adı"
+              value={newListName}
+              onChange={(e) => setNewListName(e.target.value)}
+            />
+            <button
+              type="button"
+              className="btn text-2xs"
+              onClick={() => {
+                const id = createWatchlist(newListName || "Yeni liste");
+                if (bulkText.trim()) {
+                  const n = importWatchlistSymbols(id, bulkText, bulkEx);
+                  setBulkMsg(`Liste + ${n} sembol`);
+                } else {
+                  setBulkMsg("Liste oluşturuldu");
+                }
+                setNewListName("");
+                setBulkText("");
+              }}
+            >
+              Yeni liste
+            </button>
+          </div>
+          {bulkMsg && (
+            <div className="text-2xs text-desk-muted">{bulkMsg}</div>
+          )}
+        </div>
+      )}
       {browse !== "off" ? (
         <UniverseBrowser
           exchange={browse}

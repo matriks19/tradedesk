@@ -119,6 +119,9 @@ function isHtfScan(tf: string): boolean {
 
 export function ScannerPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
+  const addWatchlistSymbol = useDeskStore((s) => s.addWatchlistSymbol);
+  const activeWatchlistId = useDeskStore((s) => s.activeWatchlistId);
+  const watchlists = useDeskStore((s) => s.watchlists);
   const pendingScannerPresets = useDeskStore((s) => s.pendingScannerPresets);
   const pendingScannerChips = useDeskStore((s) => s.pendingScannerChips);
   const clearPendingScanner = useDeskStore((s) => s.clearPendingScanner);
@@ -879,6 +882,29 @@ export function ScannerPanel() {
         </button>
       </div>
 
+      {sortedRows.length > 0 && (
+        <button
+          type="button"
+          className="btn text-2xs w-full"
+          onClick={() => {
+            const listId = activeWatchlistId || watchlists[0]?.id;
+            if (!listId) return;
+            const list = useDeskStore.getState().watchlists.find((w) => w.id === listId);
+            const room = Math.max(0, 200 - (list?.symbols.length ?? 0));
+            let added = 0;
+            for (const r of sortedRows) {
+              if (added >= room) break;
+              const before = useDeskStore.getState().watchlists.find((w) => w.id === listId)?.symbols.length ?? 0;
+              addWatchlistSymbol(listId, r.symbol, r.exchange);
+              const after = useDeskStore.getState().watchlists.find((w) => w.id === listId)?.symbols.length ?? 0;
+              if (after > before) added++;
+            }
+            setStatus(`${added} sembol izleme listesine eklendi (max 200)`);
+          }}
+        >
+          Sonuçları izleme listesine ekle
+        </button>
+      )}
       <div className="flex-1 min-h-[10rem] overflow-y-auto">
         <div className="grid grid-cols-[1fr_auto_auto_auto] gap-x-2 px-2 py-1 text-2xs text-desk-muted border-b border-desk-border/40 sticky top-0 bg-desk-bg">
           <span>Sembol</span>

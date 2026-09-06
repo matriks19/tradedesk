@@ -17,6 +17,8 @@ import { toSyncedLineData } from "@/lib/indicators/math";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 import { SymbolSearch } from "@/components/chart/SymbolSearch";
+import { DrawingToolbar } from "@/components/chart/DrawingToolbar";
+import { DrawingOverlay } from "@/components/chart/DrawingOverlay";
 import { IndicatorMenu } from "@/components/indicators/IndicatorMenu";
 import { Badge } from "@/components/ui/Badge";
 import { usePatternOverlay, TD_OVERLAY_REDRAW } from "@/components/chart/PatternOverlay";
@@ -776,6 +778,7 @@ export function ChartPane({ pane, compact }: Props) {
           }
         />
         <ChartIndicatorsButton paneId={pane.id} />
+        <DrawingToolbar paneId={pane.id} />
         <select
           className="input w-auto py-1"
           value={pane.timeframe}
@@ -876,7 +879,14 @@ export function ChartPane({ pane, compact }: Props) {
             {error}
           </div>
         )}
-        <div ref={containerRef} className="min-h-0 overflow-hidden" />
+        <div ref={containerRef} className="min-h-0 overflow-hidden relative" />
+        <DrawingOverlay
+          paneId={pane.id}
+          chart={chartReady ? chartRef.current : null}
+          series={chartReady ? candleRef.current : null}
+          container={chartReady ? containerRef.current : null}
+          ready={chartReady}
+        />
         {subGroups.map((g) => (
           <div
             key={g.id}
