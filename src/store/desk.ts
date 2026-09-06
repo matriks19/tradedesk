@@ -178,7 +178,7 @@ export const useDeskStore = create<DeskState>()(
         watchlists: [],
         activeWatchlistId: "crypto-majors",
         alerts: [],
-        botSettings: { webhookUrl: "", enabled: false, secret: "" },
+        botSettings: { webhookUrl: "", enabled: false, secret: "", telegramChatId: "" },
         drawings: [],
         activeDrawTool: "cursor",
         scripts: [],

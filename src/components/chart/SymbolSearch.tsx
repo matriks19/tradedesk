@@ -93,28 +93,42 @@ export function SymbolSearch({ symbol, exchange, onSelect }: Props) {
             onChange={(e) => setQ(e.target.value)}
           />
           <div className="max-h-56 overflow-y-auto">
-            {results.map((s) => (
+            {results.map((s) => {
+              const isPerp = /\.P$/i.test(s.symbol);
+              return (
               <button
                 key={`${s.exchange}-${s.symbol}`}
                 type="button"
-                className="w-full text-left px-2 py-1.5 text-xs hover:bg-desk-elevated rounded flex justify-between"
+                className="w-full text-left px-2 py-1.5 text-xs hover:bg-desk-elevated rounded flex justify-between gap-2"
                 onClick={() => {
                   onSelect(s.symbol, s.exchange);
                   setOpen(false);
                 }}
               >
-                <span className="font-medium">{s.symbol}</span>
-                <span className="text-desk-muted text-2xs">
-                  {s.exchange === "bist" ? s.name ?? "BIST" : s.base ?? s.exchange}
+                <span className="font-medium flex items-center gap-1 min-w-0">
+                  <span className="truncate">{s.symbol}</span>
+                  {isPerp && (
+                    <span className="shrink-0 rounded px-1 py-0.5 text-2xs font-semibold bg-desk-accent/20 text-blue-300">
+                      PERP
+                    </span>
+                  )}
+                </span>
+                <span className="text-desk-muted text-2xs shrink-0">
+                  {s.exchange === "bist"
+                    ? s.name ?? "BIST"
+                    : isPerp
+                      ? "P"
+                      : s.base ?? s.exchange}
                 </span>
               </button>
-            ))}
+              );
+            })}
             {!loading && !results.length && (
               <div className="text-2xs text-desk-muted px-2 py-3 space-y-1">
                 <div>Sonuç yok{q ? ` — “${q}”` : ""}</div>
                 {q && (
                   <div>
-                    Bu sembol listede yok olabilir (Binance spot USDT / BIST
+                    Bu sembol listede yok olabilir (Binance spot/perp USDT · .P / BIST
                     kataloğu). Kısmi arama (ör. aio → *AIO*) dener; listede yoksa
                     grafik verisi gelmeyebilir.
                   </div>

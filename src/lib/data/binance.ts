@@ -8,21 +8,47 @@ import {
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 
-/** Market data via Binance Vision — api.binance.com returns 451 in some regions. */
+/** Spot market data — api.binance.com returns 451 in some regions. */
 const REST = process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision";
 const WS_BASE = process.env.BINANCE_WS_URL ?? "wss://data-stream.binance.vision";
 
+/**
+ * USDT-M futures REST. fapi.binance.com is geo-blocked (451) in some regions;
+ * www.binance.com/fapi/v1/... works (~528 USDT PERPETUAL TRADING).
+ */
+const FAPI = process.env.BINANCE_FAPI_URL ?? "https://www.binance.com";
+const FAPI_WS =
+  process.env.BINANCE_FAPI_WS_URL ?? "wss://fstream.binance.com";
+
 const CACHE_DIR = join(process.cwd(), "data", "cache");
 const SYMBOLS_CACHE = join(CACHE_DIR, "binance_usdt_symbols.json");
+const PERP_SYMBOLS_CACHE = join(CACHE_DIR, "binance_usdt_perp_symbols.json");
 
 let memSymbols: { ts: number; symbols: SymbolInfo[] } | null = null;
+let memPerpSymbols: { ts: number; symbols: SymbolInfo[] } | null = null;
 const MEM_TTL = 60 * 60 * 1000; // 1h
 const FILE_TTL = 24 * 60 * 60 * 1000; // 24h
 
-function readFileCache(): SymbolInfo[] | null {
+/** Display / desk symbol ends with .P (e.g. BTCUSDT.P). */
+export function isBinancePerp(symbol: string): boolean {
+  return /\.P$/i.test(symbol.trim());
+}
+
+/** Strip .P/.p for Binance REST/WS symbol param. */
+export function toBinanceRestSymbol(symbol: string): string {
+  return symbol.trim().replace(/\.P$/i, "").toUpperCase();
+}
+
+/** Ensure display form XXXUSDT.P for a rest symbol or already-suffixed symbol. */
+export function toPerpDisplaySymbol(symbol: string): string {
+  const rest = toBinanceRestSymbol(symbol);
+  return `${rest}.P`;
+}
+
+function readFileCache(path: string): SymbolInfo[] | null {
   try {
-    if (!existsSync(SYMBOLS_CACHE)) return null;
-    const raw = JSON.parse(readFileSync(SYMBOLS_CACHE, "utf8"));
+    if (!existsSync(path)) return null;
+    const raw = JSON.parse(readFileSync(path, "utf8"));
     if (!Array.isArray(raw?.symbols) || !raw.symbols.length) return null;
     if (Date.now() - Number(raw.ts || 0) > FILE_TTL) return null;
     return raw.symbols as SymbolInfo[];
@@ -31,27 +57,35 @@ function readFileCache(): SymbolInfo[] | null {
   }
 }
 
-function writeFileCache(symbols: SymbolInfo[]) {
+function writeFileCache(path: string, symbols: SymbolInfo[]) {
   try {
     mkdirSync(CACHE_DIR, { recursive: true });
-    writeFileSync(
-      SYMBOLS_CACHE,
-      JSON.stringify({ ts: Date.now(), symbols }),
-      "utf8"
-    );
+    writeFileSync(path, JSON.stringify({ ts: Date.now(), symbols }), "utf8");
   } catch {
     /* ignore */
   }
 }
 
+function fapiUrl(pathAndQuery: string): string {
+  const base = FAPI.replace(/\/$/, "");
+  const path = pathAndQuery.startsWith("/")
+    ? pathAndQuery
+    : `/${pathAndQuery}`;
+  // BINANCE_FAPI_URL may be https://www.binance.com or already .../fapi
+  if (/\/fapi$/i.test(base)) return `${base}${path}`;
+  return `${base}/fapi${path}`;
+}
+
 async function fetchNativeKlines(
   symbol: string,
   interval: string,
-  limit: number
+  limit: number,
+  perp: boolean
 ): Promise<Candle[]> {
-  const url = `${REST}/api/v3/klines?symbol=${encodeURIComponent(
-    symbol.toUpperCase()
-  )}&interval=${interval}&limit=${limit}`;
+  const restSym = toBinanceRestSymbol(symbol);
+  const url = perp
+    ? `${fapiUrl("/v1/klines")}?symbol=${encodeURIComponent(restSym)}&interval=${interval}&limit=${limit}`
+    : `${REST}/api/v3/klines?symbol=${encodeURIComponent(restSym)}&interval=${interval}&limit=${limit}`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Binance klines ${res.status}`);
   const rows = (await res.json()) as unknown[][];
@@ -65,15 +99,38 @@ async function fetchNativeKlines(
   }));
 }
 
+function mapTickerRow(
+  t: {
+    symbol: string;
+    lastPrice: string;
+    priceChangePercent: string;
+    highPrice: string;
+    lowPrice: string;
+    volume: string;
+    quoteVolume: string;
+  },
+  asPerp: boolean
+): TickerQuote {
+  return {
+    symbol: asPerp ? toPerpDisplaySymbol(t.symbol) : t.symbol,
+    exchange: "binance" as const,
+    last: Number(t.lastPrice),
+    changePct: Number(t.priceChangePercent),
+    high24h: Number(t.highPrice),
+    low24h: Number(t.lowPrice),
+    volume: Number(t.volume),
+    quoteVolume: Number(t.quoteVolume),
+  };
+}
+
 export class BinanceProvider {
   static async getUsdtSymbols(): Promise<SymbolInfo[]> {
     if (memSymbols && Date.now() - memSymbols.ts < MEM_TTL) {
       return memSymbols.symbols;
     }
-    const fileCached = readFileCache();
+    const fileCached = readFileCache(SYMBOLS_CACHE);
     if (fileCached?.length) {
       memSymbols = { ts: Date.now(), symbols: fileCached };
-      // refresh in background if stale-ish
     }
     try {
       const res = await fetch(`${REST}/api/v3/exchangeInfo`, {
@@ -99,13 +156,65 @@ export class BinanceProvider {
         }))
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
       memSymbols = { ts: Date.now(), symbols };
-      writeFileCache(symbols);
+      writeFileCache(SYMBOLS_CACHE, symbols);
       return symbols;
     } catch (e) {
       if (fileCached?.length) return fileCached;
       if (memSymbols?.symbols?.length) return memSymbols.symbols;
       throw e;
     }
+  }
+
+  /** USDT-M perpetual symbols as XXXUSDT.P */
+  static async getUsdtPerpSymbols(): Promise<SymbolInfo[]> {
+    if (memPerpSymbols && Date.now() - memPerpSymbols.ts < MEM_TTL) {
+      return memPerpSymbols.symbols;
+    }
+    const fileCached = readFileCache(PERP_SYMBOLS_CACHE);
+    if (fileCached?.length) {
+      memPerpSymbols = { ts: Date.now(), symbols: fileCached };
+    }
+    try {
+      const res = await fetch(fapiUrl("/v1/exchangeInfo"), {
+        next: { revalidate: 3600 },
+      });
+      if (!res.ok) {
+        if (fileCached?.length) return fileCached;
+        throw new Error(`Binance fapi exchangeInfo ${res.status}`);
+      }
+      const data = await res.json();
+      const symbols = (data.symbols as Array<Record<string, unknown>>)
+        .filter(
+          (s) =>
+            s.status === "TRADING" &&
+            s.contractType === "PERPETUAL" &&
+            (s.quoteAsset === "USDT" || String(s.symbol).endsWith("USDT"))
+        )
+        .map((s) => ({
+          symbol: toPerpDisplaySymbol(String(s.symbol)),
+          exchange: "binance" as const,
+          base: String(s.baseAsset ?? ""),
+          quote: String(s.quoteAsset ?? "USDT"),
+          name: "PERP",
+        }))
+        .sort((a, b) => a.symbol.localeCompare(b.symbol));
+      memPerpSymbols = { ts: Date.now(), symbols };
+      writeFileCache(PERP_SYMBOLS_CACHE, symbols);
+      return symbols;
+    } catch (e) {
+      if (fileCached?.length) return fileCached;
+      if (memPerpSymbols?.symbols?.length) return memPerpSymbols.symbols;
+      throw e;
+    }
+  }
+
+  /** Spot + perp USDT symbols for search catalogs. */
+  static async getAllUsdtSymbols(): Promise<SymbolInfo[]> {
+    const [spot, perp] = await Promise.all([
+      this.getUsdtSymbols(),
+      this.getUsdtPerpSymbols(),
+    ]);
+    return [...spot, ...perp];
   }
 
   static async getKlines(
@@ -117,19 +226,72 @@ export class BinanceProvider {
     if (!resolved) {
       throw new Error(`Unsupported timeframe: ${timeframe}`);
     }
+    const perp = isBinancePerp(symbol);
     if (!resolved.aggregated) {
-      return fetchNativeKlines(symbol, resolved.fetchInterval, limit);
+      return fetchNativeKlines(symbol, resolved.fetchInterval, limit, perp);
     }
-    // Need enough source bars to fill `limit` aggregated bars
-    const srcLimit = Math.min(1000, Math.max(limit * resolved.factor + resolved.factor, limit * 2));
-    const raw = await fetchNativeKlines(symbol, resolved.fetchInterval, srcLimit);
+    const srcLimit = Math.min(
+      1000,
+      Math.max(limit * resolved.factor + resolved.factor, limit * 2)
+    );
+    const raw = await fetchNativeKlines(
+      symbol,
+      resolved.fetchInterval,
+      srcLimit,
+      perp
+    );
     const agg = aggregateCandles(raw, resolved.targetMinutes);
     return agg.slice(-limit);
   }
 
-  static async getTicker24h(symbol?: string): Promise<TickerQuote[]> {
+  /**
+   * 24h ticker. Pass a `.P` symbol for a single perp; omit symbol and set
+   * `market: "perp"` for the full futures ticker list.
+   */
+  static async getTicker24h(
+    symbol?: string,
+    opts?: { market?: "spot" | "perp" }
+  ): Promise<TickerQuote[]> {
+    const market = opts?.market ?? (symbol && isBinancePerp(symbol) ? "perp" : "spot");
+    if (market === "perp") {
+      const url = symbol
+        ? `${fapiUrl("/v1/ticker/24hr")}?symbol=${encodeURIComponent(toBinanceRestSymbol(symbol))}`
+        : `${fapiUrl("/v1/ticker/24hr")}`;
+      const res = await fetch(url, { cache: "no-store" });
+      if (!res.ok) throw new Error(`Binance fapi ticker ${res.status}`);
+      const data = await res.json();
+      const arr = Array.isArray(data) ? data : [data];
+      // Full list includes non-perpetual / non-USDT-M noise — keep TRADING perps only
+      let known: Set<string> | null = null;
+      if (!symbol) {
+        known = new Set(
+          (await this.getUsdtPerpSymbols()).map((s) =>
+            toBinanceRestSymbol(s.symbol)
+          )
+        );
+      }
+      return arr
+        .filter((t: { symbol: string }) => {
+          if (typeof t.symbol !== "string" || !t.symbol.endsWith("USDT"))
+            return false;
+          if (known && !known.has(t.symbol)) return false;
+          return true;
+        })
+        .map(
+          (t: {
+            symbol: string;
+            lastPrice: string;
+            priceChangePercent: string;
+            highPrice: string;
+            lowPrice: string;
+            volume: string;
+            quoteVolume: string;
+          }) => mapTickerRow(t, true)
+        );
+    }
+
     const url = symbol
-      ? `${REST}/api/v3/ticker/24hr?symbol=${encodeURIComponent(symbol.toUpperCase())}`
+      ? `${REST}/api/v3/ticker/24hr?symbol=${encodeURIComponent(toBinanceRestSymbol(symbol))}`
       : `${REST}/api/v3/ticker/24hr`;
     const res = await fetch(url, { cache: "no-store" });
     if (!res.ok) throw new Error(`Binance ticker ${res.status}`);
@@ -146,16 +308,7 @@ export class BinanceProvider {
           lowPrice: string;
           volume: string;
           quoteVolume: string;
-        }) => ({
-          symbol: t.symbol,
-          exchange: "binance" as const,
-          last: Number(t.lastPrice),
-          changePct: Number(t.priceChangePercent),
-          high24h: Number(t.highPrice),
-          low24h: Number(t.lowPrice),
-          volume: Number(t.volume),
-          quoteVolume: Number(t.quoteVolume),
-        })
+        }) => mapTickerRow(t, false)
       );
   }
 
@@ -163,13 +316,15 @@ export class BinanceProvider {
   static wsKlineUrl(symbol: string, timeframe: string): string | null {
     const n = normalizeTimeframe(timeframe);
     if (!n || !isBinanceNativeInterval(n)) return null;
-    // 3h is in our native list for charts but not on Binance — already excluded by isBinanceNativeInterval
-    const s = symbol.toLowerCase();
-    return `${WS_BASE}/ws/${s}@kline_${n}`;
+    const rest = toBinanceRestSymbol(symbol).toLowerCase();
+    const base = isBinancePerp(symbol) ? FAPI_WS : WS_BASE;
+    return `${base.replace(/\/$/, "")}/ws/${rest}@kline_${n}`;
   }
 
   static wsTickerUrl(symbol: string): string {
-    return `${WS_BASE}/ws/${symbol.toLowerCase()}@ticker`;
+    const rest = toBinanceRestSymbol(symbol).toLowerCase();
+    const base = isBinancePerp(symbol) ? FAPI_WS : WS_BASE;
+    return `${base.replace(/\/$/, "")}/ws/${rest}@ticker`;
   }
 
   static parseKlineMessage(msg: unknown): Candle | null {

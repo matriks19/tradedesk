@@ -27,6 +27,7 @@ import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 import {
   fetchScanQuotes,
   type BistScanSource,
+  type BinanceMarket,
 } from "@/lib/data/scanUniverse";
 import { sectorCodes, BIST_SECTORS } from "@/lib/data/bistSectors";
 
@@ -142,6 +143,8 @@ export function FormationScanPanel() {
 
   const [exchange, setExchange] = useState<Exchange>("binance");
   const [bistSource, setBistSource] = useState<BistScanSource>("all");
+  const [binanceMarket, setBinanceMarket] =
+    useState<"spot_top" | "perp_top" | "perp_all">("spot_top");
   const [sectorCode, setSectorCode] = useState("XBANK");
   const [modelsOpen, setModelsOpen] = useState(false);
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
@@ -198,7 +201,14 @@ export function FormationScanPanel() {
         exchange,
         source: bistSource,
         sectorCode: bistSource === "sector" ? sectorCode : undefined,
-        binanceTop: 120,
+        binanceTop:
+          binanceMarket === "perp_all"
+            ? 600
+            : binanceMarket === "perp_top"
+              ? 120
+              : 120,
+        binanceMarket:
+          binanceMarket === "spot_top" ? "spot" : ("perp" as BinanceMarket),
       });
       let quotes: TickerQuote[] = fetched.quotes;
       if (exchange === "bist" && quotes.length === 0) {
@@ -725,6 +735,7 @@ export function FormationScanPanel() {
     exchange,
     bistSource,
     sectorCode,
+    binanceMarket,
     timeframe,
     families,
     shtFocus,
@@ -799,6 +810,22 @@ export function FormationScanPanel() {
               </select>
             )}
           </>
+        )}
+        {exchange === "binance" && (
+          <select
+            className="input w-auto"
+            value={binanceMarket}
+            onChange={(e) =>
+              setBinanceMarket(
+                e.target.value as "spot_top" | "perp_top" | "perp_all"
+              )
+            }
+            title="Kaynak"
+          >
+            <option value="spot_top">Kaynak: Spot top</option>
+            <option value="perp_top">Kaynak: Perp top</option>
+            <option value="perp_all">Kaynak: Perp tümü</option>
+          </select>
         )}
         <select
           className="input w-auto"

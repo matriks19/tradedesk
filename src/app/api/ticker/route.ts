@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BinanceProvider } from "@/lib/data/binance";
+import { BinanceProvider, isBinancePerp } from "@/lib/data/binance";
 import { BistProvider, bistScanUniverse } from "@/lib/data/bist";
 import type { Exchange } from "@/lib/types";
 
@@ -9,6 +9,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const exchange = (sp.get("exchange") ?? "binance") as Exchange;
   const symbols = sp.get("symbols");
+  const market = (sp.get("market") ?? "spot") as "spot" | "perp";
   const limit = Math.min(650, Math.max(30, Number(sp.get("limit") ?? 180)));
 
   try {
@@ -33,7 +34,9 @@ export async function GET(req: NextRequest) {
         await Promise.all(
           parts.map(async (sym) => {
             try {
-              const q = await BinanceProvider.getTicker24h(sym);
+              const q = await BinanceProvider.getTicker24h(sym, {
+                market: isBinancePerp(sym) ? "perp" : "spot",
+              });
               return q[0];
             } catch {
               return null;
@@ -41,10 +44,12 @@ export async function GET(req: NextRequest) {
           })
         )
       ).filter(Boolean);
-      return NextResponse.json({ quotes, delayed: false });
+      return NextResponse.json({ quotes, delayed: false, market });
     }
-    const quotes = await BinanceProvider.getTicker24h();
-    return NextResponse.json({ quotes, delayed: false });
+    const quotes = await BinanceProvider.getTicker24h(undefined, {
+      market: market === "perp" ? "perp" : "spot",
+    });
+    return NextResponse.json({ quotes, delayed: false, market });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : String(e) },

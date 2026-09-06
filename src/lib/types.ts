@@ -378,4 +378,6 @@ export interface BotSettings {
   webhookUrl: string;
   enabled: boolean;
   secret?: string;
+  /** Telegram chat id when webhookUrl is api.telegram.org/.../sendMessage */
+  telegramChatId?: string;
 }

@@ -31,11 +31,31 @@ async function fetchQuotes(
   symbols: string[]
 ): Promise<TickerQuote[]> {
   if (!symbols.length) return [];
-  const res = await fetch(
-    `/api/ticker?exchange=${exchange}&symbols=${symbols.join(",")}`
-  );
-  const json = await res.json();
-  return (json.quotes ?? []) as TickerQuote[];
+  // Chunk — watchlists / bulk alarms may include many .P perps
+  const chunks: string[][] = [];
+  for (let i = 0; i < symbols.length; i += 80) {
+    chunks.push(symbols.slice(i, i + 80));
+  }
+  const out: TickerQuote[] = [];
+  for (const ch of chunks) {
+    const res = await fetch(
+      `/api/ticker?exchange=${exchange}&symbols=${ch.join(",")}`
+    );
+    const json = await res.json();
+    out.push(...((json.quotes ?? []) as TickerQuote[]));
+  }
+  return out;
+}
+
+function alertText(a: {
+  symbol: string;
+  exchange: Exchange;
+  condition: AlertCondition;
+  price: number;
+  note?: string;
+}, last: number): string {
+  const note = a.note ? ` · ${a.note}` : "";
+  return `TradeDesk alarm: ${a.symbol} (${a.exchange}) · ${a.condition} ${a.price} · son ${last}${note}`;
 }
 
 export function AlertWatcher() {
@@ -97,6 +117,8 @@ export function AlertWatcher() {
           lastPrice: q.last,
         });
 
+        const text = alertText(a, q.last);
+
         try {
           if (
             typeof Notification !== "undefined" &&
@@ -124,6 +146,7 @@ export function AlertWatcher() {
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 url: botSettings.webhookUrl.trim(),
+                telegramChatId: botSettings.telegramChatId?.trim() || undefined,
                 payload: {
                   secret: botSettings.secret || undefined,
                   event: "price_alert",
@@ -134,6 +157,8 @@ export function AlertWatcher() {
                   last: q.last,
                   ts: triggeredAt,
                   note: a.note,
+                  text,
+                  message: text,
                 },
               }),
             });

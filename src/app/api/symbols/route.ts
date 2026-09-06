@@ -14,11 +14,14 @@ function fuzzyMatch(
   const s = symbol.toUpperCase();
   const n = (name ?? "").toUpperCase();
   const b = (base ?? "").toUpperCase();
-  // partial anywhere (aio → *AIO*)
+  // partial anywhere (aio → *AIO*, btc.p → BTCUSDT.P)
   if (s.includes(q) || n.includes(q) || b.includes(q)) return true;
-  // strip USDT for crypto base search
-  const bare = s.replace(/USDT$/, "");
+  // strip .P then USDT for crypto base search
+  const bare = s.replace(/\.P$/i, "").replace(/USDT$/, "");
   if (bare.includes(q)) return true;
+  // query without .P still matches perps when typing BTCUSDT
+  if (q.endsWith(".P") && s === q) return true;
+  if (!q.endsWith(".P") && s === `${q}.P`) return true;
   return false;
 }
 
@@ -38,9 +41,9 @@ export async function GET(req: NextRequest) {
       exchange === "bist"
         ? BistProvider.listSymbols()
         : exchange === "binance"
-          ? await BinanceProvider.getUsdtSymbols()
+          ? await BinanceProvider.getAllUsdtSymbols()
           : [
-              ...(await BinanceProvider.getUsdtSymbols()),
+              ...(await BinanceProvider.getAllUsdtSymbols()),
               ...BistProvider.listSymbols(),
             ];
 
@@ -48,6 +51,20 @@ export async function GET(req: NextRequest) {
       symbols = symbols.filter((s) =>
         fuzzyMatch(q, s.symbol, s.name, s.base)
       );
+      // Prefer exact / prefix matches, then spot before listing noise
+      symbols.sort((a, b) => {
+        const as = a.symbol.toUpperCase();
+        const bs = b.symbol.toUpperCase();
+        const score = (s: string) => {
+          if (s === q || s === `${q}.P`) return 0;
+          if (s.startsWith(q)) return 1;
+          if (s.includes(q)) return 2;
+          return 3;
+        };
+        const d = score(as) - score(bs);
+        if (d !== 0) return d;
+        return as.localeCompare(bs);
+      });
     }
 
     const sliced = symbols.slice(0, limit);

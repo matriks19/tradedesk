@@ -93,11 +93,13 @@ export function AlertsPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           url: botSettings.webhookUrl.trim(),
+          telegramChatId: botSettings.telegramChatId?.trim() || undefined,
           payload: {
             secret: botSettings.secret || undefined,
             event: "test",
             ts: Date.now(),
             message: "TradeDesk webhook test",
+            text: "TradeDesk webhook test",
           },
         }),
       });
@@ -231,13 +233,39 @@ export function AlertsPanel() {
 
       <div className="border-t border-desk-border pt-2 mt-1 space-y-1">
         <div className="font-medium">Bot / Webhook</div>
+        <p className="text-2xs text-desk-muted leading-relaxed">
+          <strong className="text-desk-text">Telegram:</strong> BotFather ile bot
+          oluşturun → URL:{" "}
+          <span className="font-mono">
+            https://api.telegram.org/bot&lt;TOKEN&gt;/sendMessage
+          </span>{" "}
+          · Chat ID alanına sohbet/kanal id yazın (ör.{" "}
+          <span className="font-mono">123456789</span> veya{" "}
+          <span className="font-mono">-100…</span>).
+          <br />
+          <strong className="text-desk-text">WhatsApp:</strong> Make / n8n
+          webhook URL&apos;si kullanın (aynı webhook; metin{" "}
+          <span className="font-mono">text</span> /{" "}
+          <span className="font-mono">message</span> alanından gelir).
+        </p>
         <label className="text-2xs text-desk-muted block">
           Webhook URL
           <input
             className="input mt-0.5"
             value={botSettings.webhookUrl}
             onChange={(e) => setBotSettings({ webhookUrl: e.target.value })}
-            placeholder="https://…"
+            placeholder="https://api.telegram.org/bot…/sendMessage"
+          />
+        </label>
+        <label className="text-2xs text-desk-muted block">
+          Telegram Chat ID (opsiyonel)
+          <input
+            className="input mt-0.5"
+            value={botSettings.telegramChatId ?? ""}
+            onChange={(e) =>
+              setBotSettings({ telegramChatId: e.target.value })
+            }
+            placeholder="123456789 veya -100…"
           />
         </label>
         <label className="text-2xs text-desk-muted block">

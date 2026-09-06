@@ -5,6 +5,7 @@ import { BIST30, BIST_LIQUID_EXTRA } from "@/lib/data/bistLists";
 import { symbolsForSector, allBistSymbols } from "@/lib/data/bistSectors";
 
 export type BistScanSource = "bist30" | "liquid" | "all" | "sector";
+export type BinanceMarket = "spot" | "perp";
 
 export function bistSourceLimit(source: BistScanSource): number {
   if (source === "bist30") return 30;
@@ -38,6 +39,7 @@ export function bistSymbolsForSource(
 /**
  * Fetch ticker quotes for scan. When `symbols` given (sector/watchlist), uses
  * comma list; otherwise uses limit for BIST universe.
+ * Binance: `binanceMarket` spot (default) or perp; `binanceTop` caps by quoteVolume.
  */
 export async function fetchScanQuotes(opts: {
   exchange: Exchange;
@@ -45,12 +47,19 @@ export async function fetchScanQuotes(opts: {
   sectorCode?: string;
   symbols?: string[];
   binanceTop?: number;
+  binanceMarket?: BinanceMarket;
 }): Promise<{ quotes: TickerQuote[]; note?: string; requested: number }> {
-  const { exchange, source = "all", sectorCode, symbols, binanceTop = 120 } =
-    opts;
+  const {
+    exchange,
+    source = "all",
+    sectorCode,
+    symbols,
+    binanceTop = 120,
+    binanceMarket = "spot",
+  } = opts;
 
   if (symbols?.length) {
-    // chunk to avoid huge URLs
+    // chunk to avoid huge URLs / rate limits (esp. large perp sets)
     const chunks: string[][] = [];
     for (let i = 0; i < symbols.length; i += 80) {
       chunks.push(symbols.slice(i, i + 80));
@@ -99,14 +108,22 @@ export async function fetchScanQuotes(opts: {
     };
   }
 
-  const res = await fetch(`/api/ticker?exchange=binance`);
+  const market = binanceMarket === "perp" ? "perp" : "spot";
+  const res = await fetch(`/api/ticker?exchange=binance&market=${market}`);
   const json = await res.json();
-  let quotes: TickerQuote[] = (json.quotes ?? [])
-    .filter((q: TickerQuote) => q.symbol.endsWith("USDT"))
+  let quotes: TickerQuote[] = (json.quotes ?? []) as TickerQuote[];
+  if (market === "perp") {
+    quotes = quotes.filter((q) => /\.P$/i.test(q.symbol));
+  } else {
+    quotes = quotes.filter(
+      (q) => q.symbol.endsWith("USDT") && !/\.P$/i.test(q.symbol)
+    );
+  }
+  quotes = quotes
     .sort(
       (a: TickerQuote, b: TickerQuote) =>
         (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0)
     )
-    .slice(0, binanceTop);
+    .slice(0, Math.max(1, binanceTop));
   return { quotes, note: json.note, requested: quotes.length };
 }

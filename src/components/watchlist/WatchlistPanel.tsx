@@ -18,6 +18,7 @@ export function WatchlistPanel() {
     importWatchlistSymbols,
     deleteWatchlist,
     seedSectorWatchlists,
+    ensureWatchlist,
   } = useDeskStore();
   const list = watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
   const [quotes, setQuotes] = useState<Record<string, TickerQuote>>({});
@@ -31,6 +32,8 @@ export function WatchlistPanel() {
   const [newListName, setNewListName] = useState("");
   const [bulkMsg, setBulkMsg] = useState("");
   const [seedMsg, setSeedMsg] = useState("");
+  const [perpMsg, setPerpMsg] = useState("");
+  const [perpBusy, setPerpBusy] = useState(false);
 
   useEffect(() => {
     if (!list) return;
@@ -42,11 +45,14 @@ export function WatchlistPanel() {
       };
       const map: Record<string, TickerQuote> = {};
       if (byEx.binance.length) {
-        const res = await fetch(
-          `/api/ticker?exchange=binance&symbols=${byEx.binance.join(",")}`
-        );
-        const json = await res.json();
-        for (const q of json.quotes ?? []) map[`${q.exchange}:${q.symbol}`] = q;
+        for (let i = 0; i < byEx.binance.length; i += 80) {
+          const ch = byEx.binance.slice(i, i + 80);
+          const res = await fetch(
+            `/api/ticker?exchange=binance&symbols=${ch.join(",")}`
+          );
+          const json = await res.json();
+          for (const q of json.quotes ?? []) map[`${q.exchange}:${q.symbol}`] = q;
+        }
       }
       if (byEx.bist.length) {
         const res = await fetch(
@@ -133,8 +139,62 @@ export function WatchlistPanel() {
         >
           Sektör listelerini oluştur
         </button>
+        <button
+          type="button"
+          className="btn text-2xs"
+          disabled={perpBusy}
+          title="USDT-M perpetual top ~150 (hacim) — BN Perp · USDT.P"
+          onClick={async () => {
+            setPerpBusy(true);
+            setPerpMsg("");
+            try {
+              const id = "binance-perp-usdt";
+              const existing = useDeskStore
+                .getState()
+                .watchlists.find((w) => w.id === id);
+              if (existing && existing.symbols.length > 0) {
+                setActiveWatchlist(id);
+                setPerpMsg("BN Perp listesi zaten var");
+                return;
+              }
+              const res = await fetch(
+                "/api/ticker?exchange=binance&market=perp"
+              );
+              const json = await res.json();
+              const quotes = (json.quotes ?? [])
+                .filter((q: { symbol?: string }) =>
+                  /\.P$/i.test(String(q.symbol ?? ""))
+                )
+                .sort(
+                  (
+                    a: { quoteVolume?: number },
+                    b: { quoteVolume?: number }
+                  ) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0)
+                )
+                .slice(0, 150);
+              const syms = quotes.map((q: { symbol: string }) => q.symbol);
+              if (!syms.length) {
+                setPerpMsg("Perp kotasyon alınamadı");
+                return;
+              }
+              ensureWatchlist(id, "BN Perp · USDT.P");
+              const n = importWatchlistSymbols(id, syms.join("\n"), "binance");
+              setActiveWatchlist(id);
+              setPerpMsg(`BN Perp: ${n} sembol`);
+            } catch (e) {
+              setPerpMsg(e instanceof Error ? e.message : "hata");
+            } finally {
+              setPerpBusy(false);
+            }
+          }}
+        >
+          {perpBusy ? "Perp…" : "BN Perp listesini oluştur"}
+        </button>
         {seedMsg ? (
           <span className="text-2xs text-desk-muted">{seedMsg}</span>
+        ) : null}
+        {perpMsg ? (
+          <span className="text-2xs text-desk-muted">{perpMsg}</span>
         ) : null}
         <button
           type="button"
@@ -256,6 +316,9 @@ export function WatchlistPanel() {
                       {s.exchange === "bist" && (
                         <span className="ml-1"><Badge tone="warn">BIST</Badge></span>
                       )}
+                      {s.exchange === "binance" && /\.P$/i.test(s.symbol) && (
+                        <span className="ml-1"><Badge tone="accent">P</Badge></span>
+                      )}
                     </td>
                     <td className="px-2 py-1.5 text-right font-mono">
                       {q ? q.last.toLocaleString(undefined, { maximumFractionDigits: 6 }) : "—"}
@@ -327,7 +390,7 @@ function UniverseBrowser({
           onChange={(e) => setQ(e.target.value)}
         />
         <div className="text-2xs text-desk-muted mt-1">
-          {total} sembol · {exchange === "binance" ? "Binance USDT spot" : "BIST"}
+          {total} sembol · {exchange === "binance" ? "Binance USDT spot+perp" : "BIST"}
         </div>
       </div>
       <div
