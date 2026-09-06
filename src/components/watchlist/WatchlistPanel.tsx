@@ -17,6 +17,7 @@ export function WatchlistPanel() {
     createWatchlist,
     importWatchlistSymbols,
     deleteWatchlist,
+    seedSectorWatchlists,
   } = useDeskStore();
   const list = watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
   const [quotes, setQuotes] = useState<Record<string, TickerQuote>>({});
@@ -29,6 +30,7 @@ export function WatchlistPanel() {
   const [bulkEx, setBulkEx] = useState<Exchange>("binance");
   const [newListName, setNewListName] = useState("");
   const [bulkMsg, setBulkMsg] = useState("");
+  const [seedMsg, setSeedMsg] = useState("");
 
   useEffect(() => {
     if (!list) return;
@@ -118,6 +120,22 @@ export function WatchlistPanel() {
         >
           Tüm BIST
         </button>
+        <button
+          type="button"
+          className="btn text-2xs"
+          title="XBANK, XGIDA, … ve BIST Tümü izleme listelerini oluştur"
+          onClick={() => {
+            const r = seedSectorWatchlists();
+            setSeedMsg(
+              `Sektör: ${r.created} yeni, ${r.skipped} mevcut`
+            );
+          }}
+        >
+          Sektör listelerini oluştur
+        </button>
+        {seedMsg ? (
+          <span className="text-2xs text-desk-muted">{seedMsg}</span>
+        ) : null}
         <button
           type="button"
           className={clsx("btn text-2xs", bulkOpen && "btn-accent")}

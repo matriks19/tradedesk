@@ -7,6 +7,7 @@ import type { Candle } from "@/lib/types";
 import { FormationScanPanel } from "@/components/formations/FormationScanPanel";
 import { MacdScanPanel } from "@/components/formations/MacdScanPanel";
 import { RsiScanPanel } from "@/components/formations/RsiScanPanel";
+import { SectorScanPanel } from "@/components/formations/SectorScanPanel";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
 import {
@@ -38,7 +39,8 @@ export function PatternPanel() {
   const updatePane = useDeskStore((s) => s.updatePane);
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [patterns, setPatterns] = useState<PatternHit[]>([]);
-  const [mode, setMode] = useState<"chart" | "scan" | "macd" | "rsi">("scan");
+  const [mode, setMode] = useState<"chart" | "scan" | "osc" | "sector">("scan");
+  const [oscSub, setOscSub] = useState<"macd" | "rsi">("macd");
   const [shtFocus, setShtFocus] = useState(false);
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
@@ -174,6 +176,10 @@ export function PatternPanel() {
 
   return (
     <div className="flex flex-col h-full min-h-0">
+      <p className="text-2xs text-desk-muted px-2 pt-2 pb-0">
+        SMC/QM/MAVK chip’leri Formasyon’da; MACD/RSI Osilatör’de; sektör taraması
+        Sektör sekmesinde.
+      </p>
       <div className="flex gap-1 p-2 pb-0">
         <button
           type="button"
@@ -184,19 +190,19 @@ export function PatternPanel() {
         </button>
         <button
           type="button"
-          className={clsx("btn text-2xs flex-1", mode === "macd" && "btn-accent")}
-          onClick={() => setMode("macd")}
-          title="MACD Tarama (15–240)"
+          className={clsx("btn text-2xs flex-1", mode === "osc" && "btn-accent")}
+          onClick={() => setMode("osc")}
+          title="MACD / RSI osilatör taramaları"
         >
-          MACD
+          Osilatör
         </button>
         <button
           type="button"
-          className={clsx("btn text-2xs flex-1", mode === "rsi" && "btn-accent")}
-          onClick={() => setMode("rsi")}
-          title="RSI 30/50/70 seviye kırılım tarama (15–240)"
+          className={clsx("btn text-2xs flex-1", mode === "sector" && "btn-accent")}
+          onClick={() => setMode("sector")}
+          title="Sektör momentum + sektör hisse taraması"
         >
-          RSI
+          Sektör
         </button>
         <button
           type="button"
@@ -208,10 +214,28 @@ export function PatternPanel() {
       </div>
       {mode === "scan" ? (
         <FormationScanPanel />
-      ) : mode === "macd" ? (
-        <MacdScanPanel />
-      ) : mode === "rsi" ? (
-        <RsiScanPanel />
+      ) : mode === "osc" ? (
+        <div className="flex flex-col h-full min-h-0">
+          <div className="flex gap-1 px-2 pt-2">
+            <button
+              type="button"
+              className={clsx("btn text-2xs flex-1", oscSub === "macd" && "btn-accent")}
+              onClick={() => setOscSub("macd")}
+            >
+              MACD
+            </button>
+            <button
+              type="button"
+              className={clsx("btn text-2xs flex-1", oscSub === "rsi" && "btn-accent")}
+              onClick={() => setOscSub("rsi")}
+            >
+              RSI
+            </button>
+          </div>
+          {oscSub === "macd" ? <MacdScanPanel /> : <RsiScanPanel />}
+        </div>
+      ) : mode === "sector" ? (
+        <SectorScanPanel />
       ) : (
         <div className="flex flex-col h-full min-h-0 p-2 gap-2">
           <div className="text-xs font-medium">Formasyonlar — {pane?.symbol}</div>

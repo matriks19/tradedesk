@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
   const sp = req.nextUrl.searchParams;
   const exchange = (sp.get("exchange") ?? "binance") as Exchange;
   const symbols = sp.get("symbols");
-  const limit = Math.min(250, Math.max(30, Number(sp.get("limit") ?? 180)));
+  const limit = Math.min(650, Math.max(30, Number(sp.get("limit") ?? 180)));
 
   try {
     if (exchange === "bist") {

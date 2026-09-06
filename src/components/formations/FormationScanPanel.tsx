@@ -24,6 +24,11 @@ import { passesCloudTouchFilter } from "@/lib/patterns/cloudTouch";
 import type { PatternHit } from "@/lib/patterns/types";
 import { mapPool } from "@/lib/scanner/engine";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
+import {
+  fetchScanQuotes,
+  type BistScanSource,
+} from "@/lib/data/scanUniverse";
+import { sectorCodes, BIST_SECTORS } from "@/lib/data/bistSectors";
 
 const FAMILY_OPTS: { id: AdvancedPatternFamily; label: string }[] = [
   { id: "harmonic", label: "Harmonik" },
@@ -136,6 +141,9 @@ export function FormationScanPanel() {
   const patternSettings = useDeskStore((s) => s.patternSettings);
 
   const [exchange, setExchange] = useState<Exchange>("binance");
+  const [bistSource, setBistSource] = useState<BistScanSource>("all");
+  const [sectorCode, setSectorCode] = useState("XBANK");
+  const [modelsOpen, setModelsOpen] = useState(false);
   const [timeframe, setTimeframe] = useState<Timeframe>("1h");
   const [families, setFamilies] = useState<AdvancedPatternFamily[]>([
     "harmonic",
@@ -186,27 +194,25 @@ export function FormationScanPanel() {
     setRows([]);
     setStatus("");
     try {
-      const tickerRes = await fetch(
-        `/api/ticker?exchange=${exchange}${exchange === "bist" ? "&limit=160" : ""}`
-      );
-      const tickerJson = await tickerRes.json();
-      let quotes: TickerQuote[] = tickerJson.quotes ?? [];
+      const fetched = await fetchScanQuotes({
+        exchange,
+        source: bistSource,
+        sectorCode: bistSource === "sector" ? sectorCode : undefined,
+        binanceTop: 120,
+      });
+      let quotes: TickerQuote[] = fetched.quotes;
       if (exchange === "bist" && quotes.length === 0) {
         setStatus(
-          tickerJson.note ||
+          fetched.note ||
             "BIST kotasyonları boş — Yahoo rate-limit. Formasyon taraması için kotasyon gerekli."
         );
         return;
       }
-      if (exchange === "binance") {
-        quotes = quotes
-          .filter((q) => q.symbol.endsWith("USDT"))
-          .sort((a, b) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0))
-          .slice(0, 120);
-      } else {
-        quotes = [...quotes]
-          .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-          .slice(0, 100);
+      if (exchange === "bist") {
+        // keep full returned universe (up to ~650); volume-sort for fairness
+        quotes = [...quotes].sort(
+          (a, b) => (b.volume ?? 0) - (a.volume ?? 0)
+        );
       }
 
       const jobs = quotes.map((q) => ({
@@ -717,6 +723,8 @@ export function FormationScanPanel() {
     }
   }, [
     exchange,
+    bistSource,
+    sectorCode,
     timeframe,
     families,
     shtFocus,
@@ -753,15 +761,45 @@ export function FormationScanPanel() {
         Retest/PRZ aşamasındaki formasyonlar — hedefi dolmuşlar elenir. Tıklayınca
         XABCD bacakları + PRZ + TP/SL.
       </p>
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex gap-1 flex-wrap items-center">
         <select
           className="input w-auto"
           value={exchange}
           onChange={(e) => setExchange(e.target.value as Exchange)}
         >
-          <option value="binance">Binance top ~120</option>
-          <option value="bist">BIST likit ~100</option>
+          <option value="binance">Binance</option>
+          <option value="bist">BIST</option>
         </select>
+        {exchange === "bist" && (
+          <>
+            <select
+              className="input w-auto"
+              value={bistSource}
+              onChange={(e) =>
+                setBistSource(e.target.value as BistScanSource)
+              }
+              title="Kaynak"
+            >
+              <option value="bist30">Kaynak: BIST30</option>
+              <option value="liquid">Kaynak: Likit</option>
+              <option value="all">Kaynak: Tümü (~650)</option>
+              <option value="sector">Kaynak: Sektör</option>
+            </select>
+            {bistSource === "sector" && (
+              <select
+                className="input w-auto"
+                value={sectorCode}
+                onChange={(e) => setSectorCode(e.target.value)}
+              >
+                {sectorCodes().map((c) => (
+                  <option key={c} value={c}>
+                    {c} · {BIST_SECTORS[c]?.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </>
+        )}
         <select
           className="input w-auto"
           value={timeframe}
@@ -777,7 +815,7 @@ export function FormationScanPanel() {
           {running ? `${progress.done}/${progress.total}` : "Tara"}
         </button>
       </div>
-      <div className="flex flex-wrap gap-1">
+      <div className="flex flex-wrap gap-1 items-center">
         {FAMILY_OPTS.map((f) => (
           <button
             key={f.id}
@@ -794,81 +832,97 @@ export function FormationScanPanel() {
           onClick={() => setActiveOnly((v) => !v)}
           title="forming / PRZ / retest / aktif — hedefi dolmuşları gizle"
         >
-          Sadece aktif (retest/PRZ)
+          Sadece aktif
         </button>
         <button
           type="button"
-          className={clsx("btn text-2xs", shtFocus && "btn-accent")}
-          onClick={() => setShtFocus((v) => !v)}
-          title="Flama/bayrak/üçgen · UYGUN veya skor≥60"
+          className={clsx(
+            "btn text-2xs",
+            (ifvgFocus || smcFocus || qmFocus || mavkFocus || bistFocus || cloudFocus || shtFocus || tdFocus || bfrFocus) &&
+              "btn-accent"
+          )}
+          onClick={() => setModelsOpen((v) => !v)}
+          title="Gelişmiş modeller"
         >
-          SHT Flama/Üçgen
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", tdFocus && "btn-accent")}
-          onClick={() => setTdFocus((v) => !v)}
-          title="Three Drives / Üç İtiş · UYGUN veya skor≥60"
-        >
-          Three Drives / Üç İtiş
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", bfrFocus && "btn-accent")}
-          onClick={() => setBfrFocus((v) => !v)}
-          title="Breakout · FVG · Retest · onay · skor≥60"
-        >
-          Breakout·FVG·Retest
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", ifvgFocus && "btn-accent")}
-          onClick={() => setIfvgFocus((v) => !v)}
-          title="Inversion FVG · süpürme · CHoCH · retest · skor≥55 — İndikatörler: IFVG Bölgeler + IFVG×RSI ile birlikte kullanılabilir"
-        >
-          Inversion FVG (IFVG)
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", smcFocus && "btn-accent")}
-          onClick={() => setSmcFocus((v) => !v)}
-          title="SMC modelleri: POI+süp+MSS+FVG · +IDM · +OTE · BOX — erken/retest tercih"
-        >
-          SMC
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", qmFocus && "btn-accent")}
-          onClick={() => setQmFocus((v) => !v)}
-          title="Quasimodo · Quick Retest QML · ENTRY/SL/TP"
-        >
-          QM
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", mavkFocus && "btn-accent")}
-          onClick={() => setMavkFocus((v) => !v)}
-          title="MAVK küme (EMA şerit) + R² düşükten yükseliş"
-        >
-          MAVK
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", bistFocus && "btn-accent")}
-          onClick={() => setBistFocus((v) => !v)}
-          title="BIST 6 adımlı döngü · faz 2–3 giriş izle · 4–5 temkin · 6 çıkış"
-        >
-          BIST Döngü
-        </button>
-        <button
-          type="button"
-          className={clsx("btn text-2xs", cloudFocus && "btn-accent")}
-          onClick={() => setCloudFocus((v) => !v)}
-          title="Cloud/ribbon touch · Donchian/MA zarf + RSI OS/OB küme"
-        >
-          Cloud Touch
+          Modeller {modelsOpen ? "▴" : "▾"}
         </button>
       </div>
+      {modelsOpen && (
+        <div className="flex flex-wrap gap-1 border border-desk-border/50 rounded p-1.5">
+          <button
+            type="button"
+            className={clsx("btn text-2xs", shtFocus && "btn-accent")}
+            onClick={() => setShtFocus((v) => !v)}
+            title="Flama/bayrak/üçgen · UYGUN veya skor≥60"
+          >
+            SHT Flama/Üçgen
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", tdFocus && "btn-accent")}
+            onClick={() => setTdFocus((v) => !v)}
+            title="Three Drives / Üç İtiş"
+          >
+            Three Drives
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", bfrFocus && "btn-accent")}
+            onClick={() => setBfrFocus((v) => !v)}
+            title="Breakout · FVG · Retest"
+          >
+            Breakout·FVG·Retest
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", ifvgFocus && "btn-accent")}
+            onClick={() => setIfvgFocus((v) => !v)}
+            title="Inversion FVG"
+          >
+            IFVG
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", smcFocus && "btn-accent")}
+            onClick={() => setSmcFocus((v) => !v)}
+            title="SMC"
+          >
+            SMC
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", qmFocus && "btn-accent")}
+            onClick={() => setQmFocus((v) => !v)}
+            title="Quasimodo"
+          >
+            QM
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", mavkFocus && "btn-accent")}
+            onClick={() => setMavkFocus((v) => !v)}
+            title="MAVK"
+          >
+            MAVK
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", bistFocus && "btn-accent")}
+            onClick={() => setBistFocus((v) => !v)}
+            title="BIST döngü"
+          >
+            BIST Döngü
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", cloudFocus && "btn-accent")}
+            onClick={() => setCloudFocus((v) => !v)}
+            title="Cloud Touch"
+          >
+            Cloud Touch
+          </button>
+        </div>
+      )}
       {status && <p className="text-2xs text-desk-muted">{status}</p>}
       {running && (
         <div className="h-1 bg-desk-border rounded overflow-hidden">

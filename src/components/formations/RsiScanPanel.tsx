@@ -10,6 +10,11 @@ import {
   type RsiBreakHit,
 } from "@/lib/scanner/rsiScan";
 import { useDeskStore } from "@/store/desk";
+import {
+  fetchScanQuotes,
+  type BistScanSource,
+} from "@/lib/data/scanUniverse";
+import { sectorCodes, BIST_SECTORS } from "@/lib/data/bistSectors";
 
 /** Fixed TF chips: value (API) + chip label (minutes) */
 const RSI_TF_CHIPS: { value: Timeframe; label: string }[] = [
@@ -46,10 +51,13 @@ function fmtRsi(n: number) {
 
 export function RsiScanPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
+  const addAlertsBulk = useDeskStore((s) => s.addAlertsBulk);
   const addIndicator = useDeskStore((s) => s.addIndicator);
   const setOverlayPattern = useDeskStore((s) => s.setOverlayPattern);
 
   const [exchange, setExchange] = useState<Exchange>("binance");
+  const [bistSource, setBistSource] = useState<BistScanSource>("all");
+  const [sectorCode, setSectorCode] = useState("XBANK");
   const [tfs, setTfs] = useState<Timeframe[]>([...ALL_TFS]);
   const [levels, setLevels] = useState<number[]>([...ALL_LEVELS]);
   const [direction, setDirection] = useState<DirectionFilter>("all");
@@ -92,27 +100,28 @@ export function RsiScanPanel() {
     setRows([]);
     setStatus("");
     try {
-      const tickerRes = await fetch(
-        `/api/ticker?exchange=${exchange}${exchange === "bist" ? "&limit=160" : ""}`
-      );
-      const tickerJson = await tickerRes.json();
-      let quotes: TickerQuote[] = tickerJson.quotes ?? [];
+      const fetched = await fetchScanQuotes({
+        exchange,
+        source: bistSource,
+        sectorCode: bistSource === "sector" ? sectorCode : undefined,
+        binanceTop: 80,
+      });
+      let quotes: TickerQuote[] = fetched.quotes;
       if (exchange === "bist" && quotes.length === 0) {
         setStatus(
-          tickerJson.note ||
+          fetched.note ||
             "BIST kotasyonları boş — Yahoo rate-limit. RSI taraması için kotasyon gerekli."
         );
         return;
       }
-      if (exchange === "binance") {
-        quotes = quotes
-          .filter((q) => q.symbol.endsWith("USDT"))
-          .sort((a, b) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0))
-          .slice(0, 80);
-      } else {
-        quotes = [...quotes]
-          .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-          .slice(0, 80);
+      if (exchange === "bist") {
+        quotes = [...quotes].sort(
+          (a, b) => (b.volume ?? 0) - (a.volume ?? 0)
+        );
+        // Cap extreme full-universe * multi-TF job count for responsiveness
+        if (bistSource === "all" && tfs.length > 2) {
+          quotes = quotes.slice(0, 320);
+        }
       }
 
       type Job = { quote: TickerQuote; tf: Timeframe };
@@ -178,7 +187,7 @@ export function RsiScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [exchange, tfs, levels, direction, maxBarsAgo]);
+  }, [exchange, bistSource, sectorCode, tfs, levels, direction, maxBarsAgo]);
 
   const openHit = (r: Row) => {
     setOverlayPattern(null);
@@ -209,9 +218,38 @@ export function RsiScanPanel() {
           value={exchange}
           onChange={(e) => setExchange(e.target.value as Exchange)}
         >
-          <option value="binance">Binance top ~80</option>
-          <option value="bist">BIST likit ~80</option>
+          <option value="binance">Binance</option>
+          <option value="bist">BIST</option>
         </select>
+        {exchange === "bist" && (
+          <>
+            <select
+              className="input w-auto"
+              value={bistSource}
+              onChange={(e) =>
+                setBistSource(e.target.value as BistScanSource)
+              }
+            >
+              <option value="bist30">Kaynak: BIST30</option>
+              <option value="liquid">Kaynak: Likit</option>
+              <option value="all">Kaynak: Tümü (~650)</option>
+              <option value="sector">Kaynak: Sektör</option>
+            </select>
+            {bistSource === "sector" && (
+              <select
+                className="input w-auto"
+                value={sectorCode}
+                onChange={(e) => setSectorCode(e.target.value)}
+              >
+                {sectorCodes().map((c) => (
+                  <option key={c} value={c}>
+                    {c} · {BIST_SECTORS[c]?.name}
+                  </option>
+                ))}
+              </select>
+            )}
+          </>
+        )}
         <select
           className="input w-auto"
           value={direction}
@@ -290,6 +328,44 @@ export function RsiScanPanel() {
         </button>
       </div>
 
+      {rows.length > 0 && (
+        <div className="flex gap-1 flex-wrap">
+          <button
+            type="button"
+            className="btn text-2xs"
+            title="Sonuç sembollerine fiyat +%3 cross_above alarm"
+            onClick={async () => {
+              const syms = [...new Set(rows.map((r) => r.symbol))];
+              const res = await fetch(
+                `/api/ticker?exchange=${exchange}&symbols=${syms.join(",")}`
+              );
+              const json = await res.json();
+              const by = new Map<string, number>();
+              for (const q of json.quotes ?? []) {
+                if (q?.symbol && Number.isFinite(q.last)) by.set(q.symbol, Number(q.last));
+              }
+              const items = syms.flatMap((sym) => {
+                const last = by.get(sym);
+                if (last == null || !Number.isFinite(last)) return [];
+                return [
+                  {
+                    symbol: sym,
+                    exchange,
+                    condition: "cross_above" as const,
+                    price: Number((last * 1.03).toFixed(4)),
+                    note: "tarama +%3",
+                    lastPrice: last,
+                  },
+                ];
+              });
+              const n = addAlertsBulk(items);
+              setStatus(`${n} alarm eklendi (+%3)`);
+            }}
+          >
+            Seçilenlere alarm (+%3)
+          </button>
+        </div>
+      )}
       {status && <p className="text-2xs text-desk-muted">{status}</p>}
       {running && (
         <div className="h-1 bg-desk-border rounded overflow-hidden">

@@ -26,6 +26,7 @@ import type { BacktestParams, BacktestResult } from "@/lib/backtest"
 import { normalizeBacktestResult } from "@/lib/backtest";
 import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
 import { strategyById } from "@/lib/strategies";
+import { sectorWatchlistMeta } from "@/lib/data/bistSectors";
 
 function uid(prefix = "id"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -147,12 +148,19 @@ interface DeskState {
   clearPaneDrawings: (paneId: string) => void;
   setActiveDrawTool: (t: DrawTool) => void;
   createWatchlist: (name: string) => string;
+  ensureWatchlist: (id: string, name: string) => string;
   importWatchlistSymbols: (
     listId: string,
     text: string,
     defaultExchange: Exchange
   ) => number;
   deleteWatchlist: (id: string) => void;
+  addAlertsBulk: (
+    items: Array<
+      Omit<PriceAlert, "id" | "createdAt" | "active"> & { active?: boolean }
+    >
+  ) => number;
+  seedSectorWatchlists: () => { created: number; skipped: number };
 }
 
 export const useDeskStore = create<DeskState>()(
@@ -513,6 +521,24 @@ export const useDeskStore = create<DeskState>()(
               ...s.alerts,
             ],
           })),
+        addAlertsBulk: (items) => {
+          if (!items.length) return 0;
+          const now = Date.now();
+          const mapped = items.map((a, i) => ({
+            id: uid("alert"),
+            createdAt: now + i,
+            active: a.active ?? true,
+            symbol: a.symbol,
+            exchange: a.exchange,
+            condition: a.condition,
+            price: a.price,
+            note: a.note,
+            lastPrice: a.lastPrice,
+            triggeredAt: a.triggeredAt,
+          }));
+          set((s) => ({ alerts: [...mapped, ...s.alerts] }));
+          return mapped.length;
+        },
         removeAlert: (id) =>
           set((s) => ({ alerts: s.alerts.filter((x) => x.id !== id) })),
         updateAlert: (id, patch) =>
@@ -551,6 +577,31 @@ export const useDeskStore = create<DeskState>()(
           }));
           return id;
         },
+        ensureWatchlist: (id, name) => {
+          const existing = get().watchlists.find((w) => w.id === id);
+          if (existing) return id;
+          const trimmed = name.trim() || "Liste";
+          set((s) => ({
+            watchlists: [...s.watchlists, { id, name: trimmed, symbols: [] }],
+          }));
+          return id;
+        },
+        seedSectorWatchlists: () => {
+          let created = 0;
+          let skipped = 0;
+          const metas = sectorWatchlistMeta();
+          for (const m of metas) {
+            const exists = get().watchlists.some((w) => w.id === m.id);
+            if (exists) {
+              skipped++;
+              continue;
+            }
+            get().ensureWatchlist(m.id, m.name);
+            get().importWatchlistSymbols(m.id, m.symbols.join("\n"), "bist");
+            created++;
+          }
+          return { created, skipped };
+        },
         importWatchlistSymbols: (listId, text, defaultExchange) => {
           const raw = text
             .split(/[\n,;\s]+/)
@@ -582,7 +633,7 @@ export const useDeskStore = create<DeskState>()(
               for (const p of parsed) {
                 const key = `${p.exchange}:${p.symbol}`;
                 if (existing.has(key)) continue;
-                if (next.length >= 500) break;
+                if (next.length >= 800) break;
                 existing.add(key);
                 next.push(p);
                 added++;
