@@ -92,6 +92,24 @@ function pixelSize(el: HTMLElement): { width: number; height: number } {
   };
 }
 
+/** Nearest candle index for a unix-sec time (sorted ascending). */
+function nearestCandleIndex(times: number[], t: number): number {
+  const n = times.length;
+  if (n === 0) return -1;
+  let lo = 0;
+  let hi = n - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const v = times[mid]!;
+    if (v === t) return mid;
+    if (v < t) lo = mid + 1;
+    else hi = mid - 1;
+  }
+  if (lo >= n) return n - 1;
+  if (lo <= 0) return 0;
+  return Math.abs(times[lo]! - t) < Math.abs(times[lo - 1]! - t) ? lo : lo - 1;
+}
+
 export function ChartPane({ pane, compact }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
@@ -117,6 +135,7 @@ export function ChartPane({ pane, compact }: Props) {
   const lastSyncedRange = useRef<LogicalRange | null>(null);
   const rangeRaf = useRef(0);
   const pendingRange = useRef<LogicalRange | null>(null);
+  const pendingSource = useRef<IChartApi | null>(null);
   const subGroupsRef = useRef<SubPaneGroup[]>([]);
   const [chartReady, setChartReady] = useState(0);
   /** Bumped only when sub charts are created/destroyed (series effect). */
@@ -198,10 +217,10 @@ export function ChartPane({ pane, compact }: Props) {
     const chart = chartRef.current;
     const t0 = overlayPattern.tStart;
     const t1 = overlayPattern.tEnd;
-    const span = Math.abs(t1 - t0);
-    const pad = Math.max(span * 0.15, 60 * 60); // ≥1h pad
-    const from = (Math.min(t0, t1) - pad) as import("lightweight-charts").Time;
-    const to = (Math.max(t0, t1) + pad) as import("lightweight-charts").Time;
+    const times = candles.map((c) => c.time);
+    const n = times.length;
+    const i0 = nearestCandleIndex(times, Math.min(t0, t1));
+    const i1 = nearestCandleIndex(times, Math.max(t0, t1));
 
     let applied = false;
     const apply = () => {
@@ -209,13 +228,44 @@ export function ChartPane({ pane, compact }: Props) {
       applied = true;
       lastOverlaySettleRef.current = overlaySettleKey;
       try {
-        chart.timeScale().setVisibleRange({ from, to });
+        if (i0 < 0 || i1 < 0 || n < 1) {
+          chart.timeScale().fitContent();
+          needsInitialFitRef.current = false;
+          syncLogicalRangesRef.current(chart);
+        } else {
+          // Center pattern with ~40 bars context each side; ≥80 bars total.
+          let from = Math.max(0, i0 - 40);
+          let to = Math.min(n - 1, i1 + 40);
+          const minSpan = Math.min(80, Math.max(0, n - 1));
+          if (to - from < minSpan) {
+            const mid = (i0 + i1) / 2;
+            const half = minSpan / 2;
+            from = Math.max(0, Math.floor(mid - half));
+            to = Math.min(n - 1, Math.ceil(mid + half));
+            if (to - from < minSpan) {
+              if (from === 0) to = Math.min(n - 1, from + minSpan);
+              else if (to === n - 1) from = Math.max(0, to - minSpan);
+            }
+          }
+          // applyInitialView-style right pad so last visible bar isn't edge-glued
+          const range = { from, to: to + 4 } as LogicalRange;
+          programmaticUntil.current = performance.now() + 120;
+          chart.timeScale().setVisibleLogicalRange(range);
+          needsInitialFitRef.current = false;
+          try {
+            chart.priceScale("right").applyOptions({ autoScale: true });
+          } catch {
+            /* */
+          }
+          syncLogicalRangesRef.current(chart);
+        }
       } catch {
         try {
           chart.timeScale().fitContent();
         } catch {
           /* */
         }
+        needsInitialFitRef.current = false;
       }
       setOverlayEpoch((n) => n + 1);
       window.dispatchEvent(new Event(TD_OVERLAY_REDRAW));
@@ -269,11 +319,10 @@ export function ChartPane({ pane, compact }: Props) {
     return Math.abs(a.from - b.from) < eps && Math.abs(a.to - b.to) < eps;
   }, []);
 
-  /** Push main (or source) visible range to oscillator panes only — never re-enter via subs. */
+  /** Push source visible range to every other chart (main + subs). Skip source to avoid thrash. */
   const syncLogicalRanges = useCallback((source?: IChartApi | null) => {
     const main = chartRef.current;
     if (!main) return;
-    if (subChartsRef.current.size === 0) return;
 
     let range: LogicalRange | null = null;
     const primary = source ?? main;
@@ -297,7 +346,15 @@ export function ChartPane({ pane, compact }: Props) {
 
     lastSyncedRange.current = range;
     programmaticUntil.current = performance.now() + 80;
+    if (primary !== main) {
+      try {
+        main.timeScale().setVisibleLogicalRange(range);
+      } catch {
+        /* */
+      }
+    }
     for (const c of Array.from(subChartsRef.current.values())) {
+      if (c === primary) continue;
       try {
         c.timeScale().setVisibleLogicalRange(range);
       } catch {
@@ -602,8 +659,8 @@ export function ChartPane({ pane, compact }: Props) {
     };
   }, [destroySubChart]);
 
-  // Time sync: MAIN chart is the only source. Subs follow; never subscribe subs
-  // (setVisibleLogicalRange would re-fire → A→B→A thrash even with a boolean flag).
+  // Time sync: any pane (main or sub) can be the drag source; flush to all others.
+  // programmaticUntil + rangesNearlyEqual prevent A↔B thrash from setVisibleLogicalRange.
   // Crosshair multi-pane sync disabled by default (expensive on every mousemove).
   useEffect(() => {
     const main = chartRef.current;
@@ -612,43 +669,58 @@ export function ChartPane({ pane, compact }: Props) {
     const flushRange = () => {
       rangeRaf.current = 0;
       const range = pendingRange.current;
+      const source = pendingSource.current ?? main;
       pendingRange.current = null;
+      pendingSource.current = null;
       if (!range) return;
       if (performance.now() < programmaticUntil.current) return;
       if (lastSyncedRange.current && rangesNearlyEqual(lastSyncedRange.current, range)) {
         return;
       }
-      syncLogicalRanges(main);
+      syncLogicalRanges(source);
     };
 
-    const onMainRange = (range: LogicalRange | null) => {
+    const makeHandler = (chart: IChartApi) => (range: LogicalRange | null) => {
       if (!range) return;
       if (performance.now() < programmaticUntil.current) return;
       if (lastSyncedRange.current && rangesNearlyEqual(lastSyncedRange.current, range)) {
         return;
       }
       pendingRange.current = range;
+      pendingSource.current = chart;
       if (rangeRaf.current) return;
       rangeRaf.current = requestAnimationFrame(flushRange);
     };
 
-    main.timeScale().subscribeVisibleLogicalRangeChange(onMainRange);
+    const subs: Array<{ chart: IChartApi; handler: (r: LogicalRange | null) => void }> = [];
+    const onMain = makeHandler(main);
+    main.timeScale().subscribeVisibleLogicalRangeChange(onMain);
+    subs.push({ chart: main, handler: onMain });
+
+    for (const c of Array.from(subChartsRef.current.values())) {
+      const handler = makeHandler(c);
+      c.timeScale().subscribeVisibleLogicalRangeChange(handler);
+      subs.push({ chart: c, handler });
+    }
+
     syncLogicalRanges(main);
 
     return () => {
-      try {
-        main.timeScale().unsubscribeVisibleLogicalRangeChange(onMainRange);
-      } catch {
-        /* */
+      for (const { chart, handler } of subs) {
+        try {
+          chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+        } catch {
+          /* */
+        }
       }
       if (rangeRaf.current) {
         cancelAnimationFrame(rangeRaf.current);
         rangeRaf.current = 0;
       }
     };
-  }, [chartReady, syncLogicalRanges, rangesNearlyEqual]);
+  }, [chartReady, subReady, subGroupIds, syncLogicalRanges, rangesNearlyEqual]);
 
-  // When oscillator panes appear/disappear, align once from main (no re-subscribe).
+  // When oscillator panes appear/disappear, align once from main.
   useEffect(() => {
     if (!chartReady) return;
     syncLogicalRanges(chartRef.current);
