@@ -981,6 +981,7 @@ export function ChartPane({ pane, compact }: Props) {
           series={chartReady ? candleRef.current : null}
           container={chartReady ? containerRef.current : null}
           ready={chartReady}
+          candles={candles}
         />
         {subGroups.map((g) => (
           <div

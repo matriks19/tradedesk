@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { IChartApi, ISeriesApi, MouseEventParams, Time } from "lightweight-charts";
 import { useDeskStore } from "@/store/desk";
-import type { ChartDrawing, DrawTool } from "@/lib/types";
+import type { Candle, ChartDrawing, DrawTool } from "@/lib/types";
 
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const DEFAULT_COLOR = "#f5a623";
@@ -14,6 +14,8 @@ interface Props {
   series: ISeriesApi<"Candlestick"> | null;
   container: HTMLDivElement | null;
   ready: number;
+  /** Pane candles — used to magnet-snap draw points to wick tips (high/low). */
+  candles: Candle[];
 }
 
 function timeToNumber(t: Time | null | undefined): number | null {
@@ -25,7 +27,87 @@ function timeToNumber(t: Time | null | undefined): number | null {
   return null;
 }
 
-export function DrawingOverlay({ paneId, chart, series, container, ready }: Props) {
+/** Binary search: candle with time closest to `time`. */
+function findNearestCandle(candles: Candle[], time: number): Candle | null {
+  if (!candles.length) return null;
+  let lo = 0;
+  let hi = candles.length - 1;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (candles[mid].time < time) lo = mid + 1;
+    else hi = mid;
+  }
+  let best = candles[lo];
+  if (lo > 0) {
+    const prev = candles[lo - 1];
+    if (Math.abs(prev.time - time) < Math.abs(best.time - time)) best = prev;
+  }
+  // Also check lo+1 if we landed on first >= and next might be closer (edge)
+  if (lo + 1 < candles.length) {
+    const next = candles[lo + 1];
+    if (Math.abs(next.time - time) < Math.abs(best.time - time)) best = next;
+  }
+  return best;
+}
+
+/**
+ * Snap raw price to candle wick tips (high/low = "uçlar").
+ * Fib always magnets to H/L. Other tools prefer H/L; if click is far from both
+ * tips (>~30% of range), allow open/close as fallback.
+ */
+function snapToCandleWick(
+  candle: Candle,
+  rawPrice: number,
+  tool: DrawTool
+): number {
+  const { high, low, open, close } = candle;
+  const distH = Math.abs(rawPrice - high);
+  const distL = Math.abs(rawPrice - low);
+  const nearestTip = distH <= distL ? high : low;
+  const tipDist = Math.min(distH, distL);
+
+  // Fib (and hline for consistency): always wick tips
+  if (tool === "fib" || tool === "hline") {
+    return nearestTip;
+  }
+
+  const range = high - low;
+  if (range <= 0) return nearestTip;
+
+  // Prefer uçlar when within ~30% of candle range of a tip
+  if (tipDist <= range * 0.3) {
+    return nearestTip;
+  }
+
+  // Otherwise closest of OHLC (still often a tip if click is extreme)
+  let best = high;
+  let bestDist = distH;
+  for (const p of [low, open, close]) {
+    const d = Math.abs(rawPrice - p);
+    if (d < bestDist) {
+      bestDist = d;
+      best = p;
+    }
+  }
+  return best;
+}
+
+/** Resolve click/crosshair to snapped {time, price} on nearest candle wicks. */
+function snapDrawPoint(
+  candles: Candle[],
+  time: number,
+  rawPrice: number,
+  tool: DrawTool
+): { time: number; price: number } {
+  const candle = findNearestCandle(candles, time);
+  if (!candle) return { time, price: rawPrice };
+  return {
+    time: candle.time,
+    price: snapToCandleWick(candle, rawPrice, tool),
+  };
+}
+
+export function DrawingOverlay({ paneId, chart, series, container, ready, candles }: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const pendingRef = useRef<{ time: number; price: number } | null>(null);
   const [draft, setDraft] = useState<{ time: number; price: number } | null>(null);
@@ -368,13 +450,15 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
         time = timeToNumber(t);
       }
       if (rawPrice == null || time == null) return;
-      const price = Number(rawPrice);
+      // Magnet to candle wick tips (high/low) so Fib/trend land on swings
+      const snapped = snapDrawPoint(candles, time, Number(rawPrice), tool);
+      const { time: snapTime, price } = snapped;
 
       if (tool === "hline") {
         addDrawing({
           paneId,
           tool: "hline",
-          points: [{ time, price }],
+          points: [{ time: snapTime, price }],
           color: DEFAULT_COLOR,
         });
         setActiveDrawTool("cursor");
@@ -384,13 +468,13 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
       }
 
       if (!pendingRef.current) {
-        pendingRef.current = { time, price };
-        setDraft({ time, price });
+        pendingRef.current = { time: snapTime, price };
+        setDraft({ time: snapTime, price });
         return;
       }
 
       const p0 = pendingRef.current;
-      const p1 = { time, price };
+      const p1 = { time: snapTime, price };
 
       // Reject zero-height fib (identical price) — keep pending for another click
       if (tool === "fib") {
@@ -445,7 +529,8 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
         time = timeToNumber(t);
       }
       if (rawPrice == null || time == null) return;
-      hoverRef.current = { time, price: Number(rawPrice) };
+      // Preview also snaps so Fib draft matches final wick tips
+      hoverRef.current = snapDrawPoint(candles, time, Number(rawPrice), tool);
       drawAll();
     };
 
@@ -459,7 +544,7 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
         /* */
       }
     };
-  }, [chart, series, paneId, addDrawing, setActiveDrawTool, drawAll]);
+  }, [chart, series, paneId, candles, addDrawing, setActiveDrawTool, drawAll]);
 
   // pointer cursor hint when tool active
   useEffect(() => {
