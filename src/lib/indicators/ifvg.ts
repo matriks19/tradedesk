@@ -359,11 +359,11 @@ export type IfvgJurikStochSeries = {
 };
 
 export type IfvgJurikStochOpts = IfvgSeriesOpts & {
-  /** Stochastic %K lookback. Default 14 (jurikStoch preset). */
+  /** Stochastic %K lookback. Default 28 (2× jurikStoch preset — slower IFVG gate). */
   kLen?: number;
-  /** %D SMA of smoothed K. Default 3. */
+  /** %D SMA of smoothed K. Default 6 (2×). */
   dLen?: number;
-  /** JMA smooth length on raw K. Default 8. */
+  /** JMA smooth length on raw K. Default 16 (2×). */
   jmaLen?: number;
   phase?: number;
   power?: number;
@@ -382,8 +382,8 @@ export type IfvgJurikStochOpts = IfvgSeriesOpts & {
  * IFVG-applied Jurik Stochastic.
  *
  * Oscillator choice: **`jurikStoch`** (not `jurikKaseStoch`). Both expose k/d-like
- * lines; `jurikStoch` matches the "Jurik Stochastic" registry preset (kLen=14,
- * dLen=3, jmaLen=8) on a classic 0–100 scale — natural for OS≈20 / OB≈80 and
+ * lines; IFVG gate uses 2× the "Jurik Stochastic" registry preset (kLen=28,
+ * dLen=6, jmaLen=16) on a classic 0–100 scale — natural for OS≈20 / OB≈80 and
  * mid-50 soft filter. Kase variant adds permission-OHLC / dual-cycle richness
  * but different defaults; keep confluence gates aligned with plain Jurik Stoch.
  *
@@ -395,9 +395,9 @@ export function computeIfvgJurikStoch(
   opts: IfvgJurikStochOpts = {}
 ): IfvgJurikStochSeries {
   const n = candles.length;
-  const kLen = opts.kLen ?? 14;
-  const dLen = opts.dLen ?? 3;
-  const jmaLen = opts.jmaLen ?? 8;
+  const kLen = opts.kLen ?? 28;
+  const dLen = opts.dLen ?? 6;
+  const jmaLen = opts.jmaLen ?? 16;
   const phase = opts.phase ?? 50;
   const power = opts.power ?? 2;
   const os = opts.os ?? 20;

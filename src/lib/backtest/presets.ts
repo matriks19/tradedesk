@@ -324,7 +324,7 @@ export function recommendedWarmup(
   if (preset === "gainzAlgoV2" || preset === "gainzAlgoV2Long") return 30;
   if (preset === "eliziNexus" || preset === "eliziNexus1h" || preset === "eliziNexus4h" || preset === "eliziNexusSoft1h" || preset === "eliziNexusSoft4h") return 80;
   if (preset === "pliBreakLong" || preset === "pliDeltaHybridLong" || preset === "madBandsLong" || preset === "medianCrossLong") return 80;
-  if (preset === "ifvgLong" || preset === "ifvgRsiLong" || preset === "ifvgRsiBi" || preset === "ifvgSmiLong" || preset === "ifvgSmiBi" || preset === "ifvgJurikStochLong" || preset === "ifvgJurikStochBi") return 100;
+  if (preset === "ifvgLong" || preset === "ifvgRsiLong" || preset === "ifvgRsiBi" || preset === "ifvgSmiLong" || preset === "ifvgSmiBi" || preset === "ifvgJurikStochLong" || preset === "ifvgJurikStochBi") return 120;
   if (preset === "klingerLong" || preset === "squeezeLong" || preset === "halfTrendLong" || preset === "coralLong" || preset === "alligatorLong" || preset === "kstLong" || preset === "trixLong" || preset === "rviLong" || preset === "aoLong" || preset === "uoLong" || preset === "dpoLong" || preset === "ppoLong" || preset === "oscSqueezeLong") return 60;
   if (preset === "smcFvg" || preset === "smcFvgLong" || preset === "ictOb" || preset === "ictObLong" || preset === "ictBosLong" || preset === "vortexCross" || preset === "vortexLong" || preset === "forceIndex" || preset === "forceLong" || preset === "cmfZero" || preset === "cmfLong" || preset === "vidyaCross" || preset === "vidyaLong" || preset === "framaCross" || preset === "framaLong" || preset === "sslChannel" || preset === "sslLong" || preset === "vfiCross" || preset === "vfiLong" || preset === "elderImpulse" || preset === "elderLong" || preset === "cmoZero" || preset === "cmoLong" || preset === "massBulge" || preset === "bopZero" || preset === "bopLong") return 40;
   if (preset === "aroonLongTrend") return 40;
@@ -661,9 +661,9 @@ export function buildSignalContext(
     }
     if (params.preset === "ifvgJurikStochLong" || params.preset === "ifvgJurikStochBi") {
       ctx.ifvgJurikStoch = computeIfvgJurikStoch(candles, {
-        kLen: 14,
-        dLen: 3,
-        jmaLen: 8,
+        kLen: 28,
+        dLen: 6,
+        jmaLen: 16,
         phase: 50,
         power: 2,
         os: 20,
