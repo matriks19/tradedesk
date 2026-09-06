@@ -435,7 +435,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "ifvgZones", label: "IFVG Bölgeler", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "zoneTop", description: "Inversion FVG bölgeleri + retest AL/SAT. Formasyon IFVG taraması ile birlikte kullanılabilir (grafikte stack + backtest AND preset).", inputs: [num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30), num("zoneExtend", "Zone Extend", 8)] },
   { id: "ifvgRsi", label: "IFVG×RSI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rsi", description: "IFVG uygulanmış RSI: tam RSI + bias bağlamı (rsiIfvg) + IFVG retest × OS/OB teyit sinyalleri. Formasyon IFVG taraması ile birlikte kullanılabilir. (İkincil — tercih: IFVG×SMI)", inputs: [num("rsiPeriod", "RSI Periyot", 14), num("os", "OS", 35, 1, 50, 1), num("ob", "OB", 65, 50, 99, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
   { id: "ifvgSmi", label: "IFVG×SMI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "smi", description: "IFVG uygulanmış SMI (Blau): smi+signal + bias bağlamı (smiIfvg) + IFVG retest × SMI/signal cross teyit (playbook SMI Long tarzı, soft ≤0/≥0 seviye). Tercih edilen IFVG confluence.", inputs: [num("k", "SMI K", 14), num("d", "SMI D", 20), num("ema", "Signal EMA", 5), num("os", "OS", -40, -100, 0, 1), num("ob", "OB", 40, 0, 100, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
-  { id: "ifvgJurikStoch", label: "IFVG×Jurik Kase", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: "IFVG uygulanmış Loxx Jurik Kase Stochastic (jurikKaseStoch k/d; 2× JFKPS+ADX screenshot: Periyot 18, Cycle 10, Smoothing 6, JMA 20, Phase 0). Retest × K/D cross (soft mid K<50/>50) veya OS/OB (20/80). Bakeoff vs SMI/RSI.", inputs: [num("kLen", "Periyot", 18), num("cycle", "Synthetic/Cycle", 10), num("dLen", "Smoothing", 6), num("jmaLen", "Jurik Smoothing", 20), num("phase", "Jurik Phase", 0, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("os", "OS", 20, 1, 50, 1), num("ob", "OB", 80, 50, 99, 1), num("softMid", "Soft Mid", 1, 0, 1, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
+  { id: "ifvgJurikStoch", label: "IFVG×Jurik Kase", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: "IFVG uygulanmış Loxx Jurik Kase Stochastic (jurikKaseStoch k/d; 2× JFKPS+ADX: Periyot 18, Cycle 10, Smoothing 6, JMA 20, Phase 0). AL: IFVG bull retest × K 20↑ kırılım (önceki K≤20, şimdi K>20). SAT: IFVG bear retest × K 80↓ kırılım (önceki K≥80, şimdi K<80). Pane: OS/OB + breakUp20/breakDn20/breakUp80/breakDn80 işaretleri. İsteğe bağlı K/D cross (useKdCross, varsayılan kapalı).", inputs: [num("kLen", "Periyot", 18), num("cycle", "Synthetic/Cycle", 10), num("dLen", "Smoothing", 6), num("jmaLen", "Jurik Smoothing", 20), num("phase", "Jurik Phase", 0, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("os", "OS", 20, 1, 50, 1), num("ob", "OB", 80, 50, 99, 1), num("useKdCross", "K/D Cross", 0, 0, 1, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
 
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — DI-anchored coherence + surprise + DI acceleration before ADX confirms. Default pane: Temp/±E/Faz; Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
 ];
@@ -2320,7 +2320,7 @@ export function computeBuiltin(
         power: n(p, "power", 2),
         os: n(p, "os", 20),
         ob: n(p, "ob", 80),
-        softMid: n(p, "softMid", 1) !== 0,
+        useKdCross: n(p, "useKdCross", 0) !== 0,
         swingStrength: n(p, "swingStrength", 2),
         maxInvLookforward: n(p, "maxInvLookforward", 40),
         maxRetestLookforward: n(p, "maxRetestLookforward", 30),
@@ -2329,9 +2329,13 @@ export function computeBuiltin(
       });
       const osLine = candles.map(() => s.os as number | null);
       const obLine = candles.map(() => s.ob as number | null);
-      const midLine = candles.map(() => 50 as number | null);
       const longHist = s.longSignal.map((v) => (v === 1 ? 1 : null));
       const shortHist = s.shortSignal.map((v) => (v === 1 ? -1 : null));
+      // Pane markers for raw K level breaks (scaled near OS/OB for visibility)
+      const markUp20 = s.breakUp20.map((v) => (v === 1 ? s.os : null));
+      const markDn20 = s.breakDn20.map((v) => (v === 1 ? s.os : null));
+      const markUp80 = s.breakUp80.map((v) => (v === 1 ? s.ob : null));
+      const markDn80 = s.breakDn80.map((v) => (v === 1 ? s.ob : null));
       push(
         [
           line(inst, "k", "sub", color, candles, s.k, "%K"),
@@ -2339,9 +2343,12 @@ export function computeBuiltin(
           line(inst, "kIfvg", "sub", "#7e57c2", candles, s.kIfvg, "K·IFVG"),
           line(inst, "os", "sub", "#26a69a88", candles, osLine, "OS"),
           line(inst, "ob", "sub", "#ef535088", candles, obLine, "OB"),
-          line(inst, "mid", "sub", "#787b8655", candles, midLine, "50"),
           hist(inst, "longSig", "sub", "#26a69a", candles, longHist, "AL"),
           hist(inst, "shortSig", "sub", "#ef5350", candles, shortHist, "SAT"),
+          hist(inst, "breakUp20", "sub", "#69f0ae", candles, markUp20, "20↑"),
+          hist(inst, "breakDn20", "sub", "#80cbc4", candles, markDn20, "20↓"),
+          hist(inst, "breakUp80", "sub", "#ff8a80", candles, markUp80, "80↑"),
+          hist(inst, "breakDn80", "sub", "#ff5252", candles, markDn80, "80↓"),
           line(inst, "score", "sub", "#ffeb3b55", candles, s.score, "Skor"),
         ],
         {
@@ -2351,6 +2358,10 @@ export function computeBuiltin(
           longSignal: s.longSignal,
           shortSignal: s.shortSignal,
           score: s.score,
+          breakUp20: s.breakUp20,
+          breakDn20: s.breakDn20,
+          breakUp80: s.breakUp80,
+          breakDn80: s.breakDn80,
         }
       );
       break;

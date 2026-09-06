@@ -670,7 +670,7 @@ export function buildSignalContext(
         power: 2,
         os: 20,
         ob: 80,
-        softMid: true,
+        useKdCross: false,
         lookbackFvgs: 0,
         maxHits: 0,
       });

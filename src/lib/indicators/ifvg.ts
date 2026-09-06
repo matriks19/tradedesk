@@ -356,6 +356,14 @@ export type IfvgJurikStochSeries = {
   score: (number | null)[];
   os: number;
   ob: number;
+  /** K breaks upward through OS (default 20) — AL confirm helper (0/1) */
+  breakUp20: (number | null)[];
+  /** K breaks downward through OS — weak / exit-long helper (0/1) */
+  breakDn20: (number | null)[];
+  /** K breaks upward through OB (default 80) — strong / exit-short helper (0/1) */
+  breakUp80: (number | null)[];
+  /** K breaks downward through OB — SAT confirm helper (0/1) */
+  breakDn80: (number | null)[];
 };
 
 export type IfvgJurikStochOpts = IfvgSeriesOpts & {
@@ -375,10 +383,10 @@ export type IfvgJurikStochOpts = IfvgSeriesOpts & {
   /** Overbought guide (0–100). Default 80. */
   ob?: number;
   /**
-   * Soft mid filter: require K<50 on long cross / K>50 on short cross
-   * (SMI-analogue of ≤0 / ≥0). Default true.
+   * Optional secondary confirm: also accept K/D cross (no soft-mid).
+   * Primary remains clean OS↑ / OB↓ level breaks. Default false.
    */
-  softMid?: boolean;
+  useKdCross?: boolean;
 };
 
 /**
@@ -388,10 +396,14 @@ export type IfvgJurikStochOpts = IfvgSeriesOpts & {
  * mobile JFKPS+ADX → KASE STOCHASTIC SETTINGS screenshot:
  * Periyot 9→18 (`kLen`), Synthetic Multiplier 5→10 (`cycle`), Smoothing Period 3→6
  * (`dLen`), Jurik Smoothing 10→20 (`jmaLen`), Jurik Phase 0→0 (`phase`). Power 2.
- * Gate uses k vs d crosses on classic 0–100 scale — OS≈20 / OB≈80 and mid-50 soft filter.
  *
- * Long: IFVG bull retest AND (K cross above D [soft K<50] OR K rising from OS
- * / leave OS). Short: mirror (cross below D / from OB).
+ * Primary confirm (classic 0–100): **20↑ / 80↓ level breaks on K**
+ * - AL: previous K ≤ OS(20) and current K > OS (yukarı kırılım)
+ * - SAT: previous K ≥ OB(80) and current K < OB (aşağı kırılım)
+ * Also emits breakDn20 / breakUp80 for pane markers / optional exits.
+ * Optional `useKdCross` adds K/D cross as secondary confirm (default off).
+ *
+ * longSignal / shortSignal stay IFVG-gated (bull/bear retest × confirm).
  */
 export function computeIfvgJurikStoch(
   candles: Candle[],
@@ -406,7 +418,7 @@ export function computeIfvgJurikStoch(
   const power = opts.power ?? 2;
   const os = opts.os ?? 20;
   const ob = opts.ob ?? 80;
-  const softMid = opts.softMid ?? true;
+  const useKdCross = opts.useKdCross ?? false;
 
   const { k, d } = jurikKaseStoch(candles, {
     cycle,
@@ -421,6 +433,10 @@ export function computeIfvgJurikStoch(
   const longSignal = fillNull(n);
   const shortSignal = fillNull(n);
   const score = fillNull(n);
+  const breakUp20 = fillNull(n);
+  const breakDn20 = fillNull(n);
+  const breakUp80 = fillNull(n);
+  const breakDn80 = fillNull(n);
 
   const ifvg = computeIfvgSeries(candles, opts);
 
@@ -431,51 +447,63 @@ export function computeIfvgJurikStoch(
   }
 
   for (let i = 1; i < n; i++) {
-    if (
-      k[i] == null ||
-      k[i - 1] == null ||
-      d[i] == null ||
-      d[i - 1] == null
-    ) {
-      continue;
-    }
+    if (k[i] == null || k[i - 1] == null) continue;
     const kv = k[i] as number;
     const kp = k[i - 1] as number;
-    const dv = d[i] as number;
-    const dp = d[i - 1] as number;
-    const crossUp = kp <= dp && kv > dv;
-    const crossDn = kp >= dp && kv < dv;
-    const rising = kv > kp;
-    const falling = kv < kp;
 
-    // Primary: K/D cross with optional soft mid (K<50 / >50).
-    // Alt: rising/falling from OS/OB, or leave extreme.
-    const midOkLong = !softMid || kv < 50;
-    const midOkShort = !softMid || kv > 50;
-    const longJ =
-      (crossUp && midOkLong) ||
-      (kv < os && rising) ||
-      (kp < os && kv >= os) ||
-      (kv < 50 && rising && kv >= dv);
-    const shortJ =
-      (crossDn && midOkShort) ||
-      (kv > ob && falling) ||
-      (kp > ob && kv <= ob) ||
-      (kv > 50 && falling && kv <= dv);
+    // Clean level breaks on K (OS/OB defaults 20/80)
+    const up20 = kp <= os && kv > os;
+    const dn20 = kp >= os && kv < os;
+    const up80 = kp <= ob && kv > ob;
+    const dn80 = kp >= ob && kv < ob;
+    if (up20) breakUp20[i] = 1;
+    if (dn20) breakDn20[i] = 1;
+    if (up80) breakUp80[i] = 1;
+    if (dn80) breakDn80[i] = 1;
+
+    let crossUp = false;
+    let crossDn = false;
+    if (
+      useKdCross &&
+      d[i] != null &&
+      d[i - 1] != null
+    ) {
+      const dv = d[i] as number;
+      const dp = d[i - 1] as number;
+      crossUp = kp <= dp && kv > dv;
+      crossDn = kp >= dp && kv < dv;
+    }
+
+    // Primary: 20↑ AL / 80↓ SAT. Optional secondary: K/D cross.
+    const longJ = up20 || crossUp;
+    const shortJ = dn80 || crossDn;
 
     if (ifvg.longSignal[i] === 1 && longJ) {
       longSignal[i] = 1;
       const base = ifvg.score[i] ?? 60;
-      const bonus = crossUp ? 10 : kv < os ? 8 : kv < 50 ? 5 : 3;
+      const bonus = up20 ? 10 : 6;
       score[i] = Math.min(100, Math.round(base + bonus));
     }
     if (ifvg.shortSignal[i] === 1 && shortJ) {
       shortSignal[i] = 1;
       const base = ifvg.score[i] ?? 60;
-      const bonus = crossDn ? 10 : kv > ob ? 8 : kv > 50 ? 5 : 3;
+      const bonus = dn80 ? 10 : 6;
       score[i] = Math.min(100, Math.round(base + bonus));
     }
   }
 
-  return { k, d, kIfvg, longSignal, shortSignal, score, os, ob };
+  return {
+    k,
+    d,
+    kIfvg,
+    longSignal,
+    shortSignal,
+    score,
+    os,
+    ob,
+    breakUp20,
+    breakDn20,
+    breakUp80,
+    breakDn80,
+  };
 }
