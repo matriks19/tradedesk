@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { useDeskStore } from "@/store/desk";
 import type { Exchange, SymbolInfo, TickerQuote } from "@/lib/types";
 import { Badge } from "@/components/ui/Badge";
@@ -34,6 +34,37 @@ export function WatchlistPanel() {
   const [seedMsg, setSeedMsg] = useState("");
   const [perpMsg, setPerpMsg] = useState("");
   const [perpBusy, setPerpBusy] = useState(false);
+  type WlSortKey = "symbol" | "last" | "changePct";
+  const [sortKey, setSortKey] = useState<WlSortKey>("changePct");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const toggleSort = useCallback((key: WlSortKey) => {
+    setSortKey((prev) => {
+      if (prev === key) {
+        setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+        return prev;
+      }
+      setSortDir(key === "symbol" ? "asc" : "desc");
+      return key;
+    });
+  }, []);
+  const sortedSymbols = useMemo(() => {
+    if (!list) return [];
+    const copy = [...list.symbols];
+    copy.sort((a, b) => {
+      const qa = quotes[`${a.exchange}:${a.symbol}`];
+      const qb = quotes[`${b.exchange}:${b.symbol}`];
+      let cmp = 0;
+      if (sortKey === "symbol") {
+        cmp = a.symbol.localeCompare(b.symbol);
+      } else if (sortKey === "last") {
+        cmp = (qa?.last ?? -Infinity) - (qb?.last ?? -Infinity);
+      } else {
+        cmp = (qa?.changePct ?? -Infinity) - (qb?.changePct ?? -Infinity);
+      }
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [list, quotes, sortKey, sortDir]);
 
   useEffect(() => {
     if (!list) return;
@@ -296,14 +327,26 @@ export function WatchlistPanel() {
           <table className="w-full text-xs">
             <thead className="sticky top-0 bg-desk-panel text-desk-muted text-2xs">
               <tr>
-                <th className="text-left px-2 py-1.5 font-medium">Sembol</th>
-                <th className="text-right px-2 py-1.5 font-medium">Fiyat</th>
-                <th className="text-right px-2 py-1.5 font-medium">%Δ</th>
+                <th className="text-left px-2 py-1.5 font-medium">
+                  <button type="button" className="hover:text-desk-accent" onClick={() => toggleSort("symbol")}>
+                    Sembol{sortKey === "symbol" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                  </button>
+                </th>
+                <th className="text-right px-2 py-1.5 font-medium">
+                  <button type="button" className="hover:text-desk-accent" onClick={() => toggleSort("last")}>
+                    Fiyat{sortKey === "last" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                  </button>
+                </th>
+                <th className="text-right px-2 py-1.5 font-medium">
+                  <button type="button" className="hover:text-desk-accent" onClick={() => toggleSort("changePct")}>
+                    Değişim{sortKey === "changePct" ? (sortDir === "asc" ? " ↑" : " ↓") : ""}
+                  </button>
+                </th>
                 <th className="w-6" />
               </tr>
             </thead>
             <tbody>
-              {list.symbols.map((s) => {
+              {sortedSymbols.map((s) => {
                 const q = quotes[`${s.exchange}:${s.symbol}`];
                 return (
                   <tr

@@ -29,7 +29,7 @@ export type DetectRsiBreakOpts = {
   period?: number;
   /** Levels to watch (default 30 / 50 / 70) */
   levels?: number[];
-  /** Look back this many bars for the most recent break (default 20) */
+  /** Look back this many bars for the most recent break (default 2) */
   maxBarsAgo?: number;
   /** Filter directions; omit / empty = both */
   directions?: RsiBreakDirection[];
@@ -155,7 +155,7 @@ export function detectRsiBreaks(
 ): RsiBreakHit[] {
   const period = opts.period ?? 14;
   const levels = (opts.levels?.length ? opts.levels : DEFAULT_LEVELS).slice();
-  const maxBarsAgo = opts.maxBarsAgo ?? 20;
+  const maxBarsAgo = opts.maxBarsAgo ?? 2;
   const dirs = opts.directions;
   const allowUp = !dirs?.length || dirs.includes("up");
   const allowDown = !dirs?.length || dirs.includes("down");
@@ -186,7 +186,7 @@ export function detectRsiBreakFreshest(
 ): RsiBreakHit | null {
   const period = opts.period ?? 14;
   const levels = (opts.levels?.length ? opts.levels : DEFAULT_LEVELS).slice();
-  const maxBarsAgo = opts.maxBarsAgo ?? 20;
+  const maxBarsAgo = opts.maxBarsAgo ?? 2;
   const dirs = opts.directions;
   const allowUp = !dirs?.length || dirs.includes("up");
   const allowDown = !dirs?.length || dirs.includes("down");

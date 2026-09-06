@@ -9,6 +9,7 @@ import {
   type LogicalRange,
   ColorType,
   CrosshairMode,
+  PriceScaleMode,
 } from "lightweight-charts";
 import type { PaneConfig } from "@/lib/types";
 import { useKlines } from "@/lib/hooks/useKlines";
@@ -140,6 +141,7 @@ export function ChartPane({ pane, compact }: Props) {
   const [chartReady, setChartReady] = useState(0);
   /** Bumped only when sub charts are created/destroyed (series effect). */
   const [subReady, setSubReady] = useState(0);
+  const [logScale, setLogScale] = useState(false);
 
   const {
     activePaneId,
@@ -926,11 +928,45 @@ export function ChartPane({ pane, compact }: Props) {
     }
   }, [risk, showRiskLines, active, candles]);
 
+  // Log / normal price scale
+  useEffect(() => {
+    const main = chartRef.current;
+    if (!main) return;
+    try {
+      main.priceScale("right").applyOptions({
+        mode: logScale ? PriceScaleMode.Logarithmic : PriceScaleMode.Normal,
+      });
+    } catch {
+      /* */
+    }
+  }, [logScale, chartReady]);
+
+  const fitToScreen = useCallback(() => {
+    const main = chartRef.current;
+    if (!main) return;
+    try {
+      main.timeScale().fitContent();
+      main.priceScale("right").applyOptions({ autoScale: true });
+      for (const c of Array.from(subChartsRef.current.values())) {
+        try {
+          c.timeScale().fitContent();
+          c.priceScale("right").applyOptions({ autoScale: true });
+        } catch {
+          /* */
+        }
+      }
+      syncLogicalRanges(main);
+    } catch {
+      /* */
+    }
+  }, [syncLogicalRanges]);
+
   const last = candles[candles.length - 1];
+  // Main chart ~50% viewport of the pane body; remaining shared by sub-panes.
   const bodyGridRows =
     oscCount === 0
       ? "minmax(0, 1fr)"
-      : `minmax(0, 1fr) repeat(${oscCount}, minmax(110px, 140px))`;
+      : `minmax(50%, 1fr) repeat(${oscCount}, minmax(72px, 1fr))`;
 
   return (
     <div
@@ -1025,6 +1061,28 @@ export function ChartPane({ pane, compact }: Props) {
             </button>
           </>
         )}
+        <button
+          type="button"
+          className="btn px-1.5 text-2xs"
+          title="Görünür aralığı otomatik ölçekle / içeriği sığdır"
+          onClick={(e) => {
+            e.stopPropagation();
+            fitToScreen();
+          }}
+        >
+          Ekrana sığdır
+        </button>
+        <button
+          type="button"
+          className={clsx("btn px-1.5 text-2xs", logScale && "btn-accent")}
+          title="Fiyat ölçeği: Logaritmik / Normal"
+          onClick={(e) => {
+            e.stopPropagation();
+            setLogScale((v) => !v);
+          }}
+        >
+          {logScale ? "Logaritmik" : "Normal"}
+        </button>
         {last && (
           <span
             className={clsx(
@@ -1062,7 +1120,7 @@ export function ChartPane({ pane, compact }: Props) {
         {subGroups.map((g) => (
           <div
             key={g.id}
-            className="min-h-[110px] h-[120px] overflow-hidden relative border-t border-desk-border"
+            className="min-h-[72px] overflow-hidden relative border-t border-desk-border"
           >
             <div className="absolute top-0 left-2 z-[1] text-2xs text-desk-muted pointer-events-none py-0.5">
               {g.title}

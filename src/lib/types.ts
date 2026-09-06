@@ -372,6 +372,11 @@ export interface ChartDrawing {
   points: { time: number; price: number }[]; // 1 for hline, 2 for trend/fib/measure/rect
   color: string;
   label?: string;
+  /**
+   * user = manual drawing; auto = system (formation / auto-fib).
+   * New fib / formation open clears previous auto fibs; user drawings stay until temizle.
+   */
+  origin?: "user" | "auto";
 }
 
 export interface BotSettings {

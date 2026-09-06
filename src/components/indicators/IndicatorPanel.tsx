@@ -9,6 +9,7 @@ import {
 import { IndicatorMenu } from "@/components/indicators/IndicatorMenu";
 import { IndicatorSettings } from "@/components/indicators/IndicatorSettings";
 import type { IndicatorInstance } from "@/lib/types";
+import { ListScanActions } from "@/components/scanner/ListScanActions";
 
 export function IndicatorPanel() {
   const {
@@ -51,6 +52,7 @@ export function IndicatorPanel() {
           ☰ Göstergeler
         </button>
       </div>
+      <ListScanActions />
 
       <div className="text-2xs text-desk-muted">Aktif ({pane.indicators.length})</div>
       <div className="flex-1 overflow-y-auto space-y-1">

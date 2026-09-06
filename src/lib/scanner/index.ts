@@ -4,3 +4,6 @@ export * from "./advanced";
 export * from "./series";
 export * from "./macdScan";
 export * from "./rsiScan";
+export * from "./eliziScan";
+export * from "./freshness";
+export * from "./watchlistQuotes";

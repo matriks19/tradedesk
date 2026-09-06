@@ -3,6 +3,7 @@
 import { useDeskStore } from "@/store/desk";
 import type { DrawTool } from "@/lib/types";
 import clsx from "clsx";
+import { ListScanActions } from "@/components/scanner/ListScanActions";
 
 const TOOLS: { id: DrawTool; label: string; title: string }[] = [
   { id: "cursor", label: "↖", title: "İmleç" },
@@ -58,6 +59,7 @@ export function DrawingToolbar({ paneId }: { paneId: string }) {
       >
         Göstergeleri temizle
       </button>
+      <ListScanActions compact className="ml-1" />
     </div>
   );
 }

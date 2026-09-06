@@ -145,6 +145,12 @@ interface DeskState {
   setBotSettings: (p: Partial<BotSettings>) => void;
   addDrawing: (d: Omit<ChartDrawing, "id"> & { id?: string }) => void;
   removeDrawing: (id: string) => void;
+  clearAutoFibs: (paneId: string) => void;
+  placeAutoFib: (
+    paneId: string,
+    points: { time: number; price: number }[],
+    label?: string
+  ) => void;
   clearPaneDrawings: (paneId: string) => void;
   setActiveDrawTool: (t: DrawTool) => void;
   createWatchlist: (name: string) => string;
@@ -548,21 +554,60 @@ export const useDeskStore = create<DeskState>()(
         setBotSettings: (p) =>
           set((s) => ({ botSettings: { ...s.botSettings, ...p } })),
         addDrawing: (d) =>
-          set((s) => ({
-            drawings: [
-              ...s.drawings,
-              {
-                id: d.id ?? uid("draw"),
-                paneId: d.paneId,
-                tool: d.tool,
-                points: d.points,
-                color: d.color,
-                label: d.label,
-              },
-            ],
-          })),
+          set((s) => {
+            const origin = d.origin ?? "user";
+            let drawings = s.drawings;
+            // New fib replaces prior auto fibs on same pane (user fibs kept)
+            if (d.tool === "fib") {
+              drawings = drawings.filter(
+                (x) =>
+                  !(
+                    x.paneId === d.paneId &&
+                    x.tool === "fib" &&
+                    (x.origin ?? "user") === "auto"
+                  )
+              );
+            }
+            return {
+              drawings: [
+                ...drawings,
+                {
+                  id: d.id ?? uid("draw"),
+                  paneId: d.paneId,
+                  tool: d.tool,
+                  points: d.points,
+                  color: d.color,
+                  label: d.label,
+                  origin,
+                },
+              ],
+            };
+          }),
         removeDrawing: (id) =>
           set((s) => ({ drawings: s.drawings.filter((x) => x.id !== id) })),
+        clearAutoFibs: (paneId) =>
+          set((s) => ({
+            drawings: s.drawings.filter(
+              (x) =>
+                !(
+                  x.paneId === paneId &&
+                  x.tool === "fib" &&
+                  (x.origin ?? "user") === "auto"
+                )
+            ),
+          })),
+        placeAutoFib: (paneId, points, label) => {
+          if (points.length < 2) return;
+          get().clearAutoFibs(paneId);
+          get().addDrawing({
+            paneId,
+            tool: "fib",
+            points: points.slice(0, 2),
+            color: "#f5a623",
+            label: label ?? "Auto Fib",
+            origin: "auto",
+          });
+        },
         clearPaneDrawings: (paneId) =>
           set((s) => ({
             drawings: s.drawings.filter((x) => x.paneId !== paneId),

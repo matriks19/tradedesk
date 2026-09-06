@@ -1,10 +1,15 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import clsx from "clsx";
 import type { Candle, Exchange, Timeframe, TickerQuote } from "@/lib/types";
 import { mapPool } from "@/lib/scanner/engine";
 import { detectMacdCross, type MacdBias } from "@/lib/scanner/macdScan";
+import {
+  DEFAULT_MAX_BARS_AGO,
+  FRESHNESS_OPTIONS,
+  clampMaxBarsAgo,
+} from "@/lib/scanner/freshness";
 import { useDeskStore } from "@/store/desk";
 import {
   fetchScanQuotes,
@@ -12,6 +17,7 @@ import {
   type BinanceMarket,
 } from "@/lib/data/scanUniverse";
 import { sectorCodes, BIST_SECTORS } from "@/lib/data/bistSectors";
+import { fetchWatchlistQuotes } from "@/lib/scanner/watchlistQuotes";
 
 /** Fixed TF chips: value (API) + chip label (minutes) */
 const MACD_TF_CHIPS: { value: Timeframe; label: string }[] = [
@@ -54,6 +60,8 @@ export function MacdScanPanel() {
   const addAlertsBulk = useDeskStore((s) => s.addAlertsBulk);
   const addIndicator = useDeskStore((s) => s.addIndicator);
   const setOverlayPattern = useDeskStore((s) => s.setOverlayPattern);
+  const watchlists = useDeskStore((s) => s.watchlists);
+  const activeWatchlistId = useDeskStore((s) => s.activeWatchlistId);
 
   const [exchange, setExchange] = useState<Exchange>("binance");
   const [bistSource, setBistSource] = useState<BistScanSource>("all");
@@ -62,11 +70,36 @@ export function MacdScanPanel() {
   const [sectorCode, setSectorCode] = useState("XBANK");
   const [tfs, setTfs] = useState<Timeframe[]>([...ALL_TFS]);
   const [direction, setDirection] = useState<DirectionFilter>("all");
-  const [maxBarsAgo, setMaxBarsAgo] = useState(5);
+  const [maxBarsAgo, setMaxBarsAgo] = useState(DEFAULT_MAX_BARS_AGO);
+  const [freshOnly, setFreshOnly] = useState(true);
+  const [universe, setUniverse] = useState<"market" | "watchlist">("market");
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [rows, setRows] = useState<Row[]>([]);
   const [status, setStatus] = useState("");
+  type SortKey = "symbol" | "bias" | "barsAgo" | "hist";
+  const [sortKey, setSortKey] = useState<SortKey>("barsAgo");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(key);
+      setSortDir(key === "symbol" ? "asc" : key === "barsAgo" ? "asc" : "desc");
+    }
+  };
+  const sortedRows = useMemo(() => {
+    const copy = [...rows];
+    copy.sort((a, b) => {
+      let cmp = 0;
+      if (sortKey === "symbol") cmp = a.symbol.localeCompare(b.symbol);
+      else if (sortKey === "bias")
+        cmp = (a.bias === "bull" ? 1 : 0) - (b.bias === "bull" ? 1 : 0);
+      else if (sortKey === "barsAgo") cmp = a.barsAgo - b.barsAgo;
+      else cmp = a.hist - b.hist;
+      return sortDir === "asc" ? cmp : -cmp;
+    });
+    return copy;
+  }, [rows, sortKey, sortDir]);
 
   const toggleTf = (tf: Timeframe) => {
     setTfs((prev) =>
@@ -74,44 +107,57 @@ export function MacdScanPanel() {
     );
   };
 
-  const run = useCallback(async () => {
+  const run = useCallback(async (universeOverride?: "market" | "watchlist") => {
+    const uni = universeOverride ?? universe;
     if (!tfs.length) {
       setStatus("En az bir zaman dilimi seçin (15–240)");
       return;
     }
-    const lookback = Math.min(20, Math.max(0, Math.floor(maxBarsAgo)));
+    const lookback = freshOnly
+      ? clampMaxBarsAgo(maxBarsAgo)
+      : clampMaxBarsAgo(Math.max(maxBarsAgo, 20));
     setRunning(true);
     setRows([]);
     setStatus("");
     try {
-      const fetched = await fetchScanQuotes({
-        exchange,
-        source: bistSource,
-        sectorCode: bistSource === "sector" ? sectorCode : undefined,
-        binanceTop:
-          binanceMarket === "perp_all"
-            ? 600
-            : binanceMarket === "perp_top"
-              ? 80
-              : 80,
-        binanceMarket:
-          binanceMarket === "spot_top" ? "spot" : ("perp" as BinanceMarket),
-      });
-      let quotes: TickerQuote[] = fetched.quotes;
-      if (exchange === "bist" && quotes.length === 0) {
-        setStatus(
-          fetched.note ||
-            "BIST kotasyonları boş — Yahoo rate-limit. MACD taraması için kotasyon gerekli."
-        );
-        return;
-      }
-      if (exchange === "bist") {
-        quotes = [...quotes].sort(
-          (a, b) => (b.volume ?? 0) - (a.volume ?? 0)
-        );
-        // Cap extreme full-universe * multi-TF job count for responsiveness
-        if (bistSource === "all" && tfs.length > 2) {
-          quotes = quotes.slice(0, 320);
+      let quotes: TickerQuote[] = [];
+      if (uni === "watchlist") {
+        const list =
+          watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
+        if (!list?.symbols.length) {
+          setStatus("Aktif izleme listesi boş");
+          return;
+        }
+        quotes = await fetchWatchlistQuotes(list.symbols);
+      } else {
+        const fetched = await fetchScanQuotes({
+          exchange,
+          source: bistSource,
+          sectorCode: bistSource === "sector" ? sectorCode : undefined,
+          binanceTop:
+            binanceMarket === "perp_all"
+              ? 600
+              : binanceMarket === "perp_top"
+                ? 80
+                : 80,
+          binanceMarket:
+            binanceMarket === "spot_top" ? "spot" : ("perp" as BinanceMarket),
+        });
+        quotes = fetched.quotes;
+        if (exchange === "bist" && quotes.length === 0) {
+          setStatus(
+            fetched.note ||
+              "BIST kotasyonları boş — Yahoo rate-limit. MACD taraması için kotasyon gerekli."
+          );
+          return;
+        }
+        if (exchange === "bist") {
+          quotes = [...quotes].sort(
+            (a, b) => (b.volume ?? 0) - (a.volume ?? 0)
+          );
+          if (bistSource === "all" && tfs.length > 2) {
+            quotes = quotes.slice(0, 320);
+          }
         }
       }
 
@@ -129,7 +175,7 @@ export function MacdScanPanel() {
         async (job) => {
           try {
             const kr = await fetch(
-              `/api/klines?symbol=${encodeURIComponent(job.quote.symbol)}&exchange=${exchange}&timeframe=${job.tf}&limit=180`
+              `/api/klines?symbol=${encodeURIComponent(job.quote.symbol)}&exchange=${job.quote.exchange ?? exchange}&timeframe=${job.tf}&limit=180`
             );
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
@@ -141,7 +187,7 @@ export function MacdScanPanel() {
             out.push({
               id: `${job.quote.symbol}_${job.tf}_${hit.bias}_${hit.barsAgo}`,
               symbol: job.quote.symbol,
-              exchange,
+              exchange: job.quote.exchange ?? exchange,
               timeframe: job.tf,
               bias: hit.bias,
               barsAgo: hit.barsAgo,
@@ -175,7 +221,7 @@ export function MacdScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [exchange, bistSource, sectorCode, binanceMarket, tfs, direction, maxBarsAgo]);
+  }, [exchange, bistSource, sectorCode, binanceMarket, tfs, direction, maxBarsAgo, freshOnly, universe, watchlists, activeWatchlistId]);
 
   const openHit = (r: Row) => {
     setOverlayPattern(null);
@@ -259,25 +305,55 @@ export function MacdScanPanel() {
           <option value="al">Sadece AL</option>
           <option value="sat">Sadece SAT</option>
         </select>
-        <label className="text-2xs text-desk-muted flex items-center gap-1">
-          Max mum
-          <input
-            className="input w-14"
-            type="number"
-            min={0}
-            max={20}
-            value={maxBarsAgo}
-            onChange={(e) => setMaxBarsAgo(Number(e.target.value) || 0)}
-            title="Maksimum mum önce (0–20, varsayılan 5)"
-          />
-        </label>
+        <span className="text-2xs text-desk-muted">Max bar</span>
+        {FRESHNESS_OPTIONS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            className={clsx("btn text-2xs", maxBarsAgo === n && "btn-accent")}
+            onClick={() => setMaxBarsAgo(n)}
+          >
+            {n}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={clsx("btn text-2xs", freshOnly && "btn-accent")}
+          onClick={() => setFreshOnly((v) => !v)}
+          title="Eski sinyalleri gizle"
+        >
+          Sadece ≤{maxBarsAgo} bar
+        </button>
+        <select
+          className="input w-auto"
+          value={universe}
+          onChange={(e) =>
+            setUniverse(e.target.value as "market" | "watchlist")
+          }
+          title="Evren"
+        >
+          <option value="market">Piyasa</option>
+          <option value="watchlist">Aktif liste</option>
+        </select>
         <button
           type="button"
           className="btn-accent"
           disabled={running}
-          onClick={run}
+          onClick={() => void run()}
         >
           {running ? `${progress.done}/${progress.total}` : "Tara"}
+        </button>
+        <button
+          type="button"
+          className="btn text-2xs"
+          disabled={running}
+          title="Aktif izleme listesini tara"
+          onClick={() => {
+            setUniverse("watchlist");
+            void run("watchlist");
+          }}
+        >
+          Listeyi tara
         </button>
       </div>
 
@@ -338,7 +414,7 @@ export function MacdScanPanel() {
               setStatus(`${n} alarm eklendi (+%3)`);
             }}
           >
-            Sonuçlara alarm (+%3)
+            Toplu alarm (+%3)
           </button>
         </div>
       )}
@@ -356,15 +432,23 @@ export function MacdScanPanel() {
 
       <div className="flex-1 overflow-y-auto min-h-0">
         <div className="grid grid-cols-[1fr_auto_auto_auto_auto_auto_auto] gap-x-1.5 px-1 py-1 text-2xs text-desk-muted border-b border-desk-border/40 sticky top-0 bg-desk-bg">
-          <span>Sembol</span>
+          <button type="button" className="text-left hover:text-desk-accent" onClick={() => toggleSort("symbol")}>
+            Sembol{sortKey === "symbol" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
           <span>TF</span>
-          <span>Yön</span>
-          <span title="N mum önce">N</span>
+          <button type="button" className="text-left hover:text-desk-accent" title="Bull / Bear" onClick={() => toggleSort("bias")}>
+            Yön{sortKey === "bias" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
+          <button type="button" className="text-left hover:text-desk-accent" title="N mum önce" onClick={() => toggleSort("barsAgo")}>
+            N{sortKey === "barsAgo" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
           <span>MACD</span>
           <span>Sig</span>
-          <span>Hist</span>
+          <button type="button" className="text-left hover:text-desk-accent" onClick={() => toggleSort("hist")}>
+            Hist{sortKey === "hist" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          </button>
         </div>
-        {rows.map((r) => (
+        {sortedRows.map((r) => (
           <button
             key={r.id}
             type="button"
@@ -393,7 +477,7 @@ export function MacdScanPanel() {
                   r.bias === "bear" && "text-desk-down"
                 )}
               >
-                {r.bias === "bull" ? "AL" : "SAT"}
+                {r.bias === "bull" ? "Bull" : "Bear"}
               </span>
               <span className="text-2xs">{r.barsAgo}</span>
               <span className="text-2xs">{fmtNum(r.macd)}</span>

@@ -864,7 +864,7 @@ export function ScannerPanel() {
           className="btn text-2xs"
           onClick={() => setSort("changePct")}
         >
-          %Δ{sortKey === "changePct" ? (sortDir === "asc" ? "↑" : "↓") : ""}
+          Değişim{sortKey === "changePct" ? (sortDir === "asc" ? "↑" : "↓") : ""}
         </button>
         <button
           type="button"

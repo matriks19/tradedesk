@@ -9,6 +9,7 @@ import {
 } from "@/lib/indicators/registry";
 import type { BuiltinIndicatorId, IndicatorCategory } from "@/lib/types";
 import clsx from "clsx";
+import { ListScanActions } from "@/components/scanner/ListScanActions";
 
 interface Props {
   open: boolean;
@@ -63,7 +64,7 @@ export function IndicatorMenu({ open, onClose, onParentId, paneId }: Props) {
         className="w-[min(720px,94vw)] h-[min(520px,80vh)] panel shadow-2xl flex flex-col overflow-hidden"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-center gap-2 px-3 py-2 border-b border-desk-border shrink-0">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-desk-border shrink-0 flex-wrap">
           <span className="text-sm font-semibold">
             {onParentId ? "Göstergeye gösterge ekle" : "Göstergeler"}
           </span>
@@ -78,6 +79,11 @@ export function IndicatorMenu({ open, onClose, onParentId, paneId }: Props) {
             Kapat
           </button>
         </div>
+        {!onParentId && (
+          <div className="px-3 py-1.5 border-b border-desk-border shrink-0">
+            <ListScanActions />
+          </div>
+        )}
         <div className="flex flex-1 min-h-0">
           <div className="w-48 shrink-0 border-r border-desk-border overflow-y-auto p-1">
             <CatBtn

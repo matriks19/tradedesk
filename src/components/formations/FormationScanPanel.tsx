@@ -30,6 +30,12 @@ import {
   type BinanceMarket,
 } from "@/lib/data/scanUniverse";
 import { sectorCodes, BIST_SECTORS } from "@/lib/data/bistSectors";
+import { swingAnchorsFromPattern } from "@/lib/patterns/autoFib";
+import {
+  DEFAULT_MAX_BARS_AGO,
+  FRESHNESS_OPTIONS,
+  clampMaxBarsAgo,
+} from "@/lib/scanner/freshness";
 
 const FAMILY_OPTS: { id: AdvancedPatternFamily; label: string }[] = [
   { id: "harmonic", label: "Harmonik" },
@@ -123,6 +129,8 @@ export function FormationScanPanel() {
   const setPatternFocus = useDeskStore((s) => s.setPatternFocus);
   const setSidebarTab = useDeskStore((s) => s.setSidebarTab);
   const patternSettings = useDeskStore((s) => s.patternSettings);
+  const placeAutoFib = useDeskStore((s) => s.placeAutoFib);
+  const clearAutoFibs = useDeskStore((s) => s.clearAutoFibs);
 
   const [exchange, setExchange] = useState<Exchange>("binance");
   const [bistSource, setBistSource] = useState<BistScanSource>("all");
@@ -147,6 +155,8 @@ export function FormationScanPanel() {
   const [cloudFocus, setCloudFocus] = useState(false);
   /** Default ON: only forming/prz/retest/active — drop target_hit */
   const [activeOnly, setActiveOnly] = useState(true);
+  const [maxBarsAgo, setMaxBarsAgo] = useState(DEFAULT_MAX_BARS_AGO);
+  const [freshOnly, setFreshOnly] = useState(true);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [rows, setRows] = useState<Row[]>([]);
@@ -231,7 +241,7 @@ export function FormationScanPanel() {
                 families,
                 swingStrength: job.swing,
                 includeCompleted: !activeOnly,
-                maxBarsAgo: 55,
+                maxBarsAgo: freshOnly ? clampMaxBarsAgo(maxBarsAgo) : 55,
               });
               for (const h of hits.slice(0, 3)) {
                 if (activeOnly && h.stage && !isActiveStage(h.stage)) continue;
@@ -701,15 +711,17 @@ export function FormationScanPanel() {
         },
         (done, total) => setProgress({ done, total })
       );
-      out.sort(
+      const look = freshOnly ? clampMaxBarsAgo(maxBarsAgo) : 999;
+      const filtered = out.filter((r) => (r.barsAgo ?? 0) <= look);
+      filtered.sort(
         (a, b) =>
           (a.barsAgo ?? 999) - (b.barsAgo ?? 999) || b.confidence - a.confidence
       );
-      setRows(out.slice(0, 100));
+      setRows(filtered.slice(0, 100));
       setStatus(
-        `${out.length} formasyon · ${quotes.length} sembol · TF: ${timeframe}${
+        `${filtered.length} formasyon · ${quotes.length} sembol · TF: ${timeframe}${
           activeOnly ? " · sadece aktif" : ""
-        }`
+        }${freshOnly ? ` · ≤${look} bar` : ""}`
       );
     } finally {
       setRunning(false);
@@ -731,6 +743,8 @@ export function FormationScanPanel() {
     bistFocus,
     cloudFocus,
     activeOnly,
+    maxBarsAgo,
+    freshOnly,
     patternSettings.swingStrength,
   ]);
 
@@ -746,6 +760,13 @@ export function FormationScanPanel() {
     setOverlayPattern(tf && !ph.timeframe ? { ...ph, timeframe: tf } : ph);
     setPatternFocus(ph.id);
     setSidebarTab("patterns");
+    const paneId = useDeskStore.getState().activePaneId;
+    const anchors = swingAnchorsFromPattern(ph);
+    if (anchors && paneId) {
+      placeAutoFib(paneId, anchors, `Auto Fib · ${ph.label}`);
+    } else if (paneId) {
+      clearAutoFibs(paneId);
+    }
   };
 
   return (
@@ -843,6 +864,25 @@ export function FormationScanPanel() {
           title="forming / PRZ / retest / aktif — hedefi dolmuşları gizle"
         >
           Sadece aktif
+        </button>
+        <span className="text-2xs text-desk-muted ml-1">Max bar</span>
+        {FRESHNESS_OPTIONS.map((n) => (
+          <button
+            key={n}
+            type="button"
+            className={clsx("btn text-2xs", maxBarsAgo === n && "btn-accent")}
+            onClick={() => setMaxBarsAgo(n)}
+          >
+            {n}
+          </button>
+        ))}
+        <button
+          type="button"
+          className={clsx("btn text-2xs", freshOnly && "btn-accent")}
+          onClick={() => setFreshOnly((v) => !v)}
+          title="Sinyal barı / aşama yaşı ≤ N"
+        >
+          Sadece ≤{maxBarsAgo} bar
         </button>
         <button
           type="button"

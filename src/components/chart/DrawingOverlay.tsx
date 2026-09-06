@@ -93,6 +93,45 @@ function snapToCandleWick(
   return best;
 }
 
+/**
+ * Fib: snap to the extreme high/low of a local swing window around the click.
+ * Prefer the intended swing wick rather than a neighboring bar's tip.
+ * Window: ±3 bars from nearest candle; choose high if click is in upper half
+ * of the local range, else low (stable swing high/low).
+ */
+function snapFibToSwing(
+  candles: Candle[],
+  time: number,
+  rawPrice: number
+): { time: number; price: number } {
+  if (!candles.length) return { time, price: rawPrice };
+  let idx = 0;
+  let bestDist = Math.abs(candles[0]!.time - time);
+  for (let i = 1; i < candles.length; i++) {
+    const d = Math.abs(candles[i]!.time - time);
+    if (d < bestDist) {
+      bestDist = d;
+      idx = i;
+    }
+  }
+  const WIN = 3;
+  const lo = Math.max(0, idx - WIN);
+  const hi = Math.min(candles.length - 1, idx + WIN);
+  let swingHigh = candles[lo]!;
+  let swingLow = candles[lo]!;
+  for (let i = lo; i <= hi; i++) {
+    const c = candles[i]!;
+    if (c.high >= swingHigh.high) swingHigh = c;
+    if (c.low <= swingLow.low) swingLow = c;
+  }
+  const mid = (swingHigh.high + swingLow.low) / 2;
+  // Prefer extreme matching click side; ties → closer tip by price
+  if (rawPrice >= mid) {
+    return { time: swingHigh.time, price: swingHigh.high };
+  }
+  return { time: swingLow.time, price: swingLow.low };
+}
+
 /** Resolve click/crosshair to snapped {time, price} on nearest candle wicks. */
 function snapDrawPoint(
   candles: Candle[],
@@ -100,6 +139,9 @@ function snapDrawPoint(
   rawPrice: number,
   tool: DrawTool
 ): { time: number; price: number } {
+  if (tool === "fib") {
+    return snapFibToSwing(candles, time, rawPrice);
+  }
   const candle = findNearestCandle(candles, time);
   if (!candle) return { time, price: rawPrice };
   return {
@@ -552,6 +594,7 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
           tool: "hline",
           points: [{ time: snapTime, price }],
           color: DEFAULT_COLOR,
+          origin: "user",
         });
         setActiveDrawTool("cursor");
         pendingRef.current = null;
@@ -605,12 +648,13 @@ export function DrawingOverlay({ paneId, chart, series, container, ready, candle
         points: [p0, p1],
         color: DEFAULT_COLOR,
         label,
+        origin: "user",
       });
       pendingRef.current = null;
       setDraft(null);
       hoverRef.current = null;
       setActiveDrawTool("cursor");
-      if (tool === "fib") flashStatus("Fibonacci eklendi");
+      if (tool === "fib") flashStatus("Fibonacci eklendi (önceki auto Fib temizlendi)");
       else flashStatus("Çizim eklendi");
     },
     [chart, series, paneId, addDrawing, setActiveDrawTool, drawAll, flashStatus]

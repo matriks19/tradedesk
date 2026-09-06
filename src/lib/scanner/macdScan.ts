@@ -18,7 +18,7 @@ export type DetectMacdCrossOpts = {
   fast?: number;
   slow?: number;
   signalPeriod?: number;
-  /** Look back this many bars for the most recent cross (default 20) */
+  /** Look back this many bars for the most recent cross (default 2) */
   maxBarsAgo?: number;
 };
 
@@ -70,7 +70,7 @@ export function detectMacdCross(
   const fast = opts.fast ?? 12;
   const slow = opts.slow ?? 26;
   const signalPeriod = opts.signalPeriod ?? 9;
-  const maxBarsAgo = opts.maxBarsAgo ?? 20;
+  const maxBarsAgo = opts.maxBarsAgo ?? 2;
 
   if (candles.length < slow + signalPeriod + 2) return null;
 

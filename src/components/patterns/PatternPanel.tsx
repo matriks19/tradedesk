@@ -7,6 +7,7 @@ import type { Candle } from "@/lib/types";
 import { FormationScanPanel } from "@/components/formations/FormationScanPanel";
 import { MacdScanPanel } from "@/components/formations/MacdScanPanel";
 import { RsiScanPanel } from "@/components/formations/RsiScanPanel";
+import { EliziScanPanel } from "@/components/formations/EliziScanPanel";
 import { SectorScanPanel } from "@/components/formations/SectorScanPanel";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
@@ -32,6 +33,7 @@ import { passesMavkFilter } from "@/lib/patterns/mavkCluster";
 import { passesBistCycleFilter } from "@/lib/patterns/bistCycle";
 import { passesCloudTouchFilter } from "@/lib/patterns/cloudTouch";
 import clsx from "clsx";
+import { swingAnchorsFromPattern } from "@/lib/patterns/autoFib";
 
 export function PatternPanel() {
   const panes = useDeskStore((s) => s.panes);
@@ -45,7 +47,7 @@ export function PatternPanel() {
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [patterns, setPatterns] = useState<PatternHit[]>([]);
   const [mode, setMode] = useState<"chart" | "scan" | "osc" | "sector">("scan");
-  const [oscSub, setOscSub] = useState<"macd" | "rsi">("macd");
+  const [oscSub, setOscSub] = useState<"macd" | "rsi" | "elizi">("macd");
   const [shtFocus, setShtFocus] = useState(false);
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
@@ -78,6 +80,13 @@ export function PatternPanel() {
     }
     setOverlayPattern(h);
     setPatternFocus(h.id);
+    const paneId = pane?.id ?? useDeskStore.getState().activePaneId;
+    const anchors = swingAnchorsFromPattern(h);
+    if (anchors && paneId) {
+      useDeskStore.getState().placeAutoFib(paneId, anchors, `Auto Fib · ${h.label}`);
+    } else if (paneId) {
+      useDeskStore.getState().clearAutoFibs(paneId);
+    }
   };
 
   const cancelScan = useCallback(() => {
@@ -217,7 +226,7 @@ export function PatternPanel() {
   return (
     <div className="flex flex-col h-full min-h-0">
       <p className="text-2xs text-desk-muted px-2 pt-2 pb-0">
-        Formasyon modelleri burada ve Formasyon Tara’da; MACD/RSI Osilatör’de;
+        Formasyon modelleri burada ve Formasyon Tara’da; MACD/RSI/Elizi Osilatör’de;
         sektör taraması Sektör sekmesinde.
       </p>
       <div className="flex gap-1 p-2 pb-0">
@@ -232,7 +241,7 @@ export function PatternPanel() {
           type="button"
           className={clsx("btn text-2xs flex-1", mode === "osc" && "btn-accent")}
           onClick={() => setMode("osc")}
-          title="MACD / RSI osilatör taramaları"
+          title="MACD / RSI / Elizi osilatör taramaları"
         >
           Osilatör
         </button>
@@ -271,8 +280,22 @@ export function PatternPanel() {
             >
               RSI
             </button>
+            <button
+              type="button"
+              className={clsx("btn text-2xs flex-1", oscSub === "elizi" && "btn-accent")}
+              onClick={() => setOscSub("elizi")}
+              title="Elizi Edge ±E kesişim / faz→ateş"
+            >
+              Elizi
+            </button>
           </div>
-          {oscSub === "macd" ? <MacdScanPanel /> : <RsiScanPanel />}
+          {oscSub === "macd" ? (
+            <MacdScanPanel />
+          ) : oscSub === "rsi" ? (
+            <RsiScanPanel />
+          ) : (
+            <EliziScanPanel />
+          )}
         </div>
       ) : mode === "sector" ? (
         <SectorScanPanel />

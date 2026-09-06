@@ -90,3 +90,8 @@ Aynı sinyal üç yüzeyde:
 
 Satır tıklanınca grafik + ilgili osilatör otomatik eklenir. Strateji paketleri: `rsi_kirilim_tarama`, `macd_kesisim`, `osc_scan_pack`.
 
+## Tarama tazeliği + Elizi
+
+- Osilatör taramaları (MACD / RSI / **Elizi**) varsayılan **≤2 bar**; UI çipleri 1/2/3 + «Sadece ≤N bar».
+- **Elizi Edge** ayrı sekme: ±E (edgeUp×edgeDown) kesişim veya faz→ateş; MACD ile karışmaz.
+- Grafik: ana panel ~%50; **Ekrana sığdır** + **Logaritmik/Normal**.
