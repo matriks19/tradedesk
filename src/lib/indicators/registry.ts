@@ -170,6 +170,7 @@ import {
 } from "./proreal";
 import { adxPumpRadar } from "./adxPump";
 import { eliziEdge } from "./eliziEdge";
+import { macdEliziHybrid } from "./macdEliziHybrid";
 import {
   rollingMedian,
   madBands,
@@ -457,6 +458,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
 
   // —— Elizi Lab
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab — soft Temp hist + ±E lines; AL/SAT at +E/−E cross (below/above bar). Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
+  { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
 
 export const BUILTIN_META: Record<BuiltinIndicatorId, IndicatorMeta> =
@@ -2717,6 +2719,96 @@ export function computeBuiltin(
         minusDI: ee.minusDI,
         crossUp: crosses.crossUp,
         crossDn: crosses.crossDn,
+      });
+      break;
+    }
+
+    case "macdEliziHybrid": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const h = macdEliziHybrid(candles, {
+        fast: n(p, "fast", 12),
+        slow: n(p, "slow", 26),
+        signalPeriod: n(p, "signalPeriod", 9),
+        wMacd: n(p, "wMacd", 0.6),
+        wElizi: n(p, "wElizi", 0.4),
+        normLen: n(p, "normLen", 50),
+        hybridSignal: n(p, "hybridSignal", 5),
+        erLen: n(p, "erLen", 10),
+        atrLen: n(p, "atrLen", 14),
+        adxPeriod: n(p, "adxPeriod", 14),
+      });
+      const SOFT_UP = "#81c784";
+      const SOFT_DN = "#e57373";
+      const SOFT_HIST_UP = "#a5d6a766";
+      const SOFT_HIST_DN = "#ef9a9a66";
+      const hybridLine = line(inst, "hybrid", "sub", "#7e57c2", candles, h.hybrid, "M×E Hybrid");
+      const sigLine = line(inst, "sig", "sub", "#ffb74d", candles, h.signal, "M×E Signal");
+      const histPlot = hist(inst, "hist", "sub", SOFT_HIST_UP, candles, h.hist, "M×E Hist");
+      histPlot.data = histPlot.data.map((pt) => {
+        if (!("value" in pt) || pt.value == null) return pt;
+        return {
+          time: pt.time,
+          value: pt.value,
+          color: pt.value >= 0 ? SOFT_HIST_UP : SOFT_HIST_DN,
+        };
+      });
+      const plots: PlotSeries[] = [
+        hybridLine,
+        sigLine,
+        histPlot,
+        line(inst, "macdNorm", "sub", "#90caf9aa", candles, h.macdNorm, "MACDⁿ"),
+        line(inst, "eliziNorm", "sub", "#ce93d8aa", candles, h.eliziNorm, "Eliziⁿ"),
+      ];
+      if (showMarkers) {
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          const t = candles[i]!.time;
+          if (h.crossUp[i] === 1) {
+            markers.push({
+              time: t,
+              position: "belowBar",
+              color: SOFT_UP,
+              shape: "arrowUp",
+              text: "AL",
+            });
+          }
+          if (h.crossDn[i] === 1) {
+            markers.push({
+              time: t,
+              position: "aboveBar",
+              color: SOFT_DN,
+              shape: "arrowDown",
+              text: "SAT",
+            });
+          }
+        }
+        markers.sort((a, b) => a.time - b.time);
+        hybridLine.markers = markers;
+        const priceAnchor = candles.map((c, i) => {
+          if (h.crossUp[i] === 1) return c.low;
+          if (h.crossDn[i] === 1) return c.high;
+          return null;
+        });
+        const priceMarks = line(
+          inst,
+          "crossMark",
+          "main",
+          "rgba(0,0,0,0)",
+          candles,
+          priceAnchor,
+          ""
+        );
+        if (markers.length) priceMarks.markers = markers;
+        if (markers.length) plots.push(priceMarks);
+      }
+      push(plots, {
+        hybrid: h.hybrid,
+        signal: h.signal,
+        hist: h.hist,
+        macdNorm: h.macdNorm,
+        eliziNorm: h.eliziNorm,
+        crossUp: h.crossUp,
+        crossDn: h.crossDn,
       });
       break;
     }

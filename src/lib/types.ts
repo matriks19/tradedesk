@@ -265,7 +265,8 @@ export type BuiltinIndicatorId =
   | "mavkRibbon"
   | "rSquared"
   // Elizi Lab
-  | "eliziEdge";
+  | "eliziEdge"
+  | "macdEliziHybrid";
 
 export interface IndicatorInputDef {
   key: string;

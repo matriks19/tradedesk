@@ -6,6 +6,7 @@ import type { Candle, Exchange, Timeframe } from "@/lib/types";
 import { detectMacdCross } from "@/lib/scanner/macdScan";
 import { detectRsiBreakFreshest } from "@/lib/scanner/rsiScan";
 import { detectEliziEdgeCross } from "@/lib/scanner/eliziScan";
+import { detectMacdEliziCross } from "@/lib/scanner/macdEliziScan";
 import { DEFAULT_MAX_BARS_AGO } from "@/lib/scanner/freshness";
 import { fetchWatchlistQuotes } from "@/lib/scanner/watchlistQuotes";
 import { mapPool } from "@/lib/scanner/engine";
@@ -14,7 +15,7 @@ import clsx from "clsx";
 type Hit = {
   symbol: string;
   exchange: Exchange;
-  kind: "macd" | "rsi" | "elizi";
+  kind: "macd" | "rsi" | "elizi" | "mxe";
   bias: "bull" | "bear";
   barsAgo: number;
   label: string;
@@ -104,6 +105,19 @@ export function ListScanActions({
               bias: elizi.bias,
               barsAgo: elizi.barsAgo,
               label: `Elizi ${elizi.kind === "edge_cross" ? "±E" : "Ateş"} ${elizi.bias === "bull" ? "AL" : "SAT"}`,
+            });
+          }
+          const mxe = detectMacdEliziCross(candles, {
+            maxBarsAgo: DEFAULT_MAX_BARS_AGO,
+          });
+          if (mxe) {
+            out.push({
+              symbol: q.symbol,
+              exchange: q.exchange,
+              kind: "mxe",
+              bias: mxe.bias,
+              barsAgo: mxe.barsAgo,
+              label: `M×E ${mxe.bias === "bull" ? "AL" : "SAT"}`,
             });
           }
         } catch {

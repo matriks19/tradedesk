@@ -84,6 +84,8 @@ export type StrategyPresetId =
   | "ema13HighLowLong"
   | "zlsmaChandelier"
   | "zlsmaChandelierLong"
+  | "macdEliziHybrid"
+  | "macdEliziHybridLong"
   | "bayesianTrend"
   | "bayesianTrendLong"
   | "multiKernel"

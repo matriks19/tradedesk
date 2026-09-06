@@ -3468,6 +3468,47 @@ export const STRATEGY_PACKS: StrategyPack[] = [
 
 
   {
+    id: "macd_elizi_hybrid",
+    name: "MACD×Elizi 60/40 — MACD önde",
+    shortName: "M×E·60/40",
+    category: "elizi",
+    inspiredBy: "Elizi alone lags; weight MACD hist-norm 60% + Elizi ±E-norm 40%",
+    summary:
+      "MACD zamanlamayı öne alır, Elizi uyum/ivme ile yumuşatır. Hibrit skor × sinyal kesişiminde AL/SAT.",
+    howTo: [
+      "Pane’e MACD×Elizi (60/40) ekle — soft hist + AL/SAT.",
+      "Osilatör→M×E taraması (≤2 bar) ile aynı kesişim.",
+      "Backtest: macdEliziHybrid / macdEliziHybridLong.",
+    ],
+    timeframe: "1h",
+    allowShort: true,
+    replaceIndicators: true,
+    indicators: [
+      {
+        type: "macdEliziHybrid",
+        params: { wMacd: 0.6, wElizi: 0.4, showMarkers: 1 },
+      },
+    ],
+    risk: {
+      rMultiple: 2,
+      tip: "Saf Elizi’den daha az gecikmeli; short toksikse Long-only preset kullan.",
+    },
+    backtestPreset: "macdEliziHybrid",
+    backtestExtras: {
+      useAtrStops: true,
+      useSignalExits: true,
+      allowShort: true,
+      warmup: 80,
+      slAtrMult: 1.5,
+      tpAtrMult: 2.5,
+    },
+    tags: ["elizi", "macd", "hybrid", "60/40", "lab"],
+    edgeScore: 78,
+    researchNote:
+      "Weighted composite — not a measured WR. Validate with macdEliziHybrid on your market/TF.",
+  },
+
+  {
     id: "jurik_bb_turtle",
     name: "Jurik BB Turtle",
     shortName: "JurikBB·Turtle",

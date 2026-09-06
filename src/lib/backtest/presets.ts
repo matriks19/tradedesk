@@ -55,6 +55,7 @@ import {
 } from "@/lib/indicators/math";
 import { adxPumpRadar } from "@/lib/indicators/adxPump";
 import { eliziEdge } from "@/lib/indicators/eliziEdge";
+import { macdEliziHybrid } from "@/lib/indicators/macdEliziHybrid";
 import {
   madBands,
   medianChannel,
@@ -180,6 +181,8 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   exhaustSmiExit: "Exhaust entry + SMI exit",
   hybridMacdPump: "Hibrit MACD+Pump (seçici short)",
   hybridMacdPumpLong: "Hibrit MACD+Pump Long-only · 4s",
+  macdEliziHybrid: "MACD×Elizi 60/40",
+  macdEliziHybridLong: "MACD×Elizi 60/40 Long-only",
   shortRsiOb: "Short RSI 70 reject",
   shortTsiSignal: "Short TSI×signal (RSI>50)",
   shortRsiDiv: "Short RSI bear-div + kırılım",
@@ -317,7 +320,7 @@ export function recommendedWarmup(
       ? Math.max(params.regimeSMA ?? 200, 220)
       : 40;
   }
-  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "pumpFadeShort" || preset === "dumpStages" || preset === "pumpFadeDelta" || preset === "eliziEdgeFire" || preset === "eliziEdgeExhaust" || preset === "exhaustDelta" || preset === "exhaustFlow" || preset === "exhaustSmiExit" || preset === "hybridMacdPump" || preset === "hybridMacdPumpLong" || preset === "shortRsiOb" || preset === "shortTsiSignal" || preset === "shortRsiDiv" || preset === "shortTsiDiv" || preset === "shortEnergyFade" || preset === "earlyFisher" || preset === "earlyFisherTrend" || preset === "earlyStoch" || preset === "earlyWaveTrend" || preset === "earlyConnors" || preset === "qTrendOnly" || preset === "qTrendKlinger" || preset === "jurikBbTurtle" || preset === "jurikDonchHybrid" || preset === "jurikMaDonch" || preset === "jurikMaCross" || preset === "donchianBlaster" || preset === "donchianBlasterHma" || preset === "oscQqe" || preset === "oscSchaff" || preset === "oscLaguerre" || preset === "oscSqueeze" || preset === "oscStochRsi" || preset === "oscSmi" || preset === "oscWaddah" || preset === "oscCoppock" || preset === "eliziPulse" || preset === "eliziPulseAnd" || preset === "smiLongOnly" || preset === "eliziStack" || preset === "hybridSmiLong" || preset === "hybridSmiAnd" || preset === "oscTsi" || preset === "tsiLongOnly" || preset === "oscTsiOb" || preset === "twinNeck" || preset === "tripleNeck" || preset === "diagonalBounce" || preset === "diagonalBreak" || preset === "srCombo" || preset === "twinLongOnly" || preset === "diagonalBreakLong" || preset === "diagonalBreakShort" || preset === "shortHybridOr" || preset === "shortHybridAnd" || preset === "shortHybridSmart" || preset === "shortHybridElite" || preset === "ema13HighLow" || preset === "ema13HighLowChannel" || preset === "ema13HighLowLong" || preset === "zlsmaChandelier" || preset === "zlsmaChandelierLong") return 420;
+  if (preset === "diAdxTrend" || preset === "supertrendAdx" || preset === "adxPumpStages" || preset === "pumpFadeShort" || preset === "dumpStages" || preset === "pumpFadeDelta" || preset === "eliziEdgeFire" || preset === "eliziEdgeExhaust" || preset === "exhaustDelta" || preset === "exhaustFlow" || preset === "exhaustSmiExit" || preset === "hybridMacdPump" || preset === "hybridMacdPumpLong" || preset === "shortRsiOb" || preset === "shortTsiSignal" || preset === "shortRsiDiv" || preset === "shortTsiDiv" || preset === "shortEnergyFade" || preset === "earlyFisher" || preset === "earlyFisherTrend" || preset === "earlyStoch" || preset === "earlyWaveTrend" || preset === "earlyConnors" || preset === "qTrendOnly" || preset === "qTrendKlinger" || preset === "jurikBbTurtle" || preset === "jurikDonchHybrid" || preset === "jurikMaDonch" || preset === "jurikMaCross" || preset === "donchianBlaster" || preset === "donchianBlasterHma" || preset === "oscQqe" || preset === "oscSchaff" || preset === "oscLaguerre" || preset === "oscSqueeze" || preset === "oscStochRsi" || preset === "oscSmi" || preset === "oscWaddah" || preset === "oscCoppock" || preset === "eliziPulse" || preset === "eliziPulseAnd" || preset === "smiLongOnly" || preset === "eliziStack" || preset === "hybridSmiLong" || preset === "hybridSmiAnd" || preset === "oscTsi" || preset === "tsiLongOnly" || preset === "oscTsiOb" || preset === "twinNeck" || preset === "tripleNeck" || preset === "diagonalBounce" || preset === "diagonalBreak" || preset === "srCombo" || preset === "twinLongOnly" || preset === "diagonalBreakLong" || preset === "diagonalBreakShort" || preset === "shortHybridOr" || preset === "shortHybridAnd" || preset === "shortHybridSmart" || preset === "shortHybridElite" || preset === "ema13HighLow" || preset === "ema13HighLowChannel" || preset === "ema13HighLowLong" || preset === "zlsmaChandelier" || preset === "zlsmaChandelierLong" || preset === "macdEliziHybrid" || preset === "macdEliziHybridLong") return 420;
   if (preset === "bayesianTrend" || preset === "bayesianTrendLong") return 80;
   if (preset === "multiKernel" || preset === "multiKernelLong" || preset === "multiKernelRq" || preset === "multiKernelRqLong") return 40;
   if (preset === "bayesKernelOr" || preset === "bayesKernelAnd" || preset === "bayesKernelHybrid") return 80;
@@ -560,6 +563,23 @@ export function buildSignalContext(
     });
   }
 
+
+
+  if (
+    params.preset === "macdEliziHybrid" ||
+    params.preset === "macdEliziHybridLong"
+  ) {
+    ctx.macdElizi = macdEliziHybrid(candles, {
+      fast: params.macdFast ?? 12,
+      slow: params.macdSlow ?? 26,
+      signalPeriod: params.macdSignal ?? 9,
+      wMacd: 0.6,
+      wElizi: 0.4,
+      erLen: params.erLen ?? 10,
+      atrLen: params.atrLen ?? params.atrPeriod ?? 14,
+      adxPeriod: params.adxPeriod ?? 14,
+    });
+  }
 
   if (
     params.preset === "twinNeck" ||
@@ -1490,6 +1510,37 @@ export function getSignalFn(
         };
       };
 
+
+
+    case "macdEliziHybrid":
+    case "macdEliziHybridLong":
+      return (_c, i, ctx) => {
+        const h = ctx.macdElizi as
+          | {
+              hybrid: (number | null)[];
+              signal: (number | null)[];
+              crossUp: (number | null)[];
+              crossDn: (number | null)[];
+            }
+          | undefined;
+        if (!h || i < 1) return {};
+        if (h.hybrid[i] == null || h.signal[i] == null) return {};
+        const long = h.crossUp[i] === 1;
+        const short =
+          params.preset !== "macdEliziHybridLong" && h.crossDn[i] === 1;
+        const exitLong = h.crossDn[i] === 1;
+        const exitShort = h.crossUp[i] === 1;
+        return {
+          long,
+          short,
+          exitLong,
+          exitShort,
+          reason:
+            params.preset === "macdEliziHybridLong"
+              ? "M×E 60/40 L"
+              : "M×E 60/40",
+        };
+      };
 
     case "shortRsiOb":
       return (_c, i, ctx) => {

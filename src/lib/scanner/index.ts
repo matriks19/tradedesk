@@ -7,3 +7,4 @@ export * from "./rsiScan";
 export * from "./eliziScan";
 export * from "./freshness";
 export * from "./watchlistQuotes";
+export * from "./macdEliziScan";

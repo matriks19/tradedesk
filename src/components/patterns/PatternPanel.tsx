@@ -8,6 +8,7 @@ import { FormationScanPanel } from "@/components/formations/FormationScanPanel";
 import { MacdScanPanel } from "@/components/formations/MacdScanPanel";
 import { RsiScanPanel } from "@/components/formations/RsiScanPanel";
 import { EliziScanPanel } from "@/components/formations/EliziScanPanel";
+import { MacdEliziScanPanel } from "@/components/formations/MacdEliziScanPanel";
 import { SectorScanPanel } from "@/components/formations/SectorScanPanel";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
@@ -47,7 +48,7 @@ export function PatternPanel() {
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [patterns, setPatterns] = useState<PatternHit[]>([]);
   const [mode, setMode] = useState<"chart" | "scan" | "osc" | "sector">("scan");
-  const [oscSub, setOscSub] = useState<"macd" | "rsi" | "elizi">("macd");
+  const [oscSub, setOscSub] = useState<"macd" | "rsi" | "elizi" | "mxe">("macd");
   const [shtFocus, setShtFocus] = useState(false);
   const [tdFocus, setTdFocus] = useState(false);
   const [bfrFocus, setBfrFocus] = useState(false);
@@ -241,7 +242,7 @@ export function PatternPanel() {
           type="button"
           className={clsx("btn text-2xs flex-1", mode === "osc" && "btn-accent")}
           onClick={() => setMode("osc")}
-          title="MACD / RSI / Elizi osilatör taramaları"
+          title="MACD / RSI / Elizi / M×E osilatör taramaları"
         >
           Osilatör
         </button>
@@ -288,13 +289,23 @@ export function PatternPanel() {
             >
               Elizi
             </button>
+            <button
+              type="button"
+              className={clsx("btn text-2xs flex-1", oscSub === "mxe" && "btn-accent")}
+              onClick={() => setOscSub("mxe")}
+              title="MACD %60 × Elizi %40 hibrit"
+            >
+              M×E
+            </button>
           </div>
           {oscSub === "macd" ? (
             <MacdScanPanel />
           ) : oscSub === "rsi" ? (
             <RsiScanPanel />
-          ) : (
+          ) : oscSub === "elizi" ? (
             <EliziScanPanel />
+          ) : (
+            <MacdEliziScanPanel />
           )}
         </div>
       ) : mode === "sector" ? (
