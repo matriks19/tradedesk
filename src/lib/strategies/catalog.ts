@@ -3471,6 +3471,38 @@ export const STRATEGY_PACKS: StrategyPack[] = [
       "BIST30 1d: jurikBbTurtle +7208 (19/29); jurikDonchHybrid +5800; donchianTurtle +15322; jurikKase +14895. Crypto 4h: Turtle > JurikBB Turtle > Hybrid filter.",
   },
 
+  {
+    id: "sht_flama_ucgen_approx",
+    name: "SHT Flama / Üçgen (açık yaklaşım)",
+    shortName: "SHT·Flama",
+    category: "niche",
+    inspiredBy:
+      "SAFAKHOMETECHNICAL — SHT FLAMA ÜÇGEN (TradingView, kapalı kaynak). Bu paket korumalı Pine’ın kopyası değildir; TradeDesk açık formasyon motoru yaklaşımıdır.",
+    summary:
+      "Bayrak / flama / üçgen oluşum + kırılım, daralma%, skor 0–100, FIBO, ölçülü hedef (FLAMA HEDEFİ), RSI/ADX filtre. Formasyon paneli · SHT Flama/Üçgen çipi.",
+    howTo: [
+      "Formasyonlar → Aktif grafik veya Formasyon Tara → «SHT Flama/Üçgen» çipi.",
+      "Oluşum: sıkışma devam; KIRILIM: konsolidasyon kanalı dışı kapanış.",
+      "Hedef: kırılım ± direk yüksekliği (klasik measured move). Fib 0.236–0.786 + 1.0/1.272.",
+      "Filtre UYGUN: yönlü RSI + ADX>20 + (kırılım veya güçlü daralma). Skor≥60 tarama eşiği.",
+      "Orijinal SHT scripti korunur — bu yalnızca eğitim / açık yaklaşım.",
+    ],
+    timeframe: "1h",
+    allowShort: true,
+    replaceIndicators: true,
+    indicators: [
+      { type: "rsi", params: { period: 14 } },
+      { type: "adx", params: { period: 14 } },
+      { type: "atr", params: { period: 14 } },
+      { type: "ema", params: { period: 21 }, color: "#42a5f5" },
+    ],
+    risk: {
+      rMultiple: 2,
+      tip: "Kapalı kaynak SHT ile birebir aynı sinyal beklenmez. Kırılım + hacim teyidi tercih.",
+    },
+    tags: ["SHT", "flama", "üçgen", "flag", "pennant", "FIBO", "niche", "açık_yaklaşım"],
+  },
+
 ];
 
 export function strategyById(id: string): StrategyPack | undefined {

@@ -2,6 +2,8 @@
 
 ## Added (this pass)
 
+- **SHT Flama/Üçgen (açık yaklaşım)**: PatternHit.meta (durum/skor/daralma/hedef/FIBO/RSI/ADX/filtre); `shtFlagTriangle` enricher; PatternPanel kalite kartı + tarama çipi; FormationScanPanel «SHT Flama/Üçgen»; katalog notu (kapalı Pine kopyası değil).
+
 - **Price alerts + webhook bot**: Alarm sidebar tab; poll ticker ~8s; browser Notification; optional webhook via `/api/webhook` proxy (`secret`, `event: price_alert`).
 - **Chart draw tools**: cursor / H-line / trend / fib / measure / rect toolbar on each pane; canvas overlay; Escape cancels; clear-pane.
 - **Bulk watchlist**: Toplu textarea import (comma/newline, optional `BINANCE:` / `BIST:` prefix); Yeni liste; delete list.

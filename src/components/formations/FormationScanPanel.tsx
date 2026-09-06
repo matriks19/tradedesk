@@ -9,6 +9,9 @@ import {
   type AdvancedPatternHit,
   toPatternHit,
 } from "@/lib/patterns/advanced";
+import { detectPatterns } from "@/lib/patterns/detect";
+import { passesShtFilter } from "@/lib/patterns/shtFlagTriangle";
+import type { PatternHit } from "@/lib/patterns/types";
 import { mapPool } from "@/lib/scanner/engine";
 import { useDeskStore, TIMEFRAMES } from "@/store/desk";
 
@@ -19,9 +22,21 @@ const FAMILY_OPTS: { id: AdvancedPatternFamily; label: string }[] = [
   { id: "structure", label: "Yapı BOS/CHOCH" },
 ];
 
-type Row = AdvancedPatternHit & {
+type Row = {
+  id: string;
   symbol: string;
   exchange: Exchange;
+  label: string;
+  confidence: number;
+  timeframe?: string;
+  direction?: string;
+  entry?: number;
+  prz?: { low: number; high: number };
+  tp1?: number;
+  sl?: number;
+  /** underlying hit for overlay */
+  _hit: AdvancedPatternHit | PatternHit;
+  sht?: boolean;
 };
 
 export function FormationScanPanel() {
@@ -40,6 +55,7 @@ export function FormationScanPanel() {
     "candle",
     "liquidity",
   ]);
+  const [shtFocus, setShtFocus] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [rows, setRows] = useState<Row[]>([]);
@@ -52,8 +68,8 @@ export function FormationScanPanel() {
   };
 
   const run = useCallback(async () => {
-    if (!families.length) {
-      setStatus("En az bir formasyon ailesi seçin");
+    if (!families.length && !shtFocus) {
+      setStatus("En az bir formasyon ailesi veya SHT Flama/Üçgen seçin");
       return;
     }
     setRunning(true);
@@ -101,18 +117,63 @@ export function FormationScanPanel() {
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
             if (candles.length < 40) return null;
-            const hits = detectAdvanced(candles, {
-              families,
-              swingStrength: job.swing,
-            });
-            for (const h of hits.slice(0, 2)) {
-              out.push({
-                ...h,
-                id: `${job.tf}_${h.id}`,
-                symbol: job.quote.symbol,
-                exchange,
-                timeframe: job.tf,
+            if (families.length) {
+              const hits = detectAdvanced(candles, {
+                families,
+                swingStrength: job.swing,
               });
+              for (const h of hits.slice(0, 2)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence: h.confidence,
+                  timeframe: job.tf,
+                  direction: h.direction,
+                  entry: h.entry,
+                  prz: h.prz,
+                  tp1: h.tp1,
+                  sl: h.sl,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                });
+              }
+            }
+            if (shtFocus) {
+              const classic = detectPatterns(candles, {
+                swingStrength: job.swing,
+                enable: {
+                  flag: true,
+                  pennant: true,
+                  triangle_asc: true,
+                  triangle_desc: true,
+                  triangle_sym: true,
+                  hh_hl: false,
+                  lh_ll: false,
+                  double_top: false,
+                  double_bottom: false,
+                  head_shoulders: false,
+                  inv_head_shoulders: false,
+                  breakout_box: false,
+                  engulfing: false,
+                },
+              }).filter((h) => passesShtFilter(h, 60));
+              for (const h of classic.slice(0, 2)) {
+                out.push({
+                  id: `${job.tf}_${h.id}`,
+                  symbol: job.quote.symbol,
+                  exchange,
+                  label: h.label,
+                  confidence: h.meta?.score != null ? h.meta.score / 100 : h.confidence,
+                  timeframe: job.tf,
+                  direction: h.bias,
+                  entry: h.meta?.breakoutPrice,
+                  tp1: h.meta?.targetPrice,
+                  sl: undefined,
+                  _hit: { ...h, id: `${job.tf}_${h.id}`, timeframe: job.tf },
+                  sht: true,
+                });
+              }
             }
           } catch {
             /* skip */
@@ -129,14 +190,17 @@ export function FormationScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [exchange, timeframe, families, patternSettings.swingStrength]);
+  }, [exchange, timeframe, families, shtFocus, patternSettings.swingStrength]);
 
   const openHit = (h: Row) => {
     setActivePane(activePaneId);
     const tf = h.timeframe || timeframe;
     openSymbolInActive(h.symbol, h.exchange, tf);
-    const ph = toPatternHit(h);
-    // Prefer pattern TF on the hit so ChartPane can wait for matching candles.
+    const raw = h._hit;
+    const ph: PatternHit =
+      "drawings" in raw && Array.isArray((raw as PatternHit).drawings)
+        ? (raw as PatternHit)
+        : toPatternHit(raw as AdvancedPatternHit);
     setOverlayPattern(tf && !ph.timeframe ? { ...ph, timeframe: tf } : ph);
     setPatternFocus(ph.id);
     setSidebarTab("patterns");
@@ -184,6 +248,14 @@ export function FormationScanPanel() {
             {f.label}
           </button>
         ))}
+        <button
+          type="button"
+          className={clsx("btn text-2xs", shtFocus && "btn-accent")}
+          onClick={() => setShtFocus((v) => !v)}
+          title="Flama/bayrak/üçgen · UYGUN veya skor≥60"
+        >
+          SHT Flama/Üçgen
+        </button>
       </div>
       {status && <p className="text-2xs text-desk-muted">{status}</p>}
       {running && (
@@ -227,9 +299,10 @@ export function FormationScanPanel() {
             </div>
             <div className="text-2xs text-desk-muted font-mono truncate">
               {r.timeframe ? `${r.timeframe} · ` : ""}
+              {r.sht ? "SHT · " : ""}
               {r.entry != null ? `E ${fmt(r.entry)}` : ""}
               {r.prz ? ` · PRZ ${fmt(r.prz.low)}-${fmt(r.prz.high)}` : ""}
-              {r.tp1 != null ? ` · TP1 ${fmt(r.tp1)}` : ""}
+              {r.tp1 != null ? ` · ${r.sht ? "Hedef" : "TP1"} ${fmt(r.tp1)}` : ""}
               {r.sl != null ? ` · SL ${fmt(r.sl)}` : ""}
             </div>
           </button>

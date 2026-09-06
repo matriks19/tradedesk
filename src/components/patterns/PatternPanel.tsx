@@ -7,6 +7,10 @@ import type { Candle } from "@/lib/types";
 import { FormationScanPanel } from "@/components/formations/FormationScanPanel";
 import { detectPatterns } from "@/lib/patterns/detect";
 import { detectAdvancedAsPatternHits } from "@/lib/patterns/advanced";
+import {
+  isShtFlagTriangleType,
+  passesShtFilter,
+} from "@/lib/patterns/shtFlagTriangle";
 import clsx from "clsx";
 
 export function PatternPanel() {
@@ -21,6 +25,7 @@ export function PatternPanel() {
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [patterns, setPatterns] = useState<PatternHit[]>([]);
   const [mode, setMode] = useState<"chart" | "scan">("scan");
+  const [shtFocus, setShtFocus] = useState(false);
   const [scanning, setScanning] = useState(false);
   const [progress, setProgress] = useState({ done: 0, total: 0, label: "" });
   const [status, setStatus] = useState("");
@@ -116,7 +121,11 @@ export function PatternPanel() {
         return;
       }
       all.sort((a, b) => b.confidence - a.confidence);
-      const sliced = all.slice(0, 40);
+      let filtered = all;
+      if (shtFocus) {
+        filtered = all.filter((h) => passesShtFilter(h, 60));
+      }
+      const sliced = filtered.slice(0, 40);
       setPatterns(sliced);
       setStatus(
         sliced.length
@@ -133,6 +142,7 @@ export function PatternPanel() {
     patternSettings.swingStrength,
     patternSettings.twinTol,
     patternSettings.boxLookback,
+    shtFocus,
   ]);
 
   return (
@@ -208,6 +218,17 @@ export function PatternPanel() {
             </label>
           </div>
 
+          <div className="flex flex-wrap gap-1">
+            <button
+              type="button"
+              className={clsx("btn text-2xs", shtFocus && "btn-accent")}
+              onClick={() => setShtFocus((v) => !v)}
+              title="Yalnız flama/bayrak/üçgen · filtre UYGUN veya skor≥60"
+            >
+              SHT Flama/Üçgen
+            </button>
+          </div>
+
           <div className="flex gap-1">
             <button
               type="button"
@@ -267,7 +288,9 @@ export function PatternPanel() {
                 <div className="flex justify-between gap-2">
                   <span className="text-xs font-medium">{h.label}</span>
                   <span className="text-2xs font-mono text-desk-muted">
-                    {(h.confidence * 100).toFixed(0)}%
+                    {h.meta?.score != null
+                      ? `Skor ${h.meta.score}`
+                      : `${(h.confidence * 100).toFixed(0)}%`}
                   </span>
                 </div>
                 {h.timeframe && (
@@ -276,6 +299,43 @@ export function PatternPanel() {
                   </div>
                 )}
                 <div className="text-2xs text-desk-muted mt-0.5">{h.detail}</div>
+                {h.meta && isShtFlagTriangleType(h.type) && (
+                  <div className="mt-1.5 grid grid-cols-4 gap-x-1 gap-y-0.5 text-2xs font-mono border-t border-desk-border/40 pt-1">
+                    <span className="text-desk-muted">Durum</span>
+                    <span className={h.meta.status === "kirilim" ? "text-desk-up" : ""}>
+                      {h.meta.status === "kirilim" ? "KIRILIM" : "Oluşum"}
+                    </span>
+                    <span className="text-desk-muted">Skor</span>
+                    <span>{h.meta.score}</span>
+                    <span className="text-desk-muted">Daralma%</span>
+                    <span>{h.meta.contractionPct.toFixed(1)}</span>
+                    <span className="text-desk-muted">Kırılım</span>
+                    <span>
+                      {h.meta.breakoutPrice != null
+                        ? fmtMetaPx(h.meta.breakoutPrice)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">Hedef</span>
+                    <span>
+                      {h.meta.targetPrice != null
+                        ? fmtMetaPx(h.meta.targetPrice)
+                        : "—"}
+                    </span>
+                    <span className="text-desk-muted">RSI/ADX</span>
+                    <span>
+                      {h.meta.rsi != null ? h.meta.rsi.toFixed(0) : "—"}/
+                      {h.meta.adx != null ? h.meta.adx.toFixed(0) : "—"}
+                    </span>
+                    <span className="text-desk-muted">Filtre</span>
+                    <span
+                      className={
+                        h.meta.filterOk ? "text-desk-up" : "text-desk-down"
+                      }
+                    >
+                      {h.meta.filterOk ? "UYGUN" : "DEĞİL"}
+                    </span>
+                  </div>
+                )}
                 <div className="text-2xs text-desk-muted mt-1">
                   {h.drawings.length} çizim · {h.type}
                 </div>
@@ -291,4 +351,11 @@ export function PatternPanel() {
       )}
     </div>
   );
+}
+
+function fmtMetaPx(n: number) {
+  if (!Number.isFinite(n)) return "—";
+  if (Math.abs(n) >= 100) return n.toFixed(2);
+  if (Math.abs(n) >= 1) return n.toFixed(4);
+  return n.toPrecision(4);
 }

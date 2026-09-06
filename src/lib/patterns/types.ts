@@ -58,6 +58,19 @@ export interface PatternHit {
   advanced?: unknown;
   /** TF the pattern was detected on */
   timeframe?: string;
+  /** SHT-style flama/üçgen quality overlay (open approximation) */
+  meta?: {
+    status: "olusum" | "kirilim";
+    score: number; // 0-100
+    contractionPct: number;
+    breakoutPrice?: number;
+    targetPrice?: number;
+    rsi?: number;
+    adx?: number;
+    filterOk?: boolean;
+    fibs?: { level: number; price: number }[];
+    kind?: "flag" | "pennant" | "triangle";
+  };
 }
 
 export interface DetectOptions {

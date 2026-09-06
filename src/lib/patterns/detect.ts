@@ -6,6 +6,7 @@ import type {
   SwingPoint,
 } from "./types";
 import { findSwings, lastN } from "./swings";
+import { enrichFlagTriangleHits } from "./shtFlagTriangle";
 
 const DEFAULTS: Required<DetectOptions> = {
   swingStrength: 2,
@@ -187,7 +188,8 @@ export function detectPatterns(
     hits.push(...detectEngulfing(candles));
   }
 
-  return hits
+  const enriched = enrichFlagTriangleHits(candles, hits);
+  return enriched
     .sort((a, b) => b.confidence - a.confidence || b.tEnd - a.tEnd)
     .slice(0, 24);
 }
@@ -457,8 +459,8 @@ function detectTriangles(
   _opts: Required<DetectOptions>
 ): PatternHit[] {
   const out: PatternHit[] = [];
-  const h = lastN(highs, 5);
-  const l = lastN(lows, 5);
+  const h = lastN(highs, 6);
+  const l = lastN(lows, 6);
   if (h.length < 3 || l.length < 3) return out;
   const h1 = h[h.length - 3];
   const h2 = h[h.length - 2];
@@ -470,44 +472,64 @@ function detectTriangles(
   const sl = slope(l1, l3);
   const last = candles[candles.length - 1];
   const tStart = Math.min(h1.time, l1.time);
-  const flatTol = Math.abs(h1.price) * 0.0008;
+  const flatTol = Math.abs(h1.price) * 0.0012;
 
   // Ascending: flat/rising highs slight, rising lows
-  if (sl > 0 && Math.abs(sh) < flatTol * 2 && h3.price >= h1.price * 0.995) {
+  if (sl > 0 && Math.abs(sh) < flatTol * 3 && h3.price >= h1.price * 0.992) {
+    const res = Math.max(h1.price, h2.price, h3.price);
+    const broken = last.close > res;
     const id = uid("ta");
     out.push({
       id,
       type: "triangle_asc",
       label: "Yükselen Üçgen",
-      detail: "Yatay direnç + yükselen destek",
+      detail: broken
+        ? "Direnç kırılımı (boğa)"
+        : "Yatay direnç + yükselen destek",
       bias: "bull",
-      confidence: 0.68,
+      confidence: broken ? 0.78 : 0.64,
       tStart,
       tEnd: last.time,
       drawings: [
         trendline(`${id}_res`, h1, h3, "#ef5350", "Direnç", true),
         trendline(`${id}_sup`, l1, l3, "#26a69a", "Destek"),
-        labelDraw(`${id}_lb`, h3.time, h3.price, "↑ Üçgen", "#26a69a"),
+        labelDraw(
+          `${id}_lb`,
+          h3.time,
+          h3.price,
+          broken ? "↑ Üçgen KIRILIM" : "↑ Üçgen",
+          "#26a69a"
+        ),
       ],
     });
   }
 
   // Descending: falling highs, flat lows
-  if (sh < 0 && Math.abs(sl) < flatTol * 2 && l3.price <= l1.price * 1.005) {
+  if (sh < 0 && Math.abs(sl) < flatTol * 3 && l3.price <= l1.price * 1.008) {
+    const sup = Math.min(l1.price, l2.price, l3.price);
+    const broken = last.close < sup;
     const id = uid("td");
     out.push({
       id,
       type: "triangle_desc",
       label: "Alçalan Üçgen",
-      detail: "Alçalan direnç + yatay destek",
+      detail: broken
+        ? "Destek kırılımı (ayı)"
+        : "Alçalan direnç + yatay destek",
       bias: "bear",
-      confidence: 0.68,
+      confidence: broken ? 0.78 : 0.64,
       tStart,
       tEnd: last.time,
       drawings: [
         trendline(`${id}_res`, h1, h3, "#ef5350", "Direnç"),
         trendline(`${id}_sup`, l1, l3, "#26a69a", "Destek", true),
-        labelDraw(`${id}_lb`, h3.time, h3.price, "↓ Üçgen", "#ef5350"),
+        labelDraw(
+          `${id}_lb`,
+          h3.time,
+          h3.price,
+          broken ? "↓ Üçgen KIRILIM" : "↓ Üçgen",
+          "#ef5350"
+        ),
       ],
     });
   }
@@ -515,23 +537,41 @@ function detectTriangles(
   // Symmetrical: falling highs + rising lows
   if (sh < 0 && sl > 0) {
     const id = uid("ts");
-    // ensure converging
     const width1 = lineAt(h1, h3, h1.index) - lineAt(l1, l3, l1.index);
     const width2 = lineAt(h1, h3, h3.index) - lineAt(l1, l3, l3.index);
-    if (width2 < width1 && width2 > 0) {
+    if (width2 < width1 * 0.98 && width2 > 0) {
+      const lastIdx = candles.length - 1;
+      const resNow = lineAt(h1, h3, Math.max(h3.index, lastIdx));
+      const supNow = lineAt(l1, l3, Math.max(l3.index, lastIdx));
+      const brokenUp = last.close > resNow;
+      const brokenDn = last.close < supNow;
+      const bias: PatternHit["bias"] = brokenUp
+        ? "bull"
+        : brokenDn
+          ? "bear"
+          : "neutral";
       out.push({
         id,
         type: "triangle_sym",
         label: "Simetrik Üçgen",
-        detail: "Sıkışan yükselen destek / alçalan direnç",
-        bias: "neutral",
-        confidence: 0.62,
+        detail:
+          brokenUp || brokenDn
+            ? "Sıkışma kırılımı"
+            : "Sıkışan yükselen destek / alçalan direnç",
+        bias,
+        confidence: brokenUp || brokenDn ? 0.74 : 0.6,
         tStart,
         tEnd: last.time,
         drawings: [
           trendline(`${id}_res`, h1, h3, "#2962ff", "Direnç"),
           trendline(`${id}_sup`, l1, l3, "#2962ff", "Destek"),
-          labelDraw(`${id}_lb`, h2.time, h2.price, "Sim Üçgen", "#2962ff"),
+          labelDraw(
+            `${id}_lb`,
+            h2.time,
+            h2.price,
+            brokenUp || brokenDn ? "Sim Üçgen KIRILIM" : "Sim Üçgen",
+            "#2962ff"
+          ),
         ],
       });
     }
@@ -549,108 +589,224 @@ function detectFlagPennant(
   _opts: Required<DetectOptions>
 ): PatternHit[] {
   const out: PatternHit[] = [];
-  if (candles.length < 50) return out;
+  if (candles.length < 40) return out;
   const last = candles[candles.length - 1];
-  // Pole: strong move in prior 15 bars
-  const poleStart = candles.length - 35;
-  const poleEnd = candles.length - 15;
-  if (poleStart < 5) return out;
-  const poleMove =
-    candles[poleEnd].close - candles[poleStart].close;
-  const polePct = Math.abs(poleMove) / candles[poleStart].close;
-  if (polePct < 0.03) return out;
+  const n = candles.length;
 
-  const consH = highs.filter(
-    (x) => x.index >= poleEnd && x.index < candles.length - 1
-  );
-  const consL = lows.filter(
-    (x) => x.index >= poleEnd && x.index < candles.length - 1
-  );
-  if (consH.length < 2 || consL.length < 2) return out;
-  const h1 = consH[0];
-  const h2 = consH[consH.length - 1];
-  const l1 = consL[0];
-  const l2 = consL[consL.length - 1];
-  const sh = slope(h1, h2);
-  const sl = slope(l1, l2);
-  const bullPole = poleMove > 0;
-  const id = uid("fp");
+  // Adaptive pole: strongest |close move| impulse in lookback, then cons after it
+  type PoleCand = {
+    poleStart: number;
+    poleEnd: number;
+    poleMove: number;
+    polePct: number;
+  };
+  const poles: PoleCand[] = [];
+  for (const poleLen of [12, 16, 20, 24]) {
+    for (const consBars of [8, 10, 12, 14, 16, 18]) {
+      const poleEnd = n - 1 - consBars;
+      const poleStart = poleEnd - poleLen;
+      if (poleStart < 2) continue;
+      const poleMove = candles[poleEnd].close - candles[poleStart].close;
+      const polePct =
+        Math.abs(poleMove) / Math.max(1e-12, candles[poleStart].close);
+      if (polePct < 0.02) continue;
+      poles.push({ poleStart, poleEnd, poleMove, polePct });
+    }
+  }
+  poles.sort((a, b) => b.polePct - a.polePct);
 
-  // Flag: parallel channel against pole
-  const parallel = Math.abs(sh - sl) < Math.abs(candles[poleEnd].close) * 0.0005;
-  const counter =
-    (bullPole && sh < 0 && sl < 0) || (!bullPole && sh > 0 && sl > 0);
+  const seen = new Set<string>();
+  for (const pole of poles.slice(0, 12)) {
+    const { poleStart, poleEnd, poleMove, polePct } = pole;
+    const key = `${poleStart}_${poleEnd}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
 
-  if (parallel && counter) {
-    out.push({
-      id,
-      type: "flag",
-      label: bullPole ? "Boğa Bayrağı" : "Ayı Bayrağı",
-      detail: `Direk %${(polePct * 100).toFixed(1)} + karşı kanal`,
-      bias: bullPole ? "bull" : "bear",
-      confidence: 0.6,
-      tStart: candles[poleStart].time,
-      tEnd: last.time,
-      drawings: [
-        trendline(
-          `${id}_pole`,
-          {
-            index: poleStart,
-            time: candles[poleStart].time,
-            price: candles[poleStart].close,
-            kind: "low",
-          },
-          {
-            index: poleEnd,
-            time: candles[poleEnd].time,
-            price: candles[poleEnd].close,
-            kind: "high",
-          },
-          bullPole ? "#26a69a" : "#ef5350",
-          "Direk"
-        ),
-        trendline(`${id}_ch1`, h1, h2, "#ffb74d", "Bayrak"),
-        trendline(`${id}_ch2`, l1, l2, "#ffb74d"),
-        box(
-          `${id}_box`,
-          h1.time,
-          last.time,
-          Math.min(l1.price, l2.price),
-          Math.max(h1.price, h2.price),
-          bullPole ? "rgba(38,166,154,0.1)" : "rgba(239,83,80,0.1)"
-        ),
-        labelDraw(
-          `${id}_lb`,
-          h2.time,
-          h2.price,
-          bullPole ? "Bayrak ↑" : "Bayrak ↓",
-          bullPole ? "#26a69a" : "#ef5350"
-        ),
-      ],
-    });
-  } else if (sh < 0 && sl > 0) {
-    // Pennant: converging after pole
-    out.push({
-      id,
-      type: "pennant",
-      label: bullPole ? "Boğa Flaması" : "Ayı Flaması",
-      detail: `Direk %${(polePct * 100).toFixed(1)} + sıkışma`,
-      bias: bullPole ? "bull" : "bear",
-      confidence: 0.58,
-      tStart: candles[poleStart].time,
-      tEnd: last.time,
-      drawings: [
-        trendline(`${id}_ch1`, h1, h2, "#e040fb", "Flama"),
-        trendline(`${id}_ch2`, l1, l2, "#e040fb"),
-        labelDraw(
-          `${id}_lb`,
-          h2.time,
-          h2.price,
-          "Flama",
-          bullPole ? "#26a69a" : "#ef5350"
-        ),
-      ],
-    });
+    const consH = highs.filter(
+      (x) => x.index >= poleEnd && x.index <= n - 2
+    );
+    const consL = lows.filter(
+      (x) => x.index >= poleEnd && x.index <= n - 2
+    );
+
+    let h1: SwingPoint;
+    let h2: SwingPoint;
+    let l1: SwingPoint;
+    let l2: SwingPoint;
+
+    if (consH.length >= 2 && consL.length >= 2) {
+      h1 = consH[0];
+      h2 = consH[consH.length - 1];
+      l1 = consL[0];
+      l2 = consL[consL.length - 1];
+    } else {
+      const cons = candles.slice(poleEnd, n - 1);
+      if (cons.length < 4) continue;
+      // split cons into early/late halves for channel endpoints
+      const mid = Math.floor(cons.length / 2);
+      const early = cons.slice(0, Math.max(2, mid));
+      const late = cons.slice(mid);
+      const eHi = early.reduce((m, c, i) => (c.high >= early[m].high ? i : m), 0);
+      const eLo = early.reduce((m, c, i) => (c.low <= early[m].low ? i : m), 0);
+      const lHi = late.reduce((m, c, i) => (c.high >= late[m].high ? i : m), 0);
+      const lLo = late.reduce((m, c, i) => (c.low <= late[m].low ? i : m), 0);
+      h1 = {
+        index: poleEnd + eHi,
+        time: candles[poleEnd + eHi].time,
+        price: candles[poleEnd + eHi].high,
+        kind: "high",
+      };
+      h2 = {
+        index: poleEnd + mid + lHi,
+        time: candles[poleEnd + mid + lHi].time,
+        price: candles[poleEnd + mid + lHi].high,
+        kind: "high",
+      };
+      l1 = {
+        index: poleEnd + eLo,
+        time: candles[poleEnd + eLo].time,
+        price: candles[poleEnd + eLo].low,
+        kind: "low",
+      };
+      l2 = {
+        index: poleEnd + mid + lLo,
+        time: candles[poleEnd + mid + lLo].time,
+        price: candles[poleEnd + mid + lLo].low,
+        kind: "low",
+      };
+    }
+
+    if (h2.index <= h1.index || l2.index <= l1.index) continue;
+
+    const sh = slope(h1, h2);
+    const sl = slope(l1, l2);
+    const bullPole = poleMove > 0;
+    const px = Math.abs(candles[poleEnd].close) || 1;
+    const slopeTol = px * 0.0012;
+    const parallel =
+      Math.abs(sh - sl) < slopeTol ||
+      Math.abs(sh - sl) < Math.max(Math.abs(sh), Math.abs(sl), 1e-9) * 0.75;
+    const counter =
+      (bullPole && sh <= slopeTol && sl <= slopeTol) ||
+      (!bullPole && sh >= -slopeTol && sl >= -slopeTol);
+    const converging = sh < -1e-12 && sl > 1e-12;
+    const consHi = Math.max(h1.price, h2.price);
+    const consLo = Math.min(l1.price, l2.price);
+    const width1 = Math.abs(h1.price - l1.price);
+    const width2 = Math.abs(h2.price - l2.price);
+    const widthShrink = width2 <= width1 * 1.08;
+    // Cons should be tighter than pole range
+    const poleHi = Math.max(
+      ...candles.slice(poleStart, poleEnd + 1).map((c) => c.high)
+    );
+    const poleLo = Math.min(
+      ...candles.slice(poleStart, poleEnd + 1).map((c) => c.low)
+    );
+    const poleRange = poleHi - poleLo;
+    if (poleRange <= 0) continue;
+    const consTight = consHi - consLo < poleRange * 0.75;
+
+    const id = uid("fp");
+    const polePts: [SwingPoint, SwingPoint] = [
+      {
+        index: poleStart,
+        time: candles[poleStart].time,
+        price: candles[poleStart].close,
+        kind: bullPole ? "low" : "high",
+      },
+      {
+        index: poleEnd,
+        time: candles[poleEnd].time,
+        price: candles[poleEnd].close,
+        kind: bullPole ? "high" : "low",
+      },
+    ];
+
+    const isFlag =
+      consTight &&
+      widthShrink &&
+      ((parallel && counter) || (counter && !converging));
+    const isPennant = consTight && converging && widthShrink;
+
+    if (isFlag) {
+      out.push({
+        id,
+        type: "flag",
+        label: bullPole ? "Boğa Bayrağı" : "Ayı Bayrağı",
+        detail: `Direk %${(polePct * 100).toFixed(1)} + karşı kanal`,
+        bias: bullPole ? "bull" : "bear",
+        confidence: Math.min(0.85, 0.5 + polePct * 4),
+        tStart: candles[poleStart].time,
+        tEnd: last.time,
+        drawings: [
+          trendline(
+            `${id}_pole`,
+            polePts[0],
+            polePts[1],
+            bullPole ? "#26a69a" : "#ef5350",
+            "Direk"
+          ),
+          trendline(`${id}_ch1`, h1, h2, "#ffb74d", "Bayrak"),
+          trendline(`${id}_ch2`, l1, l2, "#ffb74d"),
+          box(
+            `${id}_box`,
+            h1.time,
+            last.time,
+            consLo,
+            consHi,
+            bullPole ? "rgba(38,166,154,0.1)" : "rgba(239,83,80,0.1)"
+          ),
+          labelDraw(
+            `${id}_lb`,
+            h2.time,
+            h2.price,
+            bullPole ? "Bayrak ↑" : "Bayrak ↓",
+            bullPole ? "#26a69a" : "#ef5350"
+          ),
+        ],
+      });
+      break;
+    }
+
+    if (isPennant) {
+      out.push({
+        id,
+        type: "pennant",
+        label: bullPole ? "Boğa Flaması" : "Ayı Flaması",
+        detail: `Direk %${(polePct * 100).toFixed(1)} + sıkışma`,
+        bias: bullPole ? "bull" : "bear",
+        confidence: Math.min(0.82, 0.48 + polePct * 4),
+        tStart: candles[poleStart].time,
+        tEnd: last.time,
+        drawings: [
+          trendline(
+            `${id}_pole`,
+            polePts[0],
+            polePts[1],
+            bullPole ? "#26a69a" : "#ef5350",
+            "Direk"
+          ),
+          trendline(`${id}_ch1`, h1, h2, "#e040fb", "Flama"),
+          trendline(`${id}_ch2`, l1, l2, "#e040fb"),
+          box(
+            `${id}_box`,
+            h1.time,
+            last.time,
+            consLo,
+            consHi,
+            "rgba(224,64,251,0.08)"
+          ),
+          labelDraw(
+            `${id}_lb`,
+            h2.time,
+            h2.price,
+            "Flama",
+            bullPole ? "#26a69a" : "#ef5350"
+          ),
+        ],
+      });
+      break;
+    }
   }
   return out;
 }
