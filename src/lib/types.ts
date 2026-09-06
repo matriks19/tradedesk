@@ -111,6 +111,7 @@ export type BuiltinIndicatorId =
   | "regChannel"
   // Momentum / oscillators
   | "rsi"
+  | "rsiLevelBreaks"
   | "stochastic"
   | "stochRsi"
   | "macd"

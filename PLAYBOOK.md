@@ -78,3 +78,15 @@ Süpürme (likidite wick) + inversion birlikte → skor boost (`IFVG·Süp`). UI
 
 Indikatör stack: **IFVG Bölgeler** (main) + oscillator sub — **IFVG×SMI** (tercih adayı) / **IFVG×Jurik Kase** (20↑ AL / 80↓ SAT) / IFVG×RSI (ikincil).
 Backtest: `ifvgSmiLong` · `ifvgJurikStochLong` · `ifvgRsiLong` (+ Bi variants). Bakeoff: `npx tsx scripts/compare-ifvg-jurik.ts` (Jurik vs SMI vs RSI on 4h).
+
+## Osilatör = İndikatör = Tarama
+
+Aynı sinyal üç yüzeyde:
+
+| Sinyal | Osilatör (alt panel) | İndikatörler menü | Formasyon tarama |
+|---|---|---|---|
+| RSI 30/50/70 kırılım | **RSI Kırılım (30/50/70)** (`rsiLevelBreaks`) | aynı id | Formasyon→**RSI** (`detectRsiBreaks`) |
+| MACD×sinyal kesişim | **MACD (kesişim işaretli)** (`macd`) | aynı id | Formasyon→**MACD** (`detectMacdCross`) |
+
+Satır tıklanınca grafik + ilgili osilatör otomatik eklenir. Strateji paketleri: `rsi_kirilim_tarama`, `macd_kesisim`, `osc_scan_pack`.
+

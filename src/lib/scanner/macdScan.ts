@@ -98,3 +98,37 @@ export function detectMacdCross(
   }
   return null;
 }
+
+/**
+ * Full-series MACD + per-bar signal-cross markers — same rules as detectMacdCross.
+ * crossUp/crossDn are 1 on cross bars, null otherwise (for chart hist spikes).
+ */
+export function macdCrossMarkerSeries(
+  candles: Candle[],
+  opts: DetectMacdCrossOpts = {}
+): {
+  macd: (number | null)[];
+  signal: (number | null)[];
+  hist: (number | null)[];
+  crossUp: (number | null)[];
+  crossDn: (number | null)[];
+} {
+  const fast = opts.fast ?? 12;
+  const slow = opts.slow ?? 26;
+  const signalPeriod = opts.signalPeriod ?? 9;
+  const m = macd(closes(candles), fast, slow, signalPeriod);
+  const n = m.macd.length;
+  const crossUp: (number | null)[] = Array(n).fill(null);
+  const crossDn: (number | null)[] = Array(n).fill(null);
+  for (let i = 1; i < n; i++) {
+    if (crossedAboveAt(m.macd, m.signal, i)) crossUp[i] = 1;
+    if (crossedBelowAt(m.macd, m.signal, i)) crossDn[i] = 1;
+  }
+  return {
+    macd: m.macd,
+    signal: m.signal,
+    hist: m.hist,
+    crossUp,
+    crossDn,
+  };
+}

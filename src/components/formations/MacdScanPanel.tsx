@@ -172,8 +172,8 @@ export function MacdScanPanel() {
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">MACD Tarama (15–240)</div>
       <p className="text-2xs text-desk-muted">
-        MACD çizgisi sinyalini kesince AL/SAT. Çoklu TF; tıklayınca grafik + MACD
-        açılır.
+        İndikatörler + MACD sekmesi ile aynı mantık (kesişim işaretli).
+        Çoklu TF; tıklayınca grafik + MACD osilatörü açılır.
       </p>
 
       <div className="flex gap-1 flex-wrap items-center">

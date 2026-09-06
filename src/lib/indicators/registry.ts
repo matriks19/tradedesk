@@ -178,6 +178,8 @@ import {
   pliDeltaHybrid,
 } from "./median";
 import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi, computeIfvgJurikStoch } from "./ifvg";
+import { rsiBreakMarkerSeries } from "@/lib/scanner/rsiScan";
+import { macdCrossMarkerSeries } from "@/lib/scanner/macdScan";
 
 export interface PlotSeries {
   id: string;
@@ -280,9 +282,10 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
 
   // —— Momentum / Osilatörler
   { id: "rsi", label: "RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", inputs: [num("period", "Period", 14), src()] },
+  { id: "rsiLevelBreaks", label: "RSI Kırılım (30/50/70)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", description: "RSI + 30/50/70 yatay seviyeler + kırılım işaretleri. Formasyon→RSI tarama ile aynı mantık (detectRsiBreaks).", inputs: [num("period", "Periyot", 14), num("lvl30", "Seviye 1", 30, 1, 99, 1), num("lvl50", "Seviye 2", 50, 1, 99, 1), num("lvl70", "Seviye 3", 70, 1, 99, 1), num("showMarkers", "İşaretler", 1, 0, 1, 1), src()] },
   { id: "stochastic", label: "Stochastic", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("kPeriod", "%K Period", 14), num("dPeriod", "%D Period", 3)] },
   { id: "stochRsi", label: "Stoch RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("rsiPeriod", "RSI Period", 14), num("stochPeriod", "Stoch Period", 14), num("kSmooth", "K Smooth", 3), num("dSmooth", "D Smooth", 3), src()] },
-  { id: "macd", label: "MACD", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", inputs: [num("fast", "Fast", 12), num("slow", "Slow", 26), num("signal", "Signal", 9), src()] },
+  { id: "macd", label: "MACD (kesişim işaretli)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: "MACD + sinyal + hist + AL/SAT kesişim işaretleri. Formasyon→MACD tarama ile aynı mantık (detectMacdCross).", inputs: [num("fast", "Fast", 12), num("slow", "Slow", 26), num("signal", "Signal", 9), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1), src()] },
   { id: "cci", label: "CCI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "cci", inputs: [num("period", "Period", 20)] },
   { id: "roc", label: "ROC", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "roc", inputs: [num("period", "Period", 12), src()] },
   { id: "momentum", label: "Momentum", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "mom", inputs: [num("period", "Period", 10), src()] },
@@ -801,6 +804,64 @@ export function computeBuiltin(
       push([line(inst, "rsi", "sub", color, candles, v, `RSI(${period})`)], { rsi: v });
       break;
     }
+    case "rsiLevelBreaks": {
+      const period = n(p, "period", 14);
+      const lvl30 = n(p, "lvl30", 30);
+      const lvl50 = n(p, "lvl50", 50);
+      const lvl70 = n(p, "lvl70", 70);
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const levels = [lvl30, lvl50, lvl70];
+      // Same cross rules as Formasyon→RSI (detectRsiBreaks) when on price source
+      const markers =
+        inst.source?.type !== "indicator"
+          ? rsiBreakMarkerSeries(candles, { period, levels })
+          : (() => {
+              const series = rsi(values, period);
+              const nBars = series.length;
+              const breakUp: (number | null)[] = Array(nBars).fill(null);
+              const breakDn: (number | null)[] = Array(nBars).fill(null);
+              for (let i = 1; i < nBars; i++) {
+                const prev = series[i - 1];
+                const curr = series[i];
+                if (prev == null || curr == null) continue;
+                for (const level of levels) {
+                  if (prev <= level && curr > level) breakUp[i] = 1;
+                  if (prev >= level && curr < level) breakDn[i] = 1;
+                }
+              }
+              return { rsi: series, breakUp, breakDn };
+            })();
+      const lvl30Line = candles.map(() => lvl30 as number | null);
+      const lvl50Line = candles.map(() => lvl50 as number | null);
+      const lvl70Line = candles.map(() => lvl70 as number | null);
+      const plots: PlotSeries[] = [
+        line(inst, "rsi", "sub", color, candles, markers.rsi, `RSI(${period})`),
+        line(inst, "lvl30", "sub", "#26a69a88", candles, lvl30Line, String(lvl30)),
+        line(inst, "lvl50", "sub", "#787b8655", candles, lvl50Line, String(lvl50)),
+        line(inst, "lvl70", "sub", "#ef535088", candles, lvl70Line, String(lvl70)),
+      ];
+      if (showMarkers) {
+        const markUp = markers.breakUp.map((v, i) =>
+          v === 1 ? (markers.rsi[i] ?? lvl50) : null
+        );
+        const markDn = markers.breakDn.map((v, i) =>
+          v === 1 ? (markers.rsi[i] ?? lvl50) : null
+        );
+        plots.push(
+          hist(inst, "breakUp", "sub", "#69f0ae", candles, markUp, "↑ kırılım"),
+          hist(inst, "breakDn", "sub", "#ff5252", candles, markDn, "↓ kırılım")
+        );
+      }
+      push(plots, {
+        rsi: markers.rsi,
+        lvl30: lvl30Line,
+        lvl50: lvl50Line,
+        lvl70: lvl70Line,
+        breakUp: markers.breakUp,
+        breakDn: markers.breakDn,
+      });
+      break;
+    }
     case "stochastic": {
       const kp = n(p, "kPeriod", 14);
       const dp = n(p, "dPeriod", 3);
@@ -835,15 +896,67 @@ export function computeBuiltin(
       break;
     }
     case "macd": {
-      const m = macd(values, n(p, "fast", 12), n(p, "slow", 26), n(p, "signal", 9));
-      push(
-        [
-          line(inst, "macd", "sub", "#2962ff", candles, m.macd, "MACD"),
-          line(inst, "sig", "sub", "#ff6d00", candles, m.signal, "Signal"),
-          hist(inst, "hist", "sub", "#26a69a", candles, m.hist, "Hist"),
-        ],
-        { macd: m.macd, signal: m.signal, hist: m.hist }
-      );
+      const fast = n(p, "fast", 12);
+      const slow = n(p, "slow", 26);
+      const sigP = n(p, "signal", 9);
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      // Prefer shared scan helper when on price (keeps chart ≡ Formasyon→MACD)
+      const fromScan =
+        inst.source?.type !== "indicator"
+          ? macdCrossMarkerSeries(candles, {
+              fast,
+              slow,
+              signalPeriod: sigP,
+            })
+          : null;
+      const m = fromScan
+        ? {
+            macd: fromScan.macd,
+            signal: fromScan.signal,
+            hist: fromScan.hist,
+            crossUp: fromScan.crossUp,
+            crossDn: fromScan.crossDn,
+          }
+        : (() => {
+            const raw = macd(values, fast, slow, sigP);
+            const nBars = raw.macd.length;
+            const crossUp: (number | null)[] = Array(nBars).fill(null);
+            const crossDn: (number | null)[] = Array(nBars).fill(null);
+            for (let i = 1; i < nBars; i++) {
+              const a0 = raw.macd[i - 1];
+              const a1 = raw.macd[i];
+              const b0 = raw.signal[i - 1];
+              const b1 = raw.signal[i];
+              if (a0 == null || a1 == null || b0 == null || b1 == null) continue;
+              if (a0 <= b0 && a1 > b1) crossUp[i] = 1;
+              if (a0 >= b0 && a1 < b1) crossDn[i] = 1;
+            }
+            return { ...raw, crossUp, crossDn };
+          })();
+      const plots: PlotSeries[] = [
+        line(inst, "macd", "sub", "#2962ff", candles, m.macd, "MACD"),
+        line(inst, "sig", "sub", "#ff6d00", candles, m.signal, "Signal"),
+        hist(inst, "hist", "sub", "#26a69a", candles, m.hist, "Hist"),
+      ];
+      if (showMarkers) {
+        const markUp = m.crossUp.map((v, i) =>
+          v === 1 ? (m.macd[i] ?? 0) : null
+        );
+        const markDn = m.crossDn.map((v, i) =>
+          v === 1 ? (m.macd[i] ?? 0) : null
+        );
+        plots.push(
+          hist(inst, "crossUp", "sub", "#69f0ae", candles, markUp, "AL↑"),
+          hist(inst, "crossDn", "sub", "#ff5252", candles, markDn, "SAT↓")
+        );
+      }
+      push(plots, {
+        macd: m.macd,
+        signal: m.signal,
+        hist: m.hist,
+        crossUp: m.crossUp,
+        crossDn: m.crossDn,
+      });
       break;
     }
     case "cci": {

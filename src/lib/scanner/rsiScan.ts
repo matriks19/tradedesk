@@ -204,3 +204,49 @@ export function detectRsiBreakFreshest(
   }
   return null;
 }
+
+/**
+ * Full-series RSI + per-bar break markers — same cross rules as detectRsiBreaks.
+ * breakUp/breakDn are 1 on break bars, null otherwise (for chart hist spikes).
+ */
+export function rsiBreakMarkerSeries(
+  candles: Candle[],
+  opts: { period?: number; levels?: number[] } = {}
+): {
+  rsi: (number | null)[];
+  breakUp: (number | null)[];
+  breakDn: (number | null)[];
+  /** Per-level up/down flags (key = String(level)) */
+  breakUpByLevel: Record<string, (number | null)[]>;
+  breakDnByLevel: Record<string, (number | null)[]>;
+} {
+  const period = opts.period ?? 14;
+  const levels = (opts.levels?.length ? opts.levels : DEFAULT_LEVELS).slice();
+  const series = rsi(closes(candles), period);
+  const n = series.length;
+  const breakUp: (number | null)[] = Array(n).fill(null);
+  const breakDn: (number | null)[] = Array(n).fill(null);
+  const breakUpByLevel: Record<string, (number | null)[]> = {};
+  const breakDnByLevel: Record<string, (number | null)[]> = {};
+  for (const level of levels) {
+    breakUpByLevel[String(level)] = Array(n).fill(null);
+    breakDnByLevel[String(level)] = Array(n).fill(null);
+  }
+  for (let i = 1; i < n; i++) {
+    let anyUp = false;
+    let anyDn = false;
+    for (const level of levels) {
+      if (crossedLevelUp(series, level, i)) {
+        breakUpByLevel[String(level)]![i] = 1;
+        anyUp = true;
+      }
+      if (crossedLevelDown(series, level, i)) {
+        breakDnByLevel[String(level)]![i] = 1;
+        anyDn = true;
+      }
+    }
+    if (anyUp) breakUp[i] = 1;
+    if (anyDn) breakDn[i] = 1;
+  }
+  return { rsi: series, breakUp, breakDn, breakUpByLevel, breakDnByLevel };
+}

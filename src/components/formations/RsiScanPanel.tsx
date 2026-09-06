@@ -185,8 +185,13 @@ export function RsiScanPanel() {
     openSymbolInActive(r.symbol, r.exchange, r.timeframe);
     const s = useDeskStore.getState();
     const pane = s.panes.find((p) => p.id === s.activePaneId) ?? s.panes[0];
-    if (pane && !pane.indicators.some((i) => i.type === "rsi")) {
-      addIndicator(pane.id, "rsi");
+    if (
+      pane &&
+      !pane.indicators.some(
+        (i) => i.type === "rsiLevelBreaks" || i.type === "rsi"
+      )
+    ) {
+      addIndicator(pane.id, "rsiLevelBreaks");
     }
   };
 
@@ -194,7 +199,8 @@ export function RsiScanPanel() {
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">RSI Tarama (30 / 50 / 70)</div>
       <p className="text-2xs text-desk-muted">
-        RSI(14) seviye kırılımı · çoklu TF; tıklayınca grafik + RSI açılır.
+        İndikatörler + Formasyon→RSI ile aynı mantık (RSI Kırılım 30/50/70).
+        Çoklu TF; tıklayınca grafik + osilatör açılır.
       </p>
 
       <div className="flex gap-1 flex-wrap items-center">
