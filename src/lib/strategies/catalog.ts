@@ -3663,6 +3663,55 @@ export const STRATEGY_PACKS: StrategyPack[] = [
     tags: ["IFVG", "SMI", "SMC", "ICT", "confluence", "inversion", "niche", "preferred"],
   },
 
+
+  {
+    id: "ifvg_jurik_stoch_confluence",
+    name: "IFVG × Jurik Stoch Confluence",
+    shortName: "IFVG·Jurik",
+    category: "smc_ict",
+    inspiredBy:
+      "ICT / Pinkman Inversion FVG + community Jurik Stochastic (k/d JMA) — bakeoff vs SMI/RSI gates",
+    summary:
+      "IFVG Bölgeler (main) + IFVG×Jurik Stoch (sub). Retest AL + K cross above D (soft K<50) veya OS (20) yükseliş. Formasyon IFVG ile aynı çekirdek.",
+    howTo: [
+      "İndikatörler → «IFVG Bölgeler» (main) ve «IFVG×Jurik Stoch» (sub) — ikisini birden açın (stack).",
+      "Formasyonlar → Inversion FVG (IFVG) çipi ile aynı sinyalleri tarayın.",
+      "Backtest: ifvgJurikStochLong · ifvgJurikStochBi. Karşılaştır: ifvgSmiLong · ifvgRsiLong · smiLongOnly.",
+      "Long: IFVG bull retest + K/D cross up (K<50 soft) veya OS (20) yükseliş. Short: mirror (OB 80).",
+      "Çıkış: K cross below D veya karşı IFVG / TP1.",
+    ],
+    timeframe: "1h",
+    allowShort: true,
+    replaceIndicators: true,
+    backtestPreset: "ifvgJurikStochLong",
+    backtestExtras: {
+      useAtrStops: false,
+      useSignalExits: true,
+      allowShort: false,
+    },
+    indicators: [
+      {
+        type: "ifvgZones",
+        params: {
+          swingStrength: 2,
+          maxInvLookforward: 40,
+          maxRetestLookforward: 30,
+          zoneExtend: 8,
+        },
+        color: "#7e57c2",
+      },
+      {
+        type: "ifvgJurikStoch",
+        params: { kLen: 14, dLen: 3, jmaLen: 8, phase: 50, power: 2, os: 20, ob: 80, softMid: 1 },
+      },
+    ],
+    risk: {
+      rMultiple: 1.5,
+      tip: "Zone kırılırsa setup iptal. Sadece IFVG retest + Jurik Stoch teyit ile girin. Oscillator: jurikStoch (k/d), not Kase.",
+    },
+    tags: ["IFVG", "Jurik", "Stochastic", "SMC", "ICT", "confluence", "inversion", "niche"],
+  },
+
   {
     id: "ifvg_rsi_confluence",
     name: "IFVG × RSI Confluence (ikincil)",

@@ -177,7 +177,7 @@ import {
   pliChannel,
   pliDeltaHybrid,
 } from "./median";
-import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi } from "./ifvg";
+import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi, computeIfvgJurikStoch } from "./ifvg";
 
 export interface PlotSeries {
   id: string;
@@ -435,6 +435,8 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "ifvgZones", label: "IFVG Bölgeler", category: "bigbeluga", pane: "main", acceptsSeries: false, primarySeriesKey: "zoneTop", description: "Inversion FVG bölgeleri + retest AL/SAT. Formasyon IFVG taraması ile birlikte kullanılabilir (grafikte stack + backtest AND preset).", inputs: [num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30), num("zoneExtend", "Zone Extend", 8)] },
   { id: "ifvgRsi", label: "IFVG×RSI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rsi", description: "IFVG uygulanmış RSI: tam RSI + bias bağlamı (rsiIfvg) + IFVG retest × OS/OB teyit sinyalleri. Formasyon IFVG taraması ile birlikte kullanılabilir. (İkincil — tercih: IFVG×SMI)", inputs: [num("rsiPeriod", "RSI Periyot", 14), num("os", "OS", 35, 1, 50, 1), num("ob", "OB", 65, 50, 99, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
   { id: "ifvgSmi", label: "IFVG×SMI", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "smi", description: "IFVG uygulanmış SMI (Blau): smi+signal + bias bağlamı (smiIfvg) + IFVG retest × SMI/signal cross teyit (playbook SMI Long tarzı, soft ≤0/≥0 seviye). Tercih edilen IFVG confluence.", inputs: [num("k", "SMI K", 14), num("d", "SMI D", 20), num("ema", "Signal EMA", 5), num("os", "OS", -40, -100, 0, 1), num("ob", "OB", 40, 0, 100, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
+  { id: "ifvgJurikStoch", label: "IFVG×Jurik Stoch", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "k", description: "IFVG uygulanmış Jurik Stochastic (jurikStoch k/d, JMA-smoothed %K). Retest × K/D cross (soft mid K<50/>50) veya OS/OB (20/80) yükseliş/düşüş. Bakeoff vs SMI/RSI.", inputs: [num("kLen", "%K", 14), num("dLen", "%D", 3), num("jmaLen", "JMA Length", 8), num("phase", "Phase", 50, -100, 100, 1), num("power", "Power", 2, 0.1, 10, 0.1), num("os", "OS", 20, 1, 50, 1), num("ob", "OB", 80, 50, 99, 1), num("softMid", "Soft Mid", 1, 0, 1, 1), num("swingStrength", "Swing", 2), num("maxInvLookforward", "İnv. Lookforward", 40), num("maxRetestLookforward", "Retest Lookforward", 30)] },
+
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab proprietary — DI-anchored coherence + surprise + DI acceleration before ADX confirms. Default pane: Temp/±E/Faz; Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
 ];
 
@@ -2307,6 +2309,52 @@ export function computeBuiltin(
       );
       break;
     }
+
+    case "ifvgJurikStoch": {
+      const s = computeIfvgJurikStoch(candles, {
+        kLen: n(p, "kLen", 14),
+        dLen: n(p, "dLen", 3),
+        jmaLen: n(p, "jmaLen", 8),
+        phase: n(p, "phase", 50),
+        power: n(p, "power", 2),
+        os: n(p, "os", 20),
+        ob: n(p, "ob", 80),
+        softMid: n(p, "softMid", 1) !== 0,
+        swingStrength: n(p, "swingStrength", 2),
+        maxInvLookforward: n(p, "maxInvLookforward", 40),
+        maxRetestLookforward: n(p, "maxRetestLookforward", 30),
+        lookbackFvgs: 0,
+        maxHits: 0,
+      });
+      const osLine = candles.map(() => s.os as number | null);
+      const obLine = candles.map(() => s.ob as number | null);
+      const midLine = candles.map(() => 50 as number | null);
+      const longHist = s.longSignal.map((v) => (v === 1 ? 1 : null));
+      const shortHist = s.shortSignal.map((v) => (v === 1 ? -1 : null));
+      push(
+        [
+          line(inst, "k", "sub", color, candles, s.k, "%K"),
+          line(inst, "d", "sub", "#ff6d00", candles, s.d, "%D"),
+          line(inst, "kIfvg", "sub", "#7e57c2", candles, s.kIfvg, "K·IFVG"),
+          line(inst, "os", "sub", "#26a69a88", candles, osLine, "OS"),
+          line(inst, "ob", "sub", "#ef535088", candles, obLine, "OB"),
+          line(inst, "mid", "sub", "#787b8655", candles, midLine, "50"),
+          hist(inst, "longSig", "sub", "#26a69a", candles, longHist, "AL"),
+          hist(inst, "shortSig", "sub", "#ef5350", candles, shortHist, "SAT"),
+          line(inst, "score", "sub", "#ffeb3b55", candles, s.score, "Skor"),
+        ],
+        {
+          k: s.k,
+          d: s.d,
+          kIfvg: s.kIfvg,
+          longSignal: s.longSignal,
+          shortSignal: s.shortSignal,
+          score: s.score,
+        }
+      );
+      break;
+    }
+
     case "eliziEdge": {
       const ee = eliziEdge(candles, {
         erLen: n(p, "erLen", 10),

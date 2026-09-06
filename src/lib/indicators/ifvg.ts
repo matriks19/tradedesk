@@ -1,5 +1,5 @@
 /**
- * IFVG chart series + IFVG-gated RSI/SMI — shared with Formasyon IFVG scanner.
+ * IFVG chart series + IFVG-gated RSI/SMI/Jurik Stoch — shared with Formasyon IFVG scanner.
  * One detect pass via findInversionFvgSetups (full history for indicators).
  */
 import type { Candle } from "@/lib/types";
@@ -9,6 +9,7 @@ import {
   type InversionFvgOpts,
 } from "@/lib/patterns/inversionFvg";
 import { rsi as rsiCalc, smi as smiCalc } from "./math";
+import { jurikStoch } from "./jurik";
 
 export type IfvgSeries = {
   zoneTop: (number | null)[];
@@ -343,4 +344,126 @@ export function computeIfvgSmi(
     os,
     ob,
   };
+}
+
+export type IfvgJurikStochSeries = {
+  k: (number | null)[];
+  d: (number | null)[];
+  /** K only while IFVG bias ≠ 0 — context paint */
+  kIfvg: (number | null)[];
+  longSignal: (number | null)[];
+  shortSignal: (number | null)[];
+  score: (number | null)[];
+  os: number;
+  ob: number;
+};
+
+export type IfvgJurikStochOpts = IfvgSeriesOpts & {
+  /** Stochastic %K lookback. Default 14 (jurikStoch preset). */
+  kLen?: number;
+  /** %D SMA of smoothed K. Default 3. */
+  dLen?: number;
+  /** JMA smooth length on raw K. Default 8. */
+  jmaLen?: number;
+  phase?: number;
+  power?: number;
+  /** Oversold guide (0–100). Default 20. */
+  os?: number;
+  /** Overbought guide (0–100). Default 80. */
+  ob?: number;
+  /**
+   * Soft mid filter: require K<50 on long cross / K>50 on short cross
+   * (SMI-analogue of ≤0 / ≥0). Default true.
+   */
+  softMid?: boolean;
+};
+
+/**
+ * IFVG-applied Jurik Stochastic.
+ *
+ * Oscillator choice: **`jurikStoch`** (not `jurikKaseStoch`). Both expose k/d-like
+ * lines; `jurikStoch` matches the "Jurik Stochastic" registry preset (kLen=14,
+ * dLen=3, jmaLen=8) on a classic 0–100 scale — natural for OS≈20 / OB≈80 and
+ * mid-50 soft filter. Kase variant adds permission-OHLC / dual-cycle richness
+ * but different defaults; keep confluence gates aligned with plain Jurik Stoch.
+ *
+ * Long: IFVG bull retest AND (K cross above D [soft K<50] OR K rising from OS
+ * / leave OS). Short: mirror (cross below D / from OB).
+ */
+export function computeIfvgJurikStoch(
+  candles: Candle[],
+  opts: IfvgJurikStochOpts = {}
+): IfvgJurikStochSeries {
+  const n = candles.length;
+  const kLen = opts.kLen ?? 14;
+  const dLen = opts.dLen ?? 3;
+  const jmaLen = opts.jmaLen ?? 8;
+  const phase = opts.phase ?? 50;
+  const power = opts.power ?? 2;
+  const os = opts.os ?? 20;
+  const ob = opts.ob ?? 80;
+  const softMid = opts.softMid ?? true;
+
+  const { k, d } = jurikStoch(candles, kLen, dLen, jmaLen, phase, power, "jma");
+  const kIfvg = fillNull(n);
+  const longSignal = fillNull(n);
+  const shortSignal = fillNull(n);
+  const score = fillNull(n);
+
+  const ifvg = computeIfvgSeries(candles, opts);
+
+  for (let i = 0; i < n; i++) {
+    if (ifvg.bias[i] != null && ifvg.bias[i] !== 0 && k[i] != null) {
+      kIfvg[i] = k[i];
+    }
+  }
+
+  for (let i = 1; i < n; i++) {
+    if (
+      k[i] == null ||
+      k[i - 1] == null ||
+      d[i] == null ||
+      d[i - 1] == null
+    ) {
+      continue;
+    }
+    const kv = k[i] as number;
+    const kp = k[i - 1] as number;
+    const dv = d[i] as number;
+    const dp = d[i - 1] as number;
+    const crossUp = kp <= dp && kv > dv;
+    const crossDn = kp >= dp && kv < dv;
+    const rising = kv > kp;
+    const falling = kv < kp;
+
+    // Primary: K/D cross with optional soft mid (K<50 / >50).
+    // Alt: rising/falling from OS/OB, or leave extreme.
+    const midOkLong = !softMid || kv < 50;
+    const midOkShort = !softMid || kv > 50;
+    const longJ =
+      (crossUp && midOkLong) ||
+      (kv < os && rising) ||
+      (kp < os && kv >= os) ||
+      (kv < 50 && rising && kv >= dv);
+    const shortJ =
+      (crossDn && midOkShort) ||
+      (kv > ob && falling) ||
+      (kp > ob && kv <= ob) ||
+      (kv > 50 && falling && kv <= dv);
+
+    if (ifvg.longSignal[i] === 1 && longJ) {
+      longSignal[i] = 1;
+      const base = ifvg.score[i] ?? 60;
+      const bonus = crossUp ? 10 : kv < os ? 8 : kv < 50 ? 5 : 3;
+      score[i] = Math.min(100, Math.round(base + bonus));
+    }
+    if (ifvg.shortSignal[i] === 1 && shortJ) {
+      shortSignal[i] = 1;
+      const base = ifvg.score[i] ?? 60;
+      const bonus = crossDn ? 10 : kv > ob ? 8 : kv > 50 ? 5 : 3;
+      score[i] = Math.min(100, Math.round(base + bonus));
+    }
+  }
+
+  return { k, d, kIfvg, longSignal, shortSignal, score, os, ob };
 }

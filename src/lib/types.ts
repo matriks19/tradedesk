@@ -259,6 +259,7 @@ export type BuiltinIndicatorId =
   | "ifvgZones"
   | "ifvgRsi"
   | "ifvgSmi"
+  | "ifvgJurikStoch"
   // Elizi Lab
   | "eliziEdge";
 

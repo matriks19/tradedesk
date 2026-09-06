@@ -62,7 +62,7 @@ import {
   pliDeltaHybrid,
   rollingMedian,
 } from "@/lib/indicators/median";
-import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi } from "@/lib/indicators/ifvg";
+import { computeIfvgSeries, computeIfvgRsi, computeIfvgSmi, computeIfvgJurikStoch } from "@/lib/indicators/ifvg";
 import { orderBlocks, fairValueGaps, bosChoch } from "@/lib/indicators/beluga";
 import { diagonalSr } from "@/lib/indicators/diagonalSr";
 import { initialBalance, laguerreRsi, schaffTrendCycle, elderImpulse, coralTrend } from "@/lib/indicators/proreal";
@@ -293,6 +293,8 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   ifvgRsiBi: "IFVG×RSI Bi",
   ifvgSmiLong: "IFVG×SMI Long",
   ifvgSmiBi: "IFVG×SMI Bi",
+  ifvgJurikStochLong: "IFVG×Jurik Stoch Long",
+  ifvgJurikStochBi: "IFVG×Jurik Stoch Bi",
   oscWaddah: "Waddah Attar",
   oscSmi: "SMI (Blau) · 4s",
   oscStochRsi: "Stoch RSI",
@@ -322,7 +324,7 @@ export function recommendedWarmup(
   if (preset === "gainzAlgoV2" || preset === "gainzAlgoV2Long") return 30;
   if (preset === "eliziNexus" || preset === "eliziNexus1h" || preset === "eliziNexus4h" || preset === "eliziNexusSoft1h" || preset === "eliziNexusSoft4h") return 80;
   if (preset === "pliBreakLong" || preset === "pliDeltaHybridLong" || preset === "madBandsLong" || preset === "medianCrossLong") return 80;
-  if (preset === "ifvgLong" || preset === "ifvgRsiLong" || preset === "ifvgRsiBi" || preset === "ifvgSmiLong" || preset === "ifvgSmiBi") return 100;
+  if (preset === "ifvgLong" || preset === "ifvgRsiLong" || preset === "ifvgRsiBi" || preset === "ifvgSmiLong" || preset === "ifvgSmiBi" || preset === "ifvgJurikStochLong" || preset === "ifvgJurikStochBi") return 100;
   if (preset === "klingerLong" || preset === "squeezeLong" || preset === "halfTrendLong" || preset === "coralLong" || preset === "alligatorLong" || preset === "kstLong" || preset === "trixLong" || preset === "rviLong" || preset === "aoLong" || preset === "uoLong" || preset === "dpoLong" || preset === "ppoLong" || preset === "oscSqueezeLong") return 60;
   if (preset === "smcFvg" || preset === "smcFvgLong" || preset === "ictOb" || preset === "ictObLong" || preset === "ictBosLong" || preset === "vortexCross" || preset === "vortexLong" || preset === "forceIndex" || preset === "forceLong" || preset === "cmfZero" || preset === "cmfLong" || preset === "vidyaCross" || preset === "vidyaLong" || preset === "framaCross" || preset === "framaLong" || preset === "sslChannel" || preset === "sslLong" || preset === "vfiCross" || preset === "vfiLong" || preset === "elderImpulse" || preset === "elderLong" || preset === "cmoZero" || preset === "cmoLong" || preset === "massBulge" || preset === "bopZero" || preset === "bopLong") return 40;
   if (preset === "aroonLongTrend") return 40;
@@ -628,7 +630,9 @@ export function buildSignalContext(
     params.preset === "ifvgRsiLong" ||
     params.preset === "ifvgRsiBi" ||
     params.preset === "ifvgSmiLong" ||
-    params.preset === "ifvgSmiBi"
+    params.preset === "ifvgSmiBi" ||
+    params.preset === "ifvgJurikStochLong" ||
+    params.preset === "ifvgJurikStochBi"
   ) {
     ctx.ifvg = computeIfvgSeries(candles, {
       lookbackFvgs: 0,
@@ -651,6 +655,20 @@ export function buildSignalContext(
         ema: 5,
         os: -40,
         ob: 40,
+        lookbackFvgs: 0,
+        maxHits: 0,
+      });
+    }
+    if (params.preset === "ifvgJurikStochLong" || params.preset === "ifvgJurikStochBi") {
+      ctx.ifvgJurikStoch = computeIfvgJurikStoch(candles, {
+        kLen: 14,
+        dLen: 3,
+        jmaLen: 8,
+        phase: 50,
+        power: 2,
+        os: 20,
+        ob: 80,
+        softMid: true,
         lookbackFvgs: 0,
         maxHits: 0,
       });
@@ -3518,6 +3536,111 @@ export function getSignalFn(
           side = null;
         }
         return { long: false, short: false, exitLong, exitShort, reason: "IFVG×SMI" };
+      };
+    }
+
+
+    case "ifvgJurikStochLong": {
+      let activeTp1: number | null = null;
+      return (candles, i, ctx) => {
+        const s = ctx.ifvgJurikStoch as {
+          longSignal: (number | null)[];
+          shortSignal: (number | null)[];
+          k: (number | null)[];
+          d: (number | null)[];
+        };
+        const z = ctx.ifvg as {
+          tp1: (number | null)[];
+          bias: (number | null)[];
+          shortSignal: (number | null)[];
+        };
+        if (!s) return {};
+        if (s.longSignal[i] === 1) {
+          activeTp1 = z?.tp1?.[i] ?? null;
+          return { long: true, short: false, reason: "IFVG×Jurik L" };
+        }
+        const hitTp =
+          activeTp1 != null && candles[i].high >= activeTp1;
+        const kdExit =
+          s.k[i] != null &&
+          s.d[i] != null &&
+          s.k[i - 1] != null &&
+          s.d[i - 1] != null &&
+          (s.k[i - 1] as number) >= (s.d[i - 1] as number) &&
+          (s.k[i] as number) < (s.d[i] as number);
+        const exitLong =
+          s.shortSignal[i] === 1 ||
+          z?.shortSignal?.[i] === 1 ||
+          kdExit ||
+          hitTp ||
+          z?.bias?.[i] === -1;
+        if (exitLong) activeTp1 = null;
+        return { long: false, short: false, exitLong, reason: "IFVG×Jurik L" };
+      };
+    }
+    case "ifvgJurikStochBi": {
+      let activeTp1: number | null = null;
+      let side: "long" | "short" | null = null;
+      return (candles, i, ctx) => {
+        const s = ctx.ifvgJurikStoch as {
+          longSignal: (number | null)[];
+          shortSignal: (number | null)[];
+          k: (number | null)[];
+          d: (number | null)[];
+        };
+        const z = ctx.ifvg as {
+          tp1: (number | null)[];
+        };
+        if (!s) return {};
+        if (s.longSignal[i] === 1) {
+          activeTp1 = z?.tp1?.[i] ?? null;
+          side = "long";
+          return {
+            long: true,
+            short: false,
+            exitShort: true,
+            reason: "IFVG×Jurik",
+          };
+        }
+        if (s.shortSignal[i] === 1) {
+          activeTp1 = z?.tp1?.[i] ?? null;
+          side = "short";
+          return {
+            long: false,
+            short: true,
+            exitLong: true,
+            reason: "IFVG×Jurik",
+          };
+        }
+        const kdCrossDn =
+          s.k[i] != null &&
+          s.d[i] != null &&
+          s.k[i - 1] != null &&
+          s.d[i - 1] != null &&
+          (s.k[i - 1] as number) >= (s.d[i - 1] as number) &&
+          (s.k[i] as number) < (s.d[i] as number);
+        const kdCrossUp =
+          s.k[i] != null &&
+          s.d[i] != null &&
+          s.k[i - 1] != null &&
+          s.d[i - 1] != null &&
+          (s.k[i - 1] as number) <= (s.d[i - 1] as number) &&
+          (s.k[i] as number) > (s.d[i] as number);
+        const hitTpLong =
+          side === "long" &&
+          activeTp1 != null &&
+          candles[i].high >= activeTp1;
+        const hitTpShort =
+          side === "short" &&
+          activeTp1 != null &&
+          candles[i].low <= activeTp1;
+        const exitLong = hitTpLong || (side === "long" && kdCrossDn);
+        const exitShort = hitTpShort || (side === "short" && kdCrossUp);
+        if (exitLong || exitShort) {
+          activeTp1 = null;
+          side = null;
+        }
+        return { long: false, short: false, exitLong, exitShort, reason: "IFVG×Jurik" };
       };
     }
 
