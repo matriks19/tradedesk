@@ -229,6 +229,20 @@ export interface BacktestParams {
   probeTemp?: number;
 }
 
+export interface BacktestSignalEvent {
+  /** bar index in the candle series */
+  barIndex: number;
+  time: number;
+  price: number;
+  /** al = long entry signal, sat = short entry or long exit signal */
+  side: "al" | "sat";
+  /** raw kind for filtering */
+  kind: "long" | "short" | "exitLong" | "exitShort";
+  reason: string;
+  /** filled relative to last bar when result is built */
+  barsAgo: number;
+}
+
 export interface BacktestTrade {
   id: string;
   side: "long" | "short";
@@ -287,6 +301,8 @@ export interface BacktestResult {
   byMonth: { key: string; trades: number; netPnl: number; winRate: number }[];
   equity: { time: number; equity: number }[];
   trades: BacktestTrade[];
+  /** Strategy signal history (newest-friendly via barsAgo) */
+  signals: BacktestSignalEvent[];
   regimes: Regime[];
   ranAt: number;
   candleCount: number;

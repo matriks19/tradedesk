@@ -9,6 +9,7 @@ import {
 import type {
   BacktestParams,
   BacktestResult,
+  BacktestSignalEvent,
   BacktestSummary,
   BacktestTrade,
   Regime,
@@ -170,6 +171,7 @@ export function runBacktest(
   } | null = null;
 
   const trades: BacktestTrade[] = [];
+  const signals: BacktestSignalEvent[] = [];
   const equity: { time: number; equity: number }[] = [];
 
   const rebuildCash = () => startEquity + trades.reduce((s, t) => s + t.pnl, 0);
@@ -213,10 +215,36 @@ export function runBacktest(
     equity.push({ time: candles[i].time, equity: eq });
   };
 
+  const pushSig = (
+    i: number,
+    kind: BacktestSignalEvent["kind"],
+    reason: string
+  ) => {
+    const side: "al" | "sat" =
+      kind === "long" || kind === "exitShort" ? "al" : "sat";
+    signals.push({
+      barIndex: i,
+      time: candles[i].time,
+      price: candles[i].close,
+      side,
+      kind,
+      reason,
+      barsAgo: 0, // filled after loop
+    });
+  };
+
   for (let i = 0; i < candles.length; i++) {
     cash = rebuildCash();
     const c = candles[i];
     const a = atrLine[i];
+
+    const sig = i >= warmup ? signalFn(candles, i, ctx) : null;
+    if (sig) {
+      if (sig.long) pushSig(i, "long", sig.reason ?? "long");
+      if (sig.short) pushSig(i, "short", sig.reason ?? "short");
+      if (sig.exitLong) pushSig(i, "exitLong", sig.reason ?? "exitLong");
+      if (sig.exitShort) pushSig(i, "exitShort", sig.reason ?? "exitShort");
+    }
 
     if (position) {
       let closed = false;
@@ -239,8 +267,7 @@ export function runBacktest(
           }
         }
       }
-      if (!closed && useSignalExits && i >= warmup) {
-        const sig = signalFn(candles, i, ctx);
+      if (!closed && useSignalExits && sig) {
         if (position.side === "long" && sig.exitLong) {
           closePos(i, c.close, "signal exit");
         } else if (position.side === "short" && sig.exitShort) {
@@ -254,8 +281,7 @@ export function runBacktest(
       continue;
     }
 
-    if (!position) {
-      const sig = signalFn(candles, i, ctx);
+    if (!position && sig) {
       const notional = params.positionSize;
       const qty = notional / c.close;
       const risk = (params.slAtrMult || 1.5) * (a && a > 0 ? a : c.close * 0.01);
@@ -290,6 +316,9 @@ export function runBacktest(
 
     markEquity(i);
   }
+
+  const lastBar = candles.length - 1;
+  for (const s of signals) s.barsAgo = lastBar - s.barIndex;
 
   if (position) {
     const last = candles.length - 1;
@@ -367,6 +396,7 @@ export function runBacktest(
     byMonth,
     equity: equityClean,
     trades,
+    signals,
     regimes,
     ranAt: Date.now(),
     candleCount: candles.length,

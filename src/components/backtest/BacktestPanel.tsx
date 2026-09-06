@@ -169,6 +169,7 @@ export function BacktestPanel() {
   const active = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const [running, setRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [resultTab, setResultTab] = useState<"ozet" | "sinyaller" | "trades">("ozet");
   const [code, setCode] = useState(
     backtestParams.strategyCode || ZSCORE_PULLBACK_SAMPLE
   );
@@ -265,6 +266,7 @@ export function BacktestPanel() {
       };
       const out = runBacktest(candles, runParams);
       setLastBacktest(out);
+      setResultTab("sinyaller");
       if (out.codeWarnings?.length) {
         setError(out.codeWarnings.join(" · "));
       }
@@ -356,6 +358,15 @@ export function BacktestPanel() {
       ["Mum", String(result.candleCount ?? 0)],
     ];
   }, [result]);
+
+  const signalRows = useMemo(() => {
+    if (!result?.signals?.length) return [];
+    // newest first
+    return [...result.signals].sort((a, b) => a.barsAgo - b.barsAgo);
+  }, [result]);
+
+  const lastAl = signalRows.find((s) => s.side === "al");
+  const lastSat = signalRows.find((s) => s.side === "sat");
 
   const download = (kind: "csv" | "json") => {
     if (!result) return;
@@ -567,6 +578,127 @@ export function BacktestPanel() {
         )}
         {result && (
           <>
+            <div className="flex gap-1 border-b border-desk-border pb-1">
+              {(
+                [
+                  ["ozet", "Özet"],
+                  ["sinyaller", `Sinyaller (${result.signals?.length ?? 0})`],
+                  ["trades", `Trade (${result.trades.length})`],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={clsx(
+                    "px-2 py-0.5 text-2xs rounded",
+                    resultTab === id
+                      ? "bg-desk-accent/20 text-desk-accent"
+                      : "text-desk-muted hover:text-desk-fg"
+                  )}
+                  onClick={() => setResultTab(id)}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            {resultTab === "sinyaller" && (
+              <section className="space-y-2">
+                <div className="grid grid-cols-2 gap-2 text-3xs font-mono">
+                  <div className="border border-desk-border rounded p-1.5">
+                    <div className="text-desk-muted text-2xs mb-0.5">Son Al</div>
+                    {lastAl ? (
+                      <>
+                        <div className="text-desk-up font-semibold">
+                          {lastAl.barsAgo === 0
+                            ? "şimdi"
+                            : `${lastAl.barsAgo} mum önce`}
+                        </div>
+                        <div className="text-desk-muted truncate" title={lastAl.reason}>
+                          {lastAl.reason} · {lastAl.price.toPrecision(5)}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-desk-muted">—</div>
+                    )}
+                  </div>
+                  <div className="border border-desk-border rounded p-1.5">
+                    <div className="text-desk-muted text-2xs mb-0.5">Son Sat</div>
+                    {lastSat ? (
+                      <>
+                        <div className="text-desk-down font-semibold">
+                          {lastSat.barsAgo === 0
+                            ? "şimdi"
+                            : `${lastSat.barsAgo} mum önce`}
+                        </div>
+                        <div className="text-desk-muted truncate" title={lastSat.reason}>
+                          {lastSat.reason} · {lastSat.price.toPrecision(5)}
+                        </div>
+                      </>
+                    ) : (
+                      <div className="text-desk-muted">—</div>
+                    )}
+                  </div>
+                </div>
+                <div className="max-h-[360px] overflow-auto border border-desk-border rounded">
+                  <table className="w-full text-3xs leading-tight">
+                    <thead className="sticky top-0 bg-desk-panel">
+                      <tr className="text-desk-muted text-left">
+                        <th className="px-1 py-0.5">Side</th>
+                        <th>Mum önce</th>
+                        <th>Kind</th>
+                        <th>Fiyat</th>
+                        <th>Zaman</th>
+                        <th>Why</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {signalRows.length === 0 && (
+                        <tr>
+                          <td colSpan={6} className="px-1 py-2 text-desk-muted">
+                            Sinyal yok
+                          </td>
+                        </tr>
+                      )}
+                      {signalRows.map((s, idx) => (
+                        <tr
+                          key={`${s.barIndex}-${s.kind}-${idx}`}
+                          className="border-t border-desk-border/50"
+                        >
+                          <td
+                            className={clsx(
+                              "px-1 py-0.5 font-semibold",
+                              s.side === "al" ? "text-desk-up" : "text-desk-down"
+                            )}
+                          >
+                            {s.side === "al" ? "Al" : "Sat"}
+                          </td>
+                          <td className="font-mono">
+                            {s.barsAgo === 0 ? "0" : s.barsAgo}
+                          </td>
+                          <td className="text-desk-muted">{s.kind}</td>
+                          <td className="font-mono">{s.price.toPrecision(5)}</td>
+                          <td className="font-mono text-desk-muted">
+                            {new Date(s.time * 1000).toLocaleString("tr-TR", {
+                              month: "short",
+                              day: "2-digit",
+                              hour: "2-digit",
+                              minute: "2-digit",
+                            })}
+                          </td>
+                          <td className="truncate max-w-[90px]" title={s.reason}>
+                            {s.reason}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+            )}
+
+            {resultTab === "ozet" && (
+            <>
             <section>
               <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
                 Özet
@@ -691,7 +823,10 @@ export function BacktestPanel() {
                 </div>
               </div>
             </section>
+            </>
+            )}
 
+            {resultTab === "trades" && (
             <section>
               <h3 className="text-2xs uppercase tracking-wide text-desk-muted mb-1">
                 Trade Log ({result.trades.length})
@@ -747,6 +882,7 @@ export function BacktestPanel() {
                 </table>
               </div>
             </section>
+            )}
           </>
         )}
       </div>
