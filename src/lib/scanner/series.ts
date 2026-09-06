@@ -268,11 +268,17 @@ export function computeFieldSeries(
     case "sma50":
       series = sma(c, 50);
       break;
+    case "sma100":
+      series = sma(c, 100);
+      break;
     case "sma200":
       series = sma(c, 200);
       break;
     case "ema9":
       series = ema(c, 9);
+      break;
+    case "ema20":
+      series = ema(c, 20);
       break;
     case "ema21":
       series = ema(c, 21);

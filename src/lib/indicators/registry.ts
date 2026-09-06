@@ -183,6 +183,8 @@ import { computeMavkIndicator, computeRSquaredIndicator } from "./mavk";
 import { rsiBreakMarkerSeries } from "@/lib/scanner/rsiScan";
 import { macdCrossMarkerSeries } from "@/lib/scanner/macdScan";
 import { eliziCrossMarkerSeries } from "@/lib/scanner/eliziScan";
+import { computeRsiPuNu } from "./rsiPuNu";
+import { computeDescendingBreak } from "./descendingBreak";
 
 export type PlotMarker = {
   time: number;
@@ -296,6 +298,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   // —— Momentum / Osilatörler
   { id: "rsi", label: "RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", inputs: [num("period", "Period", 14), src()] },
   { id: "rsiLevelBreaks", label: "RSI Kırılım (30/50/70)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "rsi", description: "RSI + 30/50/70 yatay seviyeler + kırılım işaretleri. Osilatör→RSI tarama ile aynı mantık (detectRsiBreaks).", inputs: [num("period", "Periyot", 14), num("lvl30", "Seviye 1", 30, 1, 99, 1), num("lvl50", "Seviye 2", 50, 1, 99, 1), num("lvl70", "Seviye 3", 70, 1, 99, 1), num("showMarkers", "İşaretler", 1, 0, 1, 1), src()] },
+  { id: "rsiPuNu", label: "RSI PU/NU (diverjans)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rsi", description: "Pine RSI regular diverjans: PU (fiyat LL + RSI HL), NU (fiyat HH + RSI LH). Pivot lbL/lbR + range. Tarama: rsiPuNu filtresi.", inputs: [num("rsiLen", "RSI Periyot", 14), num("lbL", "Pivot Sol", 15), num("lbR", "Pivot Sağ", 2), num("rangeLower", "Range Alt", 15), num("rangeUpper", "Range Üst", 60), num("showMarkers", "PU/NU işaretleri", 1, 0, 1, 1)] },
   { id: "stochastic", label: "Stochastic", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("kPeriod", "%K Period", 14), num("dPeriod", "%D Period", 3)] },
   { id: "stochRsi", label: "Stoch RSI", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "k", inputs: [num("rsiPeriod", "RSI Period", 14), num("stochPeriod", "Stoch Period", 14), num("kSmooth", "K Smooth", 3), num("dSmooth", "D Smooth", 3), src()] },
   { id: "macd", label: "MACD (kesişim işaretli)", category: "momentum", pane: "sub", acceptsSeries: true, primarySeriesKey: "macd", description: "MACD + sinyal + hist + AL/SAT kesişim işaretleri. Osilatör→MACD tarama ile aynı mantık (detectMacdCross).", inputs: [num("fast", "Fast", 12), num("slow", "Slow", 26), num("signal", "Signal", 9), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1), src()] },
@@ -333,6 +336,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "trendStrength", label: "Trend Strength", category: "trend", pane: "sub", acceptsSeries: true, primarySeriesKey: "ts", inputs: [num("period", "Period", 20), src()] },
   { id: "heikinAshiSmooth", label: "Heikin-Ashi Smooth", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ha", inputs: [num("period", "Period", 10)] },
   { id: "softTrend", label: "SoftTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "line", inputs: [num("period", "EMA Period", 20), num("atrPeriod", "ATR Period", 14), num("mult", "ATR Mult", 1.5, 0.5, 10, 0.1)] },
+  { id: "descendingBreak", label: "Düşen Kırılımı", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "trend", description: "İki alçalan pivot high trend çizgisi; close üstüne kırılım (Break Out). İsteğe bağlı S/R pivot kutuları. Tarama: descendingBreak ≤2 bar.", inputs: [num("lookback", "Pivot Lookback", 20), num("srBoxes", "S/R Kutuları", 1, 0, 1, 1), num("showMarkers", "Break Out işaretleri", 1, 0, 1, 1)] },
   { id: "halfTrend", label: "HalfTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ht", inputs: [num("amplitude", "Amplitude", 2), num("channelDeviation", "Channel Dev", 2, 0.5, 10, 0.1), num("atrPeriod", "ATR Period", 100)] },
   { id: "sslChannel", label: "SSL Channel", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "sslUp", inputs: [num("period", "Period", 10)] },
   { id: "rangeFilter", label: "Range Filter", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "filter", inputs: [num("period", "Period", 20), num("mult", "Mult", 2.5, 0.1, 20, 0.1), src()] },
@@ -2823,6 +2827,95 @@ export function computeBuiltin(
         ],
         { bull: e.bull, bear: e.bear, ema: e.ema }
       );
+      break;
+    }
+    case "rsiPuNu": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const r = computeRsiPuNu(candles, {
+        rsiLen: n(p, "rsiLen", 14),
+        lbL: n(p, "lbL", 15),
+        lbR: n(p, "lbR", 2),
+        rangeLower: n(p, "rangeLower", 15),
+        rangeUpper: n(p, "rangeUpper", 60),
+      });
+      const plots: PlotSeries[] = [
+        line(inst, "rsi", "sub", color, candles, r.rsi, "RSI"),
+        line(inst, "lvl30", "sub", "#26a69a55", candles, candles.map(() => 30 as number | null), "30"),
+        line(inst, "lvl70", "sub", "#ef535055", candles, candles.map(() => 70 as number | null), "70"),
+      ];
+      if (showMarkers) {
+        plots.push(
+          hist(inst, "pu", "sub", "#69f0ae", candles, r.pu, "PU"),
+          hist(inst, "nu", "sub", "#ff5252", candles, r.nu, "NU")
+        );
+      }
+      push(plots, {
+        rsi: r.rsi,
+        pu: r.pu,
+        nu: r.nu,
+        pivotLow: r.pivotLow,
+        pivotHigh: r.pivotHigh,
+      });
+      break;
+    }
+    case "descendingBreak": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const srOn = n(p, "srBoxes", 1) !== 0;
+      const d = computeDescendingBreak(candles, {
+        lookback: n(p, "lookback", 20),
+        srBoxes: srOn,
+      });
+      const plots: PlotSeries[] = [
+        line(inst, "trend", "main", "#ff9800", candles, d.trend, "Düşen TL"),
+      ];
+      if (srOn) {
+        plots.push(
+          line(inst, "resBox", "main", "#ef535088", candles, d.resBox, "Direnç"),
+          line(inst, "supBox", "main", "#26a69a88", candles, d.supBox, "Destek")
+        );
+      }
+      const trendLine = plots[0]!;
+      if (showMarkers) {
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          if (d.breakOut[i] === 1) {
+            markers.push({
+              time: candles[i]!.time,
+              position: "belowBar",
+              color: "#69f0ae",
+              shape: "arrowUp",
+              text: "Break Out",
+            });
+          }
+        }
+        markers.sort((a, b) => a.time - b.time);
+        if (markers.length) trendLine.markers = markers;
+        // Anchor marks on price
+        const priceAnchor = candles.map((c, i) =>
+          d.breakOut[i] === 1 ? c.low : null
+        );
+        const priceMarks = line(
+          inst,
+          "breakMark",
+          "main",
+          "rgba(0,0,0,0)",
+          candles,
+          priceAnchor,
+          ""
+        );
+        if (markers.length) {
+          priceMarks.markers = markers;
+          plots.push(priceMarks);
+        }
+      }
+      push(plots, {
+        trend: d.trend,
+        breakOut: d.breakOut,
+        resBox: d.resBox,
+        supBox: d.supBox,
+        pivotHigh: d.pivotHigh,
+        pivotLow: d.pivotLow,
+      });
       break;
     }
     default:

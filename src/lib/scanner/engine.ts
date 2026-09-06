@@ -15,6 +15,8 @@ import {
 import { adxPumpRadar } from "@/lib/indicators/adxPump";
 import { eliziEdge } from "@/lib/indicators/eliziEdge";
 import { jurikKaseStoch, jurikStoch } from "@/lib/indicators/jurik";
+import { recentRsiPuNu } from "@/lib/indicators/rsiPuNu";
+import { recentDescendingBreak } from "@/lib/indicators/descendingBreak";
 
 export type ScannerFilter =
   | { type: "rsi"; op: "lt" | "gt"; value: number; period?: number }
@@ -90,7 +92,34 @@ export type ScannerFilter =
       type: "eliziExhaust";
       direction: "bull" | "bear" | "any";
       minSurprise?: number;
-    };
+    }
+  | { type: "macdAboveSignal"; side: "above" | "below" }
+  | { type: "macdZeroCross"; direction: "bull" | "bear" }
+  | {
+      type: "priceVsMa";
+      kind: "sma" | "ema";
+      period: number;
+      side: "above" | "below";
+    }
+  | {
+      type: "maStack";
+      kind: "sma" | "ema";
+      fast: number;
+      slow: number;
+    }
+  | { type: "rsiBetween"; lo: number; hi: number; period?: number }
+  | {
+      type: "perfBars";
+      bars: number;
+      op: "gt" | "lt";
+      value: number;
+    }
+  | {
+      type: "rsiPuNu";
+      direction: "bull" | "bear" | "any";
+      maxBarsAgo?: number;
+    }
+  | { type: "descendingBreak"; maxBarsAgo?: number };
 
 export interface ScannerRow {
   symbol: string;
@@ -396,6 +425,62 @@ export const SCANNER_PRESETS: Record<
     description: "phase ≥ armed, uyum yüksek — fire öncesi hazır",
     filters: [{ type: "eliziPhase", phase: "armed", direction: "any", minTemp: 45, minCoherence: 0.5 }],
   },
+  // —— TradingView BIST/TR scanner ports
+  tv_w_dip: {
+    label: "W Dip",
+    description:
+      "TV W Dip: fiyat>SMA50>SMA200, RSI>50, MACD>sinyal (durum), ADX>20, vol≥SMA20, perf~21b>+5% ve perf~63b<0% (günlükte ≈1A/3A; diğer TF bar sayısı)",
+    filters: [
+      { type: "priceVsMa", kind: "sma", period: 50, side: "above" },
+      { type: "maStack", kind: "sma", fast: 50, slow: 200 },
+      { type: "rsi", op: "gt", value: 50 },
+      { type: "macdAboveSignal", side: "above" },
+      { type: "adxAbove", value: 20 },
+      { type: "volumeSpike", mult: 1 },
+      { type: "perfBars", bars: 21, op: "gt", value: 5 },
+      { type: "perfBars", bars: 63, op: "lt", value: 0 },
+    ],
+  },
+  tv_uzun_vade: {
+    label: "Uzun Vade",
+    description:
+      "TV Uzun Vade: MACD>sinyal, fiyat>SMA50>SMA100>SMA200, ADX>20, RSI≥55, vol≥ort",
+    filters: [
+      { type: "macdAboveSignal", side: "above" },
+      { type: "priceVsMa", kind: "sma", period: 50, side: "above" },
+      { type: "maStack", kind: "sma", fast: 50, slow: 100 },
+      { type: "maStack", kind: "sma", fast: 100, slow: 200 },
+      { type: "priceVsMa", kind: "sma", period: 200, side: "above" },
+      { type: "adxAbove", value: 20 },
+      { type: "rsiBetween", lo: 55, hi: 100 },
+      { type: "volumeSpike", mult: 1 },
+    ],
+  },
+  tv_tobo_avcisi: {
+    label: "TOBO Avcısı",
+    description:
+      "TV TOBO Avcısı filtre yığını (TOBO formasyonu ayrı): fiyat>EMA20>EMA50, perf~63b>+10%, RSI 50–70, rel vol>1.2. Market-cap 1Y filtresi yok (veri yok).",
+    filters: [
+      { type: "priceVsMa", kind: "ema", period: 20, side: "above" },
+      { type: "perfBars", bars: 63, op: "gt", value: 10 },
+      { type: "rsiBetween", lo: 50, hi: 70 },
+      { type: "volumeSpike", mult: 1.2 },
+      { type: "maStack", kind: "ema", fast: 20, slow: 50 },
+    ],
+  },
+  tv_momentum_avi: {
+    label: "momentum avı",
+    description:
+      "TV momentum avı: MACD sıfır çizgisi yukarı kesişim, EMA20>EMA50, fiyat>EMA20, ADX>18, RSI>50, rel vol>1.2",
+    filters: [
+      { type: "macdZeroCross", direction: "bull" },
+      { type: "maStack", kind: "ema", fast: 20, slow: 50 },
+      { type: "priceVsMa", kind: "ema", period: 20, side: "above" },
+      { type: "adxAbove", value: 18 },
+      { type: "rsi", op: "gt", value: 50 },
+      { type: "volumeSpike", mult: 1.2 },
+    ],
+  },
 };
 
 const CANDLE_FILTERS = new Set([
@@ -416,7 +501,15 @@ const CANDLE_FILTERS = new Set([
   "aroonLong",
   "consecBars",
   "priceVsSma",
+  "priceVsMa",
+  "maStack",
+  "macdAboveSignal",
+  "macdZeroCross",
+  "rsiBetween",
+  "perfBars",
   "rsiDivergence",
+  "rsiPuNu",
+  "descendingBreak",
   "adxPumpStage",
   "adxPumpMixDi",
   "eliziPhase",
@@ -856,47 +949,142 @@ export function matchFilters(
         `Elizi Exhaust${eff != null ? ` ER${(eff * 100).toFixed(0)}` : ""}`
       );
 
-    } else if (f.type === "rsiDivergence") {
-
-      if (!candles || candles.length < 40) return { ok: false, note: "" };
-      const lookback = f.lookback ?? 20;
+    } else if (f.type === "macdAboveSignal") {
+      if (!candles || candles.length < 50) return { ok: false, note: "" };
+      const m = macd(closes(candles));
+      const i = candles.length - 1;
+      const mv = m.macd[i];
+      const sv = m.signal[i];
+      if (mv == null || sv == null) return { ok: false, note: "" };
+      if (f.side === "above" && !(mv > sv)) return { ok: false, note: "" };
+      if (f.side === "below" && !(mv < sv)) return { ok: false, note: "" };
+      notes.push(f.side === "above" ? "MACD>sig" : "MACD<sig");
+    } else if (f.type === "macdZeroCross") {
+      if (!candles || candles.length < 50) return { ok: false, note: "" };
+      const m = macd(closes(candles));
+      const i = m.macd.length - 1;
+      if (i < 1) return { ok: false, note: "" };
+      const a0 = m.macd[i - 1];
+      const a1 = m.macd[i];
+      if (a0 == null || a1 == null) return { ok: false, note: "" };
+      const bull = a0 <= 0 && a1 > 0;
+      const bear = a0 >= 0 && a1 < 0;
+      if (f.direction === "bull" && !bull) return { ok: false, note: "" };
+      if (f.direction === "bear" && !bear) return { ok: false, note: "" };
+      notes.push(f.direction === "bull" ? "MACD 0↑" : "MACD 0↓");
+    } else if (f.type === "priceVsMa") {
+      if (!candles || candles.length < f.period + 5)
+        return { ok: false, note: "" };
       const c = closes(candles);
-      const r = rsi(c, 14);
-      const end = c.length - 1;
-      const start = Math.max(0, end - lookback);
-      let priceExt = start;
-      let rsiExt = start;
-      for (let i = start; i <= end; i++) {
-        if (r[i] == null) continue;
-        if (f.direction === "bull") {
-          if (c[i] <= c[priceExt]) priceExt = i;
-          if ((r[i] as number) <= (r[rsiExt] as number)) rsiExt = i;
-        } else {
-          if (c[i] >= c[priceExt]) priceExt = i;
-          if ((r[i] as number) >= (r[rsiExt] as number)) rsiExt = i;
-        }
-      }
-      if (r[end] == null || r[priceExt] == null) return { ok: false, note: "" };
-      // bullish: price lower low near end, RSI higher low
-      let ok = false;
-      if (f.direction === "bull") {
-        ok =
-          priceExt > start &&
-          priceExt >= end - 5 &&
-          c[priceExt] < c[start] &&
-          (r[priceExt] as number) > (r[rsiExt] as number) * 0.98 &&
-          (r[end] as number) > (r[priceExt] as number);
-      } else {
-        ok =
-          priceExt > start &&
-          priceExt >= end - 5 &&
-          c[priceExt] > c[start] &&
-          (r[priceExt] as number) < (r[rsiExt] as number) * 1.02 &&
-          (r[end] as number) < (r[priceExt] as number);
-      }
+      const s = f.kind === "ema" ? ema(c, f.period) : sma(c, f.period);
+      const v = s[s.length - 1];
+      if (v == null) return { ok: false, note: "" };
+      const last = candles[candles.length - 1]!.close;
+      if (f.side === "above" && !(last > v)) return { ok: false, note: "" };
+      if (f.side === "below" && !(last < v)) return { ok: false, note: "" };
+      const tag = f.kind === "ema" ? "EMA" : "SMA";
+      notes.push(`vs ${tag}${f.period} ${f.side}`);
+    } else if (f.type === "maStack") {
+      const need = Math.max(f.fast, f.slow) + 5;
+      if (!candles || candles.length < need) return { ok: false, note: "" };
+      const c = closes(candles);
+      const a =
+        f.kind === "ema" ? ema(c, f.fast) : sma(c, f.fast);
+      const b =
+        f.kind === "ema" ? ema(c, f.slow) : sma(c, f.slow);
+      const i = c.length - 1;
+      if (a[i] == null || b[i] == null) return { ok: false, note: "" };
+      if (!((a[i] as number) > (b[i] as number)))
+        return { ok: false, note: "" };
+      const tag = f.kind === "ema" ? "EMA" : "SMA";
+      notes.push(`${tag}${f.fast}>${tag}${f.slow}`);
+    } else if (f.type === "rsiBetween") {
+      if (!candles || candles.length < 30) return { ok: false, note: "" };
+      const r = rsi(closes(candles), f.period ?? 14);
+      const v = r[r.length - 1];
+      if (v == null) return { ok: false, note: "" };
+      lastRsi = v;
+      const lo = Math.min(f.lo, f.hi);
+      const hi = Math.max(f.lo, f.hi);
+      if (!(v >= lo && v <= hi)) return { ok: false, note: "" };
+      notes.push(`RSI ${v.toFixed(1)} ∈[${lo},${hi}]`);
+    } else if (f.type === "perfBars") {
+      if (!candles || candles.length <= f.bars)
+        return { ok: false, note: "" };
+      const end = candles.length - 1;
+      const start = end - f.bars;
+      const c0 = candles[start]!.close;
+      const c1 = candles[end]!.close;
+      if (!(c0 > 0)) return { ok: false, note: "" };
+      const pct = ((c1 - c0) / c0) * 100;
+      const ok = f.op === "gt" ? pct > f.value : pct < f.value;
       if (!ok) return { ok: false, note: "" };
-      lastRsi = r[end] as number;
-      notes.push(f.direction === "bull" ? "RSI↑ div" : "RSI↓ div");
+      notes.push(`perf${f.bars} ${pct.toFixed(1)}%`);
+    } else if (f.type === "rsiPuNu") {
+      if (!candles || candles.length < 60) return { ok: false, note: "" };
+      const hit = recentRsiPuNu(
+        candles,
+        f.direction,
+        f.maxBarsAgo ?? 2
+      );
+      if (!hit.ok) return { ok: false, note: "" };
+      notes.push(
+        hit.kind === "pu"
+          ? `RSI PU (−${hit.barsAgo})`
+          : `RSI NU (−${hit.barsAgo})`
+      );
+    } else if (f.type === "descendingBreak") {
+      if (!candles || candles.length < 80) return { ok: false, note: "" };
+      const hit = recentDescendingBreak(candles, f.maxBarsAgo ?? 2);
+      if (!hit.ok) return { ok: false, note: "" };
+      notes.push(`Düşen kırılım (−${hit.barsAgo})`);
+    } else if (f.type === "rsiDivergence") {
+      // Prefer Pine-style PU/NU; fall back only if no recent pivot signal
+      if (!candles || candles.length < 60) return { ok: false, note: "" };
+      const dir = f.direction === "bull" ? "bull" : "bear";
+      const lookback = f.lookback ?? 20;
+      const hit = recentRsiPuNu(candles, dir, Math.max(2, Math.min(lookback, 10)));
+      if (hit.ok) {
+        notes.push(dir === "bull" ? "RSI PU" : "RSI NU");
+      } else {
+        // Legacy sketch fallback
+        const c = closes(candles);
+        const r = rsi(c, 14);
+        const end = c.length - 1;
+        const start = Math.max(0, end - lookback);
+        let priceExt = start;
+        let rsiExt = start;
+        for (let i = start; i <= end; i++) {
+          if (r[i] == null) continue;
+          if (f.direction === "bull") {
+            if (c[i]! <= c[priceExt]!) priceExt = i;
+            if ((r[i] as number) <= (r[rsiExt] as number)) rsiExt = i;
+          } else {
+            if (c[i]! >= c[priceExt]!) priceExt = i;
+            if ((r[i] as number) >= (r[rsiExt] as number)) rsiExt = i;
+          }
+        }
+        if (r[end] == null || r[priceExt] == null) return { ok: false, note: "" };
+        let ok = false;
+        if (f.direction === "bull") {
+          ok =
+            priceExt > start &&
+            priceExt >= end - 5 &&
+            c[priceExt]! < c[start]! &&
+            (r[priceExt] as number) > (r[rsiExt] as number) * 0.98 &&
+            (r[end] as number) > (r[priceExt] as number);
+        } else {
+          ok =
+            priceExt > start &&
+            priceExt >= end - 5 &&
+            c[priceExt]! > c[start]! &&
+            (r[priceExt] as number) < (r[rsiExt] as number) * 1.02 &&
+            (r[end] as number) < (r[priceExt] as number);
+        }
+        if (!ok) return { ok: false, note: "" };
+        lastRsi = r[end] as number;
+        notes.push(f.direction === "bull" ? "RSI↑ div" : "RSI↓ div");
+      }
     }
   }
   return { ok: true, note: notes.join(" · "), rsi: lastRsi, atrPct: lastAtrPct };

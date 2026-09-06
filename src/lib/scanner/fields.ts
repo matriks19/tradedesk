@@ -30,8 +30,10 @@ export type TechnicalFieldId =
   | "bbp"
   | "sma20"
   | "sma50"
+  | "sma100"
   | "sma200"
   | "ema9"
+  | "ema20"
   | "ema21"
   | "ema50"
   | "hma20"
@@ -115,8 +117,10 @@ export const TECHNICAL_FIELDS: TechnicalFieldDef[] = [
   { id: "volume_spike", label: "Volume / SMA(20)", group: "Volume", defaultCompare: "value", defaultValue: 2, keywords: "volume spike" },
   { id: "sma20", label: "SMA 20", group: "Moving Averages", defaultCompare: "price", keywords: "sma ma" },
   { id: "sma50", label: "SMA 50", group: "Moving Averages", defaultCompare: "price", keywords: "sma ma" },
+  { id: "sma100", label: "SMA 100", group: "Moving Averages", defaultCompare: "price", keywords: "sma ma" },
   { id: "sma200", label: "SMA 200", group: "Moving Averages", defaultCompare: "price", keywords: "sma ma" },
   { id: "ema9", label: "EMA 9", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },
+  { id: "ema20", label: "EMA 20", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },
   { id: "ema21", label: "EMA 21", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },
   { id: "ema50", label: "EMA 50", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },
   { id: "hma20", label: "HMA 20", group: "Moving Averages", defaultCompare: "price", keywords: "hma hull" },

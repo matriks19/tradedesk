@@ -112,6 +112,7 @@ export type BuiltinIndicatorId =
   // Momentum / oscillators
   | "rsi"
   | "rsiLevelBreaks"
+  | "rsiPuNu"
   | "stochastic"
   | "stochRsi"
   | "macd"
@@ -241,6 +242,7 @@ export type BuiltinIndicatorId =
   | "frama"
   | "squeezeMomentum"
   | "softTrend"
+  | "descendingBreak"
   | "vfi"
   | "waddahAttar"
   | "halfTrend"

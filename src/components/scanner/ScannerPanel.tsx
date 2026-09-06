@@ -100,6 +100,21 @@ const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "hod", label: "Near HOD", filter: { type: "nearHod", pct: 1 } },
   { id: "sma50a", label: "SMA50↑", filter: { type: "priceVsSma", period: 50, side: "above" } },
   { id: "atr2", label: "ATR%>2", filter: { type: "atrPctHigh", minPct: 2 } },
+  {
+    id: "rsi_pu",
+    label: "RSI PU",
+    filter: { type: "rsiPuNu", direction: "bull", maxBarsAgo: 2 },
+  },
+  {
+    id: "rsi_nu",
+    label: "RSI NU",
+    filter: { type: "rsiPuNu", direction: "bear", maxBarsAgo: 2 },
+  },
+  {
+    id: "desc_brk",
+    label: "Düşen kırılım",
+    filter: { type: "descendingBreak", maxBarsAgo: 2 },
+  },
 ];
 
 const KLINE_TIMEOUT_MS = 10_000;
