@@ -50,6 +50,8 @@ import {
   awesomeOsc,
   ppo,
   ultimateOsc,
+  fireflyOscillator,
+  supertrendDivWeighted,
 } from "@/lib/indicators/math";
 import { adxPumpRadar } from "@/lib/indicators/adxPump";
 import { eliziEdge } from "@/lib/indicators/eliziEdge";
@@ -269,6 +271,10 @@ export const PRESET_LABELS: Record<BacktestParams["preset"], string> = {
   uoLong: "Ultimate Osc Long · niş",
   dpoLong: "DPO Long · niş",
   ppoLong: "PPO Long · niş",
+  fireflyLong: "Firefly LB Long · setup",
+  stDivWeighted: "ST Div-Weighted · setup",
+  stDivFirefly: "ST×Firefly bi · setup",
+  stDivFireflyLong: "ST×Firefly Long · 1s",
   oscSqueezeLong: "Squeeze Fire Long · 1s/4s",
   oscWaddah: "Waddah Attar",
   oscSmi: "SMI (Blau) · 4s",
@@ -285,6 +291,7 @@ export function recommendedWarmup(
   preset: BacktestParams["preset"],
   params: BacktestParams
 ): number {
+  if (preset === "fireflyLong" || preset === "stDivWeighted" || preset === "stDivFirefly" || preset === "stDivFireflyLong") return 60;
   if (preset === "zScorePullback") return Math.max(params.regimeSMA ?? 200, 220);
   if (preset === "rsi2MeanRev") {
     return params.requireRegimeAbove
@@ -390,6 +397,8 @@ export function buildSignalContext(
     aoOsc: awesomeOsc(candles),
     uoOsc: ultimateOsc(candles),
     ppoOsc: ppo(closes, 12, 26, 9),
+    fireflyOsc: fireflyOscillator(candles, 10, 3, false),
+    stDiv: supertrendDivWeighted(candles, 10, 3, 5, 0.35, 50, 14),
     st: supertrend(candles, params.atrPeriod ?? 10, params.stMult ?? 3),
     bb: bollinger(closes, params.bbPeriod ?? 20, params.bbMult ?? 2),
     jks: jurikKaseStoch(candles, {
@@ -3097,6 +3106,63 @@ export function getSignalFn(
           short: false,
           exitLong: crossedBelow(p.ppo, p.signal, i),
           reason: "PPO L",
+        };
+      };
+
+
+    case "fireflyLong":
+      return (_c, i, ctx) => {
+        const f = ctx.fireflyOsc as { color: (number | null)[]; histo: (number | null)[] };
+        if (!f || f.color[i] == null || f.color[i - 1] == null) return {};
+        const long = (f.color[i - 1] as number) <= 0 && (f.color[i] as number) === 1;
+        return {
+          long,
+          short: false,
+          exitLong: (f.color[i] as number) === -1 || (f.color[i] as number) === 0,
+          reason: "Firefly L",
+        };
+      };
+    case "stDivWeighted":
+      return (_c, i, ctx) => {
+        const s = ctx.stDiv as { buy: boolean[]; sell: boolean[]; direction: (-1 | 1 | null)[] };
+        if (!s) return {};
+        return {
+          long: s.buy[i],
+          short: s.sell[i],
+          exitLong: s.sell[i] || s.direction[i] === -1,
+          exitShort: s.buy[i] || s.direction[i] === 1,
+          reason: "ST Div",
+        };
+      };
+    case "stDivFirefly":
+    case "stDivFireflyLong":
+      return (_c, i, ctx) => {
+        const s = ctx.stDiv as { buy: boolean[]; sell: boolean[]; direction: (-1 | 1 | null)[] };
+        const f = ctx.fireflyOsc as { color: (number | null)[] };
+        if (!s || !f || f.color[i] == null) return {};
+        const ffBull = (f.color[i] as number) === 1;
+        const ffBear = (f.color[i] as number) === -1;
+        const ffFlat = (f.color[i] as number) === 0;
+        // Patron setup: ST flip + Firefly color confirm; skip flat
+        const long = s.buy[i] && ffBull && !ffFlat;
+        const short =
+          preset !== "stDivFireflyLong" && s.sell[i] && ffBear && !ffFlat;
+        // also allow entry if already green cloud and firefly just flipped green
+        const longAlt =
+          s.direction[i] === 1 &&
+          (f.color[i - 1] as number) !== 1 &&
+          ffBull;
+        const shortAlt =
+          preset !== "stDivFireflyLong" &&
+          s.direction[i] === -1 &&
+          (f.color[i - 1] as number) !== -1 &&
+          ffBear;
+        return {
+          long: long || longAlt,
+          short: short || shortAlt,
+          exitLong: s.sell[i] || ffBear || (s.direction[i] === -1),
+          exitShort: s.buy[i] || ffBull || (s.direction[i] === 1),
+          reason: "ST×Firefly",
         };
       };
 

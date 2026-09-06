@@ -19,11 +19,12 @@ Bakeoff: Crypto10, signal-exit, long-only (aksi yazılmadıkça). Net ≈ 10 coi
 
 | # | Preset | Net≈ | Not |
 |---|---|---:|---|
-| 1 | **HalfTrend Long · 1s** | 2330 | Bayes üstü, tr≈210 |
-| 2 | **AO Long · 1s** | 2273 | Bayes üstü, tr≈216 |
-| 3 | **VFI Long · 1s** | 2189 | her iki TF’de iyi |
-| 4 | Squeeze Long · 1s | 1855 | |
-| 5 | Bayesian Trend Long · 1s | 1838 | eski 1h default |
+| 1 | **ST×Firefly Long · 1s** | 2383 | Patron setup (ST-div×Firefly); tr≈180 |
+| 2 | **HalfTrend Long · 1s** | 2330 | Bayes üstü, tr≈210 |
+| 3 | **AO Long · 1s** | 2273 | Bayes üstü, tr≈216 |
+| 4 | **VFI Long · 1s** | 2189 | her iki TF’de iyi |
+| 5 | Squeeze Long · 1s | 1855 | |
+| 6 | Bayesian Trend Long · 1s | 1838 | eski 1h default |
 | — | ZLSMA200 + CE Long · 1s | alt | kullanılabilir |
 | — | Multi Kernel RQ Long · 1s | alt | 4h’de ölür |
 
@@ -33,3 +34,6 @@ Bakeoff: Crypto10, signal-exit, long-only (aksi yazılmadıkça). Net ≈ 10 coi
 - 15m’de edge ince.
 - OB/FVG Long net şişik (≈1 trade/coin) — playbook’a koyma.
 - STC / Laguerre / RVI / Alligator — elendi.
+
+
+Not: ST Div-Weighted MPO4 yerine RSI pivot divergence kullanır (orijinal kapalı). Short sleeve toksik — long-only kullan.

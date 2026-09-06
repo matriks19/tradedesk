@@ -3002,5 +3002,218 @@ export function elderRay(
 }
 
 
+/** Firefly Oscillator [LazyBear / Yasu] — weighted price z-score, 0–100 scale. */
+export function fireflyOscillator(
+  candles: Candle[],
+  length = 10,
+  smooth = 3,
+  doubleSmooth = false
+): {
+  osc: (number | null)[];
+  signal: (number | null)[];
+  histo: (number | null)[];
+  /** 1 green, -1 red, 0 yellow/flat */
+  color: (number | null)[];
+} {
+  const n = candles.length;
+  const v2 = candles.map((c) => (c.high + c.low + c.close * 2) / 4);
+  const v3 = ema(v2, length);
+  const v4 = stdev(v2, length);
+  const v5 = v2.map((v, i) =>
+    v3[i] != null && v4[i] != null && (v4[i] as number) !== 0
+      ? ((v - (v3[i] as number)) * 100) / (v4[i] as number)
+      : null
+  );
+  const filled5 = v5.map((v) => v ?? 0);
+  const v6 = ema(filled5, smooth).map((v, i) => (v5[i] == null ? null : v));
+  const filled6 = v6.map((v) => v ?? 0);
+  const v7raw = doubleSmooth
+    ? ema(filled6, smooth).map((v, i) => (v6[i] == null ? null : v))
+    : v6;
+  const filled7 = v7raw.map((v) => v ?? 0);
+  const osc = ema(filled7, length).map((v, i) =>
+    v7raw[i] == null || v == null ? null : (v + 100) / 2 - 4
+  );
+  const signal: (number | null)[] = new Array(n).fill(null);
+  for (let i = 0; i < n; i++) {
+    if (osc[i] == null || i < smooth - 1) continue;
+    let hi = -Infinity;
+    for (let j = i - smooth + 1; j <= i; j++) {
+      if (osc[j] != null) hi = Math.max(hi, osc[j] as number);
+    }
+    signal[i] = hi === -Infinity ? null : hi;
+  }
+  const histo: (number | null)[] = new Array(n).fill(null);
+  const color: (number | null)[] = new Array(n).fill(null);
+  for (let i = 0; i < n; i++) {
+    const ww = osc[i];
+    const mm = signal[i];
+    if (ww == null || mm == null) continue;
+    let d: number | null = null;
+    if (ww > 50 && mm > 50) d = Math.min(ww, mm);
+    else if (ww < 50 && mm < 50) d = Math.max(ww, mm);
+    histo[i] = d;
+    if (d == null || i === 0 || histo[i - 1] == null) {
+      color[i] = 0;
+    } else if (d > 50) {
+      color[i] = d > (histo[i - 1] as number) ? 1 : 0;
+    } else {
+      color[i] = d < (histo[i - 1] as number) ? -1 : 0;
+    }
+  }
+  return { osc, signal, histo, color };
+}
+
+/**
+ * SuperTrend with divergence-weighted ATR mult (Uncle-style approximation).
+ * Uses RSI pivots instead of proprietary MPO4 Modal Engine.
+ */
+export function supertrendDivWeighted(
+  candles: Candle[],
+  atrLen = 10,
+  baseMult = 3,
+  pivotLen = 5,
+  divSens = 0.35,
+  divBars = 50,
+  rsiLen = 14
+): {
+  line: (number | null)[];
+  direction: (-1 | 1 | null)[];
+  buy: boolean[];
+  sell: boolean[];
+  bullDiv: boolean[];
+  bearDiv: boolean[];
+  multUsed: (number | null)[];
+} {
+  const n = candles.length;
+  const atrVals = atr(candles, atrLen);
+  const closes = candles.map((c) => c.close);
+  const osc = rsi(closes, rsiLen);
+  const bullDiv = new Array(n).fill(false);
+  const bearDiv = new Array(n).fill(false);
+
+  const isPivotLow = (i: number) => {
+    if (i < pivotLen || i + pivotLen >= n) return false;
+    const p = candles[i].low;
+    for (let k = 1; k <= pivotLen; k++) {
+      if (candles[i - k].low <= p || candles[i + k].low < p) return false;
+    }
+    return true;
+  };
+  const isPivotHigh = (i: number) => {
+    if (i < pivotLen || i + pivotLen >= n) return false;
+    const p = candles[i].high;
+    for (let k = 1; k <= pivotLen; k++) {
+      if (candles[i - k].high >= p || candles[i + k].high > p) return false;
+    }
+    return true;
+  };
+
+  const pivLo: number[] = [];
+  const pivHi: number[] = [];
+  for (let i = 0; i < n; i++) {
+    // confirm pivot at i - pivotLen (right bars passed)
+    const j = i - pivotLen;
+    if (j >= pivotLen && isPivotLow(j)) pivLo.push(j);
+    if (j >= pivotLen && isPivotHigh(j)) pivHi.push(j);
+    if (pivLo.length >= 2) {
+      const a = pivLo[pivLo.length - 2];
+      const b = pivLo[pivLo.length - 1];
+      if (
+        b === j &&
+        candles[b].low < candles[a].low &&
+        osc[b] != null &&
+        osc[a] != null &&
+        (osc[b] as number) > (osc[a] as number)
+      ) {
+        bullDiv[i] = true; // mark at confirmation bar
+      }
+    }
+    if (pivHi.length >= 2) {
+      const a = pivHi[pivHi.length - 2];
+      const b = pivHi[pivHi.length - 1];
+      if (
+        b === j &&
+        candles[b].high > candles[a].high &&
+        osc[b] != null &&
+        osc[a] != null &&
+        (osc[b] as number) < (osc[a] as number)
+      ) {
+        bearDiv[i] = true;
+      }
+    }
+  }
+
+  const line: (number | null)[] = new Array(n).fill(null);
+  const direction: (-1 | 1 | null)[] = new Array(n).fill(null);
+  const buy = new Array(n).fill(false);
+  const sell = new Array(n).fill(false);
+  const multUsed: (number | null)[] = new Array(n).fill(null);
+
+  let prevUpper = 0;
+  let prevLower = 0;
+  let prevSt = 0;
+  let prevDir: -1 | 1 = 1;
+  let divUntil = -1;
+  let divKind: 0 | 1 | -1 = 0; // 1 bull softens downtrend, -1 bear softens uptrend
+
+  for (let i = 0; i < n; i++) {
+    if (bullDiv[i]) {
+      divUntil = i + divBars;
+      divKind = 1;
+    }
+    if (bearDiv[i]) {
+      divUntil = i + divBars;
+      divKind = -1;
+    }
+    if (i > divUntil) divKind = 0;
+
+    let mult = baseMult;
+    if (divKind !== 0 && i <= divUntil) {
+      // reduce ATR mult → faster reaction
+      mult = Math.max(0.5, baseMult * (1 - divSens));
+    }
+    multUsed[i] = atrVals[i] == null ? null : mult;
+
+    if (atrVals[i] == null) continue;
+    const hl2 = (candles[i].high + candles[i].low) / 2;
+    let upper = hl2 + mult * (atrVals[i] as number);
+    let lower = hl2 - mult * (atrVals[i] as number);
+    if (i > 0 && atrVals[i - 1] != null) {
+      lower =
+        lower > prevLower || candles[i - 1].close < prevLower ? lower : prevLower;
+      upper =
+        upper < prevUpper || candles[i - 1].close > prevUpper ? upper : prevUpper;
+    }
+    let dir: -1 | 1;
+    let st: number;
+    if (i === 0 || atrVals[i - 1] == null) {
+      dir = 1;
+      st = lower;
+    } else if (prevSt === prevUpper) {
+      dir = candles[i].close > upper ? 1 : -1;
+      st = dir === 1 ? lower : upper;
+    } else {
+      dir = candles[i].close < lower ? -1 : 1;
+      st = dir === 1 ? lower : upper;
+    }
+    // cancel div effect on trend change
+    if (dir !== prevDir && i > 0) {
+      divKind = 0;
+      divUntil = -1;
+      buy[i] = dir === 1;
+      sell[i] = dir === -1;
+    }
+    line[i] = st;
+    direction[i] = dir;
+    prevUpper = upper;
+    prevLower = lower;
+    prevSt = st;
+    prevDir = dir;
+  }
+  return { line, direction, buy, sell, bullDiv, bearDiv, multUsed };
+}
+
+
 // silence unused helper warning
 void sessionPivotBase;

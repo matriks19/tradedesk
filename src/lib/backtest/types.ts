@@ -138,6 +138,10 @@ export type StrategyPresetId =
   | "uoLong"
   | "dpoLong"
   | "ppoLong"
+  | "stDivFireflyLong"
+  | "stDivFirefly"
+  | "stDivWeighted"
+  | "fireflyLong"
   | "oscSqueezeLong"
   | "codeStrategy"
   | "custom";
