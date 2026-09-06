@@ -2,6 +2,7 @@
 
 ## Added (this pass)
 
+- **Pair Health / istatistiksel arbitraj**: Cointegration ≠ correlation; rolling corr 30/60/90, ADF residual, beta stability, half-life; BIST30 vs XU100 (fallback SYN_BIST30); sidebar «Çift»; Al/Sat + mum önce + Fib hedefleri.
 - **SHT Flama/Üçgen (açık yaklaşım)**: PatternHit.meta (durum/skor/daralma/hedef/FIBO/RSI/ADX/filtre); `shtFlagTriangle` enricher; PatternPanel kalite kartı + tarama çipi; FormationScanPanel «SHT Flama/Üçgen»; katalog notu (kapalı Pine kopyası değil).
 
 - **Price alerts + webhook bot**: Alarm sidebar tab; poll ticker ~8s; browser Notification; optional webhook via `/api/webhook` proxy (`secret`, `event: price_alert`).

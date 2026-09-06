@@ -23,7 +23,7 @@ import type {
 import { NATIVE_TIMEFRAMES, normalizeTimeframe } from "@/lib/data/timeframes";
 import type { PatternHit } from "@/lib/patterns/types";
 import type { BacktestParams, BacktestResult } from "@/lib/backtest"
-import { normalizeBacktestResult } from "@/lib/backtest";;
+import { normalizeBacktestResult } from "@/lib/backtest";
 import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
 import { strategyById } from "@/lib/strategies";
 
@@ -61,6 +61,7 @@ interface DeskState {
     | "heatmap"
     | "patterns"
     | "risk"
+    | "pairs"
     | "alerts"
     | "scripts"
     | "indicators"
