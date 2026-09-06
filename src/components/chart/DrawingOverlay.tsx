@@ -56,8 +56,56 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, w, h);
 
+    const ts = chart.timeScale();
+    const MIN_FIB_SPAN_PX = 72;
+
+    /** Map time → x; extrapolate / clamp when off-screen so drawings stay fixed. */
+    const timeToX = (time: number): number | null => {
+      const direct = ts.timeToCoordinate(time as Time);
+      if (direct != null) return direct as number;
+
+      const visible = ts.getVisibleRange();
+      if (visible && typeof visible.from === "number" && typeof visible.to === "number") {
+        if (time < (visible.from as number)) return 0;
+        if (time > (visible.to as number)) return w;
+      }
+
+      // Extrapolate via logical indices of nearby visible bars
+      const logical = ts.getVisibleLogicalRange();
+      if (logical) {
+        const fromX = ts.logicalToCoordinate(logical.from as never);
+        const toX = ts.logicalToCoordinate(logical.to as never);
+        const fromT = ts.coordinateToTime(fromX as number);
+        const toT = ts.coordinateToTime(toX as number);
+        const t0 = timeToNumber(fromT);
+        const t1 = timeToNumber(toT);
+        if (
+          fromX != null &&
+          toX != null &&
+          t0 != null &&
+          t1 != null &&
+          t1 !== t0
+        ) {
+          const ratio = (time - t0) / (t1 - t0);
+          return (fromX as number) + ratio * ((toX as number) - (fromX as number));
+        }
+      }
+
+      // Last resort: clamp left/right from visible time range if available
+      if (visible && typeof visible.from === "number" && typeof visible.to === "number") {
+        const mid = ((visible.from as number) + (visible.to as number)) / 2;
+        return time < mid ? 0 : w;
+      }
+      return null;
+    };
+
+    const priceToY = (price: number): number | null => {
+      const y = series.priceToCoordinate(price);
+      return y == null ? null : (y as number);
+    };
+
     const toXY = (time: number, price: number) => {
-      const x = chart.timeScale().timeToCoordinate(time as Time);
+      const x = ts.timeToCoordinate(time as Time);
       const y = series.priceToCoordinate(price);
       if (x == null || y == null) return null;
       return { x: x as number, y: y as number };
@@ -71,7 +119,7 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
       ctx.setLineDash([]);
 
       if (d.tool === "hline" && d.points[0]) {
-        const y = series.priceToCoordinate(d.points[0].price);
+        const y = priceToY(d.points[0].price);
         if (y == null) return;
         ctx.beginPath();
         ctx.moveTo(0, y);
@@ -81,7 +129,7 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
         ctx.fillText(
           d.label ?? d.points[0].price.toLocaleString(undefined, { maximumFractionDigits: 6 }),
           4,
-          (y as number) - 3
+          y - 3
         );
         return;
       }
@@ -89,6 +137,39 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
       const p0 = d.points[0];
       const p1 = d.points[1];
       if (!p0 || !p1) return;
+
+      // Fib: independent x/y mapping — never drop whole drawing when one anchor is off-screen
+      if (d.tool === "fib") {
+        const x0 = timeToX(p0.time);
+        const x1 = timeToX(p1.time);
+        if (x0 == null || x1 == null) return;
+        let xLeft = Math.min(x0, x1);
+        let xRight = Math.max(x0, x1);
+        if (xRight - xLeft < MIN_FIB_SPAN_PX) {
+          xRight = xLeft + MIN_FIB_SPAN_PX;
+        }
+        // TradingView-style: extend levels to the right edge of the chart
+        xRight = Math.max(xRight, w - 8);
+        xLeft = Math.max(0, Math.min(xLeft, w - MIN_FIB_SPAN_PX));
+
+        ctx.font = "10px ui-monospace, monospace";
+        for (const lv of FIB_LEVELS) {
+          // Click-order: level 0 = first click, 1 = second click
+          const price = p0.price + (p1.price - p0.price) * lv;
+          const y = priceToY(price);
+          if (y == null) continue;
+          ctx.beginPath();
+          ctx.setLineDash(lv === 0 || lv === 1 ? [] : [4, 3]);
+          ctx.moveTo(xLeft, y);
+          ctx.lineTo(xRight, y);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          const labelY = Math.max(10, Math.min(h - 4, y - 2));
+          ctx.fillText(`${lv} · ${price.toPrecision(6)}`, xLeft + 4, labelY);
+        }
+        return;
+      }
+
       const a = toXY(p0.time, p0.price);
       const b = toXY(p1.time, p1.price);
       if (!a || !b) return;
@@ -107,25 +188,6 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
         ctx.fillRect(x, y, rw, rh);
         ctx.globalAlpha = alpha;
         ctx.strokeRect(x, y, rw, rh);
-      } else if (d.tool === "fib") {
-        const hi = Math.max(p0.price, p1.price);
-        const lo = Math.min(p0.price, p1.price);
-        const span = hi - lo || 1;
-        const x0 = Math.min(a.x, b.x);
-        const x1 = Math.max(a.x, b.x);
-        ctx.font = "10px ui-monospace, monospace";
-        for (const lv of FIB_LEVELS) {
-          const price = hi - span * lv;
-          const y = series.priceToCoordinate(price);
-          if (y == null) continue;
-          ctx.beginPath();
-          ctx.setLineDash(lv === 0 || lv === 1 ? [] : [4, 3]);
-          ctx.moveTo(x0, y);
-          ctx.lineTo(x1, y);
-          ctx.stroke();
-          ctx.setLineDash([]);
-          ctx.fillText(`${lv} · ${price.toPrecision(6)}`, x0 + 2, (y as number) - 2);
-        }
       } else if (d.tool === "measure") {
         ctx.setLineDash([5, 4]);
         ctx.beginPath();
@@ -249,13 +311,24 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
   useEffect(() => {
     if (!chart) return;
     const onRange = () => drawAll();
-    chart.timeScale().subscribeVisibleLogicalRangeChange(onRange);
+    const ts = chart.timeScale();
+    ts.subscribeVisibleLogicalRangeChange(onRange);
+    try {
+      ts.subscribeVisibleTimeRangeChange(onRange);
+    } catch {
+      /* older LWC builds */
+    }
     window.addEventListener("resize", onRange);
     const id = window.setInterval(drawAll, 500); // cheap sync if price scale changes
     drawAll();
     return () => {
       try {
-        chart.timeScale().unsubscribeVisibleLogicalRangeChange(onRange);
+        ts.unsubscribeVisibleLogicalRangeChange(onRange);
+      } catch {
+        /* */
+      }
+      try {
+        ts.unsubscribeVisibleTimeRangeChange(onRange);
       } catch {
         /* */
       }
@@ -318,6 +391,15 @@ export function DrawingOverlay({ paneId, chart, series, container, ready }: Prop
 
       const p0 = pendingRef.current;
       const p1 = { time, price };
+
+      // Reject zero-height fib (identical price) — keep pending for another click
+      if (tool === "fib") {
+        const mid = (Math.abs(p0.price) + Math.abs(p1.price)) / 2 || 1;
+        if (Math.abs(p1.price - p0.price) / mid < 1e-6) {
+          return;
+        }
+      }
+
       let label: string | undefined;
       if (tool === "measure") {
         const dPrice = p1.price - p0.price;
