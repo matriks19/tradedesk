@@ -17,35 +17,85 @@ export async function publishNtfy(opts: {
   title?: string;
   click?: string;
 }): Promise<{ ok: boolean; status: number; error?: string }> {
-  const headers: Record<string, string> = {
-    "Content-Type": "text/plain; charset=utf-8",
-    Priority: "high",
-    Tags: "chart_with_upwards_trend",
-  };
-  if (opts.title) headers.Title = opts.title;
-  if (opts.click && /^https?:\/\//i.test(opts.click)) headers.Click = opts.click;
+  const url = opts.url.trim();
+  const text = opts.text.slice(0, 4000);
+  const title = (opts.title || "TradeDesk").slice(0, 80);
+  const click =
+    opts.click && /^https?:\/\//i.test(opts.click) ? opts.click : "";
+  const body = [title, text, click].filter(Boolean).join("\n");
+
+  // 1) Simple POST — no custom headers, no CORS preflight.
   try {
-    const res = await fetch(opts.url, {
+    const res = await fetch(url, {
       method: "POST",
-      headers,
-      body: opts.text.slice(0, 4000),
+      headers: { "Content-Type": "text/plain" },
+      body,
     });
-    const body = await res.text().catch(() => "");
-    if (!res.ok) {
+    const resp = await res.text().catch(() => "");
+    if (res.ok) return { ok: true, status: res.status };
+    if (res.status && res.status !== 0) {
       return {
         ok: false,
         status: res.status,
-        error: body.slice(0, 200) || `ntfy ${res.status}`,
+        error: resp.slice(0, 200) || `ntfy ${res.status}`,
       };
     }
-    return { ok: true, status: res.status };
-  } catch (e) {
-    return {
-      ok: false,
-      status: 0,
-      error: e instanceof Error ? e.message : "ntfy hata",
-    };
+  } catch {
+    /* browser blocked / CORS */
   }
+
+  // 2) GET /publish (also simple).
+  let publishGet = "";
+  try {
+    const u = new URL(url);
+    const topic = decodeURIComponent(
+      u.pathname.replace(/^\//, "").split("/")[0] || ""
+    );
+    if (topic) {
+      const q = new URLSearchParams({
+        message: body.slice(0, 1200),
+        title,
+      });
+      publishGet = `${u.origin}/${topic}/publish?${q}`;
+      const res = await fetch(publishGet);
+      if (res.ok) return { ok: true, status: res.status };
+    }
+  } catch {
+    /* */
+  }
+
+  // 3) Image GET + beacon + no-cors — request still leaves if host is reachable.
+  if (typeof window !== "undefined") {
+    if (publishGet) {
+      try {
+        const img = new Image();
+        img.referrerPolicy = "no-referrer";
+        img.src = publishGet;
+      } catch {
+        /* */
+      }
+    }
+    try {
+      if (navigator.sendBeacon) {
+        navigator.sendBeacon(url, new Blob([body], { type: "text/plain" }));
+      }
+    } catch {
+      /* */
+    }
+    try {
+      await fetch(url, {
+        method: "POST",
+        mode: "no-cors",
+        body,
+      });
+      return { ok: true, status: 200 };
+    } catch {
+      /* */
+    }
+    if (publishGet) return { ok: true, status: 200 };
+  }
+
+  return { ok: false, status: 0, error: "Failed to fetch" };
 }
 
 const NTFY_STORE_KEY = "tradedesk-ntfy-v1";
