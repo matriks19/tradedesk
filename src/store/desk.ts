@@ -34,6 +34,11 @@ import {
   persistNtfyFromBot,
   topicFromWebhook,
 } from "@/lib/alerts/ntfy";
+import {
+  isTelegramWebhookUrl,
+  loadSavedTelegram,
+  persistTelegramFromBot,
+} from "@/lib/alerts/telegramPersist";
 
 const WATCHLIST_CAP = 2000;
 
@@ -634,6 +639,7 @@ export const useDeskStore = create<DeskState>()(
           set((s) => {
             const botSettings = { ...s.botSettings, ...p };
             persistNtfyFromBot(botSettings);
+            persistTelegramFromBot(botSettings);
             return { botSettings };
           }),
         addDrawing: (d) =>
@@ -869,20 +875,37 @@ export const useDeskStore = create<DeskState>()(
         if (topic) {
           persistNtfyFromBot({ ...bot, ntfyTopic: topic });
           state.botSettings = { ...bot, ntfyTopic: topic };
-          return;
+        } else {
+          const saved = loadSavedNtfy();
+          if (
+            saved &&
+            (!bot.webhookUrl?.trim() ||
+              isNtfyWebhookUrl(bot.webhookUrl) ||
+              bot.channel === "ntfy") &&
+            !isTelegramWebhookUrl(bot.webhookUrl || "")
+          ) {
+            state.botSettings = {
+              ...bot,
+              channel: "ntfy",
+              ntfyTopic: saved.topic,
+              webhookUrl: bot.webhookUrl?.trim() || saved.url,
+            };
+          }
         }
-        const saved = loadSavedNtfy();
+        persistTelegramFromBot(state.botSettings);
+        const savedTg = loadSavedTelegram();
         if (
-          saved &&
-          (!bot.webhookUrl?.trim() ||
-            isNtfyWebhookUrl(bot.webhookUrl) ||
-            bot.channel === "ntfy")
+          savedTg &&
+          (!state.botSettings.webhookUrl?.trim() ||
+            isTelegramWebhookUrl(state.botSettings.webhookUrl) ||
+            state.botSettings.channel === "telegram")
         ) {
           state.botSettings = {
-            ...bot,
-            channel: "ntfy",
-            ntfyTopic: saved.topic,
-            webhookUrl: bot.webhookUrl?.trim() || saved.url,
+            ...state.botSettings,
+            channel: "telegram",
+            telegramChatId:
+              state.botSettings.telegramChatId?.trim() || savedTg.chatId,
+            webhookUrl: state.botSettings.webhookUrl?.trim() || savedTg.url,
           };
         }
       },

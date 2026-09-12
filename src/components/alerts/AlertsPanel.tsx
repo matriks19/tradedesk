@@ -18,6 +18,11 @@ import {
   publishNtfy,
   topicFromWebhook,
 } from "@/lib/alerts/ntfy";
+import {
+  loadSavedTelegram,
+  persistTelegramFromBot,
+  tokenFromTelegramWebhook,
+} from "@/lib/alerts/telegramPersist";
 import clsx from "clsx";
 
 const CONDITIONS: { value: AlertCondition; label: string }[] = [
@@ -134,6 +139,25 @@ export function AlertsPanel() {
     // store hydrate
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [botSettings.ntfyTopic, botSettings.webhookUrl]);
+
+  useEffect(() => {
+    const fromUrl = tokenFromTelegramWebhook(botSettings.webhookUrl || "");
+    const saved = loadSavedTelegram();
+    const token = fromUrl || saved?.token || "";
+    if (token) setTgToken((cur) => cur || token);
+    if (botSettings.telegramChatId && (fromUrl || saved)) {
+      persistTelegramFromBot(botSettings);
+    }
+    if (saved && !botSettings.telegramChatId?.trim()) {
+      setBotSettings({
+        channel: "telegram",
+        telegramChatId: saved.chatId,
+        webhookUrl: botSettings.webhookUrl.trim() || saved.url,
+        enabled: true,
+      });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [botSettings.webhookUrl, botSettings.telegramChatId]);
 
   const extras = () => {
     const expiresAt = hours > 0 ? Date.now() + hours * 3600_000 : undefined;
