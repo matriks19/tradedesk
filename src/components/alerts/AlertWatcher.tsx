@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types";
 import { buildDeskOpenUrl } from "@/lib/deskLink";
 import { checkScanAlert } from "@/lib/alerts/scanAlert";
+import { isNtfyWebhookUrl, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
   cond: AlertCondition,
@@ -119,6 +120,16 @@ export function AlertWatcher() {
       const bot = useDeskStore.getState().botSettings;
       if (bot.enabled && bot.webhookUrl.trim()) {
         try {
+          const hook = bot.webhookUrl.trim();
+          if (isNtfyWebhookUrl(hook) || bot.channel === "ntfy") {
+            await publishNtfy({
+              url: hook,
+              text,
+              title: `TradeDesk ${a.symbol}`,
+              click: openUrl,
+            });
+            return;
+          }
           await fetch("/api/webhook", {
             method: "POST",
             headers: { "Content-Type": "application/json" },

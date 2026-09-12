@@ -10,6 +10,7 @@ import type {
   PriceAlert,
 } from "@/lib/types";
 import { SCAN_OPTIONS } from "@/lib/alerts/scanAlert";
+import { isNtfyWebhookUrl, publishNtfy } from "@/lib/alerts/ntfy";
 import clsx from "clsx";
 
 const CONDITIONS: { value: AlertCondition; label: string }[] = [
@@ -209,6 +210,22 @@ export function AlertsPanel() {
     }
     setTestStatus("Gönderiliyor…");
     try {
+      const url = botSettings.webhookUrl.trim();
+      if (isNtfyWebhookUrl(url) || botSettings.channel === "ntfy") {
+        const r = await publishNtfy({
+          url,
+          text: "TradeDesk webhook test",
+          title: `TradeDesk ${pane?.symbol ?? "test"}`,
+          click:
+            typeof window !== "undefined"
+              ? `${window.location.origin}/?s=${pane?.symbol ?? "BTCUSDT"}&ex=${pane?.exchange ?? "binance"}`
+              : undefined,
+        });
+        setTestStatus(
+          r.ok ? `OK ${r.status} · telefona bak` : `Hata ${r.status}: ${r.error ?? ""}`
+        );
+        return;
+      }
       const res = await fetch("/api/webhook", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
