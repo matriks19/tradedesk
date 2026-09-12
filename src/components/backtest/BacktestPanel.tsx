@@ -23,6 +23,11 @@ import {
   type StrategyPresetId,
 } from "@/lib/backtest";
 import clsx from "clsx";
+import { GroupedPick } from "@/components/ui/GroupedPick";
+import {
+  BACKTEST_GROUP_ORDER,
+  classifyBacktestId,
+} from "@/lib/ui/pickGroups";
 
 const PRESETS = Object.keys(PRESET_LABELS) as StrategyPresetId[];
 
@@ -387,6 +392,23 @@ export function BacktestPanel() {
   };
 
   const showCode = preset === "codeStrategy";
+  const strategyItems = useMemo(
+    () =>
+      PRESETS.map((id) => ({
+        id,
+        label: PRESET_LABELS[id],
+        group: classifyBacktestId(id, PRESET_LABELS[id]),
+      })),
+    []
+  );
+  const grabFromChart = () => {
+    if (!active) return;
+    patch({
+      symbol: active.symbol,
+      exchange: active.exchange,
+      timeframe: active.timeframe as Timeframe,
+    });
+  };
 
   return (
     <div className="flex flex-col h-full min-h-0 text-2xs">
@@ -428,21 +450,29 @@ export function BacktestPanel() {
             </select>
           </label>
           <label className="flex flex-col gap-0.5">
-            <span className="text-desk-muted">Strateji</span>
-            <select
-              className="input"
-              value={params.preset}
-              onChange={(e) =>
-                onPresetChange(e.target.value as StrategyPresetId)
-              }
-            >
-              {PRESETS.map((id) => (
-                <option key={id} value={id}>
-                  {PRESET_LABELS[id]}
-                </option>
-              ))}
-            </select>
+            <span className="text-desk-muted">Borsa / Grafik</span>
+            <button type="button" className="btn text-2xs" onClick={grabFromChart}>
+              Grafikten al
+            </button>
           </label>
+        </div>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-desk-muted">
+              Strateji · {PRESET_LABELS[params.preset]}
+            </span>
+            <span className="text-desk-muted">
+              {classifyBacktestId(params.preset, PRESET_LABELS[params.preset])}
+            </span>
+          </div>
+          <GroupedPick
+            items={strategyItems}
+            order={BACKTEST_GROUP_ORDER}
+            selected={params.preset}
+            onPick={(id) => onPresetChange(id as StrategyPresetId)}
+            placeholder="Strateji ara (Elizi, Short, IFVG…)"
+            maxH="max-h-32"
+          />
         </div>
 
         {preset === "zScorePullback" && (

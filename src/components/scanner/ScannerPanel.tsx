@@ -32,6 +32,12 @@ import { useDeskStore } from "@/store/desk";
 import type { Candle, ChartTimeframe, TickerQuote } from "@/lib/types";
 import { timeframeToMinutes } from "@/lib/data/timeframes";
 import clsx from "clsx";
+import { GroupedPick } from "@/components/ui/GroupedPick";
+import {
+  SCANNER_GROUP_ORDER,
+  classifyChipId,
+  classifyScannerId,
+} from "@/lib/ui/pickGroups";
 
 type SortKey = "rsi" | "changePct" | "volume" | "symbol";
 type OpenSection = "advanced" | "presets" | "extra" | null;
@@ -146,7 +152,9 @@ export function ScannerPanel() {
   const [extraFilters, setExtraFilters] = useState<string[]>([]);
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilter[]>([]);
   /** Filter editors collapsed by default so scan results stay visible. */
-  const [openSection, setOpenSection] = useState<OpenSection>(null);
+  const [openSection, setOpenSection] = useState<OpenSection>("presets");
+  type UniSrc = "spot" | "perp" | "list" | "bist";
+  const [uniSrc, setUniSrc] = useState<UniSrc>("perp");
   const [exchange, setExchange] = useState<"binance" | "bist">("binance");
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
   const [universeN, setUniverseN] = useState(60);
@@ -157,6 +165,25 @@ export function ScannerPanel() {
   const [status, setStatus] = useState("");
   const [fieldSearch, setFieldSearch] = useState("");
   const abortRef = useRef<AbortController | null>(null);
+  const presetItems = useMemo(
+    () =>
+      Object.entries(SCANNER_PRESETS).map(([id, p]) => ({
+        id,
+        label: p.label,
+        group: classifyScannerId(id, p.label),
+        hint: p.description,
+      })),
+    []
+  );
+  const chipItems = useMemo(
+    () =>
+      FILTER_CHIPS.map((c) => ({
+        id: c.id,
+        label: c.label,
+        group: classifyChipId(c.id, c.label),
+      })),
+    []
+  );
 
   useEffect(() => {
     return () => {
@@ -358,29 +385,59 @@ export function ScannerPanel() {
     const nCap = Math.min(120, Math.max(20, universeN));
 
     try {
-      const tickerRes = await fetch(
-        `/api/ticker?exchange=${exchange}${exchange === "bist" ? "&limit=180" : ""}`,
-        { signal: ac.signal }
-      );
-      const tickerJson = await tickerRes.json();
-      let quotes: TickerQuote[] = tickerJson.quotes ?? [];
-      if (exchange === "bist" && quotes.length === 0) {
-        setStatus(
-          tickerJson.note ||
-            "BIST kotasyonları alınamadı (Yahoo rate-limit / kaynak hatası). Tarama boş döndü — daha sonra tekrar deneyin."
-        );
-        setRows([]);
-        return;
-      }
-      if (exchange === "binance") {
-        quotes = quotes
-          .filter((q) => q.symbol.endsWith("USDT"))
-          .sort((a, b) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0))
-          .slice(0, nCap);
+      let quotes: TickerQuote[] = [];
+      if (uniSrc === "list") {
+        const list =
+          watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
+        const syms = list?.symbols ?? [];
+        if (!syms.length) {
+          setStatus("Aktif izleme listesi boş");
+          setRows([]);
+          return;
+        }
+        const take = syms.slice(0, nCap);
+        for (let i = 0; i < take.length; i += 80) {
+          const ch = take.slice(i, i + 80);
+          const ex = ch[0]?.exchange ?? exchange;
+          const res = await fetch(
+            `/api/ticker?exchange=${ex}&symbols=${ch.map((s) => s.symbol).join(",")}`,
+            { signal: ac.signal }
+          );
+          const json = await res.json();
+          quotes.push(...(json.quotes ?? []));
+        }
       } else {
-        quotes = [...quotes]
-          .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-          .slice(0, Math.min(nCap, 180));
+        const market = uniSrc === "perp" ? "perp" : "spot";
+        const tickerRes = await fetch(
+          `/api/ticker?exchange=${exchange}${
+            exchange === "bist" ? "&limit=180" : `&market=${market}`
+          }`,
+          { signal: ac.signal }
+        );
+        const tickerJson = await tickerRes.json();
+        quotes = tickerJson.quotes ?? [];
+        if (exchange === "bist" && quotes.length === 0) {
+          setStatus(
+            tickerJson.note ||
+              "BIST kotasyonları alınamadı (Yahoo rate-limit / kaynak hatası). Tarama boş döndü — daha sonra tekrar deneyin."
+          );
+          setRows([]);
+          return;
+        }
+        if (exchange === "binance") {
+          quotes = quotes
+            .filter((q) =>
+              uniSrc === "perp"
+                ? /\.P$/i.test(q.symbol)
+                : q.symbol.endsWith("USDT") && !/\.P$/i.test(q.symbol)
+            )
+            .sort((a, b) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0))
+            .slice(0, nCap);
+        } else {
+          quotes = [...quotes]
+            .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
+            .slice(0, Math.min(nCap, 180));
+        }
       }
 
       const needsCandles =
@@ -487,6 +544,9 @@ export function ScannerPanel() {
     legacyFilters,
     timeframe,
     universeN,
+    uniSrc,
+    watchlists,
+    activeWatchlistId,
   ]);
 
   const setSort = (key: SortKey) => {
@@ -507,11 +567,18 @@ export function ScannerPanel() {
       <div className="flex gap-1 flex-wrap items-center">
         <select
           className="input w-auto"
-          value={exchange}
-          onChange={(e) => setExchange(e.target.value as "binance" | "bist")}
+          value={uniSrc}
+          title="Tarama evreni"
+          onChange={(e) => {
+            const v = e.target.value as UniSrc;
+            setUniSrc(v);
+            setExchange(v === "bist" ? "bist" : "binance");
+          }}
         >
-          <option value="binance">Binance USDT (top N)</option>
-          <option value="bist">BIST (best-effort)</option>
+          <option value="perp">Perp · USDT.P</option>
+          <option value="spot">Spot USDT</option>
+          <option value="list">Aktif liste</option>
+          <option value="bist">BIST</option>
         </select>
         <select
           className="input w-auto"
@@ -788,26 +855,19 @@ export function ScannerPanel() {
       )}
 
       {openSection === "presets" && (
-        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 max-h-40 overflow-y-auto shrink-0">
+        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 shrink-0">
           <div className="text-2xs text-desk-muted">
-            Preset galerisi (çoklu; advanced ile AND)
+            Sınıflı preset · ara / grupla · çoklu AND
           </div>
-          <div className="flex flex-wrap gap-1">
-            {Object.entries(SCANNER_PRESETS).map(([id, p]) => (
-              <button
-                key={id}
-                type="button"
-                title={p.description}
-                className={clsx(
-                  "btn text-2xs",
-                  selectedPresets.includes(id) && "btn-accent"
-                )}
-                onClick={() => togglePreset(id)}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <GroupedPick
+            items={presetItems}
+            order={SCANNER_GROUP_ORDER}
+            selected={selectedPresets}
+            onPick={togglePreset}
+            multi
+            placeholder="Preset ara (W Dip, Elizi, RSI…)"
+            maxH="max-h-40"
+          />
           <div className="flex gap-1 items-center pt-1 border-t border-desk-border/30">
             <input
               className="input flex-1 text-2xs"
@@ -823,23 +883,17 @@ export function ScannerPanel() {
       )}
 
       {openSection === "extra" && (
-        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 max-h-32 overflow-y-auto shrink-0">
-          <div className="text-2xs text-desk-muted">Ek filtreler</div>
-          <div className="flex flex-wrap gap-1">
-            {FILTER_CHIPS.map((c) => (
-              <button
-                key={c.id}
-                type="button"
-                className={clsx(
-                  "btn text-2xs",
-                  extraFilters.includes(c.id) && "btn-accent"
-                )}
-                onClick={() => toggleChip(c.id)}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
+        <div className="flex flex-col gap-1 border border-desk-border/40 rounded p-1.5 shrink-0">
+          <div className="text-2xs text-desk-muted">Ek filtre · sınıflı</div>
+          <GroupedPick
+            items={chipItems}
+            order={SCANNER_GROUP_ORDER}
+            selected={extraFilters}
+            onPick={toggleChip}
+            multi
+            placeholder="Filtre ara (RSI, Elizi, ADX…)"
+            maxH="max-h-32"
+          />
         </div>
       )}
 
