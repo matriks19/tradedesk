@@ -2,7 +2,9 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { useDeskStore } from "@/store/desk";
-import type { Candle, Exchange, Timeframe, AlertScanKey } from "@/lib/types";
+import type { Candle, Exchange, Timeframe, AlertScanKey, Watchlist } from "@/lib/types";
+import { binancePerpWatchlistMeta } from "@/lib/data/binanceLists";
+import { sectorWatchlistMeta } from "@/lib/data/bistSectors";
 import {
   mapPool,
   matchFilters,
@@ -73,6 +75,70 @@ const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "vol2", label: "Vol×2", filter: { type: "volumeSpike", mult: 2 } },
   { id: "ema_b", label: "EMA↑", filter: { type: "emaCross", direction: "bull" } },
 ];
+
+type UniSrc = "crypto" | "bist" | "sector" | "active";
+type UniOpt = { id: string; name: string; symbols: { symbol: string; exchange: Exchange }[] };
+
+function classifyList(w: Watchlist): "crypto" | "bist" {
+  if (w.id.startsWith("binance-")) return "crypto";
+  if (w.id.startsWith("bist-")) return "bist";
+  const bn = w.symbols.filter((s) => s.exchange === "binance").length;
+  const bi = w.symbols.filter((s) => s.exchange === "bist").length;
+  return bn >= bi ? "crypto" : "bist";
+}
+
+function isSectorId(id: string): boolean {
+  return id.startsWith("bist-") && id !== "bist-all";
+}
+
+function cryptoOptions(watchlists: Watchlist[]): UniOpt[] {
+  const byId = new Map<string, UniOpt>();
+  for (const m of binancePerpWatchlistMeta()) {
+    byId.set(m.id, {
+      id: m.id,
+      name: m.name,
+      symbols: m.symbols.map((symbol) => ({ symbol, exchange: "binance" as const })),
+    });
+  }
+  for (const w of watchlists) {
+    if (classifyList(w) !== "crypto") continue;
+    const prev = byId.get(w.id);
+    if (!prev || w.symbols.length >= prev.symbols.length) {
+      byId.set(w.id, { id: w.id, name: w.name, symbols: w.symbols });
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+}
+
+function bistOptions(watchlists: Watchlist[]): UniOpt[] {
+  const byId = new Map<string, UniOpt>();
+  for (const m of sectorWatchlistMeta()) {
+    if (m.id !== "bist-all") continue;
+    byId.set(m.id, {
+      id: m.id,
+      name: m.name,
+      symbols: m.symbols.map((symbol) => ({ symbol, exchange: "bist" as const })),
+    });
+  }
+  for (const w of watchlists) {
+    if (classifyList(w) !== "bist" || isSectorId(w.id)) continue;
+    const prev = byId.get(w.id);
+    if (!prev || w.symbols.length >= prev.symbols.length) {
+      byId.set(w.id, { id: w.id, name: w.name, symbols: w.symbols });
+    }
+  }
+  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+}
+
+function sectorOptions(): UniOpt[] {
+  return sectorWatchlistMeta()
+    .filter((m) => m.id !== "bist-all")
+    .map((m) => ({
+      id: m.id,
+      name: m.name,
+      symbols: m.symbols.map((symbol) => ({ symbol, exchange: "bist" as const })),
+    }));
+}
 
 type ResultRow = ListScanHit & {
   symbol: string;
@@ -216,8 +282,36 @@ export function ListScanPanel() {
   const addAlertsBulk = useDeskStore((s) => s.addAlertsBulk);
 
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
-  const list =
+  const activeList =
     watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
+
+  const [uniSrc, setUniSrc] = useState<UniSrc>("crypto");
+  const [uniId, setUniId] = useState("binance-perp-usdt");
+
+  const cryptoOpts = useMemo(() => cryptoOptions(watchlists), [watchlists]);
+  const bistOpts = useMemo(() => bistOptions(watchlists), [watchlists]);
+  const sectorOpts = useMemo(() => sectorOptions(), []);
+  const uniOpts = useMemo(() => {
+    if (uniSrc === "crypto") return cryptoOpts;
+    if (uniSrc === "bist") return bistOpts;
+    if (uniSrc === "sector") return sectorOpts;
+    return [];
+  }, [uniSrc, cryptoOpts, bistOpts, sectorOpts]);
+
+  const universe = useMemo(() => {
+    if (uniSrc === "active") {
+      return {
+        id: activeList?.id ?? "active",
+        name: activeList?.name ?? "Aktif",
+        symbols: activeList?.symbols ?? [],
+      } satisfies UniOpt;
+    }
+    return uniOpts.find((o) => o.id === uniId) ?? uniOpts[0] ?? {
+      id: "",
+      name: "—",
+      symbols: [],
+    };
+  }, [uniSrc, uniId, uniOpts, activeList]);
 
   const [tf, setTf] = useState<Timeframe>(
     () => (pane?.timeframe as Timeframe) || "15m"
@@ -369,8 +463,8 @@ export function ListScanPanel() {
   ]);
 
   const runScan = useCallback(async () => {
-    if (!list?.symbols.length) {
-      setStatus("Aktif izleme listesi boş");
+    if (!universe.symbols.length) {
+      setStatus("Liste boş — kripto / BIST / sektör seç");
       return;
     }
     const cfg = buildConfig();
@@ -381,9 +475,9 @@ export function ListScanPanel() {
     setRunning(true);
     setHits([]);
     setStatus("");
-    setProgress(`0/${list.symbols.length}`);
+    setProgress(`0/${universe.symbols.length}`);
     try {
-      const quotes = await fetchWatchlistQuotes(list.symbols);
+      const quotes = await fetchWatchlistQuotes(universe.symbols);
       const out: ResultRow[] = [];
       let done = 0;
       await mapPool(quotes, 8, async (q) => {
@@ -424,13 +518,13 @@ export function ListScanPanel() {
       );
       setHits(out);
       setStatus(
-        `${out.length} hit · ${list.symbols.length} sembol · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}`
+        `${out.length} hit · ${universe.name} · ${universe.symbols.length} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}`
       );
     } finally {
       setRunning(false);
       setProgress("");
     }
-  }, [list, buildConfig, tf, maxBars, matchMode]);
+  }, [universe, buildConfig, tf, maxBars, matchMode]);
 
   const upsertIndicators = useCallback(
     (cfg: ListScanConfig) => {
@@ -549,15 +643,54 @@ export function ListScanPanel() {
     setStatus(`${n} alarm eklendi`);
   }, [hits, buildConfig, addAlertsBulk, tf]);
 
-  const listLabel = useMemo(
-    () => `${list?.name ?? "—"} (${list?.symbols.length ?? 0})`,
-    [list]
-  );
-
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-y-auto">
       <div className="font-medium">Liste Tarama</div>
-      <div className="text-2xs text-desk-muted">{listLabel}</div>
+      <p className="text-2xs text-desk-muted">
+        Evren: kripto listesi, BIST listesi veya sektör. Şartlar aynı.
+      </p>
+
+      <div className="flex flex-wrap gap-1">
+        {([
+          ["crypto", "Kripto"],
+          ["bist", "BIST"],
+          ["sector", "Sektör"],
+          ["active", "Aktif"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={clsx("btn text-2xs px-1.5", uniSrc === id && "btn-accent")}
+            onClick={() => {
+              setUniSrc(id);
+              if (id === "crypto") setUniId("binance-perp-usdt");
+              else if (id === "bist") setUniId("bist-all");
+              else if (id === "sector") setUniId("bist-xbank");
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {uniSrc !== "active" && (
+        <label className="text-2xs text-desk-muted">
+          {uniSrc === "sector" ? "Sektör" : "Liste"}
+          <select
+            className="input mt-0.5"
+            value={uniOpts.some((o) => o.id === uniId) ? uniId : uniOpts[0]?.id ?? ""}
+            onChange={(e) => setUniId(e.target.value)}
+          >
+            {uniOpts.map((o) => (
+              <option key={o.id} value={o.id}>
+                {o.name} ({o.symbols.length})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <div className="text-2xs text-desk-muted">
+        {universe.name} · {universe.symbols.length} sembol
+      </div>
 
       <div className="flex flex-wrap gap-1 items-end">
         <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
