@@ -29,7 +29,17 @@ import {
   searchFields,
 } from "@/lib/scanner/fields";
 import { useDeskStore } from "@/store/desk";
-import type { Candle, ChartTimeframe, TickerQuote } from "@/lib/types";
+import type { Candle, ChartTimeframe, Exchange, TickerQuote } from "@/lib/types";
+import { binancePerpWatchlistMeta } from "@/lib/data/binanceLists";
+import { sectorWatchlistMeta } from "@/lib/data/bistSectors";
+import { scanSymbol, type DiagCond, type HamCond, type MacdCond, type StochCond } from "@/lib/scanner/listScan";
+import {
+  DIAG_FOUR,
+  HAM_FOUR,
+  MACD_FOUR,
+  STOCH_FOUR,
+  buildFourConfig,
+} from "@/components/scanner/scannerFour";
 import { timeframeToMinutes } from "@/lib/data/timeframes";
 import clsx from "clsx";
 import { GroupedPick } from "@/components/ui/GroupedPick";
@@ -204,11 +214,20 @@ export function ScannerPanel() {
   const [advancedFilters, setAdvancedFilters] = useState<AdvancedFilter[]>([]);
   /** Filter editors collapsed by default so scan results stay visible. */
   const [openSection, setOpenSection] = useState<OpenSection>("presets");
-  type UniSrc = "spot" | "perp" | "list" | "bist";
-  const [uniSrc, setUniSrc] = useState<UniSrc>("perp");
+  type UniSrc = "crypto" | "bist" | "sector";
+  const [uniSrc, setUniSrc] = useState<UniSrc>("crypto");
   const [exchange, setExchange] = useState<"binance" | "bist">("binance");
   const [timeframe, setTimeframe] = useState<ChartTimeframe>("15m");
-  const [universeN, setUniverseN] = useState(60);
+  const [universeN, setUniverseN] = useState(220);
+  const [uniId, setUniId] = useState("bist-xbank");
+  const [hamOn, setHamOn] = useState(false);
+  const [diagOn, setDiagOn] = useState(false);
+  const [macdOn, setMacdOn] = useState(false);
+  const [stochOn, setStochOn] = useState(false);
+  const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
+  const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
+  const [macdConds, setMacdConds] = useState<MacdCond[]>(["cross_up"]);
+  const [stochConds, setStochConds] = useState<StochCond[]>(["kx_up"]);
   const [progress, setProgress] = useState({ done: 0, total: 0 });
   const [sortKey, setSortKey] = useState<SortKey>("changePct");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -282,7 +301,54 @@ export function ScannerPanel() {
     return [...map.values()];
   }, [selectedPresets, extraFilters]);
 
-  const activeFilterCount = legacyFilters.length + advancedFilters.length;
+  const fourCfg = useMemo(
+    () =>
+      buildFourConfig({
+        hamOn,
+        hamConds,
+        diagOn,
+        diagConds,
+        macdOn,
+        macdConds,
+        stochOn,
+        stochConds,
+      }),
+    [hamOn, hamConds, diagOn, diagConds, macdOn, macdConds, stochOn, stochConds]
+  );
+  const fourCount = [hamOn, diagOn, macdOn, stochOn].filter(Boolean).length;
+  const activeFilterCount =
+    legacyFilters.length + advancedFilters.length + fourCount;
+
+  const sectorOpts = useMemo(
+    () => sectorWatchlistMeta().filter((m) => m.id !== "bist-all"),
+    []
+  );
+  const resolveUniverse = useCallback((): {
+    symbol: string;
+    exchange: Exchange;
+  }[] => {
+    if (uniSrc === "crypto") {
+      const m = binancePerpWatchlistMeta().find((x) => x.id === "binance-perp-usdt");
+      return (m?.symbols ?? []).map((symbol) => ({
+        symbol,
+        exchange: "binance" as const,
+      }));
+    }
+    if (uniSrc === "bist") {
+      const m = sectorWatchlistMeta().find((x) => x.id === "bist-all");
+      return (m?.symbols ?? []).map((symbol) => ({
+        symbol,
+        exchange: "bist" as const,
+      }));
+    }
+    const m =
+      sectorOpts.find((x) => x.id === uniId) ?? sectorOpts[0];
+    return (m?.symbols ?? []).map((symbol) => ({
+      symbol,
+      exchange: "bist" as const,
+    }));
+  }, [uniSrc, uniId, sectorOpts]);
+
 
   const filteredFieldList = useMemo(
     () => searchFields(fieldSearch),
@@ -420,7 +486,7 @@ export function ScannerPanel() {
 
   const run = useCallback(async () => {
     if (!activeFilterCount) {
-      setStatus("En az bir preset veya advanced filtre seçin");
+      setStatus("En az bir kod, preset veya filtre seçin");
       return;
     }
 
@@ -433,66 +499,48 @@ export function ScannerPanel() {
     setProgress({ done: 0, total: 0 });
     setStatus("");
 
-    const nCap = Math.min(120, Math.max(20, universeN));
+    const nCap = Math.min(600, Math.max(20, universeN));
+    const uni = resolveUniverse().slice(0, nCap);
+    if (!uni.length) {
+      setStatus("Evren boş — Kripto / BIST / Sektör seç");
+      return;
+    }
+    setExchange(uni[0].exchange);
 
     try {
-      let quotes: TickerQuote[] = [];
-      if (uniSrc === "list") {
-        const list =
-          watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
-        const syms = list?.symbols ?? [];
-        if (!syms.length) {
-          setStatus("Aktif izleme listesi boş");
-          setRows([]);
-          return;
-        }
-        const take = syms.slice(0, nCap);
-        for (let i = 0; i < take.length; i += 80) {
-          const ch = take.slice(i, i + 80);
-          const ex = ch[0]?.exchange ?? exchange;
+      let quotes: TickerQuote[] = uni.map((s) => ({
+        symbol: s.symbol,
+        exchange: s.exchange,
+        last: 0,
+        changePct: 0,
+      }));
+      const needTicker =
+        legacyFilters.some(
+          (f) =>
+            f.type === "volumeSpike" ||
+            f.type === "changePct" ||
+            f.type === "nearHod"
+        ) || advancedFilters.length > 0;
+      if (needTicker) {
+        const filled: TickerQuote[] = [];
+        for (let i = 0; i < uni.length; i += 80) {
+          const ch = uni.slice(i, i + 80);
+          const ex = ch[0]?.exchange ?? "binance";
           const res = await fetch(
             `/api/ticker?exchange=${ex}&symbols=${ch.map((s) => s.symbol).join(",")}`,
             { signal: ac.signal }
           );
           const json = await res.json();
-          quotes.push(...(json.quotes ?? []));
+          filled.push(...(json.quotes ?? []));
         }
-      } else {
-        const market = uniSrc === "perp" ? "perp" : "spot";
-        const tickerRes = await fetch(
-          `/api/ticker?exchange=${exchange}${
-            exchange === "bist" ? "&limit=180" : `&market=${market}`
-          }`,
-          { signal: ac.signal }
-        );
-        const tickerJson = await tickerRes.json();
-        quotes = tickerJson.quotes ?? [];
-        if (exchange === "bist" && quotes.length === 0) {
-          setStatus(
-            tickerJson.note ||
-              "BIST kotasyonları alınamadı (Yahoo rate-limit / kaynak hatası). Tarama boş döndü — daha sonra tekrar deneyin."
-          );
-          setRows([]);
-          return;
-        }
-        if (exchange === "binance") {
-          quotes = quotes
-            .filter((q) =>
-              uniSrc === "perp"
-                ? /\.P$/i.test(q.symbol)
-                : q.symbol.endsWith("USDT") && !/\.P$/i.test(q.symbol)
-            )
-            .sort((a, b) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0))
-            .slice(0, nCap);
-        } else {
-          quotes = [...quotes]
-            .sort((a, b) => (b.volume ?? 0) - (a.volume ?? 0))
-            .slice(0, Math.min(nCap, 180));
-        }
+        if (filled.length) quotes = filled;
       }
 
       const needsCandles =
-        filtersNeedCandles(legacyFilters) || advancedFilters.length > 0;
+        filtersNeedCandles(legacyFilters) ||
+        advancedFilters.length > 0 ||
+        !!fourCfg;
+
       setProgress({ done: 0, total: quotes.length });
 
       const out: ScannerRow[] = [];
@@ -518,7 +566,7 @@ export function ScannerPanel() {
                     ])
                   : ac.signal;
               const kr = await fetch(
-                `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${exchange}&timeframe=${timeframe}&limit=220`,
+                `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${timeframe}&limit=220`,
                 { signal: fetchSignal }
               );
               const kj = await kr.json();
@@ -550,9 +598,15 @@ export function ScannerPanel() {
             atrPct = m.atrPct ?? atrPct;
           }
 
+          if (fourCfg) {
+            const hits = scanSymbol(candles ?? [], fourCfg, 2);
+            if (!hits.length) return null;
+            noteParts.push(hits.map((h) => h.note || `${h.kind} ${h.cond}`).join(" · "));
+          }
+
           out.push({
             symbol: q.symbol,
-            exchange,
+            exchange: q.exchange,
             last: q.last,
             changePct: q.changePct,
             rsi,
@@ -591,13 +645,11 @@ export function ScannerPanel() {
   }, [
     activeFilterCount,
     advancedFilters,
-    exchange,
+    fourCfg,
     legacyFilters,
+    resolveUniverse,
     timeframe,
     universeN,
-    uniSrc,
-    watchlists,
-    activeWatchlistId,
   ]);
 
   const setSort = (key: SortKey) => {
@@ -625,21 +677,39 @@ export function ScannerPanel() {
     <div className="flex flex-col h-full min-h-0 p-2 gap-2">
       <div className="text-xs font-medium">Tarayıcı (Scanner)</div>
       <div className="flex gap-1 flex-wrap items-center">
-        <select
-          className="input w-auto"
-          value={uniSrc}
-          title="Tarama evreni"
-          onChange={(e) => {
-            const v = e.target.value as UniSrc;
-            setUniSrc(v);
-            setExchange(v === "bist" ? "bist" : "binance");
-          }}
-        >
-          <option value="perp">Perp · USDT.P</option>
-          <option value="spot">Spot USDT</option>
-          <option value="list">Aktif liste</option>
-          <option value="bist">BIST</option>
-        </select>
+        {([
+          ["crypto", "Kripto"],
+          ["bist", "BIST"],
+          ["sector", "Sektör"],
+        ] as const).map(([id, label]) => (
+          <button
+            key={id}
+            type="button"
+            className={clsx("btn text-2xs", uniSrc === id && "btn-accent")}
+            onClick={() => {
+              setUniSrc(id);
+              setExchange(id === "crypto" ? "binance" : "bist");
+              if (id === "sector" && !sectorOpts.some((s) => s.id === uniId)) {
+                setUniId(sectorOpts[0]?.id ?? "bist-xbank");
+              }
+            }}
+          >
+            {label}
+          </button>
+        ))}
+        {uniSrc === "sector" && (
+          <select
+            className="input w-auto"
+            value={sectorOpts.some((s) => s.id === uniId) ? uniId : sectorOpts[0]?.id ?? ""}
+            onChange={(e) => setUniId(e.target.value)}
+          >
+            {sectorOpts.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} ({s.symbols.length})
+              </option>
+            ))}
+          </select>
+        )}
         <select
           className="input w-auto"
           value={timeframe}
@@ -657,12 +727,12 @@ export function ScannerPanel() {
           <input
             type="number"
             min={20}
-            max={120}
+            max={600}
             className="input w-14"
             value={universeN}
             onChange={(e) =>
               setUniverseN(
-                Math.min(120, Math.max(20, Number(e.target.value) || 20))
+                Math.min(600, Math.max(20, Number(e.target.value) || 20))
               )
             }
           />
@@ -694,6 +764,13 @@ export function ScannerPanel() {
         >
           CSV
         </button>
+      </div>
+
+      <div className="grid grid-cols-4 gap-1 border border-desk-border/40 rounded p-1.5 shrink-0">
+        <FourCol title="HAM" on={hamOn} setOn={setHamOn} chips={HAM_FOUR} conds={hamConds} setConds={setHamConds} />
+        <FourCol title="Diag" on={diagOn} setOn={setDiagOn} chips={DIAG_FOUR} conds={diagConds} setConds={setDiagConds} />
+        <FourCol title="MACD" on={macdOn} setOn={setMacdOn} chips={MACD_FOUR} conds={macdConds} setConds={setMacdConds} />
+        <FourCol title="Stoch" on={stochOn} setOn={setStochOn} chips={STOCH_FOUR} conds={stochConds} setConds={setStochConds} />
       </div>
 
       <div className="flex gap-1 text-2xs flex-wrap items-center">
@@ -959,7 +1036,7 @@ export function ScannerPanel() {
 
 
 
-      {exchange === "bist" && (
+      {(uniSrc === "bist" || uniSrc === "sector") && (
         <p className="text-2xs text-desk-warn">
           BIST: küçük TF (1m) Yahoo&apos;da sınırlı — 5m+ önerilir; sonuçlar
           gecikmeli best-effort.
@@ -1080,6 +1157,62 @@ export function ScannerPanel() {
             tıklayınca aynı TF açılır.
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+
+function FourCol<T extends string>({
+  title,
+  on,
+  setOn,
+  chips,
+  conds,
+  setConds,
+}: {
+  title: string;
+  on: boolean;
+  setOn: (v: boolean | ((b: boolean) => boolean)) => void;
+  chips: { id: T; label: string }[];
+  conds: T[];
+  setConds: (v: T[] | ((prev: T[]) => T[])) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1 min-w-0">
+      <button
+        type="button"
+        className={clsx(
+          "text-2xs font-medium text-left px-1 py-0.5 rounded border",
+          on
+            ? "border-desk-accent bg-desk-accent/15 text-desk-accent"
+            : "border-desk-border/50 text-desk-muted"
+        )}
+        onClick={() => setOn((v) => !v)}
+      >
+        {title}
+      </button>
+      <div className="flex flex-col gap-0.5">
+        {chips.map((c) => (
+          <button
+            key={c.id}
+            type="button"
+            className={clsx(
+              "text-2xs text-left px-1 py-0.5 rounded border truncate",
+              conds.includes(c.id)
+                ? "border-desk-accent/70 text-desk-accent"
+                : "border-transparent text-desk-muted hover:border-desk-border"
+            )}
+            onClick={() => {
+              setOn(true);
+              setConds((arr) =>
+                arr.includes(c.id) ? arr.filter((x) => x !== c.id) : [...arr, c.id]
+              );
+            }}
+          >
+            {c.label}
+          </button>
+        ))}
       </div>
     </div>
   );
