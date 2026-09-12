@@ -2,8 +2,15 @@
 
 import { useEffect, useRef } from "react";
 import { useDeskStore } from "@/store/desk";
-import type { AlertCondition, Exchange, TickerQuote } from "@/lib/types";
+import type {
+  AlertCondition,
+  Candle,
+  Exchange,
+  PriceAlert,
+  TickerQuote,
+} from "@/lib/types";
 import { buildDeskOpenUrl } from "@/lib/deskLink";
+import { checkScanAlert } from "@/lib/alerts/scanAlert";
 
 function conditionMet(
   cond: AlertCondition,
@@ -32,7 +39,6 @@ async function fetchQuotes(
   symbols: string[]
 ): Promise<TickerQuote[]> {
   if (!symbols.length) return [];
-  // Chunk — watchlists / bulk alarms may include many .P perps
   const chunks: string[][] = [];
   for (let i = 0; i < symbols.length; i += 80) {
     chunks.push(symbols.slice(i, i + 80));
@@ -48,15 +54,14 @@ async function fetchQuotes(
   return out;
 }
 
-function alertText(a: {
-  symbol: string;
-  exchange: Exchange;
-  condition: AlertCondition;
-  price: number;
-  note?: string;
-}, last: number): string {
+function alertText(a: PriceAlert, last: number, extra = ""): string {
   const note = a.note ? ` · ${a.note}` : "";
-  return `TradeDesk alarm: ${a.symbol} (${a.exchange}) · ${a.condition} ${a.price} · son ${last}${note}`;
+  const scan = extra ? ` · ${extra}` : "";
+  const priceBit =
+    a.kind === "scan"
+      ? a.scanKey ?? "scan"
+      : `${a.condition} ${a.price}`;
+  return `TradeDesk alarm: ${a.symbol} (${a.exchange}) · ${priceBit} · son ${last}${scan}${note}`;
 }
 
 export function AlertWatcher() {
@@ -66,126 +71,167 @@ export function AlertWatcher() {
   useEffect(() => {
     let cancelled = false;
 
+    const fire = async (a: PriceAlert, last: number, extra = "") => {
+      const now = Date.now();
+      const repeat = a.repeat === "repeat";
+      useDeskStore.getState().updateAlert(a.id, {
+        active: repeat ? true : false,
+        triggeredAt: now,
+        lastFiredAt: now,
+        lastPrice: last,
+      });
+      const pane = useDeskStore
+        .getState()
+        .panes.find((x) => x.id === useDeskStore.getState().activePaneId);
+      const tf = a.timeframe || pane?.timeframe;
+      const openUrl = buildDeskOpenUrl({
+        origin: window.location.origin,
+        symbol: a.symbol,
+        exchange: a.exchange,
+        timeframe: tf,
+      });
+      const text = `${alertText(a, last, extra)}\n${openUrl}`;
+      try {
+        if (
+          typeof Notification !== "undefined" &&
+          Notification.permission === "granted"
+        ) {
+          const ntf = new Notification(`Alarm: ${a.symbol}`, {
+            body: extra || `${a.condition} ${a.price} · son ${last}`,
+          });
+          ntf.onclick = () => {
+            window.focus();
+            useDeskStore
+              .getState()
+              .openSymbolInActive(a.symbol, a.exchange, tf);
+          };
+        } else if (
+          typeof Notification !== "undefined" &&
+          Notification.permission === "default" &&
+          !notifiedPerm.current
+        ) {
+          notifiedPerm.current = true;
+          Notification.requestPermission().catch(() => {});
+        }
+      } catch {
+        /* */
+      }
+      const bot = useDeskStore.getState().botSettings;
+      if (bot.enabled && bot.webhookUrl.trim()) {
+        try {
+          await fetch("/api/webhook", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              url: bot.webhookUrl.trim(),
+              telegramChatId: bot.telegramChatId?.trim() || undefined,
+              payload: {
+                secret: bot.secret || undefined,
+                event: a.kind === "scan" ? "scan_alert" : "price_alert",
+                symbol: a.symbol,
+                exchange: a.exchange,
+                condition: a.condition,
+                price: a.price,
+                last,
+                ts: now,
+                note: extra || a.note,
+                text,
+                message: text,
+                openUrl,
+                timeframe: tf,
+                scanKey: a.scanKey,
+                group: a.group,
+              },
+            }),
+          });
+        } catch {
+          /* */
+        }
+      }
+    };
+
     const tick = async () => {
-      const { alerts, botSettings, updateAlert } = useDeskStore.getState();
-      const live = alerts.filter((a) => a.active && !a.triggeredAt);
+      const { alerts, updateAlert } = useDeskStore.getState();
+      const now = Date.now();
+      for (const a of alerts) {
+        if (a.active && a.expiresAt && now > a.expiresAt) {
+          updateAlert(a.id, { active: false });
+        }
+      }
+      const live = useDeskStore.getState().alerts.filter((a) => {
+        if (!a.active) return false;
+        if (a.expiresAt && now > a.expiresAt) return false;
+        if (a.repeat === "repeat") {
+          const cd = (a.cooldownMin ?? 60) * 60_000;
+          if (a.lastFiredAt && now - a.lastFiredAt < cd) return false;
+          return true;
+        }
+        return !a.triggeredAt;
+      });
       if (!live.length) return;
 
-      const byEx: Record<Exchange, string[]> = { binance: [], bist: [] };
-      for (const a of live) {
-        if (!byEx[a.exchange].includes(a.symbol)) {
-          byEx[a.exchange].push(a.symbol);
-        }
-      }
+      const priceLive = live.filter((a) => a.kind !== "scan");
+      const scanLive = live.filter((a) => a.kind === "scan" && a.scanKey);
 
-      const quotes: TickerQuote[] = [];
-      try {
-        const [b, t] = await Promise.all([
-          fetchQuotes("binance", byEx.binance),
-          fetchQuotes("bist", byEx.bist),
-        ]);
-        quotes.push(...b, ...t);
-      } catch {
-        return;
-      }
-      if (cancelled) return;
-
-      const map = new Map(
-        quotes.map((q) => [`${q.exchange}:${q.symbol}`, q] as const)
-      );
-
-      for (const a of live) {
-        if (firingRef.current.has(a.id)) continue;
-        const q = map.get(`${a.exchange}:${a.symbol}`);
-        if (!q || !Number.isFinite(q.last)) continue;
-
-        const prev = a.lastPrice;
-        const met = conditionMet(a.condition, a.price, q.last, prev);
-
-        // Always refresh lastPrice for cross detection
-        if (!met) {
-          if (prev !== q.last) {
-            updateAlert(a.id, { lastPrice: q.last });
+      if (priceLive.length) {
+        const byEx: Record<Exchange, string[]> = { binance: [], bist: [] };
+        for (const a of priceLive) {
+          if (!byEx[a.exchange].includes(a.symbol)) {
+            byEx[a.exchange].push(a.symbol);
           }
-          continue;
         }
-
-        firingRef.current.add(a.id);
-        const triggeredAt = Date.now();
-        updateAlert(a.id, {
-          active: false,
-          triggeredAt,
-          lastPrice: q.last,
-        });
-
-        const pane = useDeskStore.getState().panes.find(
-          (x) => x.id === useDeskStore.getState().activePaneId
-        );
-        const openUrl = buildDeskOpenUrl({
-          origin: window.location.origin,
-          symbol: a.symbol,
-          exchange: a.exchange,
-          timeframe: pane?.timeframe,
-        });
-        const text = `${alertText(a, q.last)}\n${openUrl}`;
-
+        const quotes: TickerQuote[] = [];
         try {
-          if (
-            typeof Notification !== "undefined" &&
-            Notification.permission === "granted"
-          ) {
-            const ntf = new Notification(`Alarm: ${a.symbol}`, {
-              body: `${a.condition} ${a.price} · son ${q.last}`,
-            });
-            ntf.onclick = () => {
-              window.focus();
-              useDeskStore
-                .getState()
-                .openSymbolInActive(a.symbol, a.exchange, pane?.timeframe);
-            };
-          } else if (
-            typeof Notification !== "undefined" &&
-            Notification.permission === "default" &&
-            !notifiedPerm.current
-          ) {
-            notifiedPerm.current = true;
-            Notification.requestPermission().catch(() => {});
+          const [b, t] = await Promise.all([
+            fetchQuotes("binance", byEx.binance),
+            fetchQuotes("bist", byEx.bist),
+          ]);
+          quotes.push(...b, ...t);
+        } catch {
+          /* keep going for scan */
+        }
+        if (cancelled) return;
+        const map = new Map(
+          quotes.map((q) => [`${q.exchange}:${q.symbol}`, q] as const)
+        );
+        for (const a of priceLive) {
+          if (firingRef.current.has(a.id)) continue;
+          const q = map.get(`${a.exchange}:${a.symbol}`);
+          if (!q || !Number.isFinite(q.last)) continue;
+          const prev = a.lastPrice;
+          const met = conditionMet(a.condition, a.price, q.last, prev);
+          if (!met) {
+            if (prev !== q.last) updateAlert(a.id, { lastPrice: q.last });
+            continue;
+          }
+          firingRef.current.add(a.id);
+          await fire(a, q.last);
+          firingRef.current.delete(a.id);
+        }
+      }
+
+      for (const a of scanLive) {
+        if (cancelled) break;
+        if (firingRef.current.has(a.id)) continue;
+        const iv = (a.intervalMin ?? 15) * 60_000;
+        if (a.lastCheckedAt && now - a.lastCheckedAt < iv) continue;
+        updateAlert(a.id, { lastCheckedAt: Date.now() });
+        firingRef.current.add(a.id);
+        try {
+          const tf = a.timeframe || "15m";
+          const res = await fetch(
+            `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=220`
+          );
+          const json = await res.json();
+          const candles = (json.candles ?? []) as Candle[];
+          if (candles.length) {
+            const hit = checkScanAlert(candles, a.scanKey!);
+            const last = candles[candles.length - 1]!.close;
+            if (hit.ok) await fire(a, last, hit.note);
           }
         } catch {
           /* */
         }
-
-        if (botSettings.enabled && botSettings.webhookUrl.trim()) {
-          try {
-            await fetch("/api/webhook", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                url: botSettings.webhookUrl.trim(),
-                telegramChatId: botSettings.telegramChatId?.trim() || undefined,
-                payload: {
-                  secret: botSettings.secret || undefined,
-                  event: "price_alert",
-                  symbol: a.symbol,
-                  exchange: a.exchange,
-                  condition: a.condition,
-                  price: a.price,
-                  last: q.last,
-                  ts: triggeredAt,
-                  note: a.note,
-                  text,
-                  message: text,
-                  openUrl,
-                  timeframe: pane?.timeframe,
-                },
-              }),
-            });
-          } catch {
-            /* */
-          }
-        }
-
-        // allow re-fire only after user re-activates (id stays but triggeredAt set)
         firingRef.current.delete(a.id);
       }
     };

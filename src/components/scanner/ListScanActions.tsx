@@ -167,6 +167,10 @@ export function ListScanActions({
           price: Number((last * 1.03).toFixed(4)),
           note: "liste tarama +%3",
           lastPrice: last,
+          kind: "price",
+          group: "Liste",
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
         });
       }
     }

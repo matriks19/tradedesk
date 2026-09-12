@@ -567,16 +567,10 @@ export const useDeskStore = create<DeskState>()(
           set((s) => ({
             alerts: [
               {
+                ...a,
                 id: uid("alert"),
                 createdAt: Date.now(),
                 active: a.active ?? true,
-                symbol: a.symbol,
-                exchange: a.exchange,
-                condition: a.condition,
-                price: a.price,
-                note: a.note,
-                lastPrice: a.lastPrice,
-                triggeredAt: a.triggeredAt,
               },
               ...s.alerts,
             ],
@@ -585,16 +579,10 @@ export const useDeskStore = create<DeskState>()(
           if (!items.length) return 0;
           const now = Date.now();
           const mapped = items.map((a, i) => ({
+            ...a,
             id: uid("alert"),
             createdAt: now + i,
             active: a.active ?? true,
-            symbol: a.symbol,
-            exchange: a.exchange,
-            condition: a.condition,
-            price: a.price,
-            note: a.note,
-            lastPrice: a.lastPrice,
-            triggeredAt: a.triggeredAt,
           }));
           set((s) => ({ alerts: [...mapped, ...s.alerts] }));
           return mapped.length;

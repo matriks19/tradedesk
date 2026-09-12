@@ -356,6 +356,15 @@ export interface PatternSettings {
 
 export type AlertCondition = "above" | "below" | "cross_above" | "cross_below";
 
+export type AlertKind = "price" | "scan";
+export type AlertRepeat = "once" | "repeat";
+export type AlertScanKey =
+  | "ham_setup"
+  | "ham_confirm"
+  | "ham_al"
+  | "diag_bounce"
+  | "diag_break";
+
 export interface PriceAlert {
   id: string;
   symbol: string;
@@ -367,6 +376,18 @@ export interface PriceAlert {
   createdAt: number;
   triggeredAt?: number;
   lastPrice?: number;
+  kind?: AlertKind;
+  group?: string;
+  scanKey?: AlertScanKey;
+  timeframe?: string;
+  repeat?: AlertRepeat;
+  /** Minutes between re-fires when repeat=repeat */
+  cooldownMin?: number;
+  /** Minutes between scan checks (scan alerts) */
+  intervalMin?: number;
+  expiresAt?: number;
+  lastFiredAt?: number;
+  lastCheckedAt?: number;
 }
 
 export type DrawTool = "cursor" | "hline" | "trend" | "fib" | "measure" | "rect";
