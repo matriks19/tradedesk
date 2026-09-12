@@ -196,7 +196,7 @@ export function FormationScanPanel() {
         sectorCode: bistSource === "sector" ? sectorCode : undefined,
         binanceTop:
           binanceMarket === "perp_all"
-            ? 600
+            ? 700
             : binanceMarket === "perp_top"
               ? 120
               : 120,

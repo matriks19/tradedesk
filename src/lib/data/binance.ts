@@ -7,6 +7,7 @@ import {
 } from "@/lib/data/timeframes";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { FALLBACK_USDT_PERPS } from "@/lib/data/binancePerpSnapshot";
 
 /** Spot market data — api.binance.com returns 451 in some regions. */
 const REST = process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision";
@@ -43,6 +44,19 @@ export function toBinanceRestSymbol(symbol: string): string {
 export function toPerpDisplaySymbol(symbol: string): string {
   const rest = toBinanceRestSymbol(symbol);
   return `${rest}.P`;
+}
+
+function snapshotPerpSymbols(): SymbolInfo[] {
+  return FALLBACK_USDT_PERPS.map((s) => {
+    const rest = toBinanceRestSymbol(s);
+    return {
+      symbol: toPerpDisplaySymbol(s),
+      exchange: "binance" as const,
+      base: rest.replace(/USDT$/i, ""),
+      quote: "USDT",
+      name: "PERP",
+    };
+  });
 }
 
 function readFileCache(path: string): SymbolInfo[] | null {
@@ -180,7 +194,7 @@ export class BinanceProvider {
       });
       if (!res.ok) {
         if (fileCached?.length) return fileCached;
-        throw new Error(`Binance fapi exchangeInfo ${res.status}`);
+        return snapshotPerpSymbols();
       }
       const data = await res.json();
       const symbols = (data.symbols as Array<Record<string, unknown>>)
@@ -204,7 +218,7 @@ export class BinanceProvider {
     } catch (e) {
       if (fileCached?.length) return fileCached;
       if (memPerpSymbols?.symbols?.length) return memPerpSymbols.symbols;
-      throw e;
+      return snapshotPerpSymbols();
     }
   }
 

@@ -4,6 +4,7 @@ import type { CustomScript, StoredLayout, Watchlist } from "@/lib/types";
 import { SAMPLE_SCRIPTS } from "@/lib/scripts/sandbox";
 import { getPopularSeedScripts } from "@/lib/scripts/catalog";
 import type { ScannerFilter } from "@/lib/scanner/engine";
+import { mergeBinanceWatchlists } from "@/lib/data/binanceLists";
 
 const DATA_DIR = path.join(process.cwd(), "data");
 
@@ -106,7 +107,30 @@ async function ensure() {
 export async function readDb(): Promise<AppDb> {
   const file = await ensure();
   const raw = await fs.readFile(file, "utf8");
-  return JSON.parse(raw) as AppDb;
+  const db = JSON.parse(raw) as AppDb;
+  const watchlists = mergeBinanceWatchlists(db.watchlists ?? []);
+  if (watchlists.length !== (db.watchlists ?? []).length) {
+    const next = { ...db, watchlists };
+    await fs.writeFile(file, JSON.stringify(next, null, 2), "utf8");
+    return next;
+  }
+  // also refresh if perp/ai lists are short
+  const before = JSON.stringify(
+    (db.watchlists ?? []).filter((w) =>
+      w.id === "binance-perp-usdt" || w.id === "binance-ai-usdt"
+    )
+  );
+  const after = JSON.stringify(
+    watchlists.filter((w) =>
+      w.id === "binance-perp-usdt" || w.id === "binance-ai-usdt"
+    )
+  );
+  if (before !== after) {
+    const next = { ...db, watchlists };
+    await fs.writeFile(file, JSON.stringify(next, null, 2), "utf8");
+    return next;
+  }
+  return { ...db, watchlists };
 }
 
 export async function writeDb(db: AppDb): Promise<void> {

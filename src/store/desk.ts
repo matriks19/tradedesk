@@ -27,6 +27,39 @@ import { normalizeBacktestResult } from "@/lib/backtest";
 import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicators/registry";
 import { strategyById } from "@/lib/strategies";
 import { sectorWatchlistMeta } from "@/lib/data/bistSectors";
+import { binancePerpWatchlistMeta, mergeBinanceWatchlists } from "@/lib/data/binanceLists";
+
+const WATCHLIST_CAP = 2000;
+
+function parseWatchlistText(
+  text: string,
+  defaultExchange: Exchange
+): { symbol: string; exchange: Exchange }[] {
+  const raw = text
+    .split(/[\n,;\s]+/)
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean);
+  const parsed: { symbol: string; exchange: Exchange }[] = [];
+  for (const tok of raw) {
+    let exchange: Exchange = defaultExchange;
+    let symbol = tok;
+    if (tok.includes(":")) {
+      const [ex, sym] = tok.split(":");
+      if (ex === "BINANCE" || ex === "BIST") {
+        exchange = ex.toLowerCase() as Exchange;
+        symbol = (sym || "").toUpperCase();
+      }
+    }
+    if (!symbol) continue;
+    if (/\.P$/i.test(symbol) || /USDT$/i.test(symbol)) {
+      exchange = "binance";
+    }
+    if (!parsed.some((p) => p.symbol === symbol && p.exchange === exchange)) {
+      parsed.push({ symbol, exchange });
+    }
+  }
+  return parsed;
+}
 
 function uid(prefix = "id"): string {
   return `${prefix}_${Math.random().toString(36).slice(2, 9)}`;
@@ -160,6 +193,12 @@ interface DeskState {
     text: string,
     defaultExchange: Exchange
   ) => number;
+  replaceWatchlistSymbols: (
+    listId: string,
+    text: string,
+    defaultExchange: Exchange
+  ) => number;
+  seedBinanceWatchlists: () => { created: number; updated: number };
   deleteWatchlist: (id: string) => void;
   addAlertsBulk: (
     items: Array<
@@ -647,31 +686,20 @@ export const useDeskStore = create<DeskState>()(
           }
           return { created, skipped };
         },
-        importWatchlistSymbols: (listId, text, defaultExchange) => {
-          const raw = text
-            .split(/[\n,;\s]+/)
-            .map((s) => s.trim().toUpperCase())
-            .filter(Boolean);
-          const parsed: { symbol: string; exchange: Exchange }[] = [];
-          for (const tok of raw) {
-            let exchange: Exchange = defaultExchange;
-            let symbol = tok;
-            if (tok.includes(":")) {
-              const [ex, sym] = tok.split(":");
-              if (ex === "BINANCE" || ex === "BIST") {
-                exchange = ex.toLowerCase() as Exchange;
-                symbol = (sym || "").toUpperCase();
-              }
-            }
-            if (!symbol) continue;
-            // .P / USDT always Binance — avoid BIST mismatch on perp imports
-            if (/\.P$/i.test(symbol) || /USDT$/i.test(symbol)) {
-              exchange = "binance";
-            }
-            if (!parsed.some((p) => p.symbol === symbol && p.exchange === exchange)) {
-              parsed.push({ symbol, exchange });
-            }
+        seedBinanceWatchlists: () => {
+          let created = 0;
+          let updated = 0;
+          for (const m of binancePerpWatchlistMeta()) {
+            const exists = get().watchlists.some((w) => w.id === m.id);
+            get().ensureWatchlist(m.id, m.name);
+            get().replaceWatchlistSymbols(m.id, m.symbols.join("\n"), "binance");
+            if (exists) updated++;
+            else created++;
           }
+          return { created, updated };
+        },
+        importWatchlistSymbols: (listId, text, defaultExchange) => {
+          const parsed = parseWatchlistText(text, defaultExchange);
           if (!parsed.length) return 0;
           let added = 0;
           set((s) => ({
@@ -682,7 +710,7 @@ export const useDeskStore = create<DeskState>()(
               for (const p of parsed) {
                 const key = `${p.exchange}:${p.symbol}`;
                 if (existing.has(key)) continue;
-                if (next.length >= 800) break;
+                if (next.length >= WATCHLIST_CAP) break;
                 existing.add(key);
                 next.push(p);
                 added++;
@@ -691,6 +719,18 @@ export const useDeskStore = create<DeskState>()(
             }),
           }));
           return added;
+        },
+        replaceWatchlistSymbols: (listId, text, defaultExchange) => {
+          const parsed = parseWatchlistText(text, defaultExchange).slice(
+            0,
+            WATCHLIST_CAP
+          );
+          set((s) => ({
+            watchlists: s.watchlists.map((w) =>
+              w.id === listId ? { ...w, symbols: parsed } : w
+            ),
+          }));
+          return parsed.length;
         },
         deleteWatchlist: (id) =>
           set((s) => {
@@ -702,17 +742,26 @@ export const useDeskStore = create<DeskState>()(
             return { watchlists, activeWatchlistId };
           }),
         hydrateFromServer: ({ watchlists, scripts }) =>
-          set((s) => ({
-            watchlists: watchlists.length ? watchlists : s.watchlists,
-            scripts: scripts.length
-              ? scripts.map((sc) => ({
-                  ...sc,
-                  language: sc.language ?? "td",
-                }))
-              : s.scripts,
-            activeWatchlistId:
-              watchlists[0]?.id ?? s.activeWatchlistId ?? "crypto-majors",
-          })),
+          set((s) => {
+            const merged = mergeBinanceWatchlists(
+              watchlists.length ? watchlists : s.watchlists
+            );
+            const prefer =
+              merged.find((w) => w.id === "binance-ai-usdt")?.id ??
+              merged[0]?.id ??
+              s.activeWatchlistId ??
+              "crypto-majors";
+            return {
+              watchlists: merged,
+              scripts: scripts.length
+                ? scripts.map((sc) => ({
+                    ...sc,
+                    language: sc.language ?? "td",
+                  }))
+                : s.scripts,
+              activeWatchlistId: prefer,
+            };
+          }),
       };
     },
     {

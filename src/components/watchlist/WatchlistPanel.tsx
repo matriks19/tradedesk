@@ -18,7 +18,9 @@ export function WatchlistPanel() {
     importWatchlistSymbols,
     deleteWatchlist,
     seedSectorWatchlists,
+    seedBinanceWatchlists,
     ensureWatchlist,
+    replaceWatchlistSymbols,
   } = useDeskStore();
   const list = watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
   const [quotes, setQuotes] = useState<Record<string, TickerQuote>>({});
@@ -174,44 +176,76 @@ export function WatchlistPanel() {
           type="button"
           className="btn text-2xs"
           disabled={perpBusy}
-          title="USDT-M perpetual top ~150 (hacim) — BN Perp · USDT.P"
+          title="Tüm USDT-M perpetual (.P) + AI listesi — AIO/AIOT önce"
           onClick={async () => {
             setPerpBusy(true);
             setPerpMsg("");
             try {
-              const id = "binance-perp-usdt";
-              const existing = useDeskStore
-                .getState()
-                .watchlists.find((w) => w.id === id);
-              if (existing && existing.symbols.length > 0) {
-                setActiveWatchlist(id);
-                setPerpMsg("BN Perp listesi zaten var");
-                return;
-              }
-              const res = await fetch(
-                "/api/ticker?exchange=binance&market=perp"
+              const { sortPerpsAiFirst, isAiPerp, toPerpDisplay } =
+                await import("@/lib/data/binanceLists");
+              const snap = seedBinanceWatchlists();
+              setActiveWatchlist("binance-ai-usdt");
+              setPerpMsg(
+                `Snapshot: ${snap.created} yeni, ${snap.updated} güncellendi`
               );
-              const json = await res.json();
-              const quotes = (json.quotes ?? [])
-                .filter((q: { symbol?: string }) =>
-                  /\.P$/i.test(String(q.symbol ?? ""))
-                )
-                .sort(
-                  (
-                    a: { quoteVolume?: number },
-                    b: { quoteVolume?: number }
-                  ) => (b.quoteVolume ?? 0) - (a.quoteVolume ?? 0)
-                )
-                .slice(0, 150);
-              const syms = quotes.map((q: { symbol: string }) => q.symbol);
-              if (!syms.length) {
-                setPerpMsg("Perp kotasyon alınamadı");
-                return;
+              let live: string[] = [];
+              try {
+                const res = await fetch(
+                  "/api/ticker?exchange=binance&market=perp"
+                );
+                const json = await res.json();
+                live = (json.quotes ?? [])
+                  .map((q: { symbol?: string }) =>
+                    toPerpDisplay(String(q.symbol ?? ""))
+                  )
+                  .filter((s: string) => /\.P$/i.test(s) && s.length > 3);
+              } catch {
+                /* ticker may 418 */
               }
-              ensureWatchlist(id, "BN Perp · USDT.P");
-              const n = importWatchlistSymbols(id, syms.join("\n"), "binance");
-              setActiveWatchlist(id);
-              setPerpMsg(`BN Perp: ${n} sembol`);
+              if (!live.length) {
+                try {
+                  const res = await fetch(
+                    "/api/symbols?exchange=binance&limit=5000"
+                  );
+                  const json = await res.json();
+                  live = (json.symbols ?? [])
+                    .map((s: { symbol?: string }) =>
+                      toPerpDisplay(String(s.symbol ?? ""))
+                    )
+                    .filter((s: string) => /\.P$/i.test(s) && s.length > 3);
+                } catch {
+                  /* keep snapshot */
+                }
+              }
+              if (live.length) {
+                const all = sortPerpsAiFirst(Array.from(new Set(live)));
+                const ai = all.filter(isAiPerp);
+                ensureWatchlist("binance-perp-usdt", "BN Perp · USDT.P");
+                ensureWatchlist("binance-ai-usdt", "BN AI · USDT.P");
+                replaceWatchlistSymbols(
+                  "binance-perp-usdt",
+                  all.join("\n"),
+                  "binance"
+                );
+                replaceWatchlistSymbols(
+                  "binance-ai-usdt",
+                  ai.join("\n"),
+                  "binance"
+                );
+                setPerpMsg(`BN Perp ${all.length} · AI ${ai.length} (AIO/AIOT önce)`);
+              }
+              setActiveWatchlist("binance-ai-usdt");
+              try {
+                await fetch("/api/store", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    watchlists: useDeskStore.getState().watchlists,
+                  }),
+                });
+              } catch {
+                /* in-memory lists still usable */
+              }
             } catch (e) {
               setPerpMsg(e instanceof Error ? e.message : "hata");
             } finally {
@@ -219,7 +253,7 @@ export function WatchlistPanel() {
             }
           }}
         >
-          {perpBusy ? "Perp…" : "BN Perp listesini oluştur"}
+          {perpBusy ? "Perp…" : "BN Perp + AI (hepsi)"}
         </button>
         {seedMsg ? (
           <span className="text-2xs text-desk-muted">{seedMsg}</span>

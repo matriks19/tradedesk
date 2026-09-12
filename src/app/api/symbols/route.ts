@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { BinanceProvider } from "@/lib/data/binance";
 import { BistProvider } from "@/lib/data/bist";
+import { aiRank } from "@/lib/data/binanceLists";
 
 export const dynamic = "force-dynamic";
 
@@ -51,21 +52,28 @@ export async function GET(req: NextRequest) {
       symbols = symbols.filter((s) =>
         fuzzyMatch(q, s.symbol, s.name, s.base)
       );
-      // Prefer exact / prefix matches, then spot before listing noise
-      symbols.sort((a, b) => {
-        const as = a.symbol.toUpperCase();
-        const bs = b.symbol.toUpperCase();
+    }
+    symbols.sort((a, b) => {
+      const as = a.symbol.toUpperCase();
+      const bs = b.symbol.toUpperCase();
+      if (q) {
         const score = (s: string) => {
-          if (s === q || s === `${q}.P`) return 0;
-          if (s.startsWith(q)) return 1;
+          const base = s.replace(/\.P$/i, "").replace(/USDT$/, "");
+          if (s === q || s === `${q}.P` || base === q) return 0;
+          if (s.startsWith(q) || base.startsWith(q)) return 1;
           if (s.includes(q)) return 2;
           return 3;
         };
         const d = score(as) - score(bs);
         if (d !== 0) return d;
-        return as.localeCompare(bs);
-      });
-    }
+      }
+      const ai = aiRank(as) - aiRank(bs);
+      if (ai !== 0) return ai;
+      const ap = /\.P$/i.test(as) ? 0 : 1;
+      const bp = /\.P$/i.test(bs) ? 0 : 1;
+      if (ap !== bp) return ap - bp;
+      return as.localeCompare(bs);
+    });
 
     const sliced = symbols.slice(0, limit);
     return NextResponse.json({
