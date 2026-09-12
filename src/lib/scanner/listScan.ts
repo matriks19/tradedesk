@@ -20,6 +20,18 @@ export type HamCond =
   | "dual_dn"
   | "raw_dual_up"
   | "raw_dual_dn"
+  | "raw_slow_up"
+  | "raw_slow_dn"
+  | "raw_slow_x_osc_up"
+  | "raw_slow_x_osc_dn"
+  | "osc_fast_up"
+  | "osc_fast_dn"
+  | "osc_slow_up"
+  | "osc_slow_dn"
+  | "osc_fast_zero_up"
+  | "osc_fast_zero_dn"
+  | "osc_slow_zero_up"
+  | "osc_slow_zero_dn"
   | "setup"
   | "confirm"
   | "al";
@@ -258,6 +270,66 @@ function scanHam(
           ok = h.rawDualDown[i];
           bias = "bear";
           note = `raw hızlı×yavaş↓ (−${ago})`;
+          break;
+        case "raw_slow_up":
+          ok = h.rawSlowUp[i];
+          bias = "bull";
+          note = `raw yavaş↑ (−${ago})`;
+          break;
+        case "raw_slow_dn":
+          ok = h.rawSlowDown[i];
+          bias = "bear";
+          note = `raw yavaş↓ (−${ago})`;
+          break;
+        case "raw_slow_x_osc_up":
+          ok = h.rawSlowXOsc[i];
+          bias = "bull";
+          note = `rawY×osc↑ (−${ago})`;
+          break;
+        case "raw_slow_x_osc_dn":
+          ok = h.rawSlowXOscDown[i];
+          bias = "bear";
+          note = `rawY×osc↓ (−${ago})`;
+          break;
+        case "osc_fast_up":
+          ok = h.oscFastUp[i];
+          bias = "bull";
+          note = `osc hızlı↑ (−${ago})`;
+          break;
+        case "osc_fast_dn":
+          ok = h.oscFastDown[i];
+          bias = "bear";
+          note = `osc hızlı↓ (−${ago})`;
+          break;
+        case "osc_slow_up":
+          ok = h.oscSlowUp[i];
+          bias = "bull";
+          note = `osc yavaş↑ (−${ago})`;
+          break;
+        case "osc_slow_dn":
+          ok = h.oscSlowDown[i];
+          bias = "bear";
+          note = `osc yavaş↓ (−${ago})`;
+          break;
+        case "osc_fast_zero_up":
+          ok = h.oscFastZeroUp[i];
+          bias = "bull";
+          note = `osc H 0↑ (−${ago})`;
+          break;
+        case "osc_fast_zero_dn":
+          ok = h.oscFastZeroDown[i];
+          bias = "bear";
+          note = `osc H 0↓ (−${ago})`;
+          break;
+        case "osc_slow_zero_up":
+          ok = h.oscSlowZeroUp[i];
+          bias = "bull";
+          note = `osc Y 0↑ (−${ago})`;
+          break;
+        case "osc_slow_zero_dn":
+          ok = h.oscSlowZeroDown[i];
+          bias = "bear";
+          note = `osc Y 0↓ (−${ago})`;
           break;
         case "setup":
           ok = h.rawUp[i] && h.histTurning[i];

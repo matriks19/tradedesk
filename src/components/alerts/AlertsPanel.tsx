@@ -39,6 +39,8 @@ export function AlertsPanel() {
     addAlert,
     addAlertsBulk,
     removeAlert,
+    removeAlerts,
+    setAlertsActive,
     updateAlert,
     botSettings,
     setBotSettings,
@@ -63,6 +65,9 @@ export function AlertsPanel() {
   const [filter, setFilter] = useState<(typeof GROUPS)[number]>("Hepsi");
   const [testStatus, setTestStatus] = useState("");
   const [bulkStatus, setBulkStatus] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [tgToken, setTgToken] = useState("");
+  const [tgStatus, setTgStatus] = useState("");
 
   useEffect(() => {
     if (pane) {
@@ -400,12 +405,59 @@ export function AlertsPanel() {
             key={g}
             type="button"
             className={clsx("btn text-2xs px-1.5", filter === g && "btn-accent")}
-            onClick={() => setFilter(g)}
+            onClick={() => {
+              setFilter(g);
+              setConfirmDelete(false);
+            }}
           >
             {g}
           </button>
         ))}
       </div>
+      {visible.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            className="btn text-2xs"
+            onClick={() =>
+              setAlertsActive(
+                visible.filter((a) => a.active).map((a) => a.id),
+                false
+              )
+            }
+          >
+            Görünenleri durdur ({visible.filter((a) => a.active).length})
+          </button>
+          <button
+            type="button"
+            className="btn text-2xs"
+            onClick={() =>
+              setAlertsActive(
+                visible.filter((a) => !a.active).map((a) => a.id),
+                true
+              )
+            }
+          >
+            Görünenleri aç ({visible.filter((a) => !a.active).length})
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", confirmDelete && "btn-accent")}
+            onClick={() => {
+              if (!confirmDelete) {
+                setConfirmDelete(true);
+                return;
+              }
+              removeAlerts(visible.map((a) => a.id));
+              setConfirmDelete(false);
+            }}
+          >
+            {confirmDelete
+              ? `Emin misin? ${visible.length} sil`
+              : `Görünenleri sil (${visible.length})`}
+          </button>
+        </div>
+      )}
 
       <div className="border-t border-desk-border pt-2 mt-1">
         <div className="text-2xs text-desk-muted mb-1">
@@ -467,21 +519,24 @@ export function AlertsPanel() {
       </div>
 
       <div className="border-t border-desk-border pt-2 mt-1 space-y-1">
-        <div className="font-medium">Bot / Webhook</div>
+        <div className="font-medium">Telegram bağla</div>
         <p className="text-2xs text-desk-muted leading-relaxed">
-          Telegram butonu sembolü açar. Payload’da botReady + action=signal — otomatik bot sonra bağlanır.
+          1) Telegram’da @BotFather → /newbot. 2) Token’ı buraya yapıştır (saklanır, git’e gitmez).
+          3) Bota bir mesaj at, Chat ID bul. 4) Bağla + Test.
         </p>
         <label className="text-2xs text-desk-muted block">
-          Webhook URL
+          Bot token
           <input
             className="input mt-0.5"
-            value={botSettings.webhookUrl}
-            onChange={(e) => setBotSettings({ webhookUrl: e.target.value })}
-            placeholder="https://api.telegram.org/bot…/sendMessage"
+            type="password"
+            autoComplete="off"
+            value={tgToken}
+            onChange={(e) => setTgToken(e.target.value.trim())}
+            placeholder="123456:AA…"
           />
         </label>
         <label className="text-2xs text-desk-muted block">
-          Telegram Chat ID
+          Chat ID
           <input
             className="input mt-0.5"
             value={botSettings.telegramChatId ?? ""}
@@ -489,6 +544,74 @@ export function AlertsPanel() {
               setBotSettings({ telegramChatId: e.target.value })
             }
             placeholder="123456789 veya -100…"
+          />
+        </label>
+        <div className="flex flex-wrap gap-1">
+          <button
+            type="button"
+            className="btn text-2xs"
+            onClick={async () => {
+              const token = tgToken.trim();
+              if (!token) {
+                setTgStatus("token yaz");
+                return;
+              }
+              setTgStatus("chat aranıyor…");
+              try {
+                const r = await fetch("/api/telegram/chat", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ token }),
+                });
+                const j = await r.json();
+                if (j.chatId) {
+                  setBotSettings({ telegramChatId: String(j.chatId) });
+                  setTgStatus(`chat ${j.chatId}`);
+                } else {
+                  setTgStatus(j.error || "bota bir mesaj at, tekrar dene");
+                }
+              } catch (e) {
+                setTgStatus(e instanceof Error ? e.message : "hata");
+              }
+            }}
+          >
+            Chat ID bul
+          </button>
+          <button
+            type="button"
+            className="btn btn-accent text-2xs"
+            onClick={() => {
+              const token = tgToken.trim();
+              if (!token) {
+                setTgStatus("token yaz");
+                return;
+              }
+              const chat = (botSettings.telegramChatId ?? "").trim();
+              if (!chat) {
+                setTgStatus("chat id yok — önce Chat ID bul");
+                return;
+              }
+              setBotSettings({
+                webhookUrl: `https://api.telegram.org/bot${token}/sendMessage`,
+                telegramChatId: chat,
+                enabled: true,
+              });
+              setTgStatus("bağlandı — Test’e bas");
+            }}
+          >
+            Bağla
+          </button>
+        </div>
+        {tgStatus && (
+          <div className="text-2xs text-desk-muted">{tgStatus}</div>
+        )}
+        <label className="text-2xs text-desk-muted block">
+          Webhook URL
+          <input
+            className="input mt-0.5"
+            value={botSettings.webhookUrl}
+            onChange={(e) => setBotSettings({ webhookUrl: e.target.value })}
+            placeholder="https://api.telegram.org/bot…/sendMessage"
           />
         </label>
         <label className="flex items-center gap-2 text-2xs">

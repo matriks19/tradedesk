@@ -126,8 +126,8 @@ export function ChartPane({ pane, compact }: Props) {
   >(new Map());
   const subContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const priceLinesRef = useRef<IPriceLine[]>([]);
-  /** First open / symbol·TF change: target last ~80–120 bars (not full history). */
-  const INITIAL_VISIBLE_BARS = 80;
+  /** First open / symbol·TF change: target last ~220 bars (not full history). */
+  const INITIAL_VISIBLE_BARS = 220;
   const dataViewKeyRef = useRef("");
   /** Re-apply visible range after first real layout / symbol·TF change. */
   const needsInitialFitRef = useRef(true);
@@ -403,8 +403,8 @@ export function ChartPane({ pane, compact }: Props) {
     }
     if (n < 1) return false;
 
-    // Prefer ~80–120 bars of history (not fitContent full series).
-    const visible = Math.min(120, Math.max(40, Math.min(n, Math.max(INITIAL_VISIBLE_BARS, 120))));
+    // Prefer ~180–280 bars of history (not fitContent full series).
+    const visible = Math.min(280, Math.max(80, Math.min(n, INITIAL_VISIBLE_BARS)));
     const from = Math.max(0, n - visible);
     const to = n + 4; // small right pad so last bar isn't edge-glued
 

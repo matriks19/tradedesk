@@ -3096,6 +3096,14 @@ export function computeBuiltin(
             markers.push({ time: tm, position: "belowBar", color: colorRaw, shape: "circle", text: "raw H×Y" });
           if (h.rawDualDown[i])
             markers.push({ time: tm, position: "aboveBar", color: colorRawSlow, shape: "circle", text: "raw H×Y" });
+          if (h.rawSlowXOsc[i])
+            markers.push({ time: tm, position: "belowBar", color: colorRawSlow, shape: "circle", text: "rawY×osc" });
+          if (h.rawSlowXOscDown[i])
+            markers.push({ time: tm, position: "aboveBar", color: colorRawSlow, shape: "circle", text: "rawY×osc" });
+          if (h.oscFastZeroUp[i])
+            markers.push({ time: tm, position: "belowBar", color: colorOsc, shape: "circle", text: "H0" });
+          if (h.oscFastZeroDown[i])
+            markers.push({ time: tm, position: "aboveBar", color: colorOsc, shape: "circle", text: "H0" });
           if (h.rawCrossHist[i])
             markers.push({ time: tm, position: "belowBar", color: "#81c784", shape: "circle", text: "raw×hist" });
         }

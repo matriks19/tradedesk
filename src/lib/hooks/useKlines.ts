@@ -22,7 +22,7 @@ export function useKlines(
     setError(null);
     try {
       const res = await fetch(
-        `/api/klines?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}&timeframe=${encodeURIComponent(timeframe)}&limit=500`
+        `/api/klines?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}&timeframe=${encodeURIComponent(timeframe)}&limit=800`
       );
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Kline hatası");

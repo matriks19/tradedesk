@@ -176,6 +176,8 @@ interface DeskState {
   setBacktestParams: (p: Partial<BacktestParams>) => void;
   addAlert: (a: Omit<PriceAlert, "id" | "createdAt" | "active"> & { active?: boolean }) => void;
   removeAlert: (id: string) => void;
+  removeAlerts: (ids: string[]) => void;
+  setAlertsActive: (ids: string[], active: boolean) => void;
   updateAlert: (id: string, patch: Partial<PriceAlert>) => void;
   setBotSettings: (p: Partial<BotSettings>) => void;
   addDrawing: (d: Omit<ChartDrawing, "id"> & { id?: string }) => void;
@@ -590,6 +592,26 @@ export const useDeskStore = create<DeskState>()(
         },
         removeAlert: (id) =>
           set((s) => ({ alerts: s.alerts.filter((x) => x.id !== id) })),
+        removeAlerts: (ids) => {
+          const drop = new Set(ids);
+          set((s) => ({ alerts: s.alerts.filter((x) => !drop.has(x.id)) }));
+        },
+        setAlertsActive: (ids, active) => {
+          const setIds = new Set(ids);
+          set((s) => ({
+            alerts: s.alerts.map((x) =>
+              setIds.has(x.id)
+                ? {
+                    ...x,
+                    active,
+                    ...(active
+                      ? { triggeredAt: undefined, lastFiredAt: undefined }
+                      : {}),
+                  }
+                : x
+            ),
+          }));
+        },
         updateAlert: (id, patch) =>
           set((s) => ({
             alerts: s.alerts.map((x) => (x.id === id ? { ...x, ...patch } : x)),
