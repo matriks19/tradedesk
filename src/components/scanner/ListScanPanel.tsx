@@ -22,7 +22,10 @@ import {
   type ListScanConfig,
   type ListScanHit,
   type ListScanKind,
+  type PineCond,
 } from "@/lib/scanner/listScan";
+import { convertAny } from "@/lib/scripts/pine/translate";
+import type { CustomScript } from "@/lib/types";
 import clsx from "clsx";
 
 const TFS: Timeframe[] = ["5m", "15m", "30m", "1h", "4h", "1d"];
@@ -300,6 +303,9 @@ export function ListScanPanel() {
   const addIndicator = useDeskStore((s) => s.addIndicator);
   const updateIndicatorParams = useDeskStore((s) => s.updateIndicatorParams);
   const addAlertsBulk = useDeskStore((s) => s.addAlertsBulk);
+  const scripts = useDeskStore((s) => s.scripts);
+  const upsertScript = useDeskStore((s) => s.upsertScript);
+  const applyScriptToActive = useDeskStore((s) => s.applyScriptToActive);
 
   const pane = panes.find((p) => p.id === activePaneId) ?? panes[0];
   const activeList =
@@ -389,6 +395,13 @@ export function ListScanPanel() {
   const [extraIds, setExtraIds] = useState<string[]>([]);
   const [openCard, setOpenCard] = useState<string | null>("ham");
   const [extraOpen, setExtraOpen] = useState(false);
+  const [pineDraft, setPineDraft] = useState(
+    '//@version=6\nindicator("Liste Pine", overlay=false)\nplot(ta.rsi(close, 14) - 50, "RSI50")\n'
+  );
+  const [pineName, setPineName] = useState("Liste Pine");
+  const [pineIds, setPineIds] = useState<string[]>([]);
+  const [pineConds, setPineConds] = useState<PineCond[]>(["zero_up", "cross_up"]);
+  const [pineStatus, setPineStatus] = useState("");
 
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState("");
@@ -450,6 +463,18 @@ export function ListScanPanel() {
       extraFilters: EXTRA_CHIPS.filter((c) => extraIds.includes(c.id)).map(
         (c) => c.filter
       ),
+      pine: {
+        enabled: pineIds.length > 0,
+        scripts: scripts
+          .filter((s) => pineIds.includes(s.id))
+          .map((s) => ({
+            id: s.id,
+            name: s.name,
+            code: s.code,
+            language: s.language,
+            conds: pineConds,
+          })),
+      },
     };
   }, [
     matchMode,
@@ -495,6 +520,9 @@ export function ListScanPanel() {
     colorK,
     colorD,
     extraIds,
+    pineIds,
+    pineConds,
+    scripts,
   ]);
 
   const abortRef = useRef<AbortController | null>(null);
@@ -509,7 +537,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -631,7 +659,7 @@ export function ListScanPanel() {
   const upsertIndicators = useCallback(
     (cfg: ListScanConfig) => {
       if (!pane) return;
-      const kinds: ListScanKind[] = [];
+      const kinds: Exclude<ListScanKind, "pine">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -655,16 +683,19 @@ export function ListScanPanel() {
           if (added) updateIndicatorParams(pane.id, added.id, params);
         }
       }
+      for (const sc of cfg.pine?.scripts ?? []) {
+        const has = pane.indicators.some((i) => i.scriptId === sc.id);
+        if (!has) applyScriptToActive(sc.id);
+      }
     },
-    [pane, addIndicator, updateIndicatorParams]
+    [pane, addIndicator, updateIndicatorParams, applyScriptToActive]
   );
 
   useEffect(() => {
-    if (!hamOn) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
-    // pane.id only — don't depend on upsert/build or add() retriggers a loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -682,7 +713,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -918,7 +949,10 @@ export function ListScanPanel() {
               key={c.id}
               active={diagConds.includes(c.id)}
               label={c.label}
-              onClick={() => setDiagConds((a) => toggleIn(a, c.id))}
+              onClick={() => {
+                setDiagOn(true);
+                setDiagConds((a) => toggleIn(a, c.id));
+              }}
             />
           ))}
         </div>
@@ -947,7 +981,10 @@ export function ListScanPanel() {
               key={c.id}
               active={macdConds.includes(c.id)}
               label={c.label}
-              onClick={() => setMacdConds((a) => toggleIn(a, c.id))}
+              onClick={() => {
+                setMacdOn(true);
+                setMacdConds((a) => toggleIn(a, c.id));
+              }}
             />
           ))}
         </div>
@@ -976,7 +1013,10 @@ export function ListScanPanel() {
               key={c.id}
               active={stochConds.includes(c.id)}
               label={c.label}
-              onClick={() => setStochConds((a) => toggleIn(a, c.id))}
+              onClick={() => {
+                setStochOn(true);
+                setStochConds((a) => toggleIn(a, c.id));
+              }}
             />
           ))}
         </div>
@@ -1001,15 +1041,107 @@ export function ListScanPanel() {
           Özel şart {extraOpen ? "▾" : "▸"}
         </button>
         {extraOpen && (
-          <div className="p-2 flex flex-wrap gap-1">
-            {EXTRA_CHIPS.map((c) => (
-              <Chip
-                key={c.id}
-                active={extraIds.includes(c.id)}
-                label={c.label}
-                onClick={() => setExtraIds((a) => toggleIn(a, c.id))}
-              />
-            ))}
+          <div className="p-2 space-y-2">
+            <div className="flex flex-wrap gap-1">
+              {EXTRA_CHIPS.map((c) => (
+                <Chip
+                  key={c.id}
+                  active={extraIds.includes(c.id)}
+                  label={c.label}
+                  onClick={() => setExtraIds((a) => toggleIn(a, c.id))}
+                />
+              ))}
+            </div>
+            <div className="text-2xs font-medium">Pine v6 ekle</div>
+            <input
+              className="input text-2xs"
+              value={pineName}
+              onChange={(e) => setPineName(e.target.value)}
+              placeholder="script adı"
+            />
+            <textarea
+              className="input text-2xs font-mono min-h-[120px] w-full"
+              value={pineDraft}
+              onChange={(e) => setPineDraft(e.target.value)}
+              placeholder={'//@version=6\nindicator("...")\nplot(close)'}
+              spellCheck={false}
+            />
+            <div className="flex flex-wrap gap-1">
+              {(
+                [
+                  ["zero_up", "0↑"],
+                  ["zero_dn", "0↓"],
+                  ["cross_up", "H×Y↑"],
+                  ["cross_dn", "H×Y↓"],
+                  ["up", "↑"],
+                  ["dn", "↓"],
+                ] as [PineCond, string][]
+              ).map(([id, label]) => (
+                <Chip
+                  key={id}
+                  active={pineConds.includes(id)}
+                  label={label}
+                  onClick={() => setPineConds((a) => toggleIn(a, id))}
+                />
+              ))}
+            </div>
+            <button
+              type="button"
+              className="btn btn-accent text-2xs"
+              onClick={() => {
+                const raw = pineDraft.trim();
+                if (!raw) {
+                  setPineStatus("Pine yapıştır");
+                  return;
+                }
+                const conv = convertAny(raw, "td");
+                const sc: CustomScript = {
+                  id: `pine_${Math.random().toString(36).slice(2, 9)}`,
+                  name: pineName.trim() || "Liste Pine",
+                  code: conv.code,
+                  language: "td",
+                  originalCode: raw,
+                  originalLanguage: "pine",
+                  warnings: conv.warnings,
+                  updatedAt: Date.now(),
+                };
+                upsertScript(sc);
+                setPineIds((a) => (a.includes(sc.id) ? a : [...a, sc.id]));
+                applyScriptToActive(sc.id);
+                void fetch("/api/store", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    scripts: useDeskStore.getState().scripts,
+                  }),
+                }).catch(() => {});
+                setPineStatus(
+                  conv.warnings.length
+                    ? `eklendi · ${conv.warnings[0]}`
+                    : "eklendi · TD’ye çevrildi · grafikte"
+                );
+              }}
+            >
+              Ekle ve tara
+            </button>
+            {scripts.length > 0 && (
+              <div className="flex flex-wrap gap-1">
+                {scripts.map((s) => (
+                  <Chip
+                    key={s.id}
+                    active={pineIds.includes(s.id)}
+                    label={s.name}
+                    onClick={() => {
+                      setPineIds((a) => toggleIn(a, s.id));
+                      if (!pineIds.includes(s.id)) applyScriptToActive(s.id);
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+            {pineStatus && (
+              <div className="text-2xs text-desk-muted">{pineStatus}</div>
+            )}
           </div>
         )}
       </div>

@@ -862,6 +862,7 @@ export const useDeskStore = create<DeskState>()(
         alerts: s.alerts,
         botSettings: s.botSettings,
         drawings: s.drawings,
+        scripts: s.scripts,
       }),
     }
   )

@@ -3,6 +3,8 @@ import { hamJurikTpo } from "@/lib/indicators/hamJurikTpo";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
 import { closes, macd, stochastic } from "@/lib/indicators/math";
 import type { ScannerFilter } from "@/lib/scanner/engine";
+import { runCustomScript } from "@/lib/scripts/sandbox";
+import { convertAny } from "@/lib/scripts/pine/translate";
 
 export type HamCond =
   | "raw_up"
@@ -54,7 +56,23 @@ export type DiagCond =
   | "triple_bull"
   | "triple_bear";
 
-export type ListScanKind = "ham" | "macd" | "stoch" | "diag";
+export type ListScanKind = "ham" | "macd" | "stoch" | "diag" | "pine";
+
+export type PineCond =
+  | "zero_up"
+  | "zero_dn"
+  | "cross_up"
+  | "cross_dn"
+  | "up"
+  | "dn";
+
+export type PineScriptScan = {
+  id: string;
+  name: string;
+  code: string;
+  language: "td" | "pine" | "js";
+  conds: PineCond[];
+};
 
 export type ListScanHit = {
   kind: ListScanKind;
@@ -118,6 +136,10 @@ export type ListScanConfig = {
     ob?: number;
     colorK?: string;
     colorD?: string;
+  };
+  pine?: {
+    enabled: boolean;
+    scripts: PineScriptScan[];
   };
   /** Extra AND filters (engine ScannerFilter) applied after main hit. */
   extraFilters?: ScannerFilter[];
@@ -565,6 +587,75 @@ function scanDiag(
   return hits;
 }
 
+
+function runnablePineCode(sc: PineScriptScan): { code: string; language: "td" | "js" } {
+  if (sc.language === "js") return { code: sc.code, language: "js" };
+  if (sc.language === "td") return { code: sc.code, language: "td" };
+  const conv = convertAny(sc.code, "td");
+  return { code: conv.code, language: "td" };
+}
+
+function scanPine(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["pine"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled || !cfg.scripts.length) return [];
+  if (candles.length < 30) return [];
+  const hits: ListScanHit[] = [];
+  const n = candles.length;
+  for (const sc of cfg.scripts) {
+    const conds = sc.conds.length ? sc.conds : (["zero_up", "cross_up"] as PineCond[]);
+    const run = runnablePineCode(sc);
+    const r = runCustomScript(run.code, candles, run.language);
+    if (r.error || !r.plots.length) continue;
+    const plots = r.plots.map((p) => p.values);
+    const a = plots[0]!;
+    const b = plots[1];
+    const zeros = candles.map(() => 0);
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = n - 1 - ago;
+      if (i < 1) break;
+      const tryHit = (ok: boolean, cond: PineCond, bias: ListScanHit["bias"], note: string) => {
+        if (!ok) return;
+        hits.push({
+          kind: "pine",
+          cond: `${sc.id}:${cond}`,
+          bias,
+          barsAgo: ago,
+          note: `${sc.name} ${note} (−${ago})`,
+        });
+      };
+      for (const c of conds) {
+        if (c === "zero_up")
+          tryHit(lineZeroCrossUp(a, i), c, "bull", "0↑");
+        else if (c === "zero_dn")
+          tryHit(lineZeroCrossDn(a, i), c, "bear", "0↓");
+        else if (c === "cross_up" && b)
+          tryHit(crossedAboveAt(a, b, i), c, "bull", "H×Y↑");
+        else if (c === "cross_dn" && b)
+          tryHit(crossedBelowAt(a, b, i), c, "bear", "H×Y↓");
+        else if (c === "cross_up" && !b)
+          tryHit(crossedAboveAt(a, zeros, i), c, "bull", "0↑");
+        else if (c === "cross_dn" && !b)
+          tryHit(crossedBelowAt(a, zeros, i), c, "bear", "0↓");
+        else if (c === "up") {
+          const v0 = a[i - 1];
+          const v1 = a[i];
+          tryHit(v0 != null && v1 != null && v1 > v0, c, "bull", "↑");
+        } else if (c === "dn") {
+          const v0 = a[i - 1];
+          const v1 = a[i];
+          tryHit(v0 != null && v1 != null && v1 < v0, c, "bear", "↓");
+        }
+      }
+      if (hits.some((h) => h.cond.startsWith(`${sc.id}:`) && h.barsAgo === ago))
+        break;
+    }
+  }
+  return hits;
+}
+
 /**
  * Scan one symbol for enabled list-scan indicators.
  * Per enabled indicator: OR among selected conditions.
@@ -580,6 +671,7 @@ export function scanSymbol(
   if (cfg.diag?.enabled) enabledKinds.push("diag");
   if (cfg.macd?.enabled) enabledKinds.push("macd");
   if (cfg.stoch?.enabled) enabledKinds.push("stoch");
+  if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
   const byKind: Record<ListScanKind, ListScanHit[]> = {
@@ -587,6 +679,7 @@ export function scanSymbol(
     diag: cfg.diag ? scanDiag(candles, cfg.diag, maxBarsAgo) : [],
     macd: cfg.macd ? scanMacd(candles, cfg.macd, maxBarsAgo) : [],
     stoch: cfg.stoch ? scanStoch(candles, cfg.stoch, maxBarsAgo) : [],
+    pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
   const matchMode = cfg.matchMode ?? "any";
@@ -673,7 +766,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  ListScanKind,
+  Exclude<ListScanKind, "pine">,
   "hamJurikTpo" | "diagonalSr" | "macd" | "stochastic"
 > = {
   ham: "hamJurikTpo",
