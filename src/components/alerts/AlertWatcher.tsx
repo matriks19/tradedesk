@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { useDeskStore } from "@/store/desk";
 import type { AlertCondition, Exchange, TickerQuote } from "@/lib/types";
+import { buildDeskOpenUrl } from "@/lib/deskLink";
 
 function conditionMet(
   cond: AlertCondition,
@@ -117,16 +118,31 @@ export function AlertWatcher() {
           lastPrice: q.last,
         });
 
-        const text = alertText(a, q.last);
+        const pane = useDeskStore.getState().panes.find(
+          (x) => x.id === useDeskStore.getState().activePaneId
+        );
+        const openUrl = buildDeskOpenUrl({
+          origin: window.location.origin,
+          symbol: a.symbol,
+          exchange: a.exchange,
+          timeframe: pane?.timeframe,
+        });
+        const text = `${alertText(a, q.last)}\n${openUrl}`;
 
         try {
           if (
             typeof Notification !== "undefined" &&
             Notification.permission === "granted"
           ) {
-            new Notification(`Alarm: ${a.symbol}`, {
+            const ntf = new Notification(`Alarm: ${a.symbol}`, {
               body: `${a.condition} ${a.price} · son ${q.last}`,
             });
+            ntf.onclick = () => {
+              window.focus();
+              useDeskStore
+                .getState()
+                .openSymbolInActive(a.symbol, a.exchange, pane?.timeframe);
+            };
           } else if (
             typeof Notification !== "undefined" &&
             Notification.permission === "default" &&
@@ -159,6 +175,8 @@ export function AlertWatcher() {
                   note: a.note,
                   text,
                   message: text,
+                  openUrl,
+                  timeframe: pane?.timeframe,
                 },
               }),
             });

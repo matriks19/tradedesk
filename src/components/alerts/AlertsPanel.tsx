@@ -105,6 +105,11 @@ export function AlertsPanel() {
             ts: Date.now(),
             message: "TradeDesk webhook test",
             text: "TradeDesk webhook test",
+            symbol: "BTCUSDT",
+            exchange: "binance",
+            openUrl: typeof window !== "undefined"
+              ? `${window.location.origin}/?s=BTCUSDT&ex=binance`
+              : undefined,
           },
         }),
       });

@@ -8,11 +8,25 @@ import { AlertWatcher } from "@/components/alerts/AlertWatcher";
 import { useDeskStore } from "@/store/desk";
 import { getPopularSeedScripts } from "@/lib/scripts/catalog";
 import type { CustomScript } from "@/lib/types";
+import { parseDeskOpenSearch } from "@/lib/deskLink";
 
 export function TerminalShell() {
   const hydrateFromServer = useDeskStore((s) => s.hydrateFromServer);
   const upsertScript = useDeskStore((s) => s.upsertScript);
   const seeded = useRef(false);
+
+  useEffect(() => {
+    const applyLink = () => {
+      const hit = parseDeskOpenSearch(window.location.search);
+      if (!hit) return;
+      useDeskStore
+        .getState()
+        .openSymbolInActive(hit.symbol, hit.exchange, hit.timeframe);
+    };
+    applyLink();
+    window.addEventListener("popstate", applyLink);
+    return () => window.removeEventListener("popstate", applyLink);
+  }, []);
 
   useEffect(() => {
     (async () => {

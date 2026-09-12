@@ -89,11 +89,25 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
-      upstreamBody = JSON.stringify({
+      const openUrl =
+        typeof payload.openUrl === "string" ? payload.openUrl.trim() : "";
+      const symbol =
+        payload.symbol != null ? String(payload.symbol) : "";
+      let tgText = String(payload.text || text);
+      if (openUrl && !tgText.includes(openUrl)) tgText = `${tgText}\n${openUrl}`;
+      const tg: Record<string, unknown> = {
         chat_id: chatId,
-        text: String(payload.text || text),
+        text: tgText,
         disable_web_page_preview: true,
-      });
+      };
+      if (openUrl && /^https?:\/\//i.test(openUrl)) {
+        tg.reply_markup = {
+          inline_keyboard: [
+            [{ text: symbol ? `${symbol} grafiği` : "Grafiği aç", url: openUrl }],
+          ],
+        };
+      }
+      upstreamBody = JSON.stringify(tg);
     } else {
       upstreamBody = JSON.stringify(payload);
     }
