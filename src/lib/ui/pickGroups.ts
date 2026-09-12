@@ -62,7 +62,7 @@ export function classifyScannerId(id: string, label = ""): string {
 export function classifyChipId(id: string, label = ""): string {
   const s = `${id} ${label}`.toLowerCase();
   if (/elizi/.test(s)) return "Elizi";
-  if (/rsi|stoch|jkase|jstoch|macd/.test(s)) return "Osilatör";
+  if (/ham|rsi|stoch|jkase|jstoch|macd/.test(s)) return "Osilatör";
   if (/adx|di_|aroon|ema|st_|sma/.test(s)) return "Trend";
   if (/bb_|vol|hod|atr/.test(s)) return "Piyasa";
   if (/diag_|ikili|üçlü|uclu|diyagonal|diag /.test(s)) return "Formasyon";

@@ -245,6 +245,7 @@ export type BuiltinIndicatorId =
   | "descendingBreak"
   | "descendingBreakV2"
   | "diagonalSr"
+  | "hamJurikTpo"
   | "vfi"
   | "waddahAttar"
   | "halfTrend"

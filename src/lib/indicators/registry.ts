@@ -189,6 +189,7 @@ import {
   computeDescendingBreakV2,
 } from "./descendingBreak";
 import { diagonalSr as computeDiagonalSr } from "./diagonalSr";
+import { hamJurikTpo } from "./hamJurikTpo";
 
 export type PlotMarker = {
   time: number;
@@ -468,6 +469,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
 
   // —— Elizi Lab
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab — soft Temp hist + ±E lines; AL/SAT at +E/−E cross (below/above bar). Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
+  { id: "hamJurikTpo", label: "HAM Jurik TPO", category: "jurik", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: "HAM + Jurik RMA Trend Pulse. Semi-raw, 4 renk hist, sıfır hattı. Tarama: destek teması + HAM↑ + hist dönüyor; onay: hist+ veya raw×hist alttan kesişim.", inputs: [num("hamLen", "HAM Length", 21), num("momSpan", "Mom Span", 10), num("normLen", "Norm Len", 80), num("jLen", "Jurik RMA", 20), num("jPhase", "Phase", 0, -100, 100, 1), num("postSmooth", "Final Smooth", 5), num("showRawHam", "Semi-raw", 1, 0, 1, 1), num("showHistogram", "Histogram", 1, 0, 1, 1), num("showMarkers", "Flip işaretleri", 1, 0, 1, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
 
@@ -2984,6 +2986,56 @@ export function computeBuiltin(
         support: d.support,
         resistance: d.resistance,
       });
+      break;
+    }
+    case "hamJurikTpo": {
+      const showRaw = n(p, "showRawHam", 1) !== 0;
+      const showHist = n(p, "showHistogram", 1) !== 0;
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const h = hamJurikTpo(candles, {
+        hamLen: n(p, "hamLen", 21),
+        momSpan: n(p, "momSpan", 10),
+        normLen: n(p, "normLen", 80),
+        jLen: n(p, "jLen", 20),
+        jPhase: n(p, "jPhase", 0),
+        postSmooth: n(p, "postSmooth", 5),
+      });
+      const oscLine = line(inst, "osc", "sub", "#18d0bd", candles, h.osc, "HAM Osc");
+      oscLine.data = oscLine.data.map((pt, i) => {
+        if (!("value" in pt) || pt.value == null) return pt;
+        return { time: pt.time, value: pt.value, color: h.regime[i] === 1 ? "#18d0bd" : "#cf1d3a" };
+      });
+      const plots: PlotSeries[] = [
+        line(inst, "zero", "sub", "#8b95a888", candles, candles.map(() => 0), "0"),
+        line(inst, "ob", "sub", "#ef535033", candles, candles.map(() => 60), "+60"),
+        line(inst, "os", "sub", "#26a69a33", candles, candles.map(() => -60), "-60"),
+        oscLine,
+      ];
+      if (showRaw) {
+        plots.push(line(inst, "raw", "sub", "#8b95a899", candles, h.oscDisplay, "Semi-raw"));
+      }
+      if (showHist) {
+        const hp = hist(inst, "hist", "sub", "#00c87866", candles, h.hist, "Hist");
+        hp.data = hp.data.map((pt, i) => {
+          if (!("value" in pt) || pt.value == null) return pt;
+          return { time: pt.time, value: pt.value, color: h.histColor[i] ?? "#00c87866" };
+        });
+        plots.push(hp);
+      }
+      if (showMarkers) {
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          const tm = candles[i]!.time;
+          if (h.bullFlip[i])
+            markers.push({ time: tm, position: "belowBar", color: "#18d0bd", shape: "arrowUp", text: "AL" });
+          if (h.bearFlip[i])
+            markers.push({ time: tm, position: "aboveBar", color: "#cf1d3a", shape: "arrowDown", text: "SAT" });
+          if (h.rawCrossHist[i])
+            markers.push({ time: tm, position: "belowBar", color: "#81c784", shape: "circle", text: "raw×hist" });
+        }
+        if (markers.length) oscLine.markers = markers;
+      }
+      push(plots, { osc: h.osc, raw: h.oscDisplay, hist: h.hist });
       break;
     }
     case "descendingBreakV2": {

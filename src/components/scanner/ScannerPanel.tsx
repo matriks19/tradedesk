@@ -156,6 +156,21 @@ const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
     label: "Diag kırılım",
     filter: { type: "diagonalSr", event: "break", direction: "any", maxBarsAgo: 2 },
   },
+  {
+    id: "ham_setup",
+    label: "HAM erken",
+    filter: { type: "hamJurik", event: "setup", maxBarsAgo: 2 },
+  },
+  {
+    id: "ham_onay",
+    label: "HAM onay",
+    filter: { type: "hamJurik", event: "confirm", maxBarsAgo: 2 },
+  },
+  {
+    id: "ham_al",
+    label: "HAM AL",
+    filter: { type: "hamJurik", event: "al", maxBarsAgo: 2 },
+  },
 ];
 
 const KLINE_TIMEOUT_MS = 10_000;

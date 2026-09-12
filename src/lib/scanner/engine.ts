@@ -24,6 +24,7 @@ import {
   recentDescendingBreakV2,
 } from "@/lib/indicators/descendingBreak";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
+import { recentHamJurik } from "@/lib/indicators/hamJurikTpo";
 
 export type ScannerFilter =
   | { type: "rsi"; op: "lt" | "gt"; value: number; period?: number }
@@ -143,6 +144,11 @@ export type ScannerFilter =
       event?: "bounce" | "break" | "twin" | "triple" | "any";
       direction?: "bull" | "bear" | "any";
       slope?: "desc" | "any";
+      maxBarsAgo?: number;
+    }
+  | {
+      type: "hamJurik";
+      event: "setup" | "confirm" | "histCross" | "rawCrossHist" | "al" | "rawUp";
       maxBarsAgo?: number;
     };
 
@@ -609,6 +615,27 @@ export const SCANNER_PRESETS: Record<
     description: "Diyagonal destek/direnç kırılımı ≤2 bar",
     filters: [{ type: "diagonalSr", event: "break", direction: "any", maxBarsAgo: 2 }],
   },
+  diag_ham_setup: {
+    label: "HAM erken AL",
+    description: "Diag destek teması + semi-raw HAM↑ + hist artıya dönüyor ≤2",
+    filters: [
+      { type: "diagonalSr", event: "bounce", direction: "bull", maxBarsAgo: 2 },
+      { type: "hamJurik", event: "setup", maxBarsAgo: 2 },
+    ],
+  },
+  diag_ham_onay: {
+    label: "HAM onay",
+    description: "Hist artıya geçmiş veya semi-raw hist’i alttan kesmiş ≤2",
+    filters: [{ type: "hamJurik", event: "confirm", maxBarsAgo: 2 }],
+  },
+  diag_ham_al: {
+    label: "Diag×HAM AL",
+    description: "Destek teması + HAM↑ + (hist+ veya raw×hist) ≤2",
+    filters: [
+      { type: "diagonalSr", event: "bounce", direction: "bull", maxBarsAgo: 2 },
+      { type: "hamJurik", event: "al", maxBarsAgo: 2 },
+    ],
+  },
 
 };
 
@@ -651,6 +678,7 @@ const CANDLE_FILTERS = new Set([
   "priceVsVwma",
   "descendingBreakV2",
   "diagonalSr",
+  "hamJurik",
   "adxPumpStage",
   "adxPumpMixDi",
   "eliziPhase",
@@ -1272,6 +1300,11 @@ export function matchFilters(
         slope: f.slope ?? "any",
         maxBarsAgo: f.maxBarsAgo ?? 2,
       });
+      if (!hit.ok) return { ok: false, note: "" };
+      notes.push(hit.note);
+    } else if (f.type === "hamJurik") {
+      if (!candles || candles.length < 80) return { ok: false, note: "" };
+      const hit = recentHamJurik(candles, f.event, f.maxBarsAgo ?? 2);
       if (!hit.ok) return { ok: false, note: "" };
       notes.push(hit.note);
     } else if (f.type === "rsiDivergence") {
