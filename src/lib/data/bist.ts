@@ -71,16 +71,18 @@ function cachePath(symbol: string, timeframe: string): string {
 
 function readCandleCache(
   symbol: string,
-  timeframe: string
+  timeframe: string,
+  allowStale = false
 ): Candle[] | null {
   try {
     const p = cachePath(symbol, timeframe);
     if (!existsSync(p)) return null;
     const raw = JSON.parse(readFileSync(p, "utf8"));
     if (!Array.isArray(raw?.candles) || !raw.candles.length) return null;
-    // accept cache up to 24h for daily, 6h otherwise
-    const maxAge = timeframe === "1d" || timeframe === "1w" ? 24 * 3600e3 : 6 * 3600e3;
-    if (Date.now() - Number(raw.ts || 0) > maxAge) return null;
+    if (!allowStale) {
+      const maxAge = timeframe === "1d" || timeframe === "1w" ? 24 * 3600e3 : 6 * 3600e3;
+      if (Date.now() - Number(raw.ts || 0) > maxAge) return null;
+    }
     return raw.candles as Candle[];
   } catch {
     return null;
@@ -202,21 +204,22 @@ async function fetchYahooChart(
       const res = await fetch(url, {
         cache: "no-store",
         headers: YAHOO_HEADERS,
+        signal: AbortSignal.timeout(4000),
       });
       lastStatus = res.status;
       if (res.status === 429 || res.status === 503) {
-        await sleep(400 * (attempt + 1) + Math.random() * 200);
+        await sleep(120);
         continue;
       }
       if (!res.ok) {
-        await sleep(200 * (attempt + 1));
+        await sleep(80);
         continue;
       }
       const json = await res.json();
       const parsed = parseChartCandles(json);
       if (parsed.candles.length || Object.keys(parsed.meta).length) return parsed;
     } catch {
-      await sleep(250 * (attempt + 1));
+      await sleep(80);
     }
   }
   if (lastStatus) {
@@ -282,7 +285,11 @@ export class BistProvider {
   ): Promise<{ candles: Candle[]; delayed: true; note: string }> {
     const yp = yahooParamsForTimeframe(timeframe);
     const ysym = this.yahooSymbol(symbol);
-    const fetched = await fetchYahooChart(ysym, yp.interval, yp.range, 4);
+    const fresh = readCandleCache(symbol, timeframe, false);
+    if (fresh?.length) {
+      return { candles: fresh, delayed: true as const, note: "BIST: cache" };
+    }
+    const fetched = await fetchYahooChart(ysym, yp.interval, yp.range, 2);
     const finalize = (candles: Candle[], note: string) => {
       let out = candles;
       if (yp.aggregateMinutes && yp.aggregateMinutes > 0) {
@@ -311,7 +318,7 @@ export class BistProvider {
       writeCandleCache(symbol, timeframe, result.candles);
       return result;
     }
-    const cached = readCandleCache(symbol, timeframe);
+    const cached = readCandleCache(symbol, timeframe, true);
     if (cached?.length) {
       return {
         candles: cached,
@@ -329,7 +336,7 @@ export class BistProvider {
     const results = await mapPoolLocal(list, 8, async (sym) => {
       const ysym = this.yahooSymbol(sym);
       // Short range is enough for quote meta + change
-      const fetched = await fetchYahooChart(ysym, "1d", "5d", 3);
+      const fetched = await fetchYahooChart(ysym, "1d", "5d", 2);
       if (!fetched) return null;
       return quoteFromMeta(sym, fetched.meta, fetched.candles);
     });

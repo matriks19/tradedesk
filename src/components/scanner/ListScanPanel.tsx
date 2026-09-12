@@ -514,7 +514,9 @@ export function ListScanPanel() {
 
       const out: ResultRow[] = [];
       let done = 0;
-      const concurrency = total > 200 ? 6 : 8;
+      const isBist = universe.symbols[0]?.exchange === "bist";
+      const concurrency = isBist ? 3 : total > 200 ? 6 : 8;
+      const klineMs = isBist ? 6000 : 10000;
       await mapPool(
         quotes,
         concurrency,
@@ -525,7 +527,7 @@ export function ListScanPanel() {
               typeof AbortSignal !== "undefined" &&
               typeof AbortSignal.any === "function" &&
               typeof AbortSignal.timeout === "function"
-                ? AbortSignal.any([ac.signal, AbortSignal.timeout(10000)])
+                ? AbortSignal.any([ac.signal, AbortSignal.timeout(klineMs)])
                 : ac.signal;
             const kr = await fetch(
               `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${tf}&limit=220`,
