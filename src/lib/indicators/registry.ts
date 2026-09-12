@@ -3215,7 +3215,13 @@ export function computeAllIndicators(
     if (!ind.visible) continue;
     if (ind.type === "custom") continue;
     const target = resolvePaneTarget(ind, byId);
-    const plots = computeBuiltin(ind, candles, cache);
+    let plots: PlotSeries[] = [];
+    try {
+      plots = computeBuiltin(ind, candles, cache);
+    } catch (e) {
+      console.warn("indicator compute failed", ind.type, e);
+      continue;
+    }
     const nestedOnSub =
       target.pane === "sub" && target.paneGroup != null && target.paneGroup !== ind.id;
     for (const p of plots) {

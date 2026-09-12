@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeskStore } from "@/store/desk";
 import type { Candle, Exchange, Timeframe, AlertScanKey, Watchlist, TickerQuote } from "@/lib/types";
 import { binancePerpWatchlistMeta } from "@/lib/data/binanceLists";
@@ -659,6 +659,13 @@ export function ListScanPanel() {
     [pane, addIndicator, updateIndicatorParams]
   );
 
+  useEffect(() => {
+    if (!hamOn) return;
+    upsertIndicators(buildConfig());
+    // pane.id only — don't depend on upsert/build or add() retriggers a loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hamOn, pane?.id]);
+
   const onHitClick = useCallback(
     (row: ResultRow) => {
       const cfg = buildConfig();
@@ -870,7 +877,10 @@ export function ListScanPanel() {
               key={c.id}
               active={hamConds.includes(c.id)}
               label={c.label}
-              onClick={() => setHamConds((a) => toggleIn(a, c.id))}
+              onClick={() => {
+                setHamOn(true);
+                setHamConds((a) => toggleIn(a, c.id));
+              }}
             />
           ))}
         </div>

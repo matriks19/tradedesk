@@ -190,6 +190,7 @@ function isHtfScan(tf: string): boolean {
 
 export function ScannerPanel() {
   const openSymbolInActive = useDeskStore((s) => s.openSymbolInActive);
+  const addIndicator = useDeskStore((s) => s.addIndicator);
   const addWatchlistSymbol = useDeskStore((s) => s.addWatchlistSymbol);
   const activeWatchlistId = useDeskStore((s) => s.activeWatchlistId);
   const watchlists = useDeskStore((s) => s.watchlists);
@@ -609,6 +610,15 @@ export function ScannerPanel() {
 
   const openRow = (r: ScannerRow) => {
     openSymbolInActive(r.symbol, r.exchange, timeframe);
+    const wantHam = selectedPresets.some((id) => id.startsWith("ham_"));
+    if (!wantHam) return;
+    window.setTimeout(() => {
+      const s = useDeskStore.getState();
+      const pane = s.panes.find((p) => p.id === s.activePaneId) ?? s.panes[0];
+      if (!pane) return;
+      if (pane.indicators.some((i) => i.type === "hamJurikTpo")) return;
+      addIndicator(pane.id, "hamJurikTpo");
+    }, 0);
   };
 
   return (

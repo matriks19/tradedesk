@@ -337,9 +337,16 @@ export const useDeskStore = create<DeskState>()(
           });
         },
         addIndicator: (paneId, type, source, parentId) =>
-          set((s) => ({
+          set((s) => {
+            const pid = s.panes.some((p) => p.id === paneId)
+              ? paneId
+              : s.panes.some((p) => p.id === s.activePaneId)
+                ? s.activePaneId
+                : s.panes[0]?.id;
+            if (!pid) return s;
+            return {
             panes: s.panes.map((p) => {
-              if (p.id !== paneId) return p;
+              if (p.id !== pid) return p;
               const meta = BUILTIN_META[type];
               if (!meta) return p;
               // Nesting depth limit
@@ -369,7 +376,8 @@ export const useDeskStore = create<DeskState>()(
               }
               return { ...p, indicators: [...p.indicators, inst] };
             }),
-          })),
+            };
+          }),
         removeIndicator: (paneId, indicatorId) =>
           set((s) => ({
             panes: s.panes.map((p) => {
