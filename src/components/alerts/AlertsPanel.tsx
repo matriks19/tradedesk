@@ -97,31 +97,43 @@ export function AlertsPanel() {
     }
   }, [pane?.id, pane?.symbol, pane?.exchange, pane?.timeframe]);
 
+  const boundTopic =
+    (botSettings.ntfyTopic || "").trim() ||
+    topicFromWebhook(botSettings.webhookUrl || "");
+  const topicValue = ntfyTopic || boundTopic;
+
   useEffect(() => {
-    const saved = loadSavedNtfy();
-    const topic =
-      (botSettings.ntfyTopic || "").trim() ||
-      topicFromWebhook(botSettings.webhookUrl || "") ||
-      saved?.topic ||
-      "";
-    if (topic) setNtfyTopic(topic);
-    if (saved && !botSettings.webhookUrl.trim()) {
-      setBotSettings({
-        channel: "ntfy",
-        ntfyTopic: saved.topic,
-        webhookUrl: saved.url,
-        enabled: botSettings.enabled || true,
-      });
-    } else if (topic) {
-      persistNtfyFromBot({
-        ...botSettings,
-        ntfyTopic: topic,
-      });
-    }
-    if (topic) setNtfyStatus(`kayıtlı · ${topic} · alarm silmek bunu silmez`);
-    // hydrate once
+    const apply = (bot: typeof botSettings) => {
+      const saved = loadSavedNtfy();
+      const topic =
+        (bot.ntfyTopic || "").trim() ||
+        topicFromWebhook(bot.webhookUrl || "") ||
+        saved?.topic ||
+        "";
+      if (topic) {
+        setNtfyTopic((cur) => cur || topic);
+        setNtfyStatus(`kayıtlı · ${topic} · alarm silmek bunu silmez`);
+      }
+      if (saved && !bot.webhookUrl.trim()) {
+        setBotSettings({
+          channel: "ntfy",
+          ntfyTopic: saved.topic,
+          webhookUrl: saved.url,
+          enabled: true,
+        });
+      } else if (topic) {
+        persistNtfyFromBot({ ...bot, ntfyTopic: topic });
+      }
+    };
+    apply(botSettings);
+    const api = useDeskStore.persist;
+    if (!api?.onFinishHydration) return;
+    const unsub = api.onFinishHydration((s) => apply(s.botSettings));
+    if (api.hasHydrated()) apply(useDeskStore.getState().botSettings);
+    return unsub;
+    // store hydrate
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [botSettings.ntfyTopic, botSettings.webhookUrl]);
 
   const extras = () => {
     const expiresAt = hours > 0 ? Date.now() + hours * 3600_000 : undefined;
@@ -644,7 +656,7 @@ export function AlertsPanel() {
               Konu
               <input
                 className="input mt-0.5"
-                value={ntfyTopic}
+                value={topicValue}
                 onChange={(e) =>
                   setNtfyTopic(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))
                 }
@@ -668,9 +680,7 @@ export function AlertsPanel() {
                 onClick={() => {
                   const saved = loadSavedNtfy();
                   const topic =
-                    ntfyTopic.trim() ||
-                    (botSettings.ntfyTopic || "").trim() ||
-                    topicFromWebhook(botSettings.webhookUrl || "") ||
+                    topicValue.trim() ||
                     saved?.topic ||
                     "";
                   if (!topic) {

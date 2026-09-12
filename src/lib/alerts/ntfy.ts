@@ -61,18 +61,27 @@ export function topicFromWebhook(url: string): string {
   }
 }
 
+function cookieTopic(): string {
+  if (typeof document === "undefined") return "";
+  const m = document.cookie.match(/(?:^|; )td_ntfy=([^;]+)/);
+  return m?.[1] ? decodeURIComponent(m[1]).trim() : "";
+}
+
 export function loadSavedNtfy(): { topic: string; url: string } | null {
   if (typeof window === "undefined") return null;
   try {
     const raw = localStorage.getItem(NTFY_STORE_KEY);
-    if (!raw) return null;
-    const j = JSON.parse(raw) as { topic?: string; url?: string };
-    const topic = (j.topic || "").trim();
-    const url = (j.url || "").trim();
-    if (topic && url) return { topic, url };
+    if (raw) {
+      const j = JSON.parse(raw) as { topic?: string; url?: string };
+      const topic = (j.topic || "").trim();
+      const url = (j.url || "").trim();
+      if (topic && url) return { topic, url };
+    }
   } catch {
     /* ignore */
   }
+  const topic = cookieTopic();
+  if (topic) return { topic, url: `https://ntfy.sh/${topic}` };
   return null;
 }
 
@@ -82,11 +91,21 @@ export function saveNtfyChannel(topic: string, url: string) {
   const u = url.trim();
   if (!t || !u) return;
   localStorage.setItem(NTFY_STORE_KEY, JSON.stringify({ topic: t, url: u }));
+  try {
+    document.cookie = `td_ntfy=${encodeURIComponent(t)};max-age=31536000;path=/;SameSite=Lax`;
+  } catch {
+    /* ignore */
+  }
 }
 
 export function clearSavedNtfy() {
   if (typeof window === "undefined") return;
   localStorage.removeItem(NTFY_STORE_KEY);
+  try {
+    document.cookie = "td_ntfy=;max-age=0;path=/";
+  } catch {
+    /* ignore */
+  }
 }
 
 export function persistNtfyFromBot(bot: {

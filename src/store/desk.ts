@@ -847,6 +847,17 @@ export const useDeskStore = create<DeskState>()(
     },
     {
       name: "tradedesk-v1",
+      merge: (persisted, current) => {
+        const p = (persisted ?? {}) as Partial<typeof current>;
+        return {
+          ...current,
+          ...p,
+          botSettings: {
+            ...current.botSettings,
+            ...(p.botSettings ?? {}),
+          },
+        };
+      },
       onRehydrateStorage: () => (state) => {
         if (state?.lastBacktest) {
           state.lastBacktest = normalizeBacktestResult(state.lastBacktest);
