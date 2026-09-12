@@ -243,6 +243,7 @@ export type BuiltinIndicatorId =
   | "squeezeMomentum"
   | "softTrend"
   | "descendingBreak"
+  | "descendingBreakV2"
   | "vfi"
   | "waddahAttar"
   | "halfTrend"

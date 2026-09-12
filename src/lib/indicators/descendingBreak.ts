@@ -1,4 +1,13 @@
 import type { Candle } from "@/lib/types";
+import {
+  aroon,
+  cci,
+  ema,
+  ichimoku,
+  rsi,
+  sma,
+  vwma,
+} from "@/lib/indicators/math";
 
 export type DescendingBreakOpts = {
   /** Pivot lookback on each side (Pine pivothigh length; default 20) */
@@ -154,6 +163,114 @@ export function recentDescendingBreak(
     const i = end - ago;
     if (i < 0) break;
     if (r.breakOut[i] === 1) return { ok: true, barsAgo: ago };
+  }
+  return { ok: false, barsAgo: -1 };
+}
+
+/**
+ * "Düşen Kırılımı 2. Versiyon" — multi-condition AL signal (Pine port).
+ * EMA5>20>50, close>VWMA&EMA5, RSI 50–75, CCI>90, SpanA>SpanB,
+ * AroonUp>50 & >Down, vol>1.3×SMA10, with cooldown bars.
+ */
+export type DescendingBreakV2Opts = {
+  cooldownBars?: number;
+  useEma?: boolean;
+  useVwma?: boolean;
+  useRsi?: boolean;
+  useCci?: boolean;
+  useIchimoku?: boolean;
+  useAroon?: boolean;
+  useVolume?: boolean;
+};
+
+export type DescendingBreakV2Result = {
+  signal: (number | null)[];
+  ema5: (number | null)[];
+  ema20: (number | null)[];
+  ema50: (number | null)[];
+};
+
+export function computeDescendingBreakV2(
+  candles: Candle[],
+  opts: DescendingBreakV2Opts = {}
+): DescendingBreakV2Result {
+  const {
+    cooldownBars = 10,
+    useEma = true,
+    useVwma = true,
+    useRsi = true,
+    useCci = true,
+    useIchimoku = true,
+    useAroon = true,
+    useVolume = true,
+  } = opts;
+  const n = candles.length;
+  const c = candles.map((x) => x.close);
+  const e5 = ema(c, 5);
+  const e20 = ema(c, 20);
+  const e50 = ema(c, 50);
+  const r = rsi(c, 14);
+  const cc = cci(candles, 20);
+  const vw = vwma(candles, 20);
+  const ich = ichimoku(candles);
+  const ar = aroon(candles, 14);
+  const vols = candles.map((x) => x.volume);
+  const volSma = sma(vols, 10);
+  const signal: (number | null)[] = new Array(n).fill(null);
+  let lastSig = -cooldownBars;
+  for (let i = 0; i < n; i++) {
+    const emaOk =
+      !useEma ||
+      (e5[i] != null &&
+        e20[i] != null &&
+        e50[i] != null &&
+        (e5[i] as number) > (e20[i] as number) &&
+        (e20[i] as number) > (e50[i] as number));
+    const vwmaOk =
+      !useVwma ||
+      (vw[i] != null &&
+        e5[i] != null &&
+        c[i]! > (vw[i] as number) &&
+        c[i]! > (e5[i] as number));
+    const rsiOk =
+      !useRsi || (r[i] != null && (r[i] as number) > 50 && (r[i] as number) < 75);
+    const cciOk = !useCci || (cc[i] != null && (cc[i] as number) > 90);
+    const ichOk =
+      !useIchimoku ||
+      (ich.spanA[i] != null &&
+        ich.spanB[i] != null &&
+        (ich.spanA[i] as number) > (ich.spanB[i] as number));
+    const aroonOk =
+      !useAroon ||
+      (ar.up[i] != null &&
+        ar.down[i] != null &&
+        (ar.up[i] as number) > 50 &&
+        (ar.up[i] as number) > (ar.down[i] as number));
+    const volOk =
+      !useVolume ||
+      (volSma[i] != null && vols[i]! > (volSma[i] as number) * 1.3);
+    const buy =
+      emaOk && vwmaOk && rsiOk && cciOk && ichOk && aroonOk && volOk;
+    if (buy && i - lastSig > cooldownBars) {
+      signal[i] = 1;
+      lastSig = i;
+    }
+  }
+  return { signal, ema5: e5, ema20: e20, ema50: e50 };
+}
+
+export function recentDescendingBreakV2(
+  candles: Candle[],
+  maxBarsAgo = 2,
+  opts?: DescendingBreakV2Opts
+): { ok: boolean; barsAgo: number } {
+  const r = computeDescendingBreakV2(candles, opts);
+  const end = candles.length - 1;
+  if (end < 0) return { ok: false, barsAgo: -1 };
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = end - ago;
+    if (i < 0) break;
+    if (r.signal[i] === 1) return { ok: true, barsAgo: ago };
   }
   return { ok: false, barsAgo: -1 };
 }

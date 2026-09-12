@@ -274,6 +274,9 @@ export function computeFieldSeries(
     case "sma200":
       series = sma(c, 200);
       break;
+    case "ema5":
+      series = ema(closes(candles), 5);
+      break;
     case "ema9":
       series = ema(c, 9);
       break;

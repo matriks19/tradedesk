@@ -32,6 +32,7 @@ export type TechnicalFieldId =
   | "sma50"
   | "sma100"
   | "sma200"
+  | "ema5"
   | "ema9"
   | "ema20"
   | "ema21"
@@ -119,6 +120,7 @@ export const TECHNICAL_FIELDS: TechnicalFieldDef[] = [
   { id: "sma50", label: "SMA 50", group: "Moving Averages", defaultCompare: "price", keywords: "sma ma" },
   { id: "sma100", label: "SMA 100", group: "Moving Averages", defaultCompare: "price", keywords: "sma ma" },
   { id: "sma200", label: "SMA 200", group: "Moving Averages", defaultCompare: "price", keywords: "sma ma" },
+  { id: "ema5", label: "EMA 5", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },
   { id: "ema9", label: "EMA 9", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },
   { id: "ema20", label: "EMA 20", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },
   { id: "ema21", label: "EMA 21", group: "Moving Averages", defaultCompare: "price", keywords: "ema" },

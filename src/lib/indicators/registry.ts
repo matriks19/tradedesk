@@ -184,7 +184,10 @@ import { rsiBreakMarkerSeries } from "@/lib/scanner/rsiScan";
 import { macdCrossMarkerSeries } from "@/lib/scanner/macdScan";
 import { eliziCrossMarkerSeries } from "@/lib/scanner/eliziScan";
 import { computeRsiPuNu } from "./rsiPuNu";
-import { computeDescendingBreak } from "./descendingBreak";
+import {
+  computeDescendingBreak,
+  computeDescendingBreakV2,
+} from "./descendingBreak";
 
 export type PlotMarker = {
   time: number;
@@ -337,6 +340,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "heikinAshiSmooth", label: "Heikin-Ashi Smooth", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ha", inputs: [num("period", "Period", 10)] },
   { id: "softTrend", label: "SoftTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "line", inputs: [num("period", "EMA Period", 20), num("atrPeriod", "ATR Period", 14), num("mult", "ATR Mult", 1.5, 0.5, 10, 0.1)] },
   { id: "descendingBreak", label: "Düşen Kırılımı", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "trend", description: "İki alçalan pivot high trend çizgisi; close üstüne kırılım (Break Out). İsteğe bağlı S/R pivot kutuları. Tarama: descendingBreak ≤2 bar.", inputs: [num("lookback", "Pivot Lookback", 20), num("srBoxes", "S/R Kutuları", 1, 0, 1, 1), num("showMarkers", "Break Out işaretleri", 1, 0, 1, 1)] },
+  { id: "descendingBreakV2", label: "Düşen Kırılımı v2", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ema5", description: "Pine v2 multi-şart AL: EMA5>20>50, VWMA, RSI 50–75, CCI>90, Ichimoku SpanA>B, Aroon, hacim×1.3 + cooldown. Tarama: descendingBreakV2.", inputs: [num("cooldownBars", "Cooldown-down", 10), num("showMarkers", "AL işaretleri", 1, 0, 1, 1)] },
   { id: "halfTrend", label: "HalfTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ht", inputs: [num("amplitude", "Amplitude", 2), num("channelDeviation", "Channel Dev", 2, 0.5, 10, 0.1), num("atrPeriod", "ATR Period", 100)] },
   { id: "sslChannel", label: "SSL Channel", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "sslUp", inputs: [num("period", "Period", 10)] },
   { id: "rangeFilter", label: "Range Filter", category: "trend", pane: "main", acceptsSeries: true, primarySeriesKey: "filter", inputs: [num("period", "Period", 20), num("mult", "Mult", 2.5, 0.1, 20, 0.1), src()] },
@@ -2918,6 +2922,51 @@ export function computeBuiltin(
       });
       break;
     }
+    case "descendingBreakV2": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const r = computeDescendingBreakV2(candles, {
+        cooldownBars: n(p, "cooldownBars", 10),
+      });
+      const plots: PlotSeries[] = [
+        line(inst, "ema5", "main", "#81c784", candles, r.ema5, "EMA5"),
+        line(inst, "ema20", "main", "#64b5f6", candles, r.ema20, "EMA20"),
+        line(inst, "ema50", "main", "#ffb74d", candles, r.ema50, "EMA50"),
+      ];
+      if (showMarkers) {
+        const mark = r.signal.map((v, i) =>
+          v === 1 ? candles[i]!.low : null
+        );
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          if (r.signal[i] !== 1) continue;
+          markers.push({
+            time: candles[i]!.time,
+            position: "belowBar",
+            color: "#81c784",
+            shape: "arrowUp",
+            text: "AL",
+          });
+        }
+        const markLine = line(
+          inst,
+          "alMark",
+          "main",
+          "rgba(0,0,0,0)",
+          candles,
+          mark,
+          ""
+        );
+        markLine.markers = markers;
+        plots.push(markLine);
+      }
+      push(plots, {
+        ema5: r.ema5,
+        ema20: r.ema20,
+        ema50: r.ema50,
+        signal: r.signal,
+      });
+      break;
+    }
     default:
       break;
   }
@@ -3015,5 +3064,4 @@ export function formatIndicatorLabel(
   if (period != null) return `${base} ${period}`;
   return base;
 }
-
 void seriesToLineData;

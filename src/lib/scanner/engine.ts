@@ -4,19 +4,25 @@ import {
   aroon,
   atr,
   bollinger,
+  cci,
   closes,
   ema,
+  ichimoku,
   macd,
   rsi,
   sma,
   stochastic,
   supertrend,
+  vwma,
 } from "@/lib/indicators/math";
 import { adxPumpRadar } from "@/lib/indicators/adxPump";
 import { eliziEdge } from "@/lib/indicators/eliziEdge";
 import { jurikKaseStoch, jurikStoch } from "@/lib/indicators/jurik";
 import { recentRsiPuNu } from "@/lib/indicators/rsiPuNu";
-import { recentDescendingBreak } from "@/lib/indicators/descendingBreak";
+import {
+  recentDescendingBreak,
+  recentDescendingBreakV2,
+} from "@/lib/indicators/descendingBreak";
 
 export type ScannerFilter =
   | { type: "rsi"; op: "lt" | "gt"; value: number; period?: number }
@@ -119,7 +125,18 @@ export type ScannerFilter =
       direction: "bull" | "bear" | "any";
       maxBarsAgo?: number;
     }
-  | { type: "descendingBreak"; maxBarsAgo?: number };
+  | { type: "descendingBreak"; maxBarsAgo?: number }
+  | { type: "priceVsOpen"; side: "above" | "below" }
+  | { type: "adxBelow"; value: number; period?: number }
+  | { type: "cci"; op: "gt" | "lt"; value: number; period?: number }
+  | { type: "changePctBetween"; lo: number; hi: number }
+  | { type: "atrPctBelow"; maxPct: number; period?: number }
+  | { type: "ichiTenkanAboveKijun" }
+  | { type: "ichiSpanAAboveB" }
+  | { type: "volumeMin"; min: number }
+  | { type: "perfBarsBetween"; bars: number; lo: number; hi: number }
+  | { type: "priceVsVwma"; period?: number; side: "above" | "below" }
+  | { type: "descendingBreakV2"; maxBarsAgo?: number };
 
 export interface ScannerRow {
   symbol: string;
@@ -481,6 +498,75 @@ export const SCANNER_PRESETS: Record<
       { type: "volumeSpike", mult: 1.2 },
     ],
   },
+
+  tv_dusen_kirilimi: {
+    label: "DÜŞEN KIRILIMI",
+    description:
+      "TV Düşen Kırılımı tarama: fiyat>açılış, Price>EMA5>EMA20>EMA50, RSI>50, CCI>-100, rel vol>1, perf~5b (≈1H günlük)<15%",
+    filters: [
+      { type: "priceVsOpen", side: "above" },
+      { type: "maStack", kind: "ema", fast: 5, slow: 20 },
+      { type: "maStack", kind: "ema", fast: 20, slow: 50 },
+      { type: "priceVsMa", kind: "ema", period: 5, side: "above" },
+      { type: "rsi", op: "gt", value: 50 },
+      { type: "cci", op: "gt", value: -100 },
+      { type: "volumeSpike", mult: 1 },
+      { type: "perfBars", bars: 5, op: "lt", value: 15 },
+    ],
+  },
+  tv_duk_dipten_guc: {
+    label: "DÜK+Dipten Güç",
+    description:
+      "TV DÜK+DİPTEN GÜÇ TOPLAYAN: fiyat>EMA20, perf~252b>15% (≈YP günlük), perf~21b>0%, perf~5b −3…+3%, rel vol>1.2, ADX<20, RSI>50",
+    filters: [
+      { type: "priceVsMa", kind: "ema", period: 20, side: "above" },
+      { type: "perfBars", bars: 252, op: "gt", value: 15 },
+      { type: "perfBars", bars: 21, op: "gt", value: 0 },
+      { type: "perfBarsBetween", bars: 5, lo: -3, hi: 3 },
+      { type: "volumeSpike", mult: 1.2 },
+      { type: "adxBelow", value: 20 },
+      { type: "rsi", op: "gt", value: 50 },
+    ],
+  },
+  tv_dipten_guc: {
+    label: "Dipten Güç Toplayanlar",
+    description:
+      "TV Dipten Güç: fiyat>EMA20, RSI>50, ADX<20, rel vol>1.2, ATR%<5",
+    filters: [
+      { type: "priceVsMa", kind: "ema", period: 20, side: "above" },
+      { type: "rsi", op: "gt", value: 50 },
+      { type: "adxBelow", value: 20 },
+      { type: "volumeSpike", mult: 1.2 },
+      { type: "atrPctBelow", maxPct: 5 },
+    ],
+  },
+  tv_momentum: {
+    label: "momentum",
+    description:
+      "TV momentum: %Δ 1–10, hacim≥1M (quote), MACD↑sinyal kesişim, RSI(7) 50–65, Ichimoku Tenkan>Kijun. Teknik rating yok.",
+    filters: [
+      { type: "changePctBetween", lo: 1, hi: 10 },
+      { type: "volumeMin", min: 1_000_000 },
+      { type: "macdCross", direction: "bull" },
+      { type: "rsiBetween", lo: 50, hi: 65, period: 7 },
+      { type: "ichiTenkanAboveKijun" },
+    ],
+  },
+  tv_macd_ema5_50: {
+    label: "MACD×EMA5/50",
+    description: "TV kısa: MACD↑sinyal kesişim + EMA5↑EMA50 kesişim",
+    filters: [
+      { type: "macdCross", direction: "bull" },
+      { type: "emaCross", direction: "bull", fast: 5, slow: 50 },
+    ],
+  },
+  tv_dusen_kirilim_v2: {
+    label: "Düşen Kırılımı v2",
+    description:
+      "Pine v2: EMA5>20>50, close>VWMA&EMA5, RSI 50–75, CCI>90, SpanA>SpanB, AroonUp>50 & >Down, vol>1.3×SMA10 — cooldown scan ≤2 bar",
+    filters: [{ type: "descendingBreakV2", maxBarsAgo: 2 }],
+  },
+
 };
 
 const CANDLE_FILTERS = new Set([
@@ -510,6 +596,17 @@ const CANDLE_FILTERS = new Set([
   "rsiDivergence",
   "rsiPuNu",
   "descendingBreak",
+  "priceVsOpen",
+  "adxBelow",
+  "cci",
+  "changePctBetween",
+  "atrPctBelow",
+  "ichiTenkanAboveKijun",
+  "ichiSpanAAboveB",
+  "volumeMin",
+  "perfBarsBetween",
+  "priceVsVwma",
+  "descendingBreakV2",
   "adxPumpStage",
   "adxPumpMixDi",
   "eliziPhase",
@@ -1038,6 +1135,91 @@ export function matchFilters(
       const hit = recentDescendingBreak(candles, f.maxBarsAgo ?? 2);
       if (!hit.ok) return { ok: false, note: "" };
       notes.push(`Düşen kırılım (−${hit.barsAgo})`);
+    } else if (f.type === "priceVsOpen") {
+      if (!candles || candles.length < 1) return { ok: false, note: "" };
+      const c = candles[candles.length - 1]!;
+      const ok =
+        f.side === "above" ? c.close > c.open : c.close < c.open;
+      if (!ok) return { ok: false, note: "" };
+      notes.push(f.side === "above" ? "kapanış>açılış" : "kapanış<açılış");
+    } else if (f.type === "adxBelow") {
+      if (!candles || candles.length < 40) return { ok: false, note: "" };
+      const d = adx(candles, f.period ?? 14);
+      const v = d.adx[d.adx.length - 1];
+      if (v == null || !(v < f.value)) return { ok: false, note: "" };
+      notes.push(`ADX ${v.toFixed(0)}<${f.value}`);
+    } else if (f.type === "cci") {
+      if (!candles || candles.length < 40) return { ok: false, note: "" };
+      const series = cci(candles, f.period ?? 20);
+      const v = series[series.length - 1];
+      if (v == null) return { ok: false, note: "" };
+      const ok = f.op === "gt" ? v > f.value : v < f.value;
+      if (!ok) return { ok: false, note: "" };
+      notes.push(`CCI ${v.toFixed(0)}`);
+    } else if (f.type === "changePctBetween") {
+      const v = quote.changePct;
+      if (!(v >= f.lo && v <= f.hi)) return { ok: false, note: "" };
+      notes.push(`%Δ ${v.toFixed(2)}`);
+    } else if (f.type === "atrPctBelow") {
+      if (!candles || candles.length < 20) return { ok: false, note: "" };
+      const a = atr(candles, f.period ?? 14);
+      const i = candles.length - 1;
+      if (a[i] == null || candles[i]!.close <= 0) return { ok: false, note: "" };
+      const pct = ((a[i] as number) / candles[i]!.close) * 100;
+      lastAtrPct = pct;
+      if (!(pct < f.maxPct)) return { ok: false, note: "" };
+      notes.push(`ATR% ${pct.toFixed(2)}`);
+    } else if (f.type === "ichiTenkanAboveKijun") {
+      if (!candles || candles.length < 60) return { ok: false, note: "" };
+      const ich = ichimoku(candles);
+      const i = candles.length - 1;
+      if (ich.tenkan[i] == null || ich.kijun[i] == null)
+        return { ok: false, note: "" };
+      if (!((ich.tenkan[i] as number) > (ich.kijun[i] as number)))
+        return { ok: false, note: "" };
+      notes.push("Tenkan>Kijun");
+    } else if (f.type === "ichiSpanAAboveB") {
+      if (!candles || candles.length < 60) return { ok: false, note: "" };
+      const ich = ichimoku(candles);
+      const i = candles.length - 1;
+      if (ich.spanA[i] == null || ich.spanB[i] == null)
+        return { ok: false, note: "" };
+      if (!((ich.spanA[i] as number) > (ich.spanB[i] as number)))
+        return { ok: false, note: "" };
+      notes.push("SpanA>SpanB");
+    } else if (f.type === "volumeMin") {
+      const vol = quote.quoteVolume ?? quote.volume ?? 0;
+      if (!(vol >= f.min)) return { ok: false, note: "" };
+      notes.push(`Vol≥${f.min}`);
+    } else if (f.type === "perfBarsBetween") {
+      if (!candles || candles.length <= f.bars)
+        return { ok: false, note: "" };
+      const end = candles.length - 1;
+      const start = end - f.bars;
+      const c0 = candles[start]!.close;
+      const c1 = candles[end]!.close;
+      if (!(c0 > 0)) return { ok: false, note: "" };
+      const pct = ((c1 - c0) / c0) * 100;
+      if (!(pct >= f.lo && pct <= f.hi)) return { ok: false, note: "" };
+      notes.push(`perf${f.bars}b ${pct.toFixed(1)}%`);
+    } else if (f.type === "priceVsVwma") {
+      const period = f.period ?? 20;
+      if (!candles || candles.length < period + 5)
+        return { ok: false, note: "" };
+      const v = vwma(candles, period);
+      const i = candles.length - 1;
+      if (v[i] == null) return { ok: false, note: "" };
+      const last = candles[i]!.close;
+      if (f.side === "above" && !(last > (v[i] as number)))
+        return { ok: false, note: "" };
+      if (f.side === "below" && !(last < (v[i] as number)))
+        return { ok: false, note: "" };
+      notes.push(`vs VWMA${period}`);
+    } else if (f.type === "descendingBreakV2") {
+      if (!candles || candles.length < 80) return { ok: false, note: "" };
+      const hit = recentDescendingBreakV2(candles, f.maxBarsAgo ?? 2);
+      if (!hit.ok) return { ok: false, note: "" };
+      notes.push(`Düşen kırılım v2 (−${hit.barsAgo})`);
     } else if (f.type === "rsiDivergence") {
       // Prefer Pine-style PU/NU; fall back only if no recent pivot signal
       if (!candles || candles.length < 60) return { ok: false, note: "" };
