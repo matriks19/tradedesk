@@ -1,7 +1,7 @@
 import type { Candle } from "@/lib/types";
 import { atr, ema, sma, stdev } from "./math";
 
-export type HamJurikEvent = "setup" | "histTurning" | "histCross" | "histPos" | "rawUp" | "rawCrossHist" | "confirm" | "al" | "rawDown" | "histNeg" | "histCrossDown" | "rawCrossHistDown";
+export type HamJurikEvent = "setup" | "histTurning" | "histCross" | "histPos" | "rawUp" | "rawCrossHist" | "confirm" | "al" | "rawDown" | "histNeg" | "histCrossDown" | "rawCrossHistDown" | "rawCrossOsc" | "rawCrossOscDown";
 
 function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
@@ -139,6 +139,8 @@ export function hamJurikTpo(
   const histNeg: boolean[] = new Array(n).fill(false);
   const histCrossDown: boolean[] = new Array(n).fill(false);
   const rawCrossHistDown: boolean[] = new Array(n).fill(false);
+  const rawCrossOsc: boolean[] = new Array(n).fill(false);
+  const rawCrossOscDown: boolean[] = new Array(n).fill(false);
   const bullFlip: boolean[] = new Array(n).fill(false);
   const bearFlip: boolean[] = new Array(n).fill(false);
   const histColor: (string | null)[] = new Array(n).fill(null);
@@ -159,6 +161,8 @@ export function hamJurikTpo(
       histCrossDown,
       rawCrossHist,
       rawCrossHistDown,
+      rawCrossOsc,
+      rawCrossOscDown,
       bullFlip,
       bearFlip,
       histColor,
@@ -259,9 +263,15 @@ export function hamJurikTpo(
     const d1 = i >= 1 ? oscDisplay[i - 1] : null;
     if (d != null && d1 != null && d > d1) rawUp[i] = true;
     if (d != null && d1 != null && d < d1) rawDown[i] = true;
+    const o = osc[i];
+    const o1 = i >= 1 ? osc[i - 1] : null;
     if (d != null && d1 != null && h != null && h1 != null) {
       if (d1 <= h1 && d > h) rawCrossHist[i] = true;
       if (d1 >= h1 && d < h) rawCrossHistDown[i] = true;
+    }
+    if (d != null && d1 != null && o != null && o1 != null) {
+      if (d1 <= o1 && d > o) rawCrossOsc[i] = true;
+      if (d1 >= o1 && d < o) rawCrossOscDown[i] = true;
     }
     if (h != null) {
       histPos[i] = h >= 0;
@@ -292,6 +302,8 @@ export function hamJurikTpo(
     histCrossDown,
     rawCrossHist,
     rawCrossHistDown,
+    rawCrossOsc,
+    rawCrossOscDown,
     bullFlip,
     bearFlip,
     histColor,
@@ -328,6 +340,10 @@ export function recentHamJurik(
       return { ok: true, barsAgo: ago, note: `raw×hist alttan (−${ago})` };
     if (event === "rawCrossHistDown" && h.rawCrossHistDown[i])
       return { ok: true, barsAgo: ago, note: `raw×hist üstten (−${ago})` };
+    if (event === "rawCrossOsc" && h.rawCrossOsc[i])
+      return { ok: true, barsAgo: ago, note: `raw×osc↑ (−${ago})` };
+    if (event === "rawCrossOscDown" && h.rawCrossOscDown[i])
+      return { ok: true, barsAgo: ago, note: `raw×osc↓ (−${ago})` };
     if (event === "confirm" && (h.histCross[i] || h.rawCrossHist[i]))
       return { ok: true, barsAgo: ago, note: h.rawCrossHist[i] ? `raw×hist (−${ago})` : `hist+ (−${ago})` };
     if (event === "setup" && h.rawUp[i] && h.histTurning[i])

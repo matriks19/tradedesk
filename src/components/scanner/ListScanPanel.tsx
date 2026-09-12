@@ -35,6 +35,8 @@ const HAM_CHIPS: { id: HamCond; label: string }[] = [
   { id: "hist_pos", label: "Hist+" },
   { id: "hist_neg", label: "Hist−" },
   { id: "hist_turn", label: "Hist→" },
+  { id: "raw_x_osc_up", label: "Raw×Osc↑" },
+  { id: "raw_x_osc_dn", label: "Raw×Osc↓" },
   { id: "raw_x_hist_up", label: "Raw×H↑" },
   { id: "raw_x_hist_dn", label: "Raw×H↓" },
   { id: "setup", label: "Setup" },
@@ -324,7 +326,7 @@ export function ListScanPanel() {
   const [macdOn, setMacdOn] = useState(false);
   const [stochOn, setStochOn] = useState(false);
 
-  const [hamConds, setHamConds] = useState<HamCond[]>(["setup", "al"]);
+  const [hamConds, setHamConds] = useState<HamCond[]>(["raw_x_osc_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
   const [macdConds, setMacdConds] = useState<MacdCond[]>(["cross_up"]);
   const [stochConds, setStochConds] = useState<StochCond[]>(["kx_up_os"]);

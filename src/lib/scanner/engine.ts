@@ -148,7 +148,7 @@ export type ScannerFilter =
     }
   | {
       type: "hamJurik";
-      event: "setup" | "confirm" | "histCross" | "rawCrossHist" | "al" | "rawUp";
+      event: "setup" | "confirm" | "histCross" | "rawCrossHist" | "al" | "rawUp" | "rawCrossOsc" | "rawCrossOscDown";
       maxBarsAgo?: number;
     };
 

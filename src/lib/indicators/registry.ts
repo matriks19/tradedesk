@@ -3077,6 +3077,10 @@ export function computeBuiltin(
             markers.push({ time: tm, position: "belowBar", color: "#18d0bd", shape: "arrowUp", text: "AL" });
           if (h.bearFlip[i])
             markers.push({ time: tm, position: "aboveBar", color: "#cf1d3a", shape: "arrowDown", text: "SAT" });
+          if (h.rawCrossOsc[i])
+            markers.push({ time: tm, position: "belowBar", color: "#18d0bd", shape: "circle", text: "raw×osc" });
+          if (h.rawCrossOscDown[i])
+            markers.push({ time: tm, position: "aboveBar", color: "#cf1d3a", shape: "circle", text: "raw×osc" });
           if (h.rawCrossHist[i])
             markers.push({ time: tm, position: "belowBar", color: "#81c784", shape: "circle", text: "raw×hist" });
         }

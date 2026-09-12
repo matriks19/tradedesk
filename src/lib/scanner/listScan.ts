@@ -14,6 +14,8 @@ export type HamCond =
   | "hist_turn"
   | "raw_x_hist_up"
   | "raw_x_hist_dn"
+  | "raw_x_osc_up"
+  | "raw_x_osc_dn"
   | "setup"
   | "confirm"
   | "al";
@@ -212,6 +214,16 @@ function scanHam(
           ok = h.rawCrossHistDown[i];
           bias = "bear";
           note = `raw×hist↓ (−${ago})`;
+          break;
+        case "raw_x_osc_up":
+          ok = h.rawCrossOsc[i];
+          bias = "bull";
+          note = `raw×osc↑ (−${ago})`;
+          break;
+        case "raw_x_osc_dn":
+          ok = h.rawCrossOscDown[i];
+          bias = "bear";
+          note = `raw×osc↓ (−${ago})`;
           break;
         case "setup":
           ok = h.rawUp[i] && h.histTurning[i];
