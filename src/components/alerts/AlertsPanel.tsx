@@ -10,7 +10,14 @@ import type {
   PriceAlert,
 } from "@/lib/types";
 import { SCAN_OPTIONS } from "@/lib/alerts/scanAlert";
-import { isNtfyWebhookUrl, publishNtfy } from "@/lib/alerts/ntfy";
+import {
+  clearSavedNtfy,
+  isNtfyWebhookUrl,
+  loadSavedNtfy,
+  persistNtfyFromBot,
+  publishNtfy,
+  topicFromWebhook,
+} from "@/lib/alerts/ntfy";
 import clsx from "clsx";
 
 const CONDITIONS: { value: AlertCondition; label: string }[] = [
@@ -89,6 +96,32 @@ export function AlertsPanel() {
       setTf(pane.timeframe);
     }
   }, [pane?.id, pane?.symbol, pane?.exchange, pane?.timeframe]);
+
+  useEffect(() => {
+    const saved = loadSavedNtfy();
+    const topic =
+      (botSettings.ntfyTopic || "").trim() ||
+      topicFromWebhook(botSettings.webhookUrl || "") ||
+      saved?.topic ||
+      "";
+    if (topic) setNtfyTopic(topic);
+    if (saved && !botSettings.webhookUrl.trim()) {
+      setBotSettings({
+        channel: "ntfy",
+        ntfyTopic: saved.topic,
+        webhookUrl: saved.url,
+        enabled: botSettings.enabled || true,
+      });
+    } else if (topic) {
+      persistNtfyFromBot({
+        ...botSettings,
+        ntfyTopic: topic,
+      });
+    }
+    if (topic) setNtfyStatus(`kayıtlı · ${topic} · alarm silmek bunu silmez`);
+    // hydrate once
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const extras = () => {
     const expiresAt = hours > 0 ? Date.now() + hours * 3600_000 : undefined;
@@ -605,7 +638,7 @@ export function AlertsPanel() {
           <>
             <div className="font-medium">Telefon (ntfy)</div>
             <p className="text-2xs text-desk-muted leading-relaxed">
-              Telefona ntfy kur (App Store / Play: ntfy). Konuyu yaz, Bağla, uygulamada aynı konuya abone ol. Hesap yok.
+              Telefona ntfy kur (App Store / Play: ntfy). Konuyu yaz, Bağla, uygulamada aynı konuya abone ol. Kanal alarmlardan ayrı ve kalıcı — alarm silmek ntfy’yi silmez.
             </p>
             <label className="text-2xs text-desk-muted block">
               Konu
@@ -633,8 +666,18 @@ export function AlertsPanel() {
                 type="button"
                 className="btn btn-accent text-2xs"
                 onClick={() => {
-                  const topic = ntfyTopic.trim() || `td-${Math.random().toString(36).slice(2, 10)}`;
-                  if (!ntfyTopic.trim()) setNtfyTopic(topic);
+                  const saved = loadSavedNtfy();
+                  const topic =
+                    ntfyTopic.trim() ||
+                    (botSettings.ntfyTopic || "").trim() ||
+                    topicFromWebhook(botSettings.webhookUrl || "") ||
+                    saved?.topic ||
+                    "";
+                  if (!topic) {
+                    setNtfyStatus("önce konu yaz veya Rastgele konu");
+                    return;
+                  }
+                  setNtfyTopic(topic);
                   setBotSettings({
                     channel: "ntfy",
                     ntfyTopic: topic,
@@ -645,6 +688,24 @@ export function AlertsPanel() {
                 }}
               >
                 Bağla
+              </button>
+              <button
+                type="button"
+                className="btn text-2xs"
+                onClick={() => {
+                  const url = botSettings.webhookUrl.trim();
+                  setBotSettings({
+                    channel: url && !isNtfyWebhookUrl(url) ? botSettings.channel : undefined,
+                    ntfyTopic: "",
+                    webhookUrl: url && isNtfyWebhookUrl(url) ? "" : botSettings.webhookUrl,
+                    enabled: url && !isNtfyWebhookUrl(url) ? botSettings.enabled : false,
+                  });
+                  clearSavedNtfy();
+                  setNtfyTopic("");
+                  setNtfyStatus("kanal koptu");
+                }}
+              >
+                Kanalı kopar
               </button>
             </div>
             {ntfyStatus && (

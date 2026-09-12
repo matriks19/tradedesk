@@ -28,6 +28,12 @@ import { BUILTIN_META, defaultsFor, formatIndicatorLabel } from "@/lib/indicator
 import { strategyById } from "@/lib/strategies";
 import { sectorWatchlistMeta } from "@/lib/data/bistSectors";
 import { binancePerpWatchlistMeta, mergeBinanceWatchlists } from "@/lib/data/binanceLists";
+import {
+  isNtfyWebhookUrl,
+  loadSavedNtfy,
+  persistNtfyFromBot,
+  topicFromWebhook,
+} from "@/lib/alerts/ntfy";
 
 const WATCHLIST_CAP = 2000;
 
@@ -625,7 +631,11 @@ export const useDeskStore = create<DeskState>()(
             alerts: s.alerts.map((x) => (x.id === id ? { ...x, ...patch } : x)),
           })),
         setBotSettings: (p) =>
-          set((s) => ({ botSettings: { ...s.botSettings, ...p } })),
+          set((s) => {
+            const botSettings = { ...s.botSettings, ...p };
+            persistNtfyFromBot(botSettings);
+            return { botSettings };
+          }),
         addDrawing: (d) =>
           set((s) => {
             const origin = d.origin ?? "user";
@@ -840,6 +850,29 @@ export const useDeskStore = create<DeskState>()(
       onRehydrateStorage: () => (state) => {
         if (state?.lastBacktest) {
           state.lastBacktest = normalizeBacktestResult(state.lastBacktest);
+        }
+        if (!state) return;
+        const bot = state.botSettings;
+        const topic =
+          (bot.ntfyTopic || "").trim() || topicFromWebhook(bot.webhookUrl || "");
+        if (topic) {
+          persistNtfyFromBot({ ...bot, ntfyTopic: topic });
+          state.botSettings = { ...bot, ntfyTopic: topic };
+          return;
+        }
+        const saved = loadSavedNtfy();
+        if (
+          saved &&
+          (!bot.webhookUrl?.trim() ||
+            isNtfyWebhookUrl(bot.webhookUrl) ||
+            bot.channel === "ntfy")
+        ) {
+          state.botSettings = {
+            ...bot,
+            channel: "ntfy",
+            ntfyTopic: saved.topic,
+            webhookUrl: bot.webhookUrl?.trim() || saved.url,
+          };
         }
       },
       partialize: (s) => ({

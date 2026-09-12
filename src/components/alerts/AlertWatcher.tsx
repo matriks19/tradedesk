@@ -11,7 +11,7 @@ import type {
 } from "@/lib/types";
 import { buildDeskOpenUrl } from "@/lib/deskLink";
 import { checkScanAlert } from "@/lib/alerts/scanAlert";
-import { isNtfyWebhookUrl, publishNtfy } from "@/lib/alerts/ntfy";
+import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
   cond: AlertCondition,
@@ -118,10 +118,15 @@ export function AlertWatcher() {
         /* */
       }
       const bot = useDeskStore.getState().botSettings;
-      if (bot.enabled && bot.webhookUrl.trim()) {
+      const savedNtfy = loadSavedNtfy();
+      const hook = bot.webhookUrl.trim() || savedNtfy?.url || "";
+      const ntfyOn =
+        !!hook &&
+        (bot.enabled || (!bot.webhookUrl.trim() && !!savedNtfy)) &&
+        (isNtfyWebhookUrl(hook) || bot.channel === "ntfy");
+      if (ntfyOn || (bot.enabled && hook)) {
         try {
-          const hook = bot.webhookUrl.trim();
-          if (isNtfyWebhookUrl(hook) || bot.channel === "ntfy") {
+          if (ntfyOn || isNtfyWebhookUrl(hook) || bot.channel === "ntfy") {
             await publishNtfy({
               url: hook,
               text,
