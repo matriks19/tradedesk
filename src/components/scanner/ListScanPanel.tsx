@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { useDeskStore } from "@/store/desk";
-import type { Candle, Exchange, Timeframe, AlertScanKey, Watchlist } from "@/lib/types";
+import type { Candle, Exchange, Timeframe, AlertScanKey, Watchlist, TickerQuote } from "@/lib/types";
 import { binancePerpWatchlistMeta } from "@/lib/data/binanceLists";
 import { sectorWatchlistMeta } from "@/lib/data/bistSectors";
 import {
@@ -464,6 +464,12 @@ export function ListScanPanel() {
     extraIds,
   ]);
 
+  const abortRef = useRef<AbortController | null>(null);
+
+  const stopScan = useCallback(() => {
+    abortRef.current?.abort();
+  }, []);
+
   const runScan = useCallback(async () => {
     if (!universe.symbols.length) {
       setStatus("Liste boş — kripto / BIST / sektör seç");
@@ -474,44 +480,96 @@ export function ListScanPanel() {
       setStatus("En az bir gösterge seçin");
       return;
     }
+    abortRef.current?.abort();
+    const ac = new AbortController();
+    abortRef.current = ac;
+
     setRunning(true);
     setHits([]);
     setStatus("");
-    setProgress(`0/${universe.symbols.length}`);
+    const total = universe.symbols.length;
+    setProgress(`0/${total}`);
+
+    const extrasNeedTicker = (cfg.extraFilters ?? []).some(
+      (f) => f.type === "volumeSpike" || f.type === "changePct"
+    );
+
     try {
-      const quotes = await fetchWatchlistQuotes(universe.symbols);
+      let quotes: TickerQuote[] = universe.symbols.map((s) => ({
+        symbol: s.symbol,
+        exchange: s.exchange,
+        last: 0,
+        changePct: 0,
+      }));
+      if (extrasNeedTicker) {
+        setProgress(`kotasyon 0/${total}`);
+        try {
+          const ticked = await fetchWatchlistQuotes(universe.symbols);
+          if (ticked.length) quotes = ticked;
+        } catch {
+          /* kline taramasına devam */
+        }
+        if (ac.signal.aborted) throw new DOMException("Aborted", "AbortError");
+      }
+
       const out: ResultRow[] = [];
       let done = 0;
-      await mapPool(quotes, 8, async (q) => {
-        try {
-          const kr = await fetch(
-            `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${tf}&limit=220`
-          );
-          const kj = await kr.json();
-          const candles: Candle[] = kj.candles ?? [];
-          if (candles.length < 50) return null;
-          let found = scanSymbol(candles, cfg, maxBars);
-          if (found.length && cfg.extraFilters?.length) {
-            const m = matchFilters(q, candles, cfg.extraFilters);
-            if (!m.ok) found = [];
-            else {
-              found = found.map((h) => ({
-                ...h,
-                note: m.note ? `${h.note} · ${m.note}` : h.note,
-              }));
+      const concurrency = total > 200 ? 6 : 8;
+      await mapPool(
+        quotes,
+        concurrency,
+        async (q) => {
+          if (ac.signal.aborted) return null;
+          try {
+            const fetchSignal =
+              typeof AbortSignal !== "undefined" &&
+              typeof AbortSignal.any === "function" &&
+              typeof AbortSignal.timeout === "function"
+                ? AbortSignal.any([ac.signal, AbortSignal.timeout(10000)])
+                : ac.signal;
+            const kr = await fetch(
+              `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${tf}&limit=220`,
+              { signal: fetchSignal }
+            );
+            const kj = await kr.json();
+            const candles: Candle[] = kj.candles ?? [];
+            if (candles.length < 50) return null;
+            let found = scanSymbol(candles, cfg, maxBars);
+            if (found.length && cfg.extraFilters?.length) {
+              const m = matchFilters(q, candles, cfg.extraFilters);
+              if (!m.ok) found = [];
+              else {
+                found = found.map((h) => ({
+                  ...h,
+                  note: m.note ? `${h.note} · ${m.note}` : h.note,
+                }));
+              }
+            }
+            for (const h of found) {
+              out.push({ ...h, symbol: q.symbol, exchange: q.exchange });
+            }
+          } catch (e) {
+            if (ac.signal.aborted) return null;
+            /* skip timeout / 502 */
+          } finally {
+            done += 1;
+            setProgress(`${done}/${total} ${q.symbol}`);
+            if (done % 8 === 0 || done === total) {
+              setHits(
+                [...out].sort(
+                  (a, b) =>
+                    a.barsAgo - b.barsAgo ||
+                    a.symbol.localeCompare(b.symbol) ||
+                    a.kind.localeCompare(b.kind)
+                )
+              );
             }
           }
-          for (const h of found) {
-            out.push({ ...h, symbol: q.symbol, exchange: q.exchange });
-          }
-        } catch {
-          /* skip */
-        } finally {
-          done += 1;
-          setProgress(`${done}/${quotes.length}`);
-        }
-        return null;
-      });
+          return null;
+        },
+        undefined,
+        ac.signal
+      );
       out.sort(
         (a, b) =>
           a.barsAgo - b.barsAgo ||
@@ -520,11 +578,18 @@ export function ListScanPanel() {
       );
       setHits(out);
       setStatus(
-        `${out.length} hit · ${universe.name} · ${universe.symbols.length} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}`
+        ac.signal.aborted
+          ? `Durdu · ${out.length} hit · ${done}/${total}`
+          : `${out.length} hit · ${universe.name} · ${total} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}`
       );
+    } catch (e) {
+      if (e instanceof DOMException && e.name === "AbortError") {
+        setStatus("Durduruldu");
+      } else {
+        setStatus(e instanceof Error ? e.message : "tarama hatası");
+      }
     } finally {
       setRunning(false);
-      setProgress("");
     }
   }, [universe, buildConfig, tf, maxBars, matchMode]);
 
@@ -874,6 +939,11 @@ export function ListScanPanel() {
         >
           {running ? "Taranıyor…" : "Listeyi tara"}
         </button>
+        {running && (
+          <button type="button" className="btn text-2xs" onClick={stopScan}>
+            Durdur
+          </button>
+        )}
         <button
           type="button"
           className="btn text-2xs"
