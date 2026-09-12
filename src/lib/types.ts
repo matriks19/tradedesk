@@ -413,7 +413,7 @@ export interface ChartDrawing {
   origin?: "user" | "auto";
 }
 
-export type BotChannel = "whatsapp" | "telegram" | "webhook";
+export type BotChannel = "ntfy" | "discord" | "whatsapp" | "telegram" | "webhook";
 
 export interface BotSettings {
   webhookUrl: string;
@@ -430,6 +430,8 @@ export interface BotSettings {
   waPhone?: string;
   /** CallMeBot personal apikey */
   waApiKey?: string;
+  /** ntfy.sh topic */
+  ntfyTopic?: string;
   /** When true, scan/price alerts are marked botReady for a future auto-bot. */
   autoBot?: boolean;
 }

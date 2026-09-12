@@ -68,7 +68,12 @@ export function AlertsPanel() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tgToken, setTgToken] = useState("");
   const [tgStatus, setTgStatus] = useState("");
-  const [botTab, setBotTab] = useState<"whatsapp" | "telegram">("whatsapp");
+  const [botTab, setBotTab] = useState<"ntfy" | "discord" | "whatsapp" | "telegram">("ntfy");
+  const [ntfyTopic, setNtfyTopic] = useState("");
+  const [ntfyStatus, setNtfyStatus] = useState("");
+  const [dcUrl, setDcUrl] = useState("");
+  const [dcStatus, setDcStatus] = useState("");
+  const [notifStatus, setNotifStatus] = useState("");
   const [waMode, setWaMode] = useState<"cloud" | "callme">("cloud");
   const [waToken, setWaToken] = useState("");
   const [waPhoneId, setWaPhoneId] = useState("");
@@ -531,10 +536,17 @@ export function AlertsPanel() {
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            className={clsx("btn text-2xs", botTab === "whatsapp" && "btn-accent")}
-            onClick={() => setBotTab("whatsapp")}
+            className={clsx("btn text-2xs", botTab === "ntfy" && "btn-accent")}
+            onClick={() => setBotTab("ntfy")}
           >
-            WhatsApp
+            Telefon
+          </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", botTab === "discord" && "btn-accent")}
+            onClick={() => setBotTab("discord")}
+          >
+            Discord
           </button>
           <button
             type="button"
@@ -543,9 +555,126 @@ export function AlertsPanel() {
           >
             Telegram
           </button>
+          <button
+            type="button"
+            className={clsx("btn text-2xs", botTab === "whatsapp" && "btn-accent")}
+            onClick={() => setBotTab("whatsapp")}
+          >
+            WhatsApp
+          </button>
         </div>
+        <button
+          type="button"
+          className="btn text-2xs"
+          onClick={async () => {
+            if (typeof Notification === "undefined") {
+              setNotifStatus("bu tarayıcıda yok");
+              return;
+            }
+            const p = await Notification.requestPermission();
+            setNotifStatus(p === "granted" ? "tarayıcı bildirimi açık" : p);
+            if (p === "granted") {
+              new Notification("TradeDesk", { body: "Bildirim açık" });
+            }
+          }}
+        >
+          Tarayıcı bildirimi aç
+        </button>
+        {notifStatus && (
+          <div className="text-2xs text-desk-muted">{notifStatus}</div>
+        )}
 
-        {botTab === "whatsapp" ? (
+        {botTab === "ntfy" ? (
+          <>
+            <div className="font-medium">Telefon (ntfy)</div>
+            <p className="text-2xs text-desk-muted leading-relaxed">
+              Telefona ntfy kur (App Store / Play: ntfy). Konuyu yaz, Bağla, uygulamada aynı konuya abone ol. Hesap yok.
+            </p>
+            <label className="text-2xs text-desk-muted block">
+              Konu
+              <input
+                className="input mt-0.5"
+                value={ntfyTopic}
+                onChange={(e) =>
+                  setNtfyTopic(e.target.value.replace(/[^a-zA-Z0-9_-]/g, ""))
+                }
+                placeholder="td-gizli-konu"
+              />
+            </label>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                className="btn text-2xs"
+                onClick={() => {
+                  const topic = `td-${Math.random().toString(36).slice(2, 10)}`;
+                  setNtfyTopic(topic);
+                }}
+              >
+                Rastgele konu
+              </button>
+              <button
+                type="button"
+                className="btn btn-accent text-2xs"
+                onClick={() => {
+                  const topic = ntfyTopic.trim() || `td-${Math.random().toString(36).slice(2, 10)}`;
+                  if (!ntfyTopic.trim()) setNtfyTopic(topic);
+                  setBotSettings({
+                    channel: "ntfy",
+                    ntfyTopic: topic,
+                    webhookUrl: `https://ntfy.sh/${topic}`,
+                    enabled: true,
+                  });
+                  setNtfyStatus(`bağlandı · ntfy’de ${topic} abone ol · Test`);
+                }}
+              >
+                Bağla
+              </button>
+            </div>
+            {ntfyStatus && (
+              <div className="text-2xs text-desk-muted">{ntfyStatus}</div>
+            )}
+          </>
+        ) : botTab === "discord" ? (
+          <>
+            <div className="font-medium">Discord bağla</div>
+            <p className="text-2xs text-desk-muted leading-relaxed">
+              Discord sunucu → kanal → Düzenle → Entegrasyonlar → Webhook → Yeni → URL kopyala.
+            </p>
+            <label className="text-2xs text-desk-muted block">
+              Webhook URL
+              <input
+                className="input mt-0.5"
+                type="password"
+                autoComplete="off"
+                value={dcUrl}
+                onChange={(e) => setDcUrl(e.target.value.trim())}
+                placeholder="https://discord.com/api/webhooks/…"
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-accent text-2xs"
+              onClick={() => {
+                const url = dcUrl.trim();
+                if (!/discord(?:app)?\.com\/api\/webhooks/i.test(url)) {
+                  setDcStatus("discord webhook URL değil");
+                  return;
+                }
+                setBotSettings({
+                  channel: "discord",
+                  webhookUrl: url,
+                  enabled: true,
+                });
+                setDcStatus("bağlandı — Test’e bas");
+              }}
+            >
+              Bağla
+            </button>
+            {dcStatus && (
+              <div className="text-2xs text-desk-muted">{dcStatus}</div>
+            )}
+          </>
+        ) : botTab === "whatsapp" ? (
           <>
             <div className="font-medium">WhatsApp bağla</div>
             <div className="flex flex-wrap gap-1">

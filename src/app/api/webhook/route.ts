@@ -26,6 +26,32 @@ function isCallMeBotUrl(url: string): boolean {
   }
 }
 
+function isNtfyUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname === "ntfy.sh" ||
+      u.hostname.endsWith(".ntfy.sh") ||
+      u.hostname.includes("ntfy")
+    );
+  } catch {
+    return /ntfy\.sh/i.test(url);
+  }
+}
+
+function isDiscordWebhookUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      (u.hostname.includes("discord.com") ||
+        u.hostname.includes("discordapp.com")) &&
+      u.pathname.includes("/api/webhooks/")
+    );
+  } catch {
+    return /discord(?:app)?\.com\/api\/webhooks/i.test(url);
+  }
+}
+
 function isWhatsAppCloudUrl(url: string): boolean {
   try {
     const u = new URL(url);
@@ -161,6 +187,26 @@ export async function POST(req: NextRequest) {
       }
       fetchUrl = u.toString();
       method = "GET";
+    } else if (isNtfyUrl(url)) {
+      const openUrl =
+        typeof payload.openUrl === "string" ? payload.openUrl.trim() : "";
+      let ntfyText = String(payload.text || text);
+      if (openUrl && !ntfyText.includes(openUrl))
+        ntfyText = `${ntfyText}\n${openUrl}`;
+      const symbol = payload.symbol != null ? String(payload.symbol) : "";
+      headers["Content-Type"] = "text/plain; charset=utf-8";
+      headers.Title = symbol ? `TradeDesk ${symbol}` : "TradeDesk alarm";
+      headers.Tags = "chart_with_upwards_trend";
+      headers.Priority = "high";
+      if (openUrl && /^https?:\/\//i.test(openUrl)) headers.Click = openUrl;
+      upstreamBody = ntfyText.slice(0, 4000);
+    } else if (isDiscordWebhookUrl(url)) {
+      const openUrl =
+        typeof payload.openUrl === "string" ? payload.openUrl.trim() : "";
+      let dText = String(payload.text || text);
+      if (openUrl && !dText.includes(openUrl)) dText = `${dText}\n${openUrl}`;
+      headers["Content-Type"] = contentType;
+      upstreamBody = JSON.stringify({ content: dText.slice(0, 2000) });
     } else if (isWhatsAppCloudUrl(url)) {
       const to = waToDigits(waPhone);
       if (!waToken) {
