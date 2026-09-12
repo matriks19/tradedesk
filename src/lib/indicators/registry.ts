@@ -341,7 +341,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "heikinAshiSmooth", label: "Heikin-Ashi Smooth", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ha", inputs: [num("period", "Period", 10)] },
   { id: "softTrend", label: "SoftTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "line", inputs: [num("period", "EMA Period", 20), num("atrPeriod", "ATR Period", 14), num("mult", "ATR Mult", 1.5, 0.5, 10, 0.1)] },
   { id: "descendingBreak", label: "Düşen Kırılımı", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "trend", description: "İki alçalan pivot high trend çizgisi; close üstüne kırılım (Break Out). İsteğe bağlı S/R pivot kutuları. Tarama: descendingBreak ≤2 bar.", inputs: [num("lookback", "Pivot Lookback", 20), num("srBoxes", "S/R Kutuları", 1, 0, 1, 1), num("showMarkers", "Break Out işaretleri", 1, 0, 1, 1)] },
-  { id: "diagonalSr", label: "Diyagonal S/R", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "support", description: "Son iki pivot high/low diyagonal destek-direnç. Düşen eğim, ikili/üçlü dip-tepe boyun, sekme/kırılım. Tarama: diagonalSr ≤2 bar. Diag çizim aracı aynı çizgileri koyar.", inputs: [num("left", "Pivot Sol", 5), num("right", "Pivot Sağ", 5), num("showMarkers", "İşaretler", 1, 0, 1, 1)] },
+  { id: "diagonalSr", label: "Diyagonal S/R", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "support", description: "pikusov: asimetrik window-pivot (x2=int(x1/2)), kesişmemiş diyagonal fan + temas ikili/üçlü. Diag tüm çizgileri koyar. Tarama ≤2 bar.", inputs: [num("pivotWindow", "Pivot pencere", 6, 2, 40, 1), num("historyBars", "Lookback", 300, 50, 2000, 10), num("left", "Temas sol", 30), num("right", "Temas sağ", 30), num("showMarkers", "İşaretler", 1, 0, 1, 1)] },
   { id: "descendingBreakV2", label: "Düşen Kırılımı v2", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ema5", description: "Pine v2 multi-şart AL: EMA5>20>50, VWMA, RSI 50–75, CCI>90, Ichimoku SpanA>B, Aroon, hacim×1.3 + cooldown. Tarama: descendingBreakV2.", inputs: [num("cooldownBars", "Cooldown-down", 10), num("showMarkers", "AL işaretleri", 1, 0, 1, 1)] },
   { id: "halfTrend", label: "HalfTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ht", inputs: [num("amplitude", "Amplitude", 2), num("channelDeviation", "Channel Dev", 2, 0.5, 10, 0.1), num("atrPeriod", "ATR Period", 100)] },
   { id: "sslChannel", label: "SSL Channel", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "sslUp", inputs: [num("period", "Period", 10)] },
@@ -2927,8 +2927,10 @@ export function computeBuiltin(
     case "diagonalSr": {
       const showMarkers = n(p, "showMarkers", 1) !== 0;
       const d = computeDiagonalSr(candles, {
-        left: n(p, "left", 5),
-        right: n(p, "right", 5),
+        pivotWindow: n(p, "pivotWindow", 6),
+        historyBars: n(p, "historyBars", 300),
+        left: n(p, "left", 30),
+        right: n(p, "right", 30),
       });
       const plots: PlotSeries[] = [
         line(inst, "support", "main", "#26a69a", candles, d.support, "Diag Destek"),

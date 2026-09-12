@@ -576,27 +576,27 @@ export const SCANNER_PRESETS: Record<
   },
   diag_dusen_sr: {
     label: "Düşen S/R",
-    description: "Alçalan diyagonal destek/direnç: sekme veya kırılım ≤2 bar",
+    description: "pikusov alçalan S/R: temas veya kırılım ≤2 bar",
     filters: [{ type: "diagonalSr", event: "any", direction: "any", slope: "desc", maxBarsAgo: 2 }],
   },
   diag_ikili_dip: {
     label: "İkili dip",
-    description: "İkili dip boyun kırılımı ≤2 bar",
+    description: "Trend çizgisine 2. dip teması ≤2 bar",
     filters: [{ type: "diagonalSr", event: "twin", direction: "bull", maxBarsAgo: 2 }],
   },
   diag_ikili_tepe: {
     label: "İkili tepe",
-    description: "İkili tepe boyun kırılımı ≤2 bar",
+    description: "Trend çizgisine 2. tepe teması ≤2 bar",
     filters: [{ type: "diagonalSr", event: "twin", direction: "bear", maxBarsAgo: 2 }],
   },
   diag_uclu_dip: {
     label: "Üçlü dip",
-    description: "Üçlü dip boyun kırılımı ≤2 bar",
+    description: "Trend çizgisine 3. dip teması ≤2 bar",
     filters: [{ type: "diagonalSr", event: "triple", direction: "bull", maxBarsAgo: 2 }],
   },
   diag_uclu_tepe: {
     label: "Üçlü tepe",
-    description: "Üçlü tepe boyun kırılımı ≤2 bar",
+    description: "Trend çizgisine 3. tepe teması ≤2 bar",
     filters: [{ type: "diagonalSr", event: "triple", direction: "bear", maxBarsAgo: 2 }],
   },
   diag_sekme: {

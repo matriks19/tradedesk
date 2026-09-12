@@ -187,10 +187,8 @@ export function ChartPane({ pane, compact }: Props) {
       descending?: boolean;
       kind: "sup" | "res";
     }[] = [];
-    if (d.lastSup)
-      segs.push({ ...d.lastSup, kind: "sup" });
-    if (d.lastRes)
-      segs.push({ ...d.lastRes, kind: "res" });
+    for (const s of d.linesSup) segs.push({ ...s, kind: "sup" });
+    for (const s of d.linesRes) segs.push({ ...s, kind: "res" });
     placeAutoDiag(pane.id, segs);
     requestPlaceDiag(null);
   }, [pendingDiagPaneId, candles, pane.id, placeAutoDiag, requestPlaceDiag]);
