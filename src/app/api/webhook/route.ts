@@ -14,6 +14,37 @@ function isTelegramSendMessageUrl(url: string): boolean {
   }
 }
 
+function isCallMeBotUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname.includes("callmebot.com") &&
+      /whatsapp\.php/i.test(u.pathname)
+    );
+  } catch {
+    return /callmebot\.com.+whatsapp\.php/i.test(url);
+  }
+}
+
+function isWhatsAppCloudUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return (
+      u.hostname.includes("graph.facebook.com") &&
+      /\/messages\/?$/i.test(u.pathname)
+    );
+  } catch {
+    return /graph\.facebook\.com.+\/messages/i.test(url);
+  }
+}
+
+export function waToDigits(raw: string): string {
+  let d = raw.replace(/\D/g, "");
+  if (d.startsWith("00")) d = d.slice(2);
+  if (d.startsWith("0") && d.length === 11) d = `90${d.slice(1)}`;
+  return d;
+}
+
 function humanText(payload: Record<string, unknown> | null | undefined): string {
   if (!payload || typeof payload !== "object") return "TradeDesk alert";
   const t = payload.text ?? payload.message;
@@ -49,6 +80,14 @@ export async function POST(req: NextRequest) {
       (typeof payload.telegramChatId === "string" &&
         String(payload.telegramChatId).trim()) ||
       "";
+    const waToken =
+      (typeof body?.waToken === "string" && body.waToken.trim()) ||
+      (typeof payload.waToken === "string" && String(payload.waToken).trim()) ||
+      "";
+    const waPhone =
+      (typeof body?.waPhone === "string" && body.waPhone.trim()) ||
+      (typeof payload.waPhone === "string" && String(payload.waPhone).trim()) ||
+      "";
 
     if (!url) {
       return NextResponse.json({ error: "url required" }, { status: 400 });
@@ -68,13 +107,15 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Always ensure human-readable text/message on generic payloads
     const text = humanText(payload);
     if (!payload.text) payload.text = text;
     if (!payload.message) payload.message = text;
 
-    let upstreamBody: string;
+    let upstreamBody: string | undefined;
+    let method: "GET" | "POST" = "POST";
     let contentType = "application/json";
+    let headers: Record<string, string> = {};
+    let fetchUrl = url;
 
     if (isTelegramSendMessageUrl(url)) {
       const chatId =
@@ -91,8 +132,7 @@ export async function POST(req: NextRequest) {
       }
       const openUrl =
         typeof payload.openUrl === "string" ? payload.openUrl.trim() : "";
-      const symbol =
-        payload.symbol != null ? String(payload.symbol) : "";
+      const symbol = payload.symbol != null ? String(payload.symbol) : "";
       let tgText = String(payload.text || text);
       if (openUrl && !tgText.includes(openUrl)) tgText = `${tgText}\n${openUrl}`;
       const tg: Record<string, unknown> = {
@@ -108,14 +148,54 @@ export async function POST(req: NextRequest) {
         };
       }
       upstreamBody = JSON.stringify(tg);
+      headers["Content-Type"] = contentType;
+    } else if (isCallMeBotUrl(url)) {
+      const u = new URL(url);
+      const openUrl =
+        typeof payload.openUrl === "string" ? payload.openUrl.trim() : "";
+      let waText = String(payload.text || text);
+      if (openUrl && !waText.includes(openUrl)) waText = `${waText}\n${openUrl}`;
+      u.searchParams.set("text", waText);
+      if (waPhone && !u.searchParams.get("phone")) {
+        u.searchParams.set("phone", waToDigits(waPhone));
+      }
+      fetchUrl = u.toString();
+      method = "GET";
+    } else if (isWhatsAppCloudUrl(url)) {
+      const to = waToDigits(waPhone);
+      if (!waToken) {
+        return NextResponse.json(
+          { error: "waToken required for WhatsApp Cloud" },
+          { status: 400 }
+        );
+      }
+      if (!to) {
+        return NextResponse.json(
+          { error: "waPhone required for WhatsApp Cloud" },
+          { status: 400 }
+        );
+      }
+      const openUrl =
+        typeof payload.openUrl === "string" ? payload.openUrl.trim() : "";
+      let waText = String(payload.text || text);
+      if (openUrl && !waText.includes(openUrl)) waText = `${waText}\n${openUrl}`;
+      headers["Content-Type"] = contentType;
+      headers.Authorization = `Bearer ${waToken}`;
+      upstreamBody = JSON.stringify({
+        messaging_product: "whatsapp",
+        to,
+        type: "text",
+        text: { body: waText.slice(0, 4096), preview_url: true },
+      });
     } else {
       upstreamBody = JSON.stringify(payload);
+      headers["Content-Type"] = contentType;
     }
 
-    const upstream = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": contentType },
-      body: upstreamBody,
+    const upstream = await fetch(fetchUrl, {
+      method,
+      headers,
+      body: method === "GET" ? undefined : upstreamBody,
     });
 
     const respText = await upstream.text().catch(() => "");

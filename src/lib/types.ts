@@ -413,12 +413,23 @@ export interface ChartDrawing {
   origin?: "user" | "auto";
 }
 
+export type BotChannel = "whatsapp" | "telegram" | "webhook";
+
 export interface BotSettings {
   webhookUrl: string;
   enabled: boolean;
   secret?: string;
+  channel?: BotChannel;
   /** Telegram chat id when webhookUrl is api.telegram.org/.../sendMessage */
   telegramChatId?: string;
+  /** WhatsApp Cloud access token (or unused if CallMeBot URL). */
+  waToken?: string;
+  /** WhatsApp Cloud phone-number-id */
+  waPhoneNumberId?: string;
+  /** Recipient WhatsApp number (E.164 / 90…) */
+  waPhone?: string;
+  /** CallMeBot personal apikey */
+  waApiKey?: string;
   /** When true, scan/price alerts are marked botReady for a future auto-bot. */
   autoBot?: boolean;
 }

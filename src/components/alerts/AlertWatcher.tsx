@@ -125,6 +125,8 @@ export function AlertWatcher() {
             body: JSON.stringify({
               url: bot.webhookUrl.trim(),
               telegramChatId: bot.telegramChatId?.trim() || undefined,
+              waToken: bot.waToken?.trim() || undefined,
+              waPhone: bot.waPhone?.trim() || undefined,
               payload: {
                 secret: bot.secret || undefined,
                 event: a.kind === "scan" ? "scan_alert" : "price_alert",

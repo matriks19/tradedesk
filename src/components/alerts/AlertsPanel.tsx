@@ -68,6 +68,13 @@ export function AlertsPanel() {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [tgToken, setTgToken] = useState("");
   const [tgStatus, setTgStatus] = useState("");
+  const [botTab, setBotTab] = useState<"whatsapp" | "telegram">("whatsapp");
+  const [waMode, setWaMode] = useState<"cloud" | "callme">("cloud");
+  const [waToken, setWaToken] = useState("");
+  const [waPhoneId, setWaPhoneId] = useState("");
+  const [waPhone, setWaPhone] = useState("");
+  const [waApiKey, setWaApiKey] = useState("");
+  const [waStatus, setWaStatus] = useState("");
 
   useEffect(() => {
     if (pane) {
@@ -203,6 +210,8 @@ export function AlertsPanel() {
         body: JSON.stringify({
           url: botSettings.webhookUrl.trim(),
           telegramChatId: botSettings.telegramChatId?.trim() || undefined,
+          waToken: botSettings.waToken?.trim() || undefined,
+          waPhone: botSettings.waPhone?.trim() || undefined,
           payload: {
             secret: botSettings.secret || undefined,
             event: "test",
@@ -519,99 +528,255 @@ export function AlertsPanel() {
       </div>
 
       <div className="border-t border-desk-border pt-2 mt-1 space-y-1">
-        <div className="font-medium">Telegram bağla</div>
-        <p className="text-2xs text-desk-muted leading-relaxed">
-          1) Telegram’da @BotFather → /newbot. 2) Token’ı buraya yapıştır (saklanır, git’e gitmez).
-          3) Bota bir mesaj at, Chat ID bul. 4) Bağla + Test.
-        </p>
-        <label className="text-2xs text-desk-muted block">
-          Bot token
-          <input
-            className="input mt-0.5"
-            type="password"
-            autoComplete="off"
-            value={tgToken}
-            onChange={(e) => setTgToken(e.target.value.trim())}
-            placeholder="123456:AA…"
-          />
-        </label>
-        <label className="text-2xs text-desk-muted block">
-          Chat ID
-          <input
-            className="input mt-0.5"
-            value={botSettings.telegramChatId ?? ""}
-            onChange={(e) =>
-              setBotSettings({ telegramChatId: e.target.value })
-            }
-            placeholder="123456789 veya -100…"
-          />
-        </label>
         <div className="flex flex-wrap gap-1">
           <button
             type="button"
-            className="btn text-2xs"
-            onClick={async () => {
-              const token = tgToken.trim();
-              if (!token) {
-                setTgStatus("token yaz");
-                return;
-              }
-              setTgStatus("chat aranıyor…");
-              try {
-                const r = await fetch("/api/telegram/chat", {
-                  method: "POST",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({ token }),
-                });
-                const j = await r.json();
-                if (j.chatId) {
-                  setBotSettings({ telegramChatId: String(j.chatId) });
-                  setTgStatus(`chat ${j.chatId}`);
-                } else {
-                  setTgStatus(j.error || "bota bir mesaj at, tekrar dene");
-                }
-              } catch (e) {
-                setTgStatus(e instanceof Error ? e.message : "hata");
-              }
-            }}
+            className={clsx("btn text-2xs", botTab === "whatsapp" && "btn-accent")}
+            onClick={() => setBotTab("whatsapp")}
           >
-            Chat ID bul
+            WhatsApp
           </button>
           <button
             type="button"
-            className="btn btn-accent text-2xs"
-            onClick={() => {
-              const token = tgToken.trim();
-              if (!token) {
-                setTgStatus("token yaz");
-                return;
-              }
-              const chat = (botSettings.telegramChatId ?? "").trim();
-              if (!chat) {
-                setTgStatus("chat id yok — önce Chat ID bul");
-                return;
-              }
-              setBotSettings({
-                webhookUrl: `https://api.telegram.org/bot${token}/sendMessage`,
-                telegramChatId: chat,
-                enabled: true,
-              });
-              setTgStatus("bağlandı — Test’e bas");
-            }}
+            className={clsx("btn text-2xs", botTab === "telegram" && "btn-accent")}
+            onClick={() => setBotTab("telegram")}
           >
-            Bağla
+            Telegram
           </button>
         </div>
-        {tgStatus && (
-          <div className="text-2xs text-desk-muted">{tgStatus}</div>
+
+        {botTab === "whatsapp" ? (
+          <>
+            <div className="font-medium">WhatsApp bağla</div>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                className={clsx("btn text-2xs", waMode === "cloud" && "btn-accent")}
+                onClick={() => setWaMode("cloud")}
+              >
+                Business
+              </button>
+              <button
+                type="button"
+                className={clsx("btn text-2xs", waMode === "callme" && "btn-accent")}
+                onClick={() => setWaMode("callme")}
+              >
+                Kişisel
+              </button>
+            </div>
+            {waMode === "cloud" ? (
+              <>
+                <p className="text-2xs text-desk-muted leading-relaxed">
+                  developers.facebook.com → uygulama → WhatsApp. Token + Phone number ID.
+                  Alıcıya kendi numaranı ekle (kod gelir). Token git’e gitmez.
+                </p>
+                <label className="text-2xs text-desk-muted block">
+                  Access token
+                  <input
+                    className="input mt-0.5"
+                    type="password"
+                    autoComplete="off"
+                    value={waToken}
+                    onChange={(e) => setWaToken(e.target.value.trim())}
+                    placeholder="EAAG…"
+                  />
+                </label>
+                <label className="text-2xs text-desk-muted block">
+                  Phone number ID
+                  <input
+                    className="input mt-0.5"
+                    value={waPhoneId}
+                    onChange={(e) => setWaPhoneId(e.target.value.trim())}
+                    placeholder="123456789012345"
+                  />
+                </label>
+                <label className="text-2xs text-desk-muted block">
+                  Alıcı (senin WA)
+                  <input
+                    className="input mt-0.5"
+                    value={waPhone}
+                    onChange={(e) => setWaPhone(e.target.value)}
+                    placeholder="90555… veya 0555…"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-accent text-2xs"
+                  onClick={() => {
+                    const token = waToken.trim();
+                    const id = waPhoneId.trim();
+                    const phone = waPhone.trim();
+                    if (!token || !id || !phone) {
+                      setWaStatus("token + phone id + alıcı");
+                      return;
+                    }
+                    setBotSettings({
+                      channel: "whatsapp",
+                      webhookUrl: `https://graph.facebook.com/v21.0/${id}/messages`,
+                      waToken: token,
+                      waPhoneNumberId: id,
+                      waPhone: phone,
+                      enabled: true,
+                    });
+                    setWaStatus("bağlandı — Test’e bas");
+                  }}
+                >
+                  Bağla
+                </button>
+              </>
+            ) : (
+              <>
+                <p className="text-2xs text-desk-muted leading-relaxed">
+                  CallMeBot: rehbere +34 623 78 64 49 ekle, “I allow callmebot to send me messages”
+                  yaz, apikey gelsin. Şu an kota dolu olabilir — o zaman Business kullan.
+                </p>
+                <label className="text-2xs text-desk-muted block">
+                  WhatsApp numaran
+                  <input
+                    className="input mt-0.5"
+                    value={waPhone}
+                    onChange={(e) => setWaPhone(e.target.value)}
+                    placeholder="90555…"
+                  />
+                </label>
+                <label className="text-2xs text-desk-muted block">
+                  CallMeBot apikey
+                  <input
+                    className="input mt-0.5"
+                    type="password"
+                    autoComplete="off"
+                    value={waApiKey}
+                    onChange={(e) => setWaApiKey(e.target.value.trim())}
+                    placeholder="123456"
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="btn btn-accent text-2xs"
+                  onClick={() => {
+                    const phone = waPhone.trim();
+                    const key = waApiKey.trim();
+                    if (!phone || !key) {
+                      setWaStatus("numara + apikey");
+                      return;
+                    }
+                    const digits = phone.replace(/\D/g, "");
+                    setBotSettings({
+                      channel: "whatsapp",
+                      webhookUrl: `https://api.callmebot.com/whatsapp.php?phone=${digits}&apikey=${key}`,
+                      waPhone: phone,
+                      waApiKey: key,
+                      enabled: true,
+                    });
+                    setWaStatus("bağlandı — Test’e bas");
+                  }}
+                >
+                  Bağla
+                </button>
+              </>
+            )}
+            {waStatus && (
+              <div className="text-2xs text-desk-muted">{waStatus}</div>
+            )}
+          </>
+        ) : (
+          <>
+            <div className="font-medium">Telegram bağla</div>
+            <p className="text-2xs text-desk-muted leading-relaxed">
+              1) @BotFather → /newbot. 2) Token. 3) Bota mesaj at, Chat ID bul. 4) Bağla + Test.
+            </p>
+            <label className="text-2xs text-desk-muted block">
+              Bot token
+              <input
+                className="input mt-0.5"
+                type="password"
+                autoComplete="off"
+                value={tgToken}
+                onChange={(e) => setTgToken(e.target.value.trim())}
+                placeholder="123456:AA…"
+              />
+            </label>
+            <label className="text-2xs text-desk-muted block">
+              Chat ID
+              <input
+                className="input mt-0.5"
+                value={botSettings.telegramChatId ?? ""}
+                onChange={(e) =>
+                  setBotSettings({ telegramChatId: e.target.value })
+                }
+                placeholder="123456789 veya -100…"
+              />
+            </label>
+            <div className="flex flex-wrap gap-1">
+              <button
+                type="button"
+                className="btn text-2xs"
+                onClick={async () => {
+                  const token = tgToken.trim();
+                  if (!token) {
+                    setTgStatus("token yaz");
+                    return;
+                  }
+                  setTgStatus("chat aranıyor…");
+                  try {
+                    const r = await fetch("/api/telegram/chat", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ token }),
+                    });
+                    const j = await r.json();
+                    if (j.chatId) {
+                      setBotSettings({ telegramChatId: String(j.chatId) });
+                      setTgStatus(`chat ${j.chatId}`);
+                    } else {
+                      setTgStatus(j.error || "bota bir mesaj at, tekrar dene");
+                    }
+                  } catch (e) {
+                    setTgStatus(e instanceof Error ? e.message : "hata");
+                  }
+                }}
+              >
+                Chat ID bul
+              </button>
+              <button
+                type="button"
+                className="btn btn-accent text-2xs"
+                onClick={() => {
+                  const token = tgToken.trim();
+                  if (!token) {
+                    setTgStatus("token yaz");
+                    return;
+                  }
+                  const chat = (botSettings.telegramChatId ?? "").trim();
+                  if (!chat) {
+                    setTgStatus("chat id yok — önce Chat ID bul");
+                    return;
+                  }
+                  setBotSettings({
+                    channel: "telegram",
+                    webhookUrl: `https://api.telegram.org/bot${token}/sendMessage`,
+                    telegramChatId: chat,
+                    enabled: true,
+                  });
+                  setTgStatus("bağlandı — Test’e bas");
+                }}
+              >
+                Bağla
+              </button>
+            </div>
+            {tgStatus && (
+              <div className="text-2xs text-desk-muted">{tgStatus}</div>
+            )}
+          </>
         )}
+
         <label className="text-2xs text-desk-muted block">
           Webhook URL
           <input
             className="input mt-0.5"
             value={botSettings.webhookUrl}
             onChange={(e) => setBotSettings({ webhookUrl: e.target.value })}
-            placeholder="https://api.telegram.org/bot…/sendMessage"
+            placeholder="WhatsApp / Telegram / özel URL"
           />
         </label>
         <label className="flex items-center gap-2 text-2xs">
