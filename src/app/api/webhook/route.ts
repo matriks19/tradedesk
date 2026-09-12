@@ -38,7 +38,7 @@ function isWhatsAppCloudUrl(url: string): boolean {
   }
 }
 
-export function waToDigits(raw: string): string {
+function waToDigits(raw: string): string {
   let d = raw.replace(/\D/g, "");
   if (d.startsWith("00")) d = d.slice(2);
   if (d.startsWith("0") && d.length === 11) d = `90${d.slice(1)}`;
