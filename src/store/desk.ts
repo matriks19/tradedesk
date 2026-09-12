@@ -112,6 +112,7 @@ interface DeskState {
   botSettings: BotSettings;
   drawings: ChartDrawing[];
   activeDrawTool: DrawTool;
+  pendingDiagPaneId: string | null;
   scripts: CustomScript[];
   risk: RiskSettings;
   showRiskLines: boolean;
@@ -184,6 +185,19 @@ interface DeskState {
     points: { time: number; price: number }[],
     label?: string
   ) => void;
+  requestPlaceDiag: (paneId: string | null) => void;
+  clearAutoDiag: (paneId: string) => void;
+  placeAutoDiag: (
+    paneId: string,
+    segs: {
+      t0: number;
+      p0: number;
+      t1: number;
+      p1: number;
+      descending?: boolean;
+      kind: "sup" | "res";
+    }[]
+  ) => void;
   clearPaneDrawings: (paneId: string) => void;
   setActiveDrawTool: (t: DrawTool) => void;
   createWatchlist: (name: string) => string;
@@ -226,6 +240,7 @@ export const useDeskStore = create<DeskState>()(
         botSettings: { webhookUrl: "", enabled: false, secret: "", telegramChatId: "" },
         drawings: [],
         activeDrawTool: "cursor",
+        pendingDiagPaneId: null,
         scripts: [],
         risk: {
           entry: 0,
@@ -646,6 +661,43 @@ export const useDeskStore = create<DeskState>()(
             label: label ?? "Auto Fib",
             origin: "auto",
           });
+        },
+        requestPlaceDiag: (paneId) => set({ pendingDiagPaneId: paneId }),
+        clearAutoDiag: (paneId) =>
+          set((s) => ({
+            drawings: s.drawings.filter(
+              (x) =>
+                !(
+                  x.paneId === paneId &&
+                  x.tool === "trend" &&
+                  (x.origin ?? "user") === "auto" &&
+                  (x.label ?? "").startsWith("Diag")
+                )
+            ),
+          })),
+        placeAutoDiag: (paneId, segs) => {
+          get().clearAutoDiag(paneId);
+          for (const seg of segs) {
+            const isSup = seg.kind === "sup";
+            const down = Boolean(seg.descending);
+            get().addDrawing({
+              paneId,
+              tool: "trend",
+              points: [
+                { time: seg.t0, price: seg.p0 },
+                { time: seg.t1, price: seg.p1 },
+              ],
+              color: isSup ? "#26a69a" : "#ef5350",
+              label: isSup
+                ? down
+                  ? "Diag Destek ↓"
+                  : "Diag Destek"
+                : down
+                  ? "Diag Direnç ↓"
+                  : "Diag Direnç",
+              origin: "auto",
+            });
+          }
         },
         clearPaneDrawings: (paneId) =>
           set((s) => ({

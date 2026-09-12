@@ -244,6 +244,7 @@ export type BuiltinIndicatorId =
   | "softTrend"
   | "descendingBreak"
   | "descendingBreakV2"
+  | "diagonalSr"
   | "vfi"
   | "waddahAttar"
   | "halfTrend"

@@ -24,6 +24,7 @@ import { IndicatorMenu } from "@/components/indicators/IndicatorMenu";
 import { Badge } from "@/components/ui/Badge";
 import { usePatternOverlay, TD_OVERLAY_REDRAW } from "@/components/chart/PatternOverlay";
 import { normalizeTimeframe } from "@/lib/data/timeframes";
+import { diagonalSr } from "@/lib/indicators/diagonalSr";
 import clsx from "clsx";
 
 interface Props {
@@ -163,11 +164,37 @@ export function ChartPane({ pane, compact }: Props) {
   const overlayPatternRef = useRef(overlayPattern);
   overlayPatternRef.current = overlayPattern;
 
+  const pendingDiagPaneId = useDeskStore((s) => s.pendingDiagPaneId);
+  const requestPlaceDiag = useDeskStore((s) => s.requestPlaceDiag);
+  const placeAutoDiag = useDeskStore((s) => s.placeAutoDiag);
+
+
   const { candles, loading, error, delayed, note } = useKlines(
     pane.symbol,
     pane.exchange,
     pane.timeframe
   );
+
+  useEffect(() => {
+    if (pendingDiagPaneId !== pane.id) return;
+    if (!candles.length) return;
+    const d = diagonalSr(candles);
+    const segs: {
+      t0: number;
+      p0: number;
+      t1: number;
+      p1: number;
+      descending?: boolean;
+      kind: "sup" | "res";
+    }[] = [];
+    if (d.lastSup)
+      segs.push({ ...d.lastSup, kind: "sup" });
+    if (d.lastRes)
+      segs.push({ ...d.lastRes, kind: "res" });
+    placeAutoDiag(pane.id, segs);
+    requestPlaceDiag(null);
+  }, [pendingDiagPaneId, candles, pane.id, placeAutoDiag, requestPlaceDiag]);
+
 
   const active = activePaneId === pane.id;
 

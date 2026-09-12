@@ -188,6 +188,7 @@ import {
   computeDescendingBreak,
   computeDescendingBreakV2,
 } from "./descendingBreak";
+import { diagonalSr as computeDiagonalSr } from "./diagonalSr";
 
 export type PlotMarker = {
   time: number;
@@ -340,6 +341,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "heikinAshiSmooth", label: "Heikin-Ashi Smooth", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ha", inputs: [num("period", "Period", 10)] },
   { id: "softTrend", label: "SoftTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "line", inputs: [num("period", "EMA Period", 20), num("atrPeriod", "ATR Period", 14), num("mult", "ATR Mult", 1.5, 0.5, 10, 0.1)] },
   { id: "descendingBreak", label: "Düşen Kırılımı", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "trend", description: "İki alçalan pivot high trend çizgisi; close üstüne kırılım (Break Out). İsteğe bağlı S/R pivot kutuları. Tarama: descendingBreak ≤2 bar.", inputs: [num("lookback", "Pivot Lookback", 20), num("srBoxes", "S/R Kutuları", 1, 0, 1, 1), num("showMarkers", "Break Out işaretleri", 1, 0, 1, 1)] },
+  { id: "diagonalSr", label: "Diyagonal S/R", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "support", description: "Son iki pivot high/low diyagonal destek-direnç. Düşen eğim, ikili/üçlü dip-tepe boyun, sekme/kırılım. Tarama: diagonalSr ≤2 bar. Diag çizim aracı aynı çizgileri koyar.", inputs: [num("left", "Pivot Sol", 5), num("right", "Pivot Sağ", 5), num("showMarkers", "İşaretler", 1, 0, 1, 1)] },
   { id: "descendingBreakV2", label: "Düşen Kırılımı v2", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ema5", description: "Pine v2 multi-şart AL: EMA5>20>50, VWMA, RSI 50–75, CCI>90, Ichimoku SpanA>B, Aroon, hacim×1.3 + cooldown. Tarama: descendingBreakV2.", inputs: [num("cooldownBars", "Cooldown-down", 10), num("showMarkers", "AL işaretleri", 1, 0, 1, 1)] },
   { id: "halfTrend", label: "HalfTrend", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "ht", inputs: [num("amplitude", "Amplitude", 2), num("channelDeviation", "Channel Dev", 2, 0.5, 10, 0.1), num("atrPeriod", "ATR Period", 100)] },
   { id: "sslChannel", label: "SSL Channel", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "sslUp", inputs: [num("period", "Period", 10)] },
@@ -2919,6 +2921,54 @@ export function computeBuiltin(
         supBox: d.supBox,
         pivotHigh: d.pivotHigh,
         pivotLow: d.pivotLow,
+      });
+      break;
+    }
+    case "diagonalSr": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const d = computeDiagonalSr(candles, {
+        left: n(p, "left", 5),
+        right: n(p, "right", 5),
+      });
+      const plots: PlotSeries[] = [
+        line(inst, "support", "main", "#26a69a", candles, d.support, "Diag Destek"),
+        line(inst, "resistance", "main", "#ef5350", candles, d.resistance, "Diag Direnç"),
+        line(inst, "flatSup", "main", "#26a69a55", candles, d.flatSup, "Yatay Destek"),
+        line(inst, "flatRes", "main", "#ef535055", candles, d.flatRes, "Yatay Direnç"),
+      ];
+      if (showMarkers) {
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          const t = candles[i]!.time;
+          if (d.bounceLong[i])
+            markers.push({ time: t, position: "belowBar", color: "#26a69a", shape: "arrowUp", text: "Sekme" });
+          if (d.bounceShort[i])
+            markers.push({ time: t, position: "aboveBar", color: "#ef5350", shape: "arrowDown", text: "Sekme" });
+          if (d.breakLong[i])
+            markers.push({ time: t, position: "belowBar", color: "#69f0ae", shape: "arrowUp", text: "Kırılım" });
+          if (d.breakShort[i])
+            markers.push({ time: t, position: "aboveBar", color: "#ff8a80", shape: "arrowDown", text: "Kırılım" });
+          if (d.dbLong[i])
+            markers.push({ time: t, position: "belowBar", color: "#80cbc4", shape: "circle", text: "İkili dip" });
+          if (d.dtShort[i])
+            markers.push({ time: t, position: "aboveBar", color: "#ef9a9a", shape: "circle", text: "İkili tepe" });
+          if (d.tbLong[i])
+            markers.push({ time: t, position: "belowBar", color: "#4db6ac", shape: "square", text: "Üçlü dip" });
+          if (d.ttShort[i])
+            markers.push({ time: t, position: "aboveBar", color: "#e57373", shape: "square", text: "Üçlü tepe" });
+        }
+        markers.sort((a, b) => a.time - b.time);
+        if (markers.length) plots[0]!.markers = markers;
+      }
+      push(plots, {
+        support: d.support,
+        resistance: d.resistance,
+        flatSup: d.flatSup,
+        flatRes: d.flatRes,
+        bounceLong: d.bounceLong.map((v) => (v ? 1 : 0)),
+        bounceShort: d.bounceShort.map((v) => (v ? 1 : 0)),
+        breakLong: d.breakLong.map((v) => (v ? 1 : 0)),
+        breakShort: d.breakShort.map((v) => (v ? 1 : 0)),
       });
       break;
     }

@@ -60,6 +60,8 @@ export function diagonalSr(
   const dtShort: boolean[] = new Array(n).fill(false);
   const tbLong: boolean[] = new Array(n).fill(false);
   const ttShort: boolean[] = new Array(n).fill(false);
+  const descSup: boolean[] = new Array(n).fill(false);
+  const descRes: boolean[] = new Array(n).fill(false);
   const bounceLong: boolean[] = new Array(n).fill(false);
   const bounceShort: boolean[] = new Array(n).fill(false);
   const breakLong: boolean[] = new Array(n).fill(false);
@@ -178,8 +180,14 @@ export function diagonalSr(
       }
     }
 
-    if (activeSup) support[i] = lineAt(activeSup.i0, activeSup.p0, activeSup.i1, activeSup.p1, i);
-    if (activeRes) resistance[i] = lineAt(activeRes.i0, activeRes.p0, activeRes.i1, activeRes.p1, i);
+    if (activeSup) {
+      support[i] = lineAt(activeSup.i0, activeSup.p0, activeSup.i1, activeSup.p1, i);
+      descSup[i] = activeSup.p1 < activeSup.p0;
+    }
+    if (activeRes) {
+      resistance[i] = lineAt(activeRes.i0, activeRes.p0, activeRes.i1, activeRes.p1, i);
+      descRes[i] = activeRes.p1 < activeRes.p0;
+    }
     flatSup[i] = lastFlatSup;
     flatRes[i] = lastFlatRes;
 
@@ -225,11 +233,33 @@ export function diagonalSr(
     }
   }
 
+  const last = n - 1;
+  const seg = (
+    line: { i0: number; p0: number; i1: number; p1: number } | null,
+    endPrice: number | null
+  ): DiagSeg | null => {
+    if (!line || last < 0) return null;
+    const c0 = candles[line.i0];
+    const c1 = candles[last];
+    if (!c0 || !c1) return null;
+    const slope = (line.p1 - line.p0) / Math.max(1, line.i1 - line.i0);
+    return {
+      t0: c0.time,
+      p0: line.p0,
+      t1: c1.time,
+      p1: endPrice ?? line.p1,
+      slope,
+      descending: line.p1 < line.p0,
+    };
+  };
+
   return {
     support,
     resistance,
     flatSup,
     flatRes,
+    descSup,
+    descRes,
     dbLong,
     dtShort,
     tbLong,
@@ -238,5 +268,69 @@ export function diagonalSr(
     bounceShort,
     breakLong,
     breakShort,
+    lastSup: seg(activeSup, support[last] ?? null),
+    lastRes: seg(activeRes, resistance[last] ?? null),
   };
+}
+
+export type DiagSeg = {
+  t0: number;
+  p0: number;
+  t1: number;
+  p1: number;
+  slope: number;
+  descending: boolean;
+};
+
+export type DiagEvent =
+  | "bounce"
+  | "break"
+  | "twin"
+  | "triple"
+  | "any";
+
+export function recentDiagonalSr(
+  candles: Candle[],
+  opts: {
+    event?: DiagEvent;
+    direction?: "bull" | "bear" | "any";
+    slope?: "desc" | "any";
+    maxBarsAgo?: number;
+  } = {}
+): { ok: boolean; kind: string; barsAgo: number; note: string } {
+  const event = opts.event ?? "any";
+  const dir = opts.direction ?? "any";
+  const slope = opts.slope ?? "any";
+  const max = opts.maxBarsAgo ?? 2;
+  if (candles.length < 40) return { ok: false, kind: "", barsAgo: -1, note: "" };
+  const d = diagonalSr(candles);
+  const n = candles.length;
+  for (let ago = 0; ago <= max; ago++) {
+    const i = n - 1 - ago;
+    if (i < 0) break;
+    const descOkLong = slope !== "desc" || d.descSup[i];
+    const descOkShort = slope !== "desc" || d.descRes[i];
+    const hits: { kind: string; note: string; long: boolean }[] = [];
+    if ((event === "bounce" || event === "any") && d.bounceLong[i] && descOkLong)
+      hits.push({ kind: "bounceL", note: "diag destek sekme", long: true });
+    if ((event === "bounce" || event === "any") && d.bounceShort[i] && descOkShort)
+      hits.push({ kind: "bounceS", note: "diag direnç sekme", long: false });
+    if ((event === "break" || event === "any") && d.breakLong[i] && descOkShort)
+      hits.push({ kind: "breakL", note: "diag direnç kırılım", long: true });
+    if ((event === "break" || event === "any") && d.breakShort[i] && descOkLong)
+      hits.push({ kind: "breakS", note: "diag destek kırılım", long: false });
+    if ((event === "twin" || event === "any") && d.dbLong[i])
+      hits.push({ kind: "db", note: "ikili dip boyun", long: true });
+    if ((event === "twin" || event === "any") && d.dtShort[i])
+      hits.push({ kind: "dt", note: "ikili tepe boyun", long: false });
+    if ((event === "triple" || event === "any") && d.tbLong[i])
+      hits.push({ kind: "tb", note: "üçlü dip boyun", long: true });
+    if ((event === "triple" || event === "any") && d.ttShort[i])
+      hits.push({ kind: "tt", note: "üçlü tepe boyun", long: false });
+    const hit = hits.find((h) =>
+      dir === "any" ? true : dir === "bull" ? h.long : !h.long
+    );
+    if (hit) return { ok: true, kind: hit.kind, barsAgo: ago, note: `${hit.note} (−${ago})` };
+  }
+  return { ok: false, kind: "", barsAgo: -1, note: "" };
 }

@@ -19,6 +19,9 @@ export function DrawingToolbar({ paneId }: { paneId: string }) {
   const setActiveDrawTool = useDeskStore((s) => s.setActiveDrawTool);
   const clearPaneDrawings = useDeskStore((s) => s.clearPaneDrawings);
   const clearPaneIndicators = useDeskStore((s) => s.clearPaneIndicators);
+  const requestPlaceDiag = useDeskStore((s) => s.requestPlaceDiag);
+  const addIndicator = useDeskStore((s) => s.addIndicator);
+  const panes = useDeskStore((s) => s.panes);
 
   return (
     <div
@@ -43,6 +46,19 @@ export function DrawingToolbar({ paneId }: { paneId: string }) {
           {t.label}
         </button>
       ))}
+      <button
+        type="button"
+        className="btn px-1.5 text-2xs"
+        title="Diyagonal S/R — son iki pivot destek/direnç çizgilerini koy"
+        onClick={() => {
+          const pane = panes.find((x) => x.id === paneId);
+          const has = pane?.indicators.some((i) => i.type === "diagonalSr");
+          if (!has) addIndicator(paneId, "diagonalSr");
+          requestPlaceDiag(paneId);
+        }}
+      >
+        Diag
+      </button>
       <button
         type="button"
         className="btn px-1.5 text-2xs"

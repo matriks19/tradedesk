@@ -121,6 +121,41 @@ const FILTER_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
     label: "Düşen kırılım",
     filter: { type: "descendingBreak", maxBarsAgo: 2 },
   },
+  {
+    id: "diag_desc",
+    label: "Düşen S/R",
+    filter: { type: "diagonalSr", event: "any", direction: "any", slope: "desc", maxBarsAgo: 2 },
+  },
+  {
+    id: "diag_db",
+    label: "İkili dip",
+    filter: { type: "diagonalSr", event: "twin", direction: "bull", maxBarsAgo: 2 },
+  },
+  {
+    id: "diag_dt",
+    label: "İkili tepe",
+    filter: { type: "diagonalSr", event: "twin", direction: "bear", maxBarsAgo: 2 },
+  },
+  {
+    id: "diag_tb",
+    label: "Üçlü dip",
+    filter: { type: "diagonalSr", event: "triple", direction: "bull", maxBarsAgo: 2 },
+  },
+  {
+    id: "diag_tt",
+    label: "Üçlü tepe",
+    filter: { type: "diagonalSr", event: "triple", direction: "bear", maxBarsAgo: 2 },
+  },
+  {
+    id: "diag_bounce",
+    label: "Diag sekme",
+    filter: { type: "diagonalSr", event: "bounce", direction: "any", maxBarsAgo: 2 },
+  },
+  {
+    id: "diag_break",
+    label: "Diag kırılım",
+    filter: { type: "diagonalSr", event: "break", direction: "any", maxBarsAgo: 2 },
+  },
 ];
 
 const KLINE_TIMEOUT_MS = 10_000;

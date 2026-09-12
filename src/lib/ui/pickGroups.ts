@@ -8,6 +8,7 @@ export type PickItem = {
 
 export const SCANNER_GROUP_ORDER = [
   "TV / Dip",
+  "Formasyon",
   "Elizi",
   "Osilatör",
   "Trend",
@@ -37,6 +38,8 @@ function hit(s: string, re: RegExp): boolean {
 
 export function classifyScannerId(id: string, label = ""): string {
   const s = `${id} ${label}`.toLowerCase();
+  if (id.startsWith("diag_") || /ikili|üçlü|uclu|diag |diyagonal/.test(s))
+    return "Formasyon";
   if (id.startsWith("tv_") || /w dip|tobo|düşen|dipten|uzun vade/.test(s))
     return "TV / Dip";
   if (/elizi/.test(s)) return "Elizi";
@@ -62,6 +65,7 @@ export function classifyChipId(id: string, label = ""): string {
   if (/rsi|stoch|jkase|jstoch|macd/.test(s)) return "Osilatör";
   if (/adx|di_|aroon|ema|st_|sma/.test(s)) return "Trend";
   if (/bb_|vol|hod|atr/.test(s)) return "Piyasa";
+  if (/diag_|ikili|üçlü|uclu|diyagonal|diag /.test(s)) return "Formasyon";
   if (/desc|kırılım|kirilim/.test(s)) return "TV / Dip";
   return "Kombo";
 }

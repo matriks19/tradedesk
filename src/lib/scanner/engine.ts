@@ -23,6 +23,7 @@ import {
   recentDescendingBreak,
   recentDescendingBreakV2,
 } from "@/lib/indicators/descendingBreak";
+import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
 
 export type ScannerFilter =
   | { type: "rsi"; op: "lt" | "gt"; value: number; period?: number }
@@ -136,7 +137,14 @@ export type ScannerFilter =
   | { type: "volumeMin"; min: number }
   | { type: "perfBarsBetween"; bars: number; lo: number; hi: number }
   | { type: "priceVsVwma"; period?: number; side: "above" | "below" }
-  | { type: "descendingBreakV2"; maxBarsAgo?: number };
+  | { type: "descendingBreakV2"; maxBarsAgo?: number }
+  | {
+      type: "diagonalSr";
+      event?: "bounce" | "break" | "twin" | "triple" | "any";
+      direction?: "bull" | "bear" | "any";
+      slope?: "desc" | "any";
+      maxBarsAgo?: number;
+    };
 
 export interface ScannerRow {
   symbol: string;
@@ -566,6 +574,41 @@ export const SCANNER_PRESETS: Record<
       "Pine v2: EMA5>20>50, close>VWMA&EMA5, RSI 50–75, CCI>90, SpanA>SpanB, AroonUp>50 & >Down, vol>1.3×SMA10 — cooldown scan ≤2 bar",
     filters: [{ type: "descendingBreakV2", maxBarsAgo: 2 }],
   },
+  diag_dusen_sr: {
+    label: "Düşen S/R",
+    description: "Alçalan diyagonal destek/direnç: sekme veya kırılım ≤2 bar",
+    filters: [{ type: "diagonalSr", event: "any", direction: "any", slope: "desc", maxBarsAgo: 2 }],
+  },
+  diag_ikili_dip: {
+    label: "İkili dip",
+    description: "İkili dip boyun kırılımı ≤2 bar",
+    filters: [{ type: "diagonalSr", event: "twin", direction: "bull", maxBarsAgo: 2 }],
+  },
+  diag_ikili_tepe: {
+    label: "İkili tepe",
+    description: "İkili tepe boyun kırılımı ≤2 bar",
+    filters: [{ type: "diagonalSr", event: "twin", direction: "bear", maxBarsAgo: 2 }],
+  },
+  diag_uclu_dip: {
+    label: "Üçlü dip",
+    description: "Üçlü dip boyun kırılımı ≤2 bar",
+    filters: [{ type: "diagonalSr", event: "triple", direction: "bull", maxBarsAgo: 2 }],
+  },
+  diag_uclu_tepe: {
+    label: "Üçlü tepe",
+    description: "Üçlü tepe boyun kırılımı ≤2 bar",
+    filters: [{ type: "diagonalSr", event: "triple", direction: "bear", maxBarsAgo: 2 }],
+  },
+  diag_sekme: {
+    label: "Diag sekme",
+    description: "Diyagonal destek/direnç sekmesi ≤2 bar",
+    filters: [{ type: "diagonalSr", event: "bounce", direction: "any", maxBarsAgo: 2 }],
+  },
+  diag_kirilim: {
+    label: "Diag kırılım",
+    description: "Diyagonal destek/direnç kırılımı ≤2 bar",
+    filters: [{ type: "diagonalSr", event: "break", direction: "any", maxBarsAgo: 2 }],
+  },
 
 };
 
@@ -607,6 +650,7 @@ const CANDLE_FILTERS = new Set([
   "perfBarsBetween",
   "priceVsVwma",
   "descendingBreakV2",
+  "diagonalSr",
   "adxPumpStage",
   "adxPumpMixDi",
   "eliziPhase",
@@ -1220,6 +1264,16 @@ export function matchFilters(
       const hit = recentDescendingBreakV2(candles, f.maxBarsAgo ?? 2);
       if (!hit.ok) return { ok: false, note: "" };
       notes.push(`Düşen kırılım v2 (−${hit.barsAgo})`);
+    } else if (f.type === "diagonalSr") {
+      if (!candles || candles.length < 40) return { ok: false, note: "" };
+      const hit = recentDiagonalSr(candles, {
+        event: f.event ?? "any",
+        direction: f.direction ?? "any",
+        slope: f.slope ?? "any",
+        maxBarsAgo: f.maxBarsAgo ?? 2,
+      });
+      if (!hit.ok) return { ok: false, note: "" };
+      notes.push(hit.note);
     } else if (f.type === "rsiDivergence") {
       // Prefer Pine-style PU/NU; fall back only if no recent pivot signal
       if (!candles || candles.length < 60) return { ok: false, note: "" };
