@@ -428,8 +428,8 @@ export function diagonalSr(
     }
   }
 
-  const support = touch.support.slice();
-  const resistance = touch.resistance.slice();
+  const support: (number | null)[] = new Array(n).fill(null);
+  const resistance: (number | null)[] = new Array(n).fill(null);
   const descSup = touch.descSup.slice();
   const descRes = touch.descRes.slice();
   const flatSup: (number | null)[] = new Array(n).fill(null);
@@ -468,20 +468,9 @@ export function diagonalSr(
     }
   }
 
-  const linesSup = pik.supports
-    .slice(0, 24)
-    .map((ln) => toSeg(candles, last, ln));
-  const linesRes = pik.resistances
-    .slice(0, 24)
-    .map((ln) => toSeg(candles, last, ln));
-  if (touch.upLine && last >= 0) {
-    const s = toSeg(candles, last, touch.upLine);
-    if (!linesSup.some((x) => x.i0 === s.i0 && x.i1 === s.i1)) linesSup.unshift(s);
-  }
-  if (touch.dnLine && last >= 0) {
-    const s = toSeg(candles, last, touch.dnLine);
-    if (!linesRes.some((x) => x.i0 === s.i0 && x.i1 === s.i1)) linesRes.unshift(s);
-  }
+  // Drawings / plots: pikusov fan only. Touch lines stay in the scanner.
+  const linesSup = pik.supports.slice(0, 12).map((ln) => toSeg(candles, last, ln));
+  const linesRes = pik.resistances.slice(0, 12).map((ln) => toSeg(candles, last, ln));
 
   return {
     support,
