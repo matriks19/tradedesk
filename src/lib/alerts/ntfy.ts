@@ -17,106 +17,35 @@ export async function publishNtfy(opts: {
   title?: string;
   click?: string;
 }): Promise<{ ok: boolean; status: number; error?: string }> {
-  const url = opts.url.trim();
-  const text = opts.text.slice(0, 4000);
-  const title = (opts.title || "TradeDesk").slice(0, 80);
-  const click =
-    opts.click && /^https?:\/\//i.test(opts.click) ? opts.click : "";
-  const body = click && !text.includes(click) ? `${text}\n${click}` : text;
-  let last = { ok: false, status: 0, error: "ntfy hata" };
-
-  // Simple POST — no custom headers, avoids CORS preflight.
+  const headers: Record<string, string> = {
+    "Content-Type": "text/plain; charset=utf-8",
+    Priority: "high",
+    Tags: "chart_with_upwards_trend",
+  };
+  if (opts.title) headers.Title = opts.title;
+  if (opts.click && /^https?:\/\//i.test(opts.click)) headers.Click = opts.click;
   try {
-    const res = await fetch(url, {
+    const res = await fetch(opts.url, {
       method: "POST",
-      headers: { "Content-Type": "text/plain" },
-      body,
+      headers,
+      body: opts.text.slice(0, 4000),
     });
-    const resp = await res.text().catch(() => "");
-    if (res.ok) return { ok: true, status: res.status };
-    last = {
-      ok: false,
-      status: res.status,
-      error: resp.slice(0, 200) || `ntfy ${res.status}`,
-    };
+    const body = await res.text().catch(() => "");
+    if (!res.ok) {
+      return {
+        ok: false,
+        status: res.status,
+        error: body.slice(0, 200) || `ntfy ${res.status}`,
+      };
+    }
+    return { ok: true, status: res.status };
   } catch (e) {
-    last = {
+    return {
       ok: false,
       status: 0,
       error: e instanceof Error ? e.message : "ntfy hata",
     };
   }
-
-  // GET publish — also a simple request.
-  try {
-    const u = new URL(url);
-    const topic = decodeURIComponent(
-      u.pathname.replace(/^\//, "").split("/")[0] || ""
-    );
-    if (topic) {
-      const q = new URLSearchParams({
-        message: body.slice(0, 1200),
-        title,
-        priority: "high",
-      });
-      const res = await fetch(`${u.origin}/${topic}/publish?${q}`);
-      const resp = await res.text().catch(() => "");
-      if (res.ok) return { ok: true, status: res.status };
-      last = {
-        ok: false,
-        status: res.status,
-        error: resp.slice(0, 200) || `ntfy ${res.status}`,
-      };
-    }
-  } catch (e) {
-    last = {
-      ok: false,
-      status: 0,
-      error: e instanceof Error ? e.message : last.error,
-    };
-  }
-
-  // Same-origin relay (Render → ntfy) when the browser cannot reach ntfy.sh.
-  if (typeof window !== "undefined") {
-    try {
-      const res = await fetch("/api/webhook", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          url,
-          payload: {
-            event: "ntfy",
-            text: body,
-            message: body,
-            title,
-            openUrl: click || undefined,
-            symbol: title.replace(/^TradeDesk\s+/i, "") || undefined,
-          },
-        }),
-      });
-      const json = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        status?: number;
-        error?: string;
-        body?: string;
-      };
-      if (json.ok) {
-        return { ok: true, status: json.status ?? res.status };
-      }
-      last = {
-        ok: false,
-        status: json.status ?? (res.ok ? 0 : res.status),
-        error: json.error || json.body || last.error,
-      };
-    } catch (e) {
-      last = {
-        ok: false,
-        status: 0,
-        error: e instanceof Error ? e.message : last.error,
-      };
-    }
-  }
-  return last;
 }
 
 const NTFY_STORE_KEY = "tradedesk-ntfy-v1";
