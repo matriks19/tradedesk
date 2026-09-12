@@ -8,6 +8,12 @@ import {
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { FALLBACK_USDT_PERPS } from "@/lib/data/binancePerpSnapshot";
+import {
+  PERP_FETCH_HEADERS,
+  fetchAltPerpKlines,
+  fetchAltPerpTickers,
+  setLastPerpFeed,
+} from "@/lib/data/perpAlts";
 
 /** Spot market data — api.binance.com returns 451 in some regions. */
 const REST = process.env.BINANCE_REST_URL ?? "https://data-api.binance.vision";
@@ -100,17 +106,29 @@ async function fetchNativeKlines(
   const url = perp
     ? `${fapiUrl("/v1/klines")}?symbol=${encodeURIComponent(restSym)}&interval=${interval}&limit=${limit}`
     : `${REST}/api/v3/klines?symbol=${encodeURIComponent(restSym)}&interval=${interval}&limit=${limit}`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Binance klines ${res.status}`);
-  const rows = (await res.json()) as unknown[][];
-  return rows.map((r) => ({
-    time: Math.floor(Number(r[0]) / 1000),
-    open: Number(r[1]),
-    high: Number(r[2]),
-    low: Number(r[3]),
-    close: Number(r[4]),
-    volume: Number(r[5]),
-  }));
+  try {
+    const res = await fetch(url, {
+      cache: "no-store",
+      headers: perp ? PERP_FETCH_HEADERS : undefined,
+    });
+    if (!res.ok) throw new Error(`Binance klines ${res.status}`);
+    const rows = (await res.json()) as unknown[][];
+    if (perp) setLastPerpFeed("binance");
+    return rows.map((r) => ({
+      time: Math.floor(Number(r[0]) / 1000),
+      open: Number(r[1]),
+      high: Number(r[2]),
+      low: Number(r[3]),
+      close: Number(r[4]),
+      volume: Number(r[5]),
+    }));
+  } catch (e) {
+    if (perp) {
+      const alt = await fetchAltPerpKlines(symbol, interval, limit);
+      if (alt.length) return alt;
+    }
+    throw e instanceof Error ? e : new Error(String(e));
+  }
 }
 
 function mapTickerRow(
@@ -271,8 +289,19 @@ export class BinanceProvider {
       const url = symbol
         ? `${fapiUrl("/v1/ticker/24hr")}?symbol=${encodeURIComponent(toBinanceRestSymbol(symbol))}`
         : `${fapiUrl("/v1/ticker/24hr")}`;
-      const res = await fetch(url, { cache: "no-store" });
-      if (!res.ok) throw new Error(`Binance fapi ticker ${res.status}`);
+      let res: Response;
+      try {
+        res = await fetch(url, { cache: "no-store", headers: PERP_FETCH_HEADERS });
+      } catch {
+        const alt = await fetchAltPerpTickers(symbol);
+        if (alt.length) return alt;
+        throw new Error("Binance fapi ticker network");
+      }
+      if (!res.ok) {
+        const alt = await fetchAltPerpTickers(symbol);
+        if (alt.length) return alt;
+        throw new Error(`Binance fapi ticker ${res.status}`);
+      }
       const data = await res.json();
       const arr = Array.isArray(data) ? data : [data];
       // Full list includes non-perpetual / non-USDT-M noise — keep TRADING perps only

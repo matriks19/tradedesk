@@ -14,6 +14,7 @@ export function useKlines(
   const [error, setError] = useState<string | null>(null);
   const [delayed, setDelayed] = useState(false);
   const [note, setNote] = useState<string | null>(null);
+  const [feed, setFeed] = useState<string>("binance");
   const wsRef = useRef<WebSocket | null>(null);
 
   const load = useCallback(async () => {
@@ -28,6 +29,7 @@ export function useKlines(
       setCandles(json.candles ?? []);
       setDelayed(!!json.delayed);
       setNote(json.note ?? null);
+      setFeed(String(json.feed ?? "binance"));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -41,6 +43,7 @@ export function useKlines(
 
   useEffect(() => {
     if (exchange !== "binance") return;
+    if (feed && feed !== "binance") return;
     wsRef.current?.close();
     const url = BinanceProvider.wsKlineUrl(symbol, timeframe);
     if (!url) return; // custom / aggregated TF — REST only
@@ -74,7 +77,7 @@ export function useKlines(
     return () => {
       ws.close();
     };
-  }, [symbol, exchange, timeframe]);
+  }, [symbol, exchange, timeframe, feed]);
 
   return { candles, loading, error, delayed, note, reload: load };
 }

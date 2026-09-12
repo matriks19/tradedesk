@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BinanceProvider } from "@/lib/data/binance";
+import { BinanceProvider, isBinancePerp } from "@/lib/data/binance";
 import { BistProvider } from "@/lib/data/bist";
+import { getLastPerpFeed } from "@/lib/data/perpAlts";
 import type { Exchange } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -22,7 +23,13 @@ export async function GET(req: NextRequest) {
       });
     }
     const candles = await BinanceProvider.getKlines(symbol, timeframe, limit);
-    return NextResponse.json({ candles, delayed: false });
+    const feed = isBinancePerp(symbol) ? getLastPerpFeed() : "binance";
+    return NextResponse.json({
+      candles,
+      delayed: false,
+      feed,
+      note: feed !== "binance" ? `perp feed: ${feed}` : undefined,
+    });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : String(e) },
