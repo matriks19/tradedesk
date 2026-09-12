@@ -35,8 +35,10 @@ const HAM_CHIPS: { id: HamCond; label: string }[] = [
   { id: "hist_pos", label: "Hist+" },
   { id: "hist_neg", label: "Hist−" },
   { id: "hist_turn", label: "Hist→" },
-  { id: "dual_up", label: "Hızlı×Yavaş↑" },
-  { id: "dual_dn", label: "Hızlı×Yavaş↓" },
+  { id: "dual_up", label: "Osc H×Y↑" },
+  { id: "dual_dn", label: "Osc H×Y↓" },
+  { id: "raw_dual_up", label: "Raw H×Y↑" },
+  { id: "raw_dual_dn", label: "Raw H×Y↓" },
   { id: "raw_x_osc_up", label: "Raw×Osc↑" },
   { id: "raw_x_osc_dn", label: "Raw×Osc↓" },
   { id: "raw_x_hist_up", label: "Raw×H↑" },
@@ -330,13 +332,15 @@ export function ListScanPanel() {
   const [macdOn, setMacdOn] = useState(false);
   const [stochOn, setStochOn] = useState(false);
 
-  const [hamConds, setHamConds] = useState<HamCond[]>(["dual_up"]);
+  const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
   const [macdConds, setMacdConds] = useState<MacdCond[]>(["cross_up"]);
   const [stochConds, setStochConds] = useState<StochCond[]>(["kx_up_os"]);
 
   const [hamLen, setHamLen] = useState(21);
   const [hamLenSlow, setHamLenSlow] = useState(34);
+  const [rawLen, setRawLen] = useState(10);
+  const [rawLenSlow, setRawLenSlow] = useState(21);
   const [momSpan, setMomSpan] = useState(10);
   const [normLen, setNormLen] = useState(80);
   const [jLen, setJLen] = useState(20);
@@ -345,6 +349,7 @@ export function ListScanPanel() {
   const [colorOsc, setColorOsc] = useState("#18d0bd");
   const [colorSlow, setColorSlow] = useState("#ffb74d");
   const [colorRaw, setColorRaw] = useState("#8b95a8");
+  const [colorRawSlow, setColorRawSlow] = useState("#ce93d8");
   const [colorHistUp, setColorHistUp] = useState("#00c878");
   const [colorHistDn, setColorHistDn] = useState("#dc283c");
 
@@ -386,6 +391,8 @@ export function ListScanPanel() {
         conds: hamConds,
         hamLen,
         hamLenSlow,
+        rawLen,
+        rawLenSlow,
         momSpan,
         normLen,
         jLen,
@@ -394,6 +401,7 @@ export function ListScanPanel() {
         colorOsc,
         colorSlow,
         colorRaw,
+        colorRawSlow,
         colorHistUp,
         colorHistDn,
       },
@@ -437,6 +445,8 @@ export function ListScanPanel() {
     hamConds,
     hamLen,
     hamLenSlow,
+    rawLen,
+    rawLenSlow,
     momSpan,
     normLen,
     jLen,
@@ -445,6 +455,7 @@ export function ListScanPanel() {
     colorOsc,
     colorSlow,
     colorRaw,
+    colorRawSlow,
     colorHistUp,
     colorHistDn,
     diagOn,
@@ -852,8 +863,10 @@ export function ListScanPanel() {
           ))}
         </div>
         <div className="grid grid-cols-3 gap-1">
-          <NumInput label="Hızlı" value={hamLen} onChange={setHamLen} />
-          <NumInput label="Yavaş" value={hamLenSlow} onChange={setHamLenSlow} />
+          <NumInput label="Osc hızlı" value={hamLen} onChange={setHamLen} />
+          <NumInput label="Osc yavaş" value={hamLenSlow} onChange={setHamLenSlow} />
+          <NumInput label="Raw hızlı" value={rawLen} onChange={setRawLen} />
+          <NumInput label="Raw yavaş" value={rawLenSlow} onChange={setRawLenSlow} />
           <NumInput label="momSpan" value={momSpan} onChange={setMomSpan} />
           <NumInput label="normLen" value={normLen} onChange={setNormLen} />
           <NumInput label="jLen" value={jLen} onChange={setJLen} />
@@ -861,9 +874,10 @@ export function ListScanPanel() {
           <NumInput label="postSm" value={postSmooth} onChange={setPostSmooth} />
         </div>
         <div className="grid grid-cols-4 gap-1">
-          <ColorInput label="Hızlı" value={colorOsc} onChange={setColorOsc} />
-          <ColorInput label="Yavaş" value={colorSlow} onChange={setColorSlow} />
-          <ColorInput label="Raw" value={colorRaw} onChange={setColorRaw} />
+          <ColorInput label="Osc H" value={colorOsc} onChange={setColorOsc} />
+          <ColorInput label="Osc Y" value={colorSlow} onChange={setColorSlow} />
+          <ColorInput label="Raw H" value={colorRaw} onChange={setColorRaw} />
+          <ColorInput label="Raw Y" value={colorRawSlow} onChange={setColorRawSlow} />
           <ColorInput label="Hist+" value={colorHistUp} onChange={setColorHistUp} />
           <ColorInput label="Hist−" value={colorHistDn} onChange={setColorHistDn} />
         </div>

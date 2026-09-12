@@ -469,7 +469,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
 
   // —— Elizi Lab
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab — soft Temp hist + ±E lines; AL/SAT at +E/−E cross (below/above bar). Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
-  { id: "hamJurikTpo", label: "HAM Jurik TPO", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: "HAM + Jurik RMA Trend Pulse. Hızlı/yavaş HAM osc kesişimi. Semi-raw, 4 renk hist. Tarama: raw×osc, hızlı×yavaş, setup/onay/AL.", inputs: [num("hamLen", "HAM Hızlı", 21), num("hamLenSlow", "HAM Yavaş", 34), num("momSpan", "Mom Span", 10), num("normLen", "Norm Len", 80), num("jLen", "Jurik RMA", 20), num("jPhase", "Phase", 0, -100, 100, 1), num("postSmooth", "Final Smooth", 5), num("showRawHam", "Semi-raw", 1, 0, 1, 1), num("showHistogram", "Histogram", 1, 0, 1, 1), num("showMarkers", "Flip işaretleri", 1, 0, 1, 1)] },
+  { id: "hamJurikTpo", label: "HAM Jurik TPO", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: "HAM + Jurik RMA Trend Pulse. Hızlı/yavaş HAM osc kesişimi. Semi-raw, 4 renk hist. Tarama: raw×osc, hızlı×yavaş, setup/onay/AL.", inputs: [num("hamLen", "HAM Hızlı", 21), num("hamLenSlow", "HAM Yavaş", 34), num("rawLen", "Raw Hızlı", 10), num("rawLenSlow", "Raw Yavaş", 21), num("momSpan", "Mom Span", 10), num("normLen", "Norm Len", 80), num("jLen", "Jurik RMA", 20), num("jPhase", "Phase", 0, -100, 100, 1), num("postSmooth", "Final Smooth", 5), num("showRawHam", "Semi-raw", 1, 0, 1, 1), num("showHistogram", "Histogram", 1, 0, 1, 1), num("showMarkers", "Flip işaretleri", 1, 0, 1, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
 
@@ -3020,6 +3020,8 @@ export function computeBuiltin(
       const h = hamJurikTpo(candles, {
         hamLen: n(p, "hamLen", 21),
         hamLenSlow: n(p, "hamLenSlow", 34),
+        rawLen: n(p, "rawLen", 10),
+        rawLenSlow: n(p, "rawLenSlow", 21),
         momSpan: n(p, "momSpan", 10),
         normLen: n(p, "normLen", 80),
         jLen: n(p, "jLen", 20),
@@ -3031,6 +3033,7 @@ export function computeBuiltin(
       const colorOsc = c("colorOsc", "#18d0bd");
       const colorSlow = c("colorSlow", "#ffb74d");
       const colorRaw = c("colorRaw", "#8b95a899");
+      const colorRawSlow = c("colorRawSlow", "#ce93d8");
       const colorHistUp = c("colorHistUp", "#00c878");
       const colorHistDn = c("colorHistDn", "#dc283c");
       const remapHist = (col: string | null) => {
@@ -3058,7 +3061,8 @@ export function computeBuiltin(
         line(inst, "oscSlow", "sub", colorSlow, candles, h.oscSlow, "HAM Yavaş"),
       ];
       if (showRaw) {
-        plots.push(line(inst, "raw", "sub", colorRaw, candles, h.oscDisplay, "Semi-raw"));
+        plots.push(line(inst, "raw", "sub", colorRaw, candles, h.oscDisplay, "Raw hızlı"));
+        plots.push(line(inst, "rawSlow", "sub", colorRawSlow, candles, h.rawSlow, "Raw yavaş"));
       }
       if (showHist) {
         const hp = hist(inst, "hist", "sub", colorHistUp + "66", candles, h.hist, "Hist");
@@ -3088,12 +3092,16 @@ export function computeBuiltin(
             markers.push({ time: tm, position: "belowBar", color: colorOsc, shape: "arrowUp", text: "H×Y" });
           if (h.dualCrossDown[i])
             markers.push({ time: tm, position: "aboveBar", color: colorSlow, shape: "arrowDown", text: "H×Y" });
+          if (h.rawDualUp[i])
+            markers.push({ time: tm, position: "belowBar", color: colorRaw, shape: "circle", text: "raw H×Y" });
+          if (h.rawDualDown[i])
+            markers.push({ time: tm, position: "aboveBar", color: colorRawSlow, shape: "circle", text: "raw H×Y" });
           if (h.rawCrossHist[i])
             markers.push({ time: tm, position: "belowBar", color: "#81c784", shape: "circle", text: "raw×hist" });
         }
         if (markers.length) oscLine.markers = markers;
       }
-      push(plots, { osc: h.osc, oscSlow: h.oscSlow, raw: h.oscDisplay, hist: h.hist });
+      push(plots, { osc: h.osc, oscSlow: h.oscSlow, raw: h.oscDisplay, rawSlow: h.rawSlow, hist: h.hist });
       break;
     }
     case "descendingBreakV2": {
