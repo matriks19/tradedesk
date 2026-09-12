@@ -16,6 +16,8 @@ export type HamCond =
   | "raw_x_hist_dn"
   | "raw_x_osc_up"
   | "raw_x_osc_dn"
+  | "dual_up"
+  | "dual_dn"
   | "setup"
   | "confirm"
   | "al";
@@ -54,6 +56,7 @@ export type ListScanConfig = {
     enabled: boolean;
     conds: HamCond[];
     hamLen?: number;
+    hamLenSlow?: number;
     momSpan?: number;
     normLen?: number;
     jLen?: number;
@@ -63,6 +66,7 @@ export type ListScanConfig = {
     colorRaw?: string;
     colorHistUp?: string;
     colorHistDn?: string;
+    colorSlow?: string;
   };
   diag?: {
     enabled: boolean;
@@ -85,6 +89,7 @@ export type ListScanConfig = {
     colorHist?: string;
     colorHistUp?: string;
     colorHistDn?: string;
+    colorSlow?: string;
   };
   stoch?: {
     enabled: boolean;
@@ -153,6 +158,7 @@ function scanHam(
   if (candles.length < 80) return [];
   const h = hamJurikTpo(candles, {
     hamLen: cfg.hamLen,
+    hamLenSlow: cfg.hamLenSlow,
     momSpan: cfg.momSpan,
     normLen: cfg.normLen,
     jLen: cfg.jLen,
@@ -224,6 +230,16 @@ function scanHam(
           ok = h.rawCrossOscDown[i];
           bias = "bear";
           note = `raw×osc↓ (−${ago})`;
+          break;
+        case "dual_up":
+          ok = h.dualCrossUp[i];
+          bias = "bull";
+          note = `HAM hızlı×yavaş↑ (−${ago})`;
+          break;
+        case "dual_dn":
+          ok = h.dualCrossDown[i];
+          bias = "bear";
+          note = `HAM hızlı×yavaş↓ (−${ago})`;
           break;
         case "setup":
           ok = h.rawUp[i] && h.histTurning[i];
@@ -505,6 +521,7 @@ export function indicatorParamsFromConfig(
     const h = cfg.ham;
     const p: Record<string, number | string> = {
       hamLen: h.hamLen ?? 21,
+      hamLenSlow: h.hamLenSlow ?? 34,
       momSpan: h.momSpan ?? 10,
       normLen: h.normLen ?? 80,
       jLen: h.jLen ?? 20,
@@ -518,6 +535,7 @@ export function indicatorParamsFromConfig(
     if (h.colorRaw) p.colorRaw = h.colorRaw;
     if (h.colorHistUp) p.colorHistUp = h.colorHistUp;
     if (h.colorHistDn) p.colorHistDn = h.colorHistDn;
+    if (h.colorSlow) p.colorSlow = h.colorSlow;
     return p;
   }
   if (kind === "diag" && cfg.diag) {

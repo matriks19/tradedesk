@@ -1,7 +1,7 @@
 import type { Candle } from "@/lib/types";
 import { atr, ema, sma, stdev } from "./math";
 
-export type HamJurikEvent = "setup" | "histTurning" | "histCross" | "histPos" | "rawUp" | "rawCrossHist" | "confirm" | "al" | "rawDown" | "histNeg" | "histCrossDown" | "rawCrossHistDown" | "rawCrossOsc" | "rawCrossOscDown";
+export type HamJurikEvent = "setup" | "histTurning" | "histCross" | "histPos" | "rawUp" | "rawCrossHist" | "confirm" | "al" | "rawDown" | "histNeg" | "histCrossDown" | "rawCrossHistDown" | "rawCrossOsc" | "rawCrossOscDown" | "dualUp" | "dualDown";
 
 function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
@@ -96,6 +96,7 @@ export function hamJurikTpo(
   candles: Candle[],
   opts: {
     hamLen?: number;
+    hamLenSlow?: number;
     momSpan?: number;
     normLen?: number;
     rawSmoothLen?: number;
@@ -112,6 +113,7 @@ export function hamJurikTpo(
 ) {
   const n = candles.length;
   const hamLen = opts.hamLen ?? 21;
+  const hamLenSlow = opts.hamLenSlow ?? 34;
   const momSpan = opts.momSpan ?? 10;
   const normLen = opts.normLen ?? 80;
   const rawSmoothLen = opts.rawSmoothLen ?? 4;
@@ -126,6 +128,7 @@ export function hamJurikTpo(
   const bandMult = opts.bandMult ?? 1;
 
   const osc: (number | null)[] = new Array(n).fill(null);
+  const oscSlow: (number | null)[] = new Array(n).fill(null);
   const oscDisplay: (number | null)[] = new Array(n).fill(null);
   const hist: (number | null)[] = new Array(n).fill(null);
   const band: (number | null)[] = new Array(n).fill(null);
@@ -141,6 +144,8 @@ export function hamJurikTpo(
   const rawCrossHistDown: boolean[] = new Array(n).fill(false);
   const rawCrossOsc: boolean[] = new Array(n).fill(false);
   const rawCrossOscDown: boolean[] = new Array(n).fill(false);
+  const dualCrossUp: boolean[] = new Array(n).fill(false);
+  const dualCrossDown: boolean[] = new Array(n).fill(false);
   const bullFlip: boolean[] = new Array(n).fill(false);
   const bearFlip: boolean[] = new Array(n).fill(false);
   const histColor: (string | null)[] = new Array(n).fill(null);
@@ -148,6 +153,7 @@ export function hamJurikTpo(
   if (n < 30) {
     return {
       osc,
+      oscSlow,
       oscDisplay,
       hist,
       band,
@@ -163,6 +169,8 @@ export function hamJurikTpo(
       rawCrossHistDown,
       rawCrossOsc,
       rawCrossOscDown,
+      dualCrossUp,
+      dualCrossDown,
       bullFlip,
       bearFlip,
       histColor,
@@ -187,6 +195,17 @@ export function hamJurikTpo(
   for (let i = 0; i < n; i++) {
     if (nFinal[i] != null) osc[i] = ((nFinal[i] as number) - 50) * 2;
     if (nDisp[i] != null) oscDisplay[i] = ((nDisp[i] as number) - 50) * 2;
+  }
+
+  const hamRawSlow = hamCore(src, vol, hamLenSlow, momSpan, rawSmoothLen, volClampHi);
+  const hamSmoothSlow = jurikRmaStyle(hamRawSlow, jLen, jPhase);
+  const hamFinalSlow = ema(
+    hamSmoothSlow.map((v) => v ?? 0),
+    postSmooth
+  );
+  const nFinalSlow = normalize100(hamFinalSlow, normLen);
+  for (let i = 0; i < n; i++) {
+    if (nFinalSlow[i] != null) oscSlow[i] = ((nFinalSlow[i] as number) - 50) * 2;
   }
 
   const oscFilled = osc.map((v, i) => {
@@ -273,6 +292,12 @@ export function hamJurikTpo(
       if (d1 <= o1 && d > o) rawCrossOsc[i] = true;
       if (d1 >= o1 && d < o) rawCrossOscDown[i] = true;
     }
+    const s0 = oscSlow[i];
+    const s1 = i >= 1 ? oscSlow[i - 1] : null;
+    if (o != null && o1 != null && s0 != null && s1 != null) {
+      if (o1 <= s1 && o > s0) dualCrossUp[i] = true;
+      if (o1 >= s1 && o < s0) dualCrossDown[i] = true;
+    }
     if (h != null) {
       histPos[i] = h >= 0;
       histNeg[i] = h < 0;
@@ -289,6 +314,7 @@ export function hamJurikTpo(
 
   return {
     osc,
+    oscSlow,
     oscDisplay,
     hist,
     band,
@@ -304,6 +330,8 @@ export function hamJurikTpo(
     rawCrossHistDown,
     rawCrossOsc,
     rawCrossOscDown,
+    dualCrossUp,
+    dualCrossDown,
     bullFlip,
     bearFlip,
     histColor,
@@ -344,6 +372,10 @@ export function recentHamJurik(
       return { ok: true, barsAgo: ago, note: `raw×osc↑ (−${ago})` };
     if (event === "rawCrossOscDown" && h.rawCrossOscDown[i])
       return { ok: true, barsAgo: ago, note: `raw×osc↓ (−${ago})` };
+    if (event === "dualUp" && h.dualCrossUp[i])
+      return { ok: true, barsAgo: ago, note: `HAM hızlı×yavaş↑ (−${ago})` };
+    if (event === "dualDown" && h.dualCrossDown[i])
+      return { ok: true, barsAgo: ago, note: `HAM hızlı×yavaş↓ (−${ago})` };
     if (event === "confirm" && (h.histCross[i] || h.rawCrossHist[i]))
       return { ok: true, barsAgo: ago, note: h.rawCrossHist[i] ? `raw×hist (−${ago})` : `hist+ (−${ago})` };
     if (event === "setup" && h.rawUp[i] && h.histTurning[i])

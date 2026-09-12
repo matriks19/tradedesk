@@ -469,7 +469,7 @@ export function AlertsPanel() {
       <div className="border-t border-desk-border pt-2 mt-1 space-y-1">
         <div className="font-medium">Bot / Webhook</div>
         <p className="text-2xs text-desk-muted leading-relaxed">
-          Telegram mesajındaki buton o sembolü açar.
+          Telegram butonu sembolü açar. Payload’da botReady + action=signal — otomatik bot sonra bağlanır.
         </p>
         <label className="text-2xs text-desk-muted block">
           Webhook URL
@@ -498,6 +498,14 @@ export function AlertsPanel() {
             onChange={(e) => setBotSettings({ enabled: e.target.checked })}
           />
           Webhook açık
+        </label>
+        <label className="flex items-center gap-2 text-2xs">
+          <input
+            type="checkbox"
+            checked={!!botSettings.autoBot}
+            onChange={(e) => setBotSettings({ autoBot: e.target.checked })}
+          />
+          Bot kancası (ileride emir)
         </label>
         <div className="flex gap-1 items-center">
           <button type="button" className="btn" onClick={testWebhook}>

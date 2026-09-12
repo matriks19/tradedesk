@@ -141,6 +141,9 @@ export function AlertWatcher() {
                 timeframe: tf,
                 scanKey: a.scanKey,
                 group: a.group,
+                scanPayload: a.scanPayload,
+                botReady: a.botReady ?? bot.autoBot ?? false,
+                action: "signal",
               },
             }),
           });
@@ -225,7 +228,7 @@ export function AlertWatcher() {
           const json = await res.json();
           const candles = (json.candles ?? []) as Candle[];
           if (candles.length) {
-            const hit = checkScanAlert(candles, a.scanKey!);
+            const hit = checkScanAlert(candles, a.scanKey!, a.scanPayload);
             const last = candles[candles.length - 1]!.close;
             if (hit.ok) await fire(a, last, hit.note);
           }

@@ -35,6 +35,8 @@ const HAM_CHIPS: { id: HamCond; label: string }[] = [
   { id: "hist_pos", label: "Hist+" },
   { id: "hist_neg", label: "Hist−" },
   { id: "hist_turn", label: "Hist→" },
+  { id: "dual_up", label: "Hızlı×Yavaş↑" },
+  { id: "dual_dn", label: "Hızlı×Yavaş↓" },
   { id: "raw_x_osc_up", label: "Raw×Osc↑" },
   { id: "raw_x_osc_dn", label: "Raw×Osc↓" },
   { id: "raw_x_hist_up", label: "Raw×H↑" },
@@ -264,6 +266,8 @@ function hamCondToScanKey(cond: string): AlertScanKey | null {
   if (cond === "setup") return "ham_setup";
   if (cond === "confirm") return "ham_confirm";
   if (cond === "al") return "ham_al";
+  if (cond === "dual_up") return "ham_dual_up";
+  if (cond === "dual_dn") return "ham_dual_dn";
   return null;
 }
 
@@ -326,18 +330,20 @@ export function ListScanPanel() {
   const [macdOn, setMacdOn] = useState(false);
   const [stochOn, setStochOn] = useState(false);
 
-  const [hamConds, setHamConds] = useState<HamCond[]>(["raw_x_osc_up"]);
+  const [hamConds, setHamConds] = useState<HamCond[]>(["dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
   const [macdConds, setMacdConds] = useState<MacdCond[]>(["cross_up"]);
   const [stochConds, setStochConds] = useState<StochCond[]>(["kx_up_os"]);
 
   const [hamLen, setHamLen] = useState(21);
+  const [hamLenSlow, setHamLenSlow] = useState(34);
   const [momSpan, setMomSpan] = useState(10);
   const [normLen, setNormLen] = useState(80);
   const [jLen, setJLen] = useState(20);
   const [jPhase, setJPhase] = useState(0);
   const [postSmooth, setPostSmooth] = useState(5);
   const [colorOsc, setColorOsc] = useState("#18d0bd");
+  const [colorSlow, setColorSlow] = useState("#ffb74d");
   const [colorRaw, setColorRaw] = useState("#8b95a8");
   const [colorHistUp, setColorHistUp] = useState("#00c878");
   const [colorHistDn, setColorHistDn] = useState("#dc283c");
@@ -379,12 +385,14 @@ export function ListScanPanel() {
         enabled: hamOn,
         conds: hamConds,
         hamLen,
+        hamLenSlow,
         momSpan,
         normLen,
         jLen,
         jPhase,
         postSmooth,
         colorOsc,
+        colorSlow,
         colorRaw,
         colorHistUp,
         colorHistDn,
@@ -428,12 +436,14 @@ export function ListScanPanel() {
     hamOn,
     hamConds,
     hamLen,
+    hamLenSlow,
     momSpan,
     normLen,
     jLen,
     jPhase,
     postSmooth,
     colorOsc,
+    colorSlow,
     colorRaw,
     colorHistUp,
     colorHistDn,
@@ -636,6 +646,40 @@ export function ListScanPanel() {
     [buildConfig, openSymbolInActive, tf, upsertIndicators]
   );
 
+  const armListAlerts = useCallback(() => {
+    if (!universe.symbols.length) {
+      setStatus("Liste boş");
+      return;
+    }
+    const cfg = buildConfig();
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled) {
+      setStatus("En az bir gösterge seçin");
+      return;
+    }
+    const botReady = !!useDeskStore.getState().botSettings.enabled;
+    const items = universe.symbols.map((s) => ({
+      symbol: s.symbol,
+      exchange: s.exchange,
+      condition: "cross_above" as const,
+      price: 0,
+      kind: "scan" as const,
+      scanKey: "list_scan" as const,
+      scanPayload: cfg as unknown as Record<string, unknown>,
+      group: "Liste",
+      note: `${universe.name} · liste koşulu`,
+      timeframe: tf,
+      repeat: "repeat" as const,
+      cooldownMin: 60,
+      intervalMin: 15,
+      expiresAt: Date.now() + 24 * 3600_000,
+      botReady,
+    }));
+    const n = addAlertsBulk(items);
+    setStatus(
+      `${n} alarm · ${universe.name} · bot ${botReady ? "açık" : "kapalı (Alarm sekmesi)"}`
+    );
+  }, [universe, buildConfig, addAlertsBulk, tf]);
+
   const bulkAlerts = useCallback(async () => {
     if (!hits.length) {
       setStatus("Önce Listeyi tara");
@@ -808,7 +852,8 @@ export function ListScanPanel() {
           ))}
         </div>
         <div className="grid grid-cols-3 gap-1">
-          <NumInput label="hamLen" value={hamLen} onChange={setHamLen} />
+          <NumInput label="Hızlı" value={hamLen} onChange={setHamLen} />
+          <NumInput label="Yavaş" value={hamLenSlow} onChange={setHamLenSlow} />
           <NumInput label="momSpan" value={momSpan} onChange={setMomSpan} />
           <NumInput label="normLen" value={normLen} onChange={setNormLen} />
           <NumInput label="jLen" value={jLen} onChange={setJLen} />
@@ -816,7 +861,8 @@ export function ListScanPanel() {
           <NumInput label="postSm" value={postSmooth} onChange={setPostSmooth} />
         </div>
         <div className="grid grid-cols-4 gap-1">
-          <ColorInput label="Osc" value={colorOsc} onChange={setColorOsc} />
+          <ColorInput label="Hızlı" value={colorOsc} onChange={setColorOsc} />
+          <ColorInput label="Yavaş" value={colorSlow} onChange={setColorSlow} />
           <ColorInput label="Raw" value={colorRaw} onChange={setColorRaw} />
           <ColorInput label="Hist+" value={colorHistUp} onChange={setColorHistUp} />
           <ColorInput label="Hist−" value={colorHistDn} onChange={setColorHistDn} />
@@ -946,6 +992,14 @@ export function ListScanPanel() {
             Durdur
           </button>
         )}
+        <button
+          type="button"
+          className="btn text-2xs"
+          disabled={running || !universe.symbols.length}
+          onClick={armListAlerts}
+        >
+          Listeye alarm
+        </button>
         <button
           type="button"
           className="btn text-2xs"

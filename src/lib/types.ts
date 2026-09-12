@@ -362,8 +362,11 @@ export type AlertScanKey =
   | "ham_setup"
   | "ham_confirm"
   | "ham_al"
+  | "ham_dual_up"
+  | "ham_dual_dn"
   | "diag_bounce"
-  | "diag_break";
+  | "diag_break"
+  | "list_scan";
 
 export interface PriceAlert {
   id: string;
@@ -388,6 +391,10 @@ export interface PriceAlert {
   expiresAt?: number;
   lastFiredAt?: number;
   lastCheckedAt?: number;
+  /** Full Liste scan config when scanKey=list_scan */
+  scanPayload?: Record<string, unknown>;
+  /** Future auto-bot hook — webhook already fires; bot consumes this. */
+  botReady?: boolean;
 }
 
 export type DrawTool = "cursor" | "hline" | "trend" | "fib" | "measure" | "rect";
@@ -412,4 +419,6 @@ export interface BotSettings {
   secret?: string;
   /** Telegram chat id when webhookUrl is api.telegram.org/.../sendMessage */
   telegramChatId?: string;
+  /** When true, scan/price alerts are marked botReady for a future auto-bot. */
+  autoBot?: boolean;
 }
