@@ -9,3 +9,4 @@ export * from "./freshness";
 export * from "./watchlistQuotes";
 export * from "./macdEliziScan";
 export * from "./rsiPuNuScan";
+export * from "./listScan";

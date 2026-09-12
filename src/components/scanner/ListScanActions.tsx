@@ -130,7 +130,7 @@ export function ListScanActions({
       setStatus(
         `${out.length} sinyal · ${list.symbols.length} sembol · ${tf} · ≤${DEFAULT_MAX_BARS_AGO} bar`
       );
-      setSidebarTab("patterns");
+      setSidebarTab("list");
     } finally {
       setRunning(false);
     }

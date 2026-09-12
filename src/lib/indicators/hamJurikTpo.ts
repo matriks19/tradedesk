@@ -1,7 +1,7 @@
 import type { Candle } from "@/lib/types";
 import { atr, ema, sma, stdev } from "./math";
 
-export type HamJurikEvent = "setup" | "histTurning" | "histCross" | "histPos" | "rawUp" | "rawCrossHist" | "confirm" | "al";
+export type HamJurikEvent = "setup" | "histTurning" | "histCross" | "histPos" | "rawUp" | "rawCrossHist" | "confirm" | "al" | "rawDown" | "histNeg" | "histCrossDown" | "rawCrossHistDown";
 
 function clamp(x: number, lo: number, hi: number): number {
   return Math.max(lo, Math.min(hi, x));
@@ -135,6 +135,10 @@ export function hamJurikTpo(
   const histPos: boolean[] = new Array(n).fill(false);
   const histCross: boolean[] = new Array(n).fill(false);
   const rawCrossHist: boolean[] = new Array(n).fill(false);
+  const rawDown: boolean[] = new Array(n).fill(false);
+  const histNeg: boolean[] = new Array(n).fill(false);
+  const histCrossDown: boolean[] = new Array(n).fill(false);
+  const rawCrossHistDown: boolean[] = new Array(n).fill(false);
   const bullFlip: boolean[] = new Array(n).fill(false);
   const bearFlip: boolean[] = new Array(n).fill(false);
   const histColor: (string | null)[] = new Array(n).fill(null);
@@ -147,10 +151,14 @@ export function hamJurikTpo(
       band,
       regime,
       rawUp,
+      rawDown,
       histTurning,
       histPos,
+      histNeg,
       histCross,
+      histCrossDown,
       rawCrossHist,
+      rawCrossHistDown,
       bullFlip,
       bearFlip,
       histColor,
@@ -250,14 +258,18 @@ export function hamJurikTpo(
     const d = oscDisplay[i];
     const d1 = i >= 1 ? oscDisplay[i - 1] : null;
     if (d != null && d1 != null && d > d1) rawUp[i] = true;
+    if (d != null && d1 != null && d < d1) rawDown[i] = true;
     if (d != null && d1 != null && h != null && h1 != null) {
       if (d1 <= h1 && d > h) rawCrossHist[i] = true;
+      if (d1 >= h1 && d < h) rawCrossHistDown[i] = true;
     }
     if (h != null) {
       histPos[i] = h >= 0;
+      histNeg[i] = h < 0;
       if (h1 != null) {
         if (h < 0 && h >= h1) histTurning[i] = true;
         if (h >= 0 && h1 < 0) histCross[i] = true;
+        if (h < 0 && h1 >= 0) histCrossDown[i] = true;
         const rising = h >= h1;
         histColor[i] =
           h >= 0 ? (rising ? UP : UP_FADE) : rising ? DN_FADE : DN;
@@ -272,10 +284,14 @@ export function hamJurikTpo(
     band,
     regime,
     rawUp,
+    rawDown,
     histTurning,
     histPos,
+    histNeg,
     histCross,
+    histCrossDown,
     rawCrossHist,
+    rawCrossHistDown,
     bullFlip,
     bearFlip,
     histColor,
@@ -285,24 +301,33 @@ export function hamJurikTpo(
 export function recentHamJurik(
   candles: Candle[],
   event: HamJurikEvent,
-  maxBarsAgo = 2
+  maxBarsAgo = 2,
+  opts: Parameters<typeof hamJurikTpo>[1] = {}
 ): { ok: boolean; barsAgo: number; note: string } {
   if (candles.length < 80) return { ok: false, barsAgo: -1, note: "" };
-  const h = hamJurikTpo(candles);
+  const h = hamJurikTpo(candles, opts);
   const n = candles.length;
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = n - 1 - ago;
     if (i < 1) break;
     if (event === "rawUp" && h.rawUp[i])
       return { ok: true, barsAgo: ago, note: `HAM raw↑ (−${ago})` };
+    if (event === "rawDown" && h.rawDown[i])
+      return { ok: true, barsAgo: ago, note: `HAM raw↓ (−${ago})` };
     if (event === "histTurning" && h.histTurning[i])
       return { ok: true, barsAgo: ago, note: `hist→0 (−${ago})` };
     if (event === "histPos" && h.histPos[i])
       return { ok: true, barsAgo: ago, note: `hist+ (−${ago})` };
+    if (event === "histNeg" && h.histNeg[i])
+      return { ok: true, barsAgo: ago, note: `hist− (−${ago})` };
     if (event === "histCross" && h.histCross[i])
       return { ok: true, barsAgo: ago, note: `hist+ kesişim (−${ago})` };
+    if (event === "histCrossDown" && h.histCrossDown[i])
+      return { ok: true, barsAgo: ago, note: `hist− kesişim (−${ago})` };
     if (event === "rawCrossHist" && h.rawCrossHist[i])
       return { ok: true, barsAgo: ago, note: `raw×hist alttan (−${ago})` };
+    if (event === "rawCrossHistDown" && h.rawCrossHistDown[i])
+      return { ok: true, barsAgo: ago, note: `raw×hist üstten (−${ago})` };
     if (event === "confirm" && (h.histCross[i] || h.rawCrossHist[i]))
       return { ok: true, barsAgo: ago, note: h.rawCrossHist[i] ? `raw×hist (−${ago})` : `hist+ (−${ago})` };
     if (event === "setup" && h.rawUp[i] && h.histTurning[i])

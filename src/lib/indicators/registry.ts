@@ -895,14 +895,18 @@ export function computeBuiltin(
     case "stochastic": {
       const kp = n(p, "kPeriod", 14);
       const dp = n(p, "dPeriod", 3);
+      const c = (k: string, d: string) =>
+        typeof p[k] === "string" && p[k] ? String(p[k]) : d;
+      const colorK = c("colorK", "#2962ff");
+      const colorD = c("colorD", "#ff6d00");
       const s =
         inst.source?.type === "indicator"
           ? stochasticSeries(values, kp, dp)
           : stochastic(candles, kp, dp);
       push(
         [
-          line(inst, "k", "sub", "#2962ff", candles, s.k, "%K"),
-          line(inst, "d", "sub", "#ff6d00", candles, s.d, "%D"),
+          line(inst, "k", "sub", colorK, candles, s.k, "%K"),
+          line(inst, "d", "sub", colorD, candles, s.d, "%D"),
         ],
         { k: s.k, d: s.d }
       );
@@ -963,10 +967,27 @@ export function computeBuiltin(
             }
             return { ...raw, crossUp, crossDn };
           })();
+      const c = (k: string, d: string) =>
+        typeof p[k] === "string" && p[k] ? String(p[k]) : d;
+      const colorMacd = c("colorMacd", "#2962ff");
+      const colorSignal = c("colorSignal", "#ff6d00");
+      const colorHist = c("colorHist", "#26a69a");
+      const colorHistUp = c("colorHistUp", colorHist);
+      const colorHistDn = c("colorHistDn", colorHist);
+      const histPlot = hist(inst, "hist", "sub", colorHist, candles, m.hist, "Hist");
+      if (colorHistUp !== colorHist || colorHistDn !== colorHist) {
+        histPlot.data = histPlot.data.map((pt, i) => {
+          if (!("value" in pt) || pt.value == null) return pt;
+          const hv = m.hist[i];
+          const col =
+            hv == null ? colorHist : hv >= 0 ? colorHistUp : colorHistDn;
+          return { time: pt.time, value: pt.value, color: col };
+        });
+      }
       const plots: PlotSeries[] = [
-        line(inst, "macd", "sub", "#2962ff", candles, m.macd, "MACD"),
-        line(inst, "sig", "sub", "#ff6d00", candles, m.signal, "Signal"),
-        hist(inst, "hist", "sub", "#26a69a", candles, m.hist, "Hist"),
+        line(inst, "macd", "sub", colorMacd, candles, m.macd, "MACD"),
+        line(inst, "sig", "sub", colorSignal, candles, m.signal, "Signal"),
+        histPlot,
       ];
       if (showMarkers) {
         const markUp = m.crossUp.map((v, i) =>
@@ -2944,18 +2965,22 @@ export function computeBuiltin(
         }
         return vals;
       };
+      const c = (k: string, dflt: string) =>
+        typeof p[k] === "string" && p[k] ? String(p[k]) : dflt;
+      const colorSup = c("colorSup", "#7BCB8B");
+      const colorRes = c("colorRes", "#ff77ad");
       d.linesSup.forEach((seg, i) => {
         plots.push(
-          line(inst, `sup${i}`, "main", "#7BCB8B", candles, raster(seg), i === 0 ? "Destek" : "")
+          line(inst, `sup${i}`, "main", colorSup, candles, raster(seg), i === 0 ? "Destek" : "")
         );
       });
       d.linesRes.forEach((seg, i) => {
         plots.push(
-          line(inst, `res${i}`, "main", "#ff77ad", candles, raster(seg), i === 0 ? "Direnç" : "")
+          line(inst, `res${i}`, "main", colorRes, candles, raster(seg), i === 0 ? "Direnç" : "")
         );
       });
       if (!plots.length) {
-        plots.push(line(inst, "support", "main", "#7BCB8B", candles, d.support, "Destek"));
+        plots.push(line(inst, "support", "main", colorSup, candles, d.support, "Destek"));
       }
       if (showMarkers) {
         const markers: PlotMarker[] = [];
@@ -3000,10 +3025,28 @@ export function computeBuiltin(
         jPhase: n(p, "jPhase", 0),
         postSmooth: n(p, "postSmooth", 5),
       });
-      const oscLine = line(inst, "osc", "sub", "#18d0bd", candles, h.osc, "HAM Osc");
+      const c = (k: string, d: string) =>
+        typeof p[k] === "string" && p[k] ? String(p[k]) : d;
+      const colorOsc = c("colorOsc", "#18d0bd");
+      const colorRaw = c("colorRaw", "#8b95a899");
+      const colorHistUp = c("colorHistUp", "#00c878");
+      const colorHistDn = c("colorHistDn", "#dc283c");
+      const remapHist = (col: string | null) => {
+        if (!col) return colorHistUp + "66";
+        if (col === "#00c878") return colorHistUp;
+        if (col === "#006446") return colorHistUp + "99";
+        if (col === "#dc283c") return colorHistDn;
+        if (col === "#8c1e28") return colorHistDn + "99";
+        return col;
+      };
+      const oscLine = line(inst, "osc", "sub", colorOsc, candles, h.osc, "HAM Osc");
       oscLine.data = oscLine.data.map((pt, i) => {
         if (!("value" in pt) || pt.value == null) return pt;
-        return { time: pt.time, value: pt.value, color: h.regime[i] === 1 ? "#18d0bd" : "#cf1d3a" };
+        return {
+          time: pt.time,
+          value: pt.value,
+          color: h.regime[i] === 1 ? colorOsc : "#cf1d3a",
+        };
       });
       const plots: PlotSeries[] = [
         line(inst, "zero", "sub", "#8b95a888", candles, candles.map(() => 0), "0"),
@@ -3012,13 +3055,17 @@ export function computeBuiltin(
         oscLine,
       ];
       if (showRaw) {
-        plots.push(line(inst, "raw", "sub", "#8b95a899", candles, h.oscDisplay, "Semi-raw"));
+        plots.push(line(inst, "raw", "sub", colorRaw, candles, h.oscDisplay, "Semi-raw"));
       }
       if (showHist) {
-        const hp = hist(inst, "hist", "sub", "#00c87866", candles, h.hist, "Hist");
+        const hp = hist(inst, "hist", "sub", colorHistUp + "66", candles, h.hist, "Hist");
         hp.data = hp.data.map((pt, i) => {
           if (!("value" in pt) || pt.value == null) return pt;
-          return { time: pt.time, value: pt.value, color: h.histColor[i] ?? "#00c87866" };
+          return {
+            time: pt.time,
+            value: pt.value,
+            color: remapHist(h.histColor[i]),
+          };
         });
         plots.push(hp);
       }

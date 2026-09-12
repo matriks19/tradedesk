@@ -501,6 +501,10 @@ export function recentDiagonalSr(
     direction?: "bull" | "bear" | "any";
     slope?: "desc" | "any";
     maxBarsAgo?: number;
+    pivotWindow?: number;
+    historyBars?: number;
+    left?: number;
+    right?: number;
   } = {}
 ): { ok: boolean; kind: string; barsAgo: number; note: string } {
   const event = opts.event ?? "any";
@@ -508,7 +512,12 @@ export function recentDiagonalSr(
   const slope = opts.slope ?? "any";
   const max = opts.maxBarsAgo ?? 2;
   if (candles.length < 40) return { ok: false, kind: "", barsAgo: -1, note: "" };
-  const d = diagonalSr(candles);
+  const d = diagonalSr(candles, {
+    pivotWindow: opts.pivotWindow,
+    historyBars: opts.historyBars,
+    left: opts.left,
+    right: opts.right,
+  });
   const n = candles.length;
   for (let ago = 0; ago <= max; ago++) {
     const i = n - 1 - ago;

@@ -11,12 +11,14 @@ import { ScriptEditor } from "@/components/editor/ScriptEditor";
 import { BacktestPanel } from "@/components/backtest/BacktestPanel";
 import { StrategiesPanel } from "@/components/strategies/StrategiesPanel";
 import { AlertsPanel } from "@/components/alerts/AlertsPanel";
+import { ListScanPanel } from "@/components/scanner/ListScanPanel";
 import { PairHealthPanel } from "@/components/pairs/PairHealthPanel";
 import clsx from "clsx";
 
 const TABS = [
   { id: "strategies", label: "Strateji" },
   { id: "watchlist", label: "İzleme" },
+  { id: "list", label: "Liste" },
   { id: "indicators", label: "Göstergeler" },
   { id: "scanner", label: "Tarayıcı" },
   { id: "heatmap", label: "Isı" },
@@ -48,6 +50,7 @@ export function Sidebar() {
       <div className="flex-1 min-h-0 overflow-hidden">
         {sidebarTab === "strategies" && <StrategiesPanel />}
         {sidebarTab === "watchlist" && <WatchlistPanel />}
+        {sidebarTab === "list" && <ListScanPanel />}
         {sidebarTab === "indicators" && <IndicatorPanel />}
         {sidebarTab === "scanner" && <ScannerPanel />}
         {sidebarTab === "heatmap" && <HeatmapPanel />}

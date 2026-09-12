@@ -91,6 +91,7 @@ interface DeskState {
   activePaneId: string;
   sidebarTab:
     | "watchlist"
+    | "list"
     | "scanner"
     | "heatmap"
     | "patterns"
