@@ -393,6 +393,9 @@ export interface PriceAlert {
   lastCheckedAt?: number;
   /** Full Liste scan config when scanKey=list_scan */
   scanPayload?: Record<string, unknown>;
+  /** First scan check only records state — does not fire. */
+  scanPrimed?: boolean;
+  lastScanSig?: string;
   /** Future auto-bot hook — webhook already fires; bot consumes this. */
   botReady?: boolean;
 }

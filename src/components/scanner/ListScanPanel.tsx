@@ -734,10 +734,11 @@ export function ListScanPanel() {
       intervalMin: 15,
       expiresAt: Date.now() + 24 * 3600_000,
       botReady,
+      scanPrimed: false,
     }));
     const n = addAlertsBulk(items);
     setStatus(
-      `${n} alarm · ${universe.name} · bot ${botReady ? "açık" : "kapalı (Alarm sekmesi)"}`
+      `${n} izleme · mevcut sinyal çalmaz · ${universe.name} · bot ${botReady ? "açık" : "kapalı"}`
     );
   }, [universe, buildConfig, addAlertsBulk, tf]);
 

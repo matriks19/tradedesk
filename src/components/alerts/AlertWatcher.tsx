@@ -248,7 +248,13 @@ export function AlertWatcher() {
           if (candles.length) {
             const hit = checkScanAlert(candles, a.scanKey!, a.scanPayload);
             const last = candles[candles.length - 1]!.close;
-            if (hit.ok) await fire(a, last, hit.note);
+            const sig = hit.sig || hit.note || "";
+            if (a.scanPrimed !== true) {
+              updateAlert(a.id, { scanPrimed: true, lastScanSig: sig });
+            } else if (hit.ok && sig && sig !== a.lastScanSig) {
+              updateAlert(a.id, { lastScanSig: sig });
+              await fire(a, last, hit.note);
+            }
           }
         } catch {
           /* */

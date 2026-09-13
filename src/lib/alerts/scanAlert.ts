@@ -1,7 +1,7 @@
 import type { AlertScanKey, Candle } from "@/lib/types";
 import { recentHamJurik } from "@/lib/indicators/hamJurikTpo";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
-import { scanSymbol, type ListScanConfig } from "@/lib/scanner/listScan";
+import { alertScanHits, alertScanSig, type ListScanConfig } from "@/lib/scanner/listScan";
 
 export const SCAN_OPTIONS: { key: AlertScanKey; label: string; group: string }[] = [
   { key: "ham_setup", label: "HAM erken AL", group: "HAM" },
@@ -18,7 +18,7 @@ export function checkScanAlert(
   candles: Candle[],
   scanKey: AlertScanKey,
   payload?: Record<string, unknown>
-): { ok: boolean; note: string } {
+): { ok: boolean; note: string; sig?: string } {
   switch (scanKey) {
     case "ham_setup":
       return recentHamJurik(candles, "setup", 2);
@@ -43,10 +43,14 @@ export function checkScanAlert(
         maxBarsAgo: 2,
       });
     case "list_scan": {
-      if (!payload) return { ok: false, note: "" };
-      const hits = scanSymbol(candles, payload as ListScanConfig, 2);
-      if (!hits.length) return { ok: false, note: "" };
-      return { ok: true, note: hits.map((h) => h.note).join(" · ") };
+      if (!payload) return { ok: false, note: "", sig: "" };
+      const hits = alertScanHits(candles, payload as ListScanConfig, 1);
+      if (!hits.length) return { ok: false, note: "", sig: "" };
+      return {
+        ok: true,
+        note: hits.map((h) => h.note).join(" · "),
+        sig: alertScanSig(candles, hits),
+      };
     }
     default:
       return { ok: false, note: "" };

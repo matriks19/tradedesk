@@ -695,6 +695,47 @@ export function scanSymbol(
   return out;
 }
 
+/** State/zone flags — true for many bars; do not fire phone alerts. */
+const STATE_CONDS = new Set([
+  "hist_pos",
+  "hist_neg",
+  "raw_up",
+  "raw_dn",
+  "raw_slow_up",
+  "raw_slow_dn",
+  "osc_fast_up",
+  "osc_fast_dn",
+  "osc_slow_up",
+  "osc_slow_dn",
+  "os",
+  "ob",
+  "up",
+  "dn",
+]);
+
+export function alertScanHits(
+  candles: Candle[],
+  cfg: ListScanConfig,
+  maxBarsAgo = 1
+): ListScanHit[] {
+  const hits = scanSymbol(candles, cfg, maxBarsAgo);
+  return hits.filter((h) => {
+    if (h.barsAgo > 1) return false;
+    const cond = h.cond.includes(":") ? h.cond.split(":").slice(1).join(":") : h.cond;
+    if (STATE_CONDS.has(cond)) return false;
+    return true;
+  });
+}
+
+export function alertScanSig(candles: Candle[], hits: ListScanHit[]): string {
+  const last = candles[candles.length - 1];
+  const t0 = last && typeof last.time === "number" ? last.time : 0;
+  return hits
+    .map((h) => `${h.kind}:${h.cond}:${t0 - h.barsAgo}`)
+    .sort()
+    .join("|");
+}
+
 /** Build indicator params (incl. color*) to upsert onto a pane. */
 export function indicatorParamsFromConfig(
   kind: ListScanKind,
