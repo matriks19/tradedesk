@@ -65,8 +65,8 @@ function chartOptions(height: number, width: number, showTime: boolean) {
       secondsVisible: false,
       visible: showTime,
       // Comfortable default density; initial range is set after setData.
-      barSpacing: 8,
-      minBarSpacing: 2,
+      barSpacing: 5,
+      minBarSpacing: 1,
       rightOffset: 12,
     },
     handleScroll: {
@@ -126,8 +126,8 @@ export function ChartPane({ pane, compact }: Props) {
   >(new Map());
   const subContainerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const priceLinesRef = useRef<IPriceLine[]>([]);
-  /** First open / symbol·TF change: target last ~220 bars (not full history). */
-  const INITIAL_VISIBLE_BARS = 220;
+  /** First open / symbol·TF change: target last ~520 bars so history is readable. */
+  const INITIAL_VISIBLE_BARS = 520;
   const dataViewKeyRef = useRef("");
   /** Re-apply visible range after first real layout / symbol·TF change. */
   const needsInitialFitRef = useRef(true);
@@ -390,7 +390,7 @@ export function ChartPane({ pane, compact }: Props) {
     }
   }, [rangesNearlyEqual]);
 
-  /** Fit last ~40–120 bars + price autoScale; fallback fitContent. Returns success. */
+  /** Fit last ~520 bars + price autoScale; fallback fitContent. Returns success. */
   const applyInitialView = useCallback((main: IChartApi): boolean => {
     if (overlayPatternRef.current) return false;
     const series = candleRef.current;
@@ -403,8 +403,8 @@ export function ChartPane({ pane, compact }: Props) {
     }
     if (n < 1) return false;
 
-    // Prefer ~180–280 bars of history (not fitContent full series).
-    const visible = Math.min(280, Math.max(80, Math.min(n, INITIAL_VISIBLE_BARS)));
+    // Prefer ~400–700 bars of history (not fitContent full series).
+    const visible = Math.min(700, Math.max(150, Math.min(n, INITIAL_VISIBLE_BARS)));
     const from = Math.max(0, n - visible);
     const to = n + 4; // small right pad so last bar isn't edge-glued
 

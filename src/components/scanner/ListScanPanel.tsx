@@ -19,6 +19,7 @@ import {
   type MacdCond,
   type StochCond,
   type DiagCond,
+  type DiCond,
   type ListScanConfig,
   type ListScanHit,
   type ListScanKind,
@@ -88,6 +89,14 @@ const STOCH_CHIPS: { id: StochCond; label: string }[] = [
   { id: "kx_dn", label: "K×D↓" },
   { id: "kx_up_os", label: "↑15–25" },
   { id: "kx_dn_ob", label: "↓75–85" },
+];
+
+const DI_CHIPS: { id: DiCond; label: string }[] = [
+  { id: "plus_x_minus", label: "+DI×−DI↑" },
+  { id: "minus_x_plus", label: "−DI×+DI↑" },
+  { id: "plus_above", label: "+DI>−DI" },
+  { id: "minus_above", label: "−DI>+DI" },
+  { id: "adx_above", label: "ADX>25" },
 ];
 
 const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
@@ -349,11 +358,13 @@ export function ListScanPanel() {
   const [diagOn, setDiagOn] = useState(false);
   const [macdOn, setMacdOn] = useState(false);
   const [stochOn, setStochOn] = useState(false);
+  const [diOn, setDiOn] = useState(false);
 
   const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
   const [macdConds, setMacdConds] = useState<MacdCond[]>(["cross_up"]);
   const [stochConds, setStochConds] = useState<StochCond[]>(["kx_up_os"]);
+  const [diConds, setDiConds] = useState<DiCond[]>(["plus_x_minus"]);
 
   const [hamLen, setHamLen] = useState(21);
   const [hamLenSlow, setHamLenSlow] = useState(34);
@@ -391,6 +402,9 @@ export function ListScanPanel() {
   const [stochOb, setStochOb] = useState(80);
   const [colorK, setColorK] = useState("#2962ff");
   const [colorD, setColorD] = useState("#ff6d00");
+
+  const [diPeriod, setDiPeriod] = useState(14);
+  const [diAdxMin, setDiAdxMin] = useState(25);
 
   const [extraIds, setExtraIds] = useState<string[]>([]);
   const [openCard, setOpenCard] = useState<string | null>("ham");
@@ -460,6 +474,12 @@ export function ListScanPanel() {
         colorK,
         colorD,
       },
+      di: {
+        enabled: diOn,
+        conds: diConds,
+        period: diPeriod,
+        adxMin: diAdxMin,
+      },
       extraFilters: EXTRA_CHIPS.filter((c) => extraIds.includes(c.id)).map(
         (c) => c.filter
       ),
@@ -519,6 +539,10 @@ export function ListScanPanel() {
     stochOb,
     colorK,
     colorD,
+    diOn,
+    diConds,
+    diPeriod,
+    diAdxMin,
     extraIds,
     pineIds,
     pineConds,
@@ -537,7 +561,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -664,6 +688,7 @@ export function ListScanPanel() {
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
       if (cfg.stoch?.enabled) kinds.push("stoch");
+      if (cfg.di?.enabled) kinds.push("di");
       for (const kind of kinds) {
         const type = KIND_TO_INDICATOR[kind];
         const params = indicatorParamsFromConfig(kind, cfg);
@@ -692,10 +717,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -713,7 +738,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -756,6 +781,33 @@ export function ListScanPanel() {
       let scanKey: AlertScanKey | null = null;
       if (h.kind === "ham") scanKey = hamCondToScanKey(h.cond);
       if (h.kind === "diag") scanKey = diagCondToScanKey(h.cond);
+      if (h.kind === "di") {
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "DI",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            di: {
+              enabled: true,
+              conds: [h.cond],
+              period: cfg.di?.period ?? 14,
+              adxMin: cfg.di?.adxMin ?? 25,
+            },
+          },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
       if (scanKey) {
         items.push({
           symbol: h.symbol,
@@ -812,8 +864,6 @@ export function ListScanPanel() {
       }
     }
 
-    // Avoid unused cfg lint — keep for future scan-param alerts
-    void cfg;
     const n = addAlertsBulk(items);
     setStatus(`${n} alarm eklendi`);
   }, [hits, buildConfig, addAlertsBulk, tf]);
@@ -1030,6 +1080,32 @@ export function ListScanPanel() {
         <div className="grid grid-cols-2 gap-1">
           <ColorInput label="%K" value={colorK} onChange={setColorK} />
           <ColorInput label="%D" value={colorD} onChange={setColorD} />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="DI"
+        enabled={diOn}
+        onToggle={() => setDiOn((v) => !v)}
+        open={openCard === "di"}
+        onOpen={() => setOpenCard((c) => (c === "di" ? null : "di"))}
+      >
+        <div className="flex flex-wrap gap-1">
+          {DI_CHIPS.map((c) => (
+            <Chip
+              key={c.id}
+              active={diConds.includes(c.id)}
+              label={c.label}
+              onClick={() => {
+                setDiOn(true);
+                setDiConds((a) => toggleIn(a, c.id));
+              }}
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          <NumInput label="Period" value={diPeriod} onChange={setDiPeriod} />
+          <NumInput label="ADX min" value={diAdxMin} onChange={setDiAdxMin} />
         </div>
       </SectionCard>
 

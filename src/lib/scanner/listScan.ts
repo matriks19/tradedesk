@@ -1,7 +1,7 @@
 import type { Candle } from "@/lib/types";
 import { hamJurikTpo } from "@/lib/indicators/hamJurikTpo";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
-import { closes, macd, stochastic } from "@/lib/indicators/math";
+import { adx, closes, macd, stochastic } from "@/lib/indicators/math";
 import type { ScannerFilter } from "@/lib/scanner/engine";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { convertAny } from "@/lib/scripts/pine/translate";
@@ -56,7 +56,14 @@ export type DiagCond =
   | "triple_bull"
   | "triple_bear";
 
-export type ListScanKind = "ham" | "macd" | "stoch" | "diag" | "pine";
+export type DiCond =
+  | "plus_x_minus"
+  | "minus_x_plus"
+  | "plus_above"
+  | "minus_above"
+  | "adx_above";
+
+export type ListScanKind = "ham" | "macd" | "stoch" | "diag" | "di" | "pine";
 
 export type PineCond =
   | "zero_up"
@@ -136,6 +143,12 @@ export type ListScanConfig = {
     ob?: number;
     colorK?: string;
     colorD?: string;
+  };
+  di?: {
+    enabled: boolean;
+    conds: DiCond[];
+    period?: number;
+    adxMin?: number;
   };
   pine?: {
     enabled: boolean;
@@ -588,6 +601,67 @@ function scanDiag(
 }
 
 
+
+function scanDi(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["di"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled || !cfg.conds.length) return [];
+  const period = cfg.period ?? 14;
+  const adxMin = cfg.adxMin ?? 25;
+  if (candles.length < period * 3 + 2) return [];
+  const d = adx(candles, period);
+  const last = d.plusDI.length - 1;
+  const best = new Map<string, ListScanHit>();
+
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = last - ago;
+    if (i < 1) break;
+    const p = d.plusDI[i];
+    const m = d.minusDI[i];
+    const ax = d.adx[i];
+    for (const cond of cfg.conds) {
+      let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
+      let note = "";
+      switch (cond) {
+        case "plus_x_minus":
+          ok = crossedAboveAt(d.plusDI, d.minusDI, i);
+          bias = "bull";
+          note = `+DI×−DI↑ (−${ago})`;
+          break;
+        case "minus_x_plus":
+          ok = crossedAboveAt(d.minusDI, d.plusDI, i);
+          bias = "bear";
+          note = `−DI×+DI↑ (−${ago})`;
+          break;
+        case "plus_above":
+          ok = p != null && m != null && p > m;
+          bias = "bull";
+          note = `+DI>−DI (−${ago})`;
+          break;
+        case "minus_above":
+          ok = p != null && m != null && m > p;
+          bias = "bear";
+          note = `−DI>+DI (−${ago})`;
+          break;
+        case "adx_above":
+          ok = ax != null && ax > adxMin;
+          bias = "neutral";
+          note = `ADX>${adxMin} (${ax != null ? ax.toFixed(0) : "—"}) (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "di", cond, bias, barsAgo: ago, note });
+      }
+    }
+  }
+  return [...best.values()];
+}
+
 function runnablePineCode(sc: PineScriptScan): { code: string; language: "td" | "js" } {
   if (sc.language === "js") return { code: sc.code, language: "js" };
   if (sc.language === "td") return { code: sc.code, language: "td" };
@@ -671,6 +745,7 @@ export function scanSymbol(
   if (cfg.diag?.enabled) enabledKinds.push("diag");
   if (cfg.macd?.enabled) enabledKinds.push("macd");
   if (cfg.stoch?.enabled) enabledKinds.push("stoch");
+  if (cfg.di?.enabled) enabledKinds.push("di");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -679,6 +754,7 @@ export function scanSymbol(
     diag: cfg.diag ? scanDiag(candles, cfg.diag, maxBarsAgo) : [],
     macd: cfg.macd ? scanMacd(candles, cfg.macd, maxBarsAgo) : [],
     stoch: cfg.stoch ? scanStoch(candles, cfg.stoch, maxBarsAgo) : [],
+    di: cfg.di ? scanDi(candles, cfg.di, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -711,6 +787,9 @@ const STATE_CONDS = new Set([
   "ob",
   "up",
   "dn",
+  "plus_above",
+  "minus_above",
+  "adx_above",
 ]);
 
 export function alertScanHits(
@@ -803,15 +882,19 @@ export function indicatorParamsFromConfig(
     if (s.colorD) p.colorD = s.colorD;
     return p;
   }
+  if (kind === "di" && cfg.di) {
+    return { period: cfg.di.period ?? 14 };
+  }
   return {};
 }
 
 export const KIND_TO_INDICATOR: Record<
   Exclude<ListScanKind, "pine">,
-  "hamJurikTpo" | "diagonalSr" | "macd" | "stochastic"
+  "hamJurikTpo" | "diagonalSr" | "macd" | "stochastic" | "adx"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
   macd: "macd",
   stoch: "stochastic",
+  di: "adx",
 };
