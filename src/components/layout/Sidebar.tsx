@@ -11,6 +11,7 @@ import { ScriptEditor } from "@/components/editor/ScriptEditor";
 import { BacktestPanel } from "@/components/backtest/BacktestPanel";
 import { StrategiesPanel } from "@/components/strategies/StrategiesPanel";
 import { AlertsPanel } from "@/components/alerts/AlertsPanel";
+import { BotPanel } from "@/components/bot/BotPanel";
 import { ListScanPanel } from "@/components/scanner/ListScanPanel";
 import { PairHealthPanel } from "@/components/pairs/PairHealthPanel";
 import clsx from "clsx";
@@ -27,6 +28,7 @@ const TABS = [
   { id: "risk", label: "Risk" },
   { id: "pairs", label: "Çift" },
   { id: "alerts", label: "Alarm" },
+  { id: "bot", label: "Bot" },
   { id: "scripts", label: "Script" },
 ] as const;
 
@@ -59,6 +61,7 @@ export function Sidebar() {
         {sidebarTab === "risk" && <RiskPanel />}
         {sidebarTab === "pairs" && <PairHealthPanel />}
         {sidebarTab === "alerts" && <AlertsPanel />}
+        {sidebarTab === "bot" && <BotPanel />}
         {sidebarTab === "scripts" && <ScriptEditor />}
       </div>
     </aside>

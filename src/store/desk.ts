@@ -109,6 +109,7 @@ interface DeskState {
     | "risk"
     | "pairs"
     | "alerts"
+    | "bot"
     | "scripts"
     | "indicators"
     | "backtest"
