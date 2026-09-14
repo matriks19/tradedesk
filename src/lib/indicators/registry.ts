@@ -190,6 +190,7 @@ import {
 } from "./descendingBreak";
 import { diagonalSr as computeDiagonalSr } from "./diagonalSr";
 import { hamJurikTpo } from "./hamJurikTpo";
+import { doktorHull as computeDoktorHull } from "./doktorHull";
 
 export type PlotMarker = {
   time: number;
@@ -470,6 +471,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   // —— Elizi Lab
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab — soft Temp hist + ±E lines; AL/SAT at +E/−E cross (below/above bar). Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
   { id: "hamJurikTpo", label: "HAM Jurik TPO", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: "HAM + Jurik RMA Trend Pulse. Hızlı/yavaş HAM osc kesişimi. Semi-raw, 4 renk hist. Tarama: raw×osc, hızlı×yavaş, setup/onay/AL.", inputs: [num("hamLen", "HAM Hızlı", 21), num("hamLenSlow", "HAM Yavaş", 34), num("rawLen", "Raw Hızlı", 10), num("rawLenSlow", "Raw Yavaş", 21), num("momSpan", "Mom Span", 10), num("normLen", "Norm Len", 80), num("jLen", "Jurik RMA", 20), num("jPhase", "Phase", 0, -100, 100, 1), num("postSmooth", "Final Smooth", 5), num("showRawHam", "Semi-raw", 1, 0, 1, 1), num("showHistogram", "Histogram", 1, 0, 1, 1), num("showMarkers", "Flip işaretleri", 1, 0, 1, 1)] },
+  { id: "doktorHull", label: "Doktor Hull", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "h21", description: "Hull ribbon 8/13/21/50/100/200 (Hma/Ehma/Thma). Grafik AL: 13×50↑, SAT: 21×50↓. Tarama: 100↑200 AL, 21↓100 SAT + kesişimler. Liste TF≈4h, ≥400 mum.", inputs: [sel("mode", "Hull Type", "Hma", [{ value: "Hma", label: "Hma" }, { value: "Ehma", label: "Ehma" }, { value: "Thma", label: "Thma" }]), num("showRibbon", "Ribbon", 1, 0, 1, 1), num("showMarkers", "AL/SAT", 1, 0, 1, 1), num("thickness", "Kalınlık", 2, 1, 5, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
 
@@ -2752,6 +2754,69 @@ export function computeBuiltin(
         minusDI: ee.minusDI,
         crossUp: crosses.crossUp,
         crossDn: crosses.crossDn,
+      });
+      break;
+    }
+
+    case "doktorHull": {
+      const modeRaw = String(p.mode ?? "Hma");
+      const mode =
+        modeRaw === "Ehma" || modeRaw === "Thma" ? modeRaw : "Hma";
+      const showRibbon = n(p, "showRibbon", 1) !== 0;
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const dh = computeDoktorHull(candles, { mode: mode as "Hma" | "Ehma" | "Thma" });
+      const c8 = String(p.color8 ?? "#00ff00");
+      const c13 = String(p.color13 ?? "#7cfc00");
+      const c21 = String(p.color21 ?? "#ffff00");
+      const c50 = String(p.color50 ?? "#ff8c00");
+      const c100 = String(p.color100 ?? "#ff0000");
+      const c200 = String(p.color200 ?? "#8b0000");
+      const plots = showRibbon
+        ? [
+            line(inst, "h8", "main", c8, candles, dh.h8, "Hull 8"),
+            line(inst, "h13", "main", c13, candles, dh.h13, "Hull 13"),
+            line(inst, "h21", "main", c21, candles, dh.h21, "Hull 21"),
+            line(inst, "h50", "main", c50, candles, dh.h50, "Hull 50"),
+            line(inst, "h100", "main", c100, candles, dh.h100, "Hull 100"),
+            line(inst, "h200", "main", c200, candles, dh.h200, "Hull 200"),
+          ]
+        : [
+            line(inst, "h21", "main", c21, candles, dh.h21, "Hull 21"),
+            line(inst, "h50", "main", c50, candles, dh.h50, "Hull 50"),
+          ];
+      if (showMarkers) {
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          const t = candles[i]!.time;
+          if (dh.chartBuy[i] === 1) {
+            markers.push({
+              time: t,
+              position: "belowBar",
+              color: "#7cff7c",
+              shape: "arrowUp",
+              text: "AL",
+            });
+          }
+          if (dh.chartSell[i] === 1) {
+            markers.push({
+              time: t,
+              position: "aboveBar",
+              color: "#ff5252",
+              shape: "arrowDown",
+              text: "SAT",
+            });
+          }
+        }
+        markers.sort((a, b) => a.time - b.time);
+        if (plots[0]) plots[0].markers = markers;
+      }
+      push(plots, {
+        h8: dh.h8,
+        h13: dh.h13,
+        h21: dh.h21,
+        h50: dh.h50,
+        h100: dh.h100,
+        h200: dh.h200,
       });
       break;
     }

@@ -2,6 +2,11 @@ import type { Candle } from "@/lib/types";
 import { hamJurikTpo } from "@/lib/indicators/hamJurikTpo";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
 import { adx, closes, macd, stochastic } from "@/lib/indicators/math";
+import {
+  doktorHull,
+  DOKTOR_HULL_MIN_BARS,
+  type HullMode,
+} from "@/lib/indicators/doktorHull";
 import type { ScannerFilter } from "@/lib/scanner/engine";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { convertAny } from "@/lib/scripts/pine/translate";
@@ -63,7 +68,18 @@ export type DiCond =
   | "minus_above"
   | "adx_above";
 
-export type ListScanKind = "ham" | "macd" | "stoch" | "diag" | "di" | "pine";
+export type HullCond =
+  | "al"
+  | "sat"
+  | "c50_100"
+  | "c50_200"
+  | "c100_200"
+  | "c21_50"
+  | "c21_100"
+  | "chart_al"
+  | "chart_sat";
+
+export type ListScanKind = "ham" | "macd" | "stoch" | "diag" | "di" | "hull" | "pine";
 
 export type PineCond =
   | "zero_up"
@@ -149,6 +165,23 @@ export type ListScanConfig = {
     conds: DiCond[];
     period?: number;
     adxMin?: number;
+  };
+  hull?: {
+    enabled: boolean;
+    conds: HullCond[];
+    /** Hull type — matches Pine Doktor Hull */
+    mode?: HullMode;
+    /**
+     * Preferred scan TF (Pine tfScan default 240 → 4h).
+     * When set, Liste fetch uses this TF instead of the panel TF.
+     */
+    tf?: string;
+    color8?: string;
+    color13?: string;
+    color21?: string;
+    color50?: string;
+    color100?: string;
+    color200?: string;
   };
   pine?: {
     enabled: boolean;
@@ -662,6 +695,83 @@ function scanDi(
   return [...best.values()];
 }
 
+
+function scanHull(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["hull"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (candles.length < DOKTOR_HULL_MIN_BARS) return [];
+  const mode = cfg.mode ?? "Hma";
+  const d = doktorHull(candles, { mode });
+  const last = candles.length - 1;
+  const best = new Map<string, ListScanHit>();
+
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = last - ago;
+    if (i < 1) break;
+    for (const cond of cfg.conds) {
+      let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
+      let note = "";
+      switch (cond) {
+        case "al":
+          ok = d.scanBuy[i] === 1;
+          bias = "bull";
+          note = `Hull AL 100×200↑ (−${ago})`;
+          break;
+        case "sat":
+          ok = d.scanSell[i] === 1;
+          bias = "bear";
+          note = `Hull SAT 21×100↓ (−${ago})`;
+          break;
+        case "c50_100":
+          ok = d.c50_100[i] === 1;
+          bias = "bull";
+          note = `Hull 50×100↑ (−${ago})`;
+          break;
+        case "c50_200":
+          ok = d.c50_200[i] === 1;
+          bias = "bull";
+          note = `Hull 50×200↑ (−${ago})`;
+          break;
+        case "c100_200":
+          ok = d.c100_200[i] === 1;
+          bias = "bull";
+          note = `Hull 100×200↑ (−${ago})`;
+          break;
+        case "c21_50":
+          ok = d.c21_50[i] === 1;
+          bias = "bull";
+          note = `Hull 21×50↑ (−${ago})`;
+          break;
+        case "c21_100":
+          ok = d.c21_100[i] === 1;
+          bias = "bull";
+          note = `Hull 21×100↑ (−${ago})`;
+          break;
+        case "chart_al":
+          ok = d.chartBuy[i] === 1;
+          bias = "bull";
+          note = `Hull grafik AL 13×50↑ (−${ago})`;
+          break;
+        case "chart_sat":
+          ok = d.chartSell[i] === 1;
+          bias = "bear";
+          note = `Hull grafik SAT 21×50↓ (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "hull", cond, bias, barsAgo: ago, note });
+      }
+    }
+  }
+  return [...best.values()];
+}
+
 function runnablePineCode(sc: PineScriptScan): { code: string; language: "td" | "js" } {
   if (sc.language === "js") return { code: sc.code, language: "js" };
   if (sc.language === "td") return { code: sc.code, language: "td" };
@@ -746,6 +856,7 @@ export function scanSymbol(
   if (cfg.macd?.enabled) enabledKinds.push("macd");
   if (cfg.stoch?.enabled) enabledKinds.push("stoch");
   if (cfg.di?.enabled) enabledKinds.push("di");
+  if (cfg.hull?.enabled) enabledKinds.push("hull");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -755,6 +866,7 @@ export function scanSymbol(
     macd: cfg.macd ? scanMacd(candles, cfg.macd, maxBarsAgo) : [],
     stoch: cfg.stoch ? scanStoch(candles, cfg.stoch, maxBarsAgo) : [],
     di: cfg.di ? scanDi(candles, cfg.di, maxBarsAgo) : [],
+    hull: cfg.hull ? scanHull(candles, cfg.hull, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -885,16 +997,34 @@ export function indicatorParamsFromConfig(
   if (kind === "di" && cfg.di) {
     return { period: cfg.di.period ?? 14 };
   }
+  if (kind === "hull" && cfg.hull) {
+    const h = cfg.hull;
+    const p: Record<string, number | string> = {
+      mode: h.mode ?? "Hma",
+      showRibbon: 1,
+      showMarkers: 1,
+    };
+    if (h.color8) p.color8 = h.color8;
+    if (h.color13) p.color13 = h.color13;
+    if (h.color21) p.color21 = h.color21;
+    if (h.color50) p.color50 = h.color50;
+    if (h.color100) p.color100 = h.color100;
+    if (h.color200) p.color200 = h.color200;
+    return p;
+  }
   return {};
 }
 
 export const KIND_TO_INDICATOR: Record<
   Exclude<ListScanKind, "pine">,
-  "hamJurikTpo" | "diagonalSr" | "macd" | "stochastic" | "adx"
+  "hamJurikTpo" | "diagonalSr" | "macd" | "stochastic" | "adx" | "doktorHull"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
   macd: "macd",
   stoch: "stochastic",
   di: "adx",
+  hull: "doktorHull",
 };
+
+export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";

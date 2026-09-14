@@ -20,7 +20,10 @@ import {
   type StochCond,
   type DiagCond,
   type DiCond,
+  type HullCond,
   type ListScanConfig,
+  DOKTOR_HULL_FETCH_LIMIT,
+  DOKTOR_HULL_MIN_BARS,
   type ListScanHit,
   type ListScanKind,
   type PineCond,
@@ -97,6 +100,18 @@ const DI_CHIPS: { id: DiCond; label: string }[] = [
   { id: "plus_above", label: "+DI>−DI" },
   { id: "minus_above", label: "−DI>+DI" },
   { id: "adx_above", label: "ADX>25" },
+];
+
+const HULL_CHIPS: { id: HullCond; label: string }[] = [
+  { id: "al", label: "AL 100↑200" },
+  { id: "sat", label: "SAT 21↓100" },
+  { id: "c50_100", label: "50↑100" },
+  { id: "c50_200", label: "50↑200" },
+  { id: "c100_200", label: "100↑200" },
+  { id: "c21_50", label: "21↑50" },
+  { id: "c21_100", label: "21↑100" },
+  { id: "chart_al", label: "Grafik AL 13↑50" },
+  { id: "chart_sat", label: "Grafik SAT 21↓50" },
 ];
 
 const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
@@ -359,12 +374,14 @@ export function ListScanPanel() {
   const [macdOn, setMacdOn] = useState(false);
   const [stochOn, setStochOn] = useState(false);
   const [diOn, setDiOn] = useState(false);
+  const [hullOn, setHullOn] = useState(false);
 
   const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
   const [macdConds, setMacdConds] = useState<MacdCond[]>(["cross_up"]);
   const [stochConds, setStochConds] = useState<StochCond[]>(["kx_up_os"]);
   const [diConds, setDiConds] = useState<DiCond[]>(["plus_x_minus"]);
+  const [hullConds, setHullConds] = useState<HullCond[]>(["al"]);
 
   const [hamLen, setHamLen] = useState(21);
   const [hamLenSlow, setHamLenSlow] = useState(34);
@@ -405,6 +422,16 @@ export function ListScanPanel() {
 
   const [diPeriod, setDiPeriod] = useState(14);
   const [diAdxMin, setDiAdxMin] = useState(25);
+
+  const [hullMode, setHullMode] = useState<"Hma" | "Ehma" | "Thma">("Hma");
+  /** Pine tfScan default 240 → 4h; used when Hull is on */
+  const [hullTf, setHullTf] = useState<Timeframe>("4h");
+  const [colorH8, setColorH8] = useState("#00ff00");
+  const [colorH13, setColorH13] = useState("#7cfc00");
+  const [colorH21, setColorH21] = useState("#ffff00");
+  const [colorH50, setColorH50] = useState("#ff8c00");
+  const [colorH100, setColorH100] = useState("#ff0000");
+  const [colorH200, setColorH200] = useState("#8b0000");
 
   const [extraIds, setExtraIds] = useState<string[]>([]);
   const [openCard, setOpenCard] = useState<string | null>("ham");
@@ -480,6 +507,18 @@ export function ListScanPanel() {
         period: diPeriod,
         adxMin: diAdxMin,
       },
+      hull: {
+        enabled: hullOn,
+        conds: hullConds,
+        mode: hullMode,
+        tf: hullTf,
+        color8: colorH8,
+        color13: colorH13,
+        color21: colorH21,
+        color50: colorH50,
+        color100: colorH100,
+        color200: colorH200,
+      },
       extraFilters: EXTRA_CHIPS.filter((c) => extraIds.includes(c.id)).map(
         (c) => c.filter
       ),
@@ -543,6 +582,16 @@ export function ListScanPanel() {
     diConds,
     diPeriod,
     diAdxMin,
+    hullOn,
+    hullConds,
+    hullMode,
+    hullTf,
+    colorH8,
+    colorH13,
+    colorH21,
+    colorH50,
+    colorH100,
+    colorH200,
     extraIds,
     pineIds,
     pineConds,
@@ -561,7 +610,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -614,13 +663,17 @@ export function ListScanPanel() {
               typeof AbortSignal.timeout === "function"
                 ? AbortSignal.any([ac.signal, AbortSignal.timeout(klineMs)])
                 : ac.signal;
+            const useHull = !!cfg.hull?.enabled;
+            const scanTf = useHull && cfg.hull?.tf ? String(cfg.hull.tf) : tf;
+            const klineLimit = useHull ? DOKTOR_HULL_FETCH_LIMIT : 220;
+            const minBars = useHull ? DOKTOR_HULL_MIN_BARS : 50;
             const kr = await fetch(
-              `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${tf}&limit=220`,
+              `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${encodeURIComponent(scanTf)}&limit=${klineLimit}`,
               { signal: fetchSignal }
             );
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
-            if (candles.length < 50) return null;
+            if (candles.length < minBars) return null;
             let found = scanSymbol(candles, cfg, maxBars);
             if (found.length && cfg.extraFilters?.length) {
               const m = matchFilters(q, candles, cfg.extraFilters);
@@ -689,6 +742,7 @@ export function ListScanPanel() {
       if (cfg.macd?.enabled) kinds.push("macd");
       if (cfg.stoch?.enabled) kinds.push("stoch");
       if (cfg.di?.enabled) kinds.push("di");
+      if (cfg.hull?.enabled) kinds.push("hull");
       for (const kind of kinds) {
         const type = KIND_TO_INDICATOR[kind];
         const params = indicatorParamsFromConfig(kind, cfg);
@@ -717,15 +771,19 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
       const cfg = buildConfig();
-      openSymbolInActive(row.symbol, row.exchange, tf);
+      const openTf =
+        row.kind === "hull" && cfg.hull?.tf
+          ? (cfg.hull.tf as Timeframe)
+          : tf;
+      openSymbolInActive(row.symbol, row.exchange, openTf);
       // slight delay so pane symbol updates first
       setTimeout(() => upsertIndicators(cfg), 0);
     },
@@ -738,11 +796,12 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
     const botReady = !!useDeskStore.getState().botSettings.enabled;
+    const alertTf = cfg.hull?.enabled && cfg.hull.tf ? (cfg.hull.tf as Timeframe) : tf;
     const items = universe.symbols.map((s) => ({
       symbol: s.symbol,
       exchange: s.exchange,
@@ -753,7 +812,7 @@ export function ListScanPanel() {
       scanPayload: cfg as unknown as Record<string, unknown>,
       group: "Liste",
       note: `${universe.name} · liste koşulu`,
-      timeframe: tf,
+      timeframe: alertTf,
       repeat: "repeat" as const,
       cooldownMin: 60,
       intervalMin: 15,
@@ -801,6 +860,33 @@ export function ListScanPanel() {
             },
           },
           timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "hull") {
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "Hull",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            hull: {
+              enabled: true,
+              conds: [h.cond],
+              mode: cfg.hull?.mode ?? "Hma",
+              tf: cfg.hull?.tf ?? hullTf,
+            },
+          },
+          timeframe: (cfg.hull?.tf as Timeframe) || hullTf || tf,
           repeat: "once",
           expiresAt: Date.now() + 24 * 3600_000,
           intervalMin: 15,
@@ -866,7 +952,7 @@ export function ListScanPanel() {
 
     const n = addAlertsBulk(items);
     setStatus(`${n} alarm eklendi`);
-  }, [hits, buildConfig, addAlertsBulk, tf]);
+  }, [hits, buildConfig, addAlertsBulk, tf, hullTf]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-y-auto">
@@ -1106,6 +1192,69 @@ export function ListScanPanel() {
         <div className="grid grid-cols-2 gap-1">
           <NumInput label="Period" value={diPeriod} onChange={setDiPeriod} />
           <NumInput label="ADX min" value={diAdxMin} onChange={setDiAdxMin} />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Doktor Hull"
+        enabled={hullOn}
+        onToggle={() => setHullOn((v) => !v)}
+        open={openCard === "hull"}
+        onOpen={() => setOpenCard((c) => (c === "hull" ? null : "hull"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Pine Doktor Hull · ribbon 8/13/21/50/100/200 · tarama TF varsayılan 4h · ≥{DOKTOR_HULL_MIN_BARS} mum
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {HULL_CHIPS.map((c) => (
+            <Chip
+              key={c.id}
+              active={hullConds.includes(c.id)}
+              label={c.label}
+              onClick={() => {
+                setHullOn(true);
+                setHullConds((a) => toggleIn(a, c.id));
+              }}
+            />
+          ))}
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+            Hull type
+            <select
+              className="input text-2xs py-0.5"
+              value={hullMode}
+              onChange={(e) =>
+                setHullMode(e.target.value as "Hma" | "Ehma" | "Thma")
+              }
+            >
+              <option value="Hma">Hma</option>
+              <option value="Ehma">Ehma</option>
+              <option value="Thma">Thma</option>
+            </select>
+          </label>
+          <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+            Scanner TF
+            <select
+              className="input text-2xs py-0.5"
+              value={hullTf}
+              onChange={(e) => setHullTf(e.target.value as Timeframe)}
+            >
+              {TFS.map((t) => (
+                <option key={t} value={t}>
+                  {t}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          <ColorInput label="H8" value={colorH8} onChange={setColorH8} />
+          <ColorInput label="H13" value={colorH13} onChange={setColorH13} />
+          <ColorInput label="H21" value={colorH21} onChange={setColorH21} />
+          <ColorInput label="H50" value={colorH50} onChange={setColorH50} />
+          <ColorInput label="H100" value={colorH100} onChange={setColorH100} />
+          <ColorInput label="H200" value={colorH200} onChange={setColorH200} />
         </div>
       </SectionCard>
 

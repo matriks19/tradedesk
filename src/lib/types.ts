@@ -271,7 +271,8 @@ export type BuiltinIndicatorId =
   | "rSquared"
   // Elizi Lab
   | "eliziEdge"
-  | "macdEliziHybrid";
+  | "macdEliziHybrid"
+  | "doktorHull";
 
 export interface IndicatorInputDef {
   key: string;

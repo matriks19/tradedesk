@@ -239,9 +239,15 @@ export function AlertWatcher() {
         updateAlert(a.id, { lastCheckedAt: Date.now() });
         firingRef.current.add(a.id);
         try {
-          const tf = a.timeframe || "15m";
+          const payload = (a.scanPayload ?? {}) as {
+            hull?: { enabled?: boolean; tf?: string };
+          };
+          const hullOn = !!payload.hull?.enabled;
+          const tf =
+            (hullOn && payload.hull?.tf) || a.timeframe || "15m";
+          const limit = hullOn ? 500 : 220;
           const res = await fetch(
-            `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=220`
+            `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=${limit}`
           );
           const json = await res.json();
           const candles = (json.candles ?? []) as Candle[];
