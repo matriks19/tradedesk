@@ -21,9 +21,11 @@ import {
   type DiagCond,
   type DiCond,
   type HullCond,
+  type HamAoCond,
   type ListScanConfig,
   DOKTOR_HULL_FETCH_LIMIT,
   DOKTOR_HULL_MIN_BARS,
+  HAM_AO_JRMA_Z_MIN_BARS,
   type ListScanHit,
   type ListScanKind,
   type PineCond,
@@ -112,6 +114,14 @@ const HULL_CHIPS: { id: HullCond; label: string }[] = [
   { id: "c21_100", label: "21↑100" },
   { id: "chart_al", label: "Grafik AL 13↑50" },
   { id: "chart_sat", label: "Grafik SAT 21↓50" },
+];
+
+const HAM_AO_CHIPS: { id: HamAoCond; label: string }[] = [
+  { id: "rma_up_pt", label: "RMA↑ PT" },
+  { id: "ao_up_pt", label: "AO↑ PT" },
+  { id: "ao_up_nt", label: "AO↑ NT" },
+  { id: "pt_x_nt", label: "PT↑ NT" },
+  { id: "nt_x_pt", label: "NT↑ PT" },
 ];
 
 const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
@@ -375,6 +385,7 @@ export function ListScanPanel() {
   const [stochOn, setStochOn] = useState(false);
   const [diOn, setDiOn] = useState(false);
   const [hullOn, setHullOn] = useState(false);
+  const [hamAoOn, setHamAoOn] = useState(false);
 
   const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
@@ -382,6 +393,11 @@ export function ListScanPanel() {
   const [stochConds, setStochConds] = useState<StochCond[]>(["kx_up_os"]);
   const [diConds, setDiConds] = useState<DiCond[]>(["plus_x_minus"]);
   const [hullConds, setHullConds] = useState<HullCond[]>(["al"]);
+  const [hamAoConds, setHamAoConds] = useState<HamAoCond[]>([
+    "rma_up_pt",
+    "ao_up_pt",
+    "pt_x_nt",
+  ]);
 
   const [hamLen, setHamLen] = useState(21);
   const [hamLenSlow, setHamLenSlow] = useState(34);
@@ -519,6 +535,10 @@ export function ListScanPanel() {
         color100: colorH100,
         color200: colorH200,
       },
+      hamAo: {
+        enabled: hamAoOn,
+        conds: hamAoConds,
+      },
       extraFilters: EXTRA_CHIPS.filter((c) => extraIds.includes(c.id)).map(
         (c) => c.filter
       ),
@@ -586,6 +606,8 @@ export function ListScanPanel() {
     hullConds,
     hullMode,
     hullTf,
+    hamAoOn,
+    hamAoConds,
     colorH8,
     colorH13,
     colorH21,
@@ -610,7 +632,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -743,6 +765,7 @@ export function ListScanPanel() {
       if (cfg.stoch?.enabled) kinds.push("stoch");
       if (cfg.di?.enabled) kinds.push("di");
       if (cfg.hull?.enabled) kinds.push("hull");
+      if (cfg.hamAo?.enabled) kinds.push("hamAo");
       for (const kind of kinds) {
         const type = KIND_TO_INDICATOR[kind];
         const params = indicatorParamsFromConfig(kind, cfg);
@@ -771,10 +794,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -796,7 +819,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -887,6 +910,31 @@ export function ListScanPanel() {
             },
           },
           timeframe: (cfg.hull?.tf as Timeframe) || hullTf || tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "hamAo") {
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "HAM+AO",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            hamAo: {
+              enabled: true,
+              conds: [h.cond as HamAoCond],
+            },
+          },
+          timeframe: tf,
           repeat: "once",
           expiresAt: Date.now() + 24 * 3600_000,
           intervalMin: 15,
@@ -1255,6 +1303,32 @@ export function ListScanPanel() {
           <ColorInput label="H50" value={colorH50} onChange={setColorH50} />
           <ColorInput label="H100" value={colorH100} onChange={setColorH100} />
           <ColorInput label="H200" value={colorH200} onChange={setColorH200} />
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="HAM+AO JRMA Z"
+        enabled={hamAoOn}
+        onToggle={() => setHamAoOn((v) => !v)}
+        open={openCard === "hamAo"}
+        onOpen={() => setOpenCard((c) => (c === "hamAo" ? null : "hamAo"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Pine HAM_AO_JRMA_Z · AO debug = aoSmooth×0↑ · RMA debug = rmaSignal×jurikCore↑
+          (TV Long tersi olabilir) · PT/NT = posTrend vs negTrend · kenar-only · ≥{HAM_AO_JRMA_Z_MIN_BARS} mum
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {HAM_AO_CHIPS.map((c) => (
+            <Chip
+              key={c.id}
+              active={hamAoConds.includes(c.id)}
+              label={c.label}
+              onClick={() => {
+                setHamAoOn(true);
+                setHamAoConds((a) => toggleIn(a, c.id));
+              }}
+            />
+          ))}
         </div>
       </SectionCard>
 
