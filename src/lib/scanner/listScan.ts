@@ -7,6 +7,10 @@ import {
   DOKTOR_HULL_MIN_BARS,
   type HullMode,
 } from "@/lib/indicators/doktorHull";
+import {
+  hamAoJrmaZ,
+  HAM_AO_JRMA_Z_MIN_BARS,
+} from "@/lib/indicators/hamAoJrmaZ";
 import type { ScannerFilter } from "@/lib/scanner/engine";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { convertAny } from "@/lib/scripts/pine/translate";
@@ -79,7 +83,22 @@ export type HullCond =
   | "chart_al"
   | "chart_sat";
 
-export type ListScanKind = "ham" | "macd" | "stoch" | "diag" | "di" | "hull" | "pine";
+export type HamAoCond =
+  | "rma_up_pt"
+  | "ao_up_pt"
+  | "ao_up_nt"
+  | "pt_x_nt"
+  | "nt_x_pt";
+
+export type ListScanKind =
+  | "ham"
+  | "macd"
+  | "stoch"
+  | "diag"
+  | "di"
+  | "hull"
+  | "hamAo"
+  | "pine";
 
 export type PineCond =
   | "zero_up"
@@ -182,6 +201,24 @@ export type ListScanConfig = {
     color50?: string;
     color100?: string;
     color200?: string;
+  };
+  hamAo?: {
+    enabled: boolean;
+    conds: HamAoCond[];
+    hamMomLen?: number;
+    volBaseLen?: number;
+    hamPower?: number;
+    aoFast?: number;
+    aoSlow?: number;
+    hamWeight?: number;
+    aoWeight?: number;
+    trendLen?: number;
+    trendBoost?: number;
+    preSmoothLen?: number;
+    jurikLen?: number;
+    rmaLen?: number;
+    postSmoothLen?: number;
+    zLen?: number;
   };
   pine?: {
     enabled: boolean;
@@ -845,6 +882,77 @@ function scanPine(
  * Per enabled indicator: OR among selected conditions.
  * matchMode "all": only return hits if every enabled indicator produced ≥1 hit.
  */
+
+function scanHamAo(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["hamAo"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (candles.length < HAM_AO_JRMA_Z_MIN_BARS) return [];
+  const s = hamAoJrmaZ(candles, {
+    hamMomLen: cfg.hamMomLen,
+    volBaseLen: cfg.volBaseLen,
+    hamPower: cfg.hamPower,
+    aoFast: cfg.aoFast,
+    aoSlow: cfg.aoSlow,
+    hamWeight: cfg.hamWeight,
+    aoWeight: cfg.aoWeight,
+    trendLen: cfg.trendLen,
+    trendBoost: cfg.trendBoost,
+    preSmoothLen: cfg.preSmoothLen,
+    jurikLen: cfg.jurikLen,
+    rmaLen: cfg.rmaLen,
+    postSmoothLen: cfg.postSmoothLen,
+    zLen: cfg.zLen,
+  });
+  const last = candles.length - 1;
+  const best = new Map<string, ListScanHit>();
+
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = last - ago;
+    if (i < 1) break;
+    for (const cond of cfg.conds) {
+      let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
+      let note = "";
+      switch (cond) {
+        case "rma_up_pt":
+          ok = s.rmaUp[i] && s.pt[i];
+          bias = "bull";
+          note = `RMA↑ PT (−${ago})`;
+          break;
+        case "ao_up_pt":
+          ok = s.aoUp[i] && s.pt[i];
+          bias = "bull";
+          note = `AO↑ PT (−${ago})`;
+          break;
+        case "ao_up_nt":
+          ok = s.aoUp[i] && s.nt[i];
+          bias = "bear";
+          note = `AO↑ NT (−${ago})`;
+          break;
+        case "pt_x_nt":
+          ok = s.ptXNt[i];
+          bias = "bull";
+          note = `PT↑ NT (−${ago})`;
+          break;
+        case "nt_x_pt":
+          ok = s.ntXPt[i];
+          bias = "bear";
+          note = `NT↑ PT (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "hamAo", cond, bias, barsAgo: ago, note });
+      }
+    }
+  }
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -857,6 +965,7 @@ export function scanSymbol(
   if (cfg.stoch?.enabled) enabledKinds.push("stoch");
   if (cfg.di?.enabled) enabledKinds.push("di");
   if (cfg.hull?.enabled) enabledKinds.push("hull");
+  if (cfg.hamAo?.enabled) enabledKinds.push("hamAo");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -867,6 +976,7 @@ export function scanSymbol(
     stoch: cfg.stoch ? scanStoch(candles, cfg.stoch, maxBarsAgo) : [],
     di: cfg.di ? scanDi(candles, cfg.di, maxBarsAgo) : [],
     hull: cfg.hull ? scanHull(candles, cfg.hull, maxBarsAgo) : [],
+    hamAo: cfg.hamAo ? scanHamAo(candles, cfg.hamAo, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -997,6 +1107,25 @@ export function indicatorParamsFromConfig(
   if (kind === "di" && cfg.di) {
     return { period: cfg.di.period ?? 14 };
   }
+  if (kind === "hamAo" && cfg.hamAo) {
+    const h = cfg.hamAo;
+    return {
+      hamMomLen: h.hamMomLen ?? 21,
+      volBaseLen: h.volBaseLen ?? 34,
+      hamPower: h.hamPower ?? 1.2,
+      aoFast: h.aoFast ?? 5,
+      aoSlow: h.aoSlow ?? 34,
+      hamWeight: h.hamWeight ?? 0.6,
+      aoWeight: h.aoWeight ?? 0.4,
+      trendLen: h.trendLen ?? 34,
+      trendBoost: h.trendBoost ?? 1.3,
+      preSmoothLen: h.preSmoothLen ?? 3,
+      jurikLen: h.jurikLen ?? 8,
+      rmaLen: h.rmaLen ?? 13,
+      postSmoothLen: h.postSmoothLen ?? 2,
+      zLen: h.zLen ?? 89,
+    };
+  }
   if (kind === "hull" && cfg.hull) {
     const h = cfg.hull;
     const p: Record<string, number | string> = {
@@ -1017,7 +1146,13 @@ export function indicatorParamsFromConfig(
 
 export const KIND_TO_INDICATOR: Record<
   Exclude<ListScanKind, "pine">,
-  "hamJurikTpo" | "diagonalSr" | "macd" | "stochastic" | "adx" | "doktorHull"
+  | "hamJurikTpo"
+  | "diagonalSr"
+  | "macd"
+  | "stochastic"
+  | "adx"
+  | "doktorHull"
+  | "hamAoJrmaZ"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -1025,6 +1160,8 @@ export const KIND_TO_INDICATOR: Record<
   stoch: "stochastic",
   di: "adx",
   hull: "doktorHull",
+  hamAo: "hamAoJrmaZ",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
+export { HAM_AO_JRMA_Z_MIN_BARS } from "@/lib/indicators/hamAoJrmaZ";
