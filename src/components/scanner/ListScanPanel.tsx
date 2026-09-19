@@ -513,6 +513,7 @@ export function ListScanPanel() {
   const [colorH200, setColorH200] = useState("#8b0000");
 
   const [extraIds, setExtraIds] = useState<string[]>([]);
+  const [indicatorsOpen, setIndicatorsOpen] = useState(false);
   const [openCard, setOpenCard] = useState<string | null>("ham");
   const [extraOpen, setExtraOpen] = useState(false);
   const [pineDraft, setPineDraft] = useState(
@@ -1203,9 +1204,26 @@ export function ListScanPanel() {
     setStatus(`${n} alarm eklendi`);
   }, [hits, buildConfig, addAlertsBulk, tf, hullTf]);
 
+  const enabledIndicatorSummary = useMemo(() => {
+    const names: string[] = [];
+    if (hamOn) names.push("HAM");
+    if (diagOn) names.push("Diag");
+    if (macdOn) names.push("MACD");
+    if (stochOn) names.push("Stoch");
+    if (diOn) names.push("DI");
+    if (hullOn) names.push("Hull");
+    if (hamAoOn) names.push("HamAo");
+    if (goldOn) names.push("Gold");
+    if (gold2On) names.push("Gold2");
+    if (extraIds.length) names.push("Özel");
+    if (pineIds.length) names.push("Pine");
+    return names.length ? names.join(" · ") : "—";
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, extraIds.length, pineIds.length]);
+
   return (
-    <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-y-auto">
-      <div className="font-medium">Liste Tarama</div>
+    <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs">
+      <div className="flex flex-col gap-2 shrink-0">
+        <div className="font-medium">Liste Tarama</div>
       <p className="text-2xs text-desk-muted">
         Evren: kripto listesi, BIST listesi veya sektör. Şartlar aynı.
       </p>
@@ -1281,6 +1299,24 @@ export function ListScanPanel() {
         </label>
       </div>
 
+      <div className="flex items-center gap-2 border border-desk-border/40 rounded px-2 py-1 bg-desk-elevated/30">
+        <button
+          type="button"
+          className="text-left text-xs font-medium"
+          aria-expanded={indicatorsOpen}
+          onClick={() => setIndicatorsOpen((open) => !open)}
+        >
+          Göstergeler {indicatorsOpen ? "▾" : "▸"}
+        </button>
+        {!indicatorsOpen && (
+          <span className="text-2xs text-desk-muted truncate">
+            {enabledIndicatorSummary}
+          </span>
+        )}
+      </div>
+
+      {indicatorsOpen && (
+        <div className="space-y-2">
       <SectionCard
         title="HAM"
         enabled={hamOn}
@@ -1828,6 +1864,8 @@ export function ListScanPanel() {
           </div>
         )}
       </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap gap-1">
         <button
@@ -1867,10 +1905,10 @@ export function ListScanPanel() {
           {status}
         </div>
       )}
+      </div>
 
-      {hits.length > 0 && (
-        <div className="flex-1 min-h-0 overflow-y-auto border border-desk-border/40 rounded">
-          {hits.map((h, i) => (
+      <div className="flex-1 min-h-0 overflow-y-auto border border-desk-border/40 rounded">
+        {hits.length ? hits.map((h, i) => (
             <button
               key={`${h.symbol}_${h.kind}_${h.cond}_${h.barsAgo}_${i}`}
               type="button"
@@ -1893,9 +1931,10 @@ export function ListScanPanel() {
               <span className="text-desk-muted flex-1 truncate">{h.note}</span>
               <span className="font-mono shrink-0">−{h.barsAgo}</span>
             </button>
-          ))}
-        </div>
-      )}
+          )) : (
+            <div className="p-2 text-2xs text-desk-muted">Henüz hit yok</div>
+          )}
+      </div>
     </div>
   );
 }
