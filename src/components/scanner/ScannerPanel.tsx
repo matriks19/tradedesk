@@ -455,6 +455,10 @@ export function ScannerPanel() {
     }
     try {
       const res = await fetch("/api/store");
+      if (!res.ok) {
+        setStatus("Kayıt başarısız");
+        return;
+      }
       const db = await res.json();
       const scanPresets = Array.isArray(db.scanPresets) ? db.scanPresets : [];
       const entry = {
@@ -467,7 +471,7 @@ export function ScannerPanel() {
         universeN,
         updatedAt: Date.now(),
       };
-      await fetch("/api/store", {
+      const post = await fetch("/api/store", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -477,6 +481,10 @@ export function ScannerPanel() {
           ],
         }),
       });
+      if (!post.ok) {
+        setStatus("Kayıt başarısız");
+        return;
+      }
       setStatus(`"${name}" kaydedildi`);
       setSaveName("");
     } catch {
