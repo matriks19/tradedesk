@@ -1,6 +1,7 @@
 import type { Candle } from "@/lib/types";
 import { hamJurikTpo } from "@/lib/indicators/hamJurikTpo";
 import { hamBb } from "@/lib/indicators/hamBb";
+import { hamBbPrice } from "@/lib/indicators/hamBbPrice";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
 import { adx, bollinger, closes, ema, macd, stochastic } from "@/lib/indicators/math";
 import {
@@ -228,6 +229,33 @@ export const HAM_BB_FETCH_LIMIT = 300;
 /** Min bars — HAM normLen (~80) + BB period (~20). */
 export const HAM_BB_MIN_BARS = 120;
 
+export type HamBbPriceCond =
+  | "raw_dual_up"
+  | "raw_dual_dn"
+  | "lower_x_up"
+  | "bb_x_mid"
+  | "ham_x_lower";
+
+/** All HAM BB Mum (price) chip ids. */
+export const ALL_HAM_BB_PRICE_CONDS: HamBbPriceCond[] = [
+  "raw_dual_up",
+  "raw_dual_dn",
+  "lower_x_up",
+  "bb_x_mid",
+  "ham_x_lower",
+];
+
+/** Default HAM BB Mum — raw + price BB lower cross + soft combo. */
+export const DEFAULT_HAM_BB_PRICE_CONDS: HamBbPriceCond[] = [
+  "raw_dual_up",
+  "lower_x_up",
+  "ham_x_lower",
+];
+
+/** Same warmup as osc HAM BB. */
+export const HAM_BB_PRICE_FETCH_LIMIT = 300;
+export const HAM_BB_PRICE_MIN_BARS = 120;
+
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
 export const DEFAULT_HAM_CONDS: HamCond[] = ["raw_dual_up"];
 export const DEFAULT_DIAG_CONDS: DiagCond[] = ["bounce"];
@@ -244,6 +272,7 @@ export const DEFAULT_HAM_AO_CONDS: HamAoCond[] = [
 export type ListScanKind =
   | "ham"
   | "hamBb"
+  | "hamBbPrice"
   | "macd"
   | "stoch"
   | "diag"
@@ -304,6 +333,21 @@ export type ListScanConfig = {
   hamBb?: {
     enabled: boolean;
     conds: HamBbCond[];
+    hamLen?: number;
+    hamLenSlow?: number;
+    rawLen?: number;
+    rawLenSlow?: number;
+    momSpan?: number;
+    normLen?: number;
+    jLen?: number;
+    jPhase?: number;
+    postSmooth?: number;
+    bbPeriod?: number;
+    bbMult?: number;
+  };
+  hamBbPrice?: {
+    enabled: boolean;
+    conds: HamBbPriceCond[];
     hamLen?: number;
     hamLenSlow?: number;
     rawLen?: number;
@@ -1700,6 +1744,105 @@ function scanHamBb(
   return [...best.values()];
 }
 
+
+function scanHamBbPrice(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["hamBbPrice"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_HAM_BB_PRICE_CONDS;
+  const bbPeriod = cfg.bbPeriod ?? 20;
+  const bbMult = cfg.bbMult ?? 2;
+  if (candles.length < HAM_BB_PRICE_MIN_BARS) return [];
+
+  const h = hamBbPrice(candles, {
+    hamLen: cfg.hamLen,
+    hamLenSlow: cfg.hamLenSlow,
+    rawLen: cfg.rawLen,
+    rawLenSlow: cfg.rawLenSlow,
+    momSpan: cfg.momSpan,
+    normLen: cfg.normLen,
+    jLen: cfg.jLen,
+    jPhase: cfg.jPhase,
+    postSmooth: cfg.postSmooth,
+    bbPeriod,
+    bbMult,
+  });
+  const c = h.closes;
+  const n = candles.length;
+  const best = new Map<string, ListScanHit>();
+
+  const simpleConds = conds.filter((x) => x !== "ham_x_lower");
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = n - 1 - ago;
+    if (i < 1) break;
+    for (const cond of simpleConds) {
+      let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
+      let note = "";
+      switch (cond) {
+        case "raw_dual_up":
+          ok = h.rawDualUp[i];
+          bias = "bull";
+          note = `raw hızlı×yavaş↑ (−${ago})`;
+          break;
+        case "raw_dual_dn":
+          ok = h.rawDualDown[i];
+          bias = "bear";
+          note = `raw hızlı×yavaş↓ (−${ago})`;
+          break;
+        case "lower_x_up":
+          ok = crossedAboveAt(c, h.bbLower, i);
+          bias = "bull";
+          note = `fiyat BB alt↑ (−${ago})`;
+          break;
+        case "bb_x_mid":
+          ok = crossedAboveAt(c, h.bbMid, i);
+          bias = "bull";
+          note = `fiyat BB orta↑ (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, {
+          kind: "hamBbPrice",
+          cond,
+          bias,
+          barsAgo: ago,
+          note,
+        });
+      }
+    }
+  }
+
+  // Soft combo: raw_dual_up AND lower_x_up within window (different bars OK)
+  if (conds.includes("ham_x_lower")) {
+    let rawAgo: number | null = null;
+    let lowerAgo: number | null = null;
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = n - 1 - ago;
+      if (i < 1) break;
+      if (rawAgo == null && h.rawDualUp[i]) rawAgo = ago;
+      if (lowerAgo == null && crossedAboveAt(c, h.bbLower, i)) lowerAgo = ago;
+      if (rawAgo != null && lowerAgo != null) break;
+    }
+    if (rawAgo != null && lowerAgo != null) {
+      const ago = Math.max(rawAgo, lowerAgo);
+      best.set("ham_x_lower", {
+        kind: "hamBbPrice",
+        cond: "ham_x_lower",
+        bias: "bull",
+        barsAgo: ago,
+        note: `Raw+Alt fiyat (−${ago})`,
+      });
+    }
+  }
+
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1708,6 +1851,7 @@ export function scanSymbol(
   const enabledKinds: ListScanKind[] = [];
   if (cfg.ham?.enabled) enabledKinds.push("ham");
   if (cfg.hamBb?.enabled) enabledKinds.push("hamBb");
+  if (cfg.hamBbPrice?.enabled) enabledKinds.push("hamBbPrice");
   if (cfg.diag?.enabled) enabledKinds.push("diag");
   if (cfg.macd?.enabled) enabledKinds.push("macd");
   if (cfg.stoch?.enabled) enabledKinds.push("stoch");
@@ -1724,6 +1868,7 @@ export function scanSymbol(
   const byKind: Record<ListScanKind, ListScanHit[]> = {
     ham: cfg.ham ? scanHam(candles, cfg.ham, maxBarsAgo) : [],
     hamBb: cfg.hamBb ? scanHamBb(candles, cfg.hamBb, maxBarsAgo) : [],
+    hamBbPrice: cfg.hamBbPrice ? scanHamBbPrice(candles, cfg.hamBbPrice, maxBarsAgo) : [],
     diag: cfg.diag ? scanDiag(candles, cfg.diag, maxBarsAgo) : [],
     macd: cfg.macd ? scanMacd(candles, cfg.macd, maxBarsAgo) : [],
     stoch: cfg.stoch ? scanStoch(candles, cfg.stoch, maxBarsAgo) : [],
@@ -1838,6 +1983,24 @@ export function indicatorParamsFromConfig(
       bbPeriod: h.bbPeriod ?? 20,
       bbMult: h.bbMult ?? 2,
       showOsc: 0,
+    };
+  }
+  if (kind === "hamBbPrice" && cfg.hamBbPrice) {
+    const h = cfg.hamBbPrice;
+    return {
+      hamLen: h.hamLen ?? 21,
+      hamLenSlow: h.hamLenSlow ?? 34,
+      rawLen: h.rawLen ?? 10,
+      rawLenSlow: h.rawLenSlow ?? 21,
+      momSpan: h.momSpan ?? 10,
+      normLen: h.normLen ?? 80,
+      jLen: h.jLen ?? 20,
+      jPhase: h.jPhase ?? 0,
+      postSmooth: h.postSmooth ?? 5,
+      bbPeriod: h.bbPeriod ?? 20,
+      bbMult: h.bbMult ?? 2,
+      showMarkers: 1,
+      showCloseTint: 1,
     };
   }
   if (kind === "diag" && cfg.diag) {
@@ -1993,6 +2156,7 @@ export const KIND_TO_INDICATOR: Record<
   Exclude<ListScanKind, "pine">,
   | "hamJurikTpo"
   | "hamBb"
+  | "hamBbPrice"
   | "diagonalSr"
   | "macd"
   | "stochastic"
@@ -2005,6 +2169,7 @@ export const KIND_TO_INDICATOR: Record<
 > = {
   ham: "hamJurikTpo",
   hamBb: "hamBb",
+  hamBbPrice: "hamBbPrice",
   diag: "diagonalSr",
   macd: "macd",
   stoch: "stochastic",

@@ -248,6 +248,7 @@ export type BuiltinIndicatorId =
   | "diagonalSr"
   | "hamJurikTpo"
   | "hamBb"
+  | "hamBbPrice"
   | "hamAoJrmaZ"
   | "aohamJrmaEngine"
   | "goldKeko"
