@@ -32,31 +32,45 @@ export function TerminalShell() {
     (async () => {
       try {
         const res = await fetch("/api/store");
+        if (!res.ok) {
+          // Keep existing zustand/localStorage watchlists — do not hydrate from error body
+          if (!seeded.current) {
+            seeded.current = true;
+            const seeds = getPopularSeedScripts();
+            for (const s of seeds) upsertScript(s);
+          }
+          return;
+        }
         const db = await res.json();
-        let scripts: CustomScript[] = db.scripts ?? [];
+        let scripts: CustomScript[] = Array.isArray(db?.scripts) ? db.scripts : [];
 
         // Seed popular community scripts if none installed from library
-        const hasLib = scripts.some((x) => x.id.startsWith("lib_"));
+        const hasLib = scripts.some((x: CustomScript) => x.id.startsWith("lib_"));
         if (!hasLib && !seeded.current) {
           seeded.current = true;
           const seeds = getPopularSeedScripts();
-          const byId = new Map(scripts.map((x) => [x.id, x]));
+          const byId = new Map(scripts.map((x: CustomScript) => [x.id, x]));
           for (const s of seeds) byId.set(s.id, s);
           scripts = [...byId.values()];
           for (const s of seeds) upsertScript(s);
           try {
-            await fetch("/api/store", {
+            const seedRes = await fetch("/api/store", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({ scripts }),
             });
+            if (!seedRes.ok) {
+              /* local seed only — keep client scripts */
+            }
           } catch {
             /* local seed only */
           }
         }
 
         hydrateFromServer({
-          watchlists: db.watchlists ?? [],
+          watchlists: Array.isArray(db?.watchlists)
+            ? db.watchlists
+            : useDeskStore.getState().watchlists,
           scripts,
         });
       } catch {
@@ -64,7 +78,7 @@ export function TerminalShell() {
           seeded.current = true;
           const seeds = getPopularSeedScripts();
           for (const s of seeds) upsertScript(s);
-          hydrateFromServer({ watchlists: [], scripts: seeds });
+          // Do NOT pass watchlists: [] in a way that wipes — upsert scripts only
         }
       }
     })();

@@ -6,7 +6,12 @@ import { getPopularSeedScripts } from "@/lib/scripts/catalog";
 import type { ScannerFilter } from "@/lib/scanner/engine";
 import { mergeBinanceWatchlists } from "@/lib/data/binanceLists";
 
-const DATA_DIR = path.join(process.cwd(), "data");
+/** Vercel serverless FS is read-only except /tmp. */
+const IS_VERCEL = Boolean(process.env.VERCEL);
+const DATA_DIR = IS_VERCEL ? "/tmp" : path.join(process.cwd(), "data");
+const STORE_FILE = IS_VERCEL
+  ? "/tmp/tradedesk-store.json"
+  : path.join(DATA_DIR, "store.json");
 
 export interface SavedScanPreset {
   id: string;
@@ -93,49 +98,93 @@ const DEFAULT_DB: AppDb = {
   scanPresets: [],
 };
 
-async function ensure() {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  const file = path.join(DATA_DIR, "store.json");
-  try {
-    await fs.access(file);
-  } catch {
-    await fs.writeFile(file, JSON.stringify(DEFAULT_DB, null, 2), "utf8");
-  }
-  return file;
+/** Module-level cache for Vercel /tmp failures or cold paths — never throws. */
+let memoryCache: AppDb | null = null;
+
+export function getFallbackDb(): AppDb {
+  const base = memoryCache ?? DEFAULT_DB;
+  return {
+    ...base,
+    watchlists: mergeBinanceWatchlists(base.watchlists ?? []),
+  };
 }
 
-export async function readDb(): Promise<AppDb> {
-  const file = await ensure();
-  const raw = await fs.readFile(file, "utf8");
-  const db = JSON.parse(raw) as AppDb;
+function withMergedWatchlists(db: AppDb): AppDb {
   const watchlists = mergeBinanceWatchlists(db.watchlists ?? []);
-  if (watchlists.length !== (db.watchlists ?? []).length) {
-    const next = { ...db, watchlists };
-    await fs.writeFile(file, JSON.stringify(next, null, 2), "utf8");
-    return next;
-  }
-  // also refresh if perp/ai lists are short
-  const before = JSON.stringify(
-    (db.watchlists ?? []).filter((w) =>
-      w.id === "binance-perp-usdt" || w.id === "binance-ai-usdt"
-    )
-  );
-  const after = JSON.stringify(
-    watchlists.filter((w) =>
-      w.id === "binance-perp-usdt" || w.id === "binance-ai-usdt"
-    )
-  );
-  if (before !== after) {
-    const next = { ...db, watchlists };
-    await fs.writeFile(file, JSON.stringify(next, null, 2), "utf8");
-    return next;
-  }
   return { ...db, watchlists };
 }
 
+async function tryEnsureFile(): Promise<string | null> {
+  try {
+    if (!IS_VERCEL) {
+      await fs.mkdir(DATA_DIR, { recursive: true });
+    }
+    try {
+      await fs.access(STORE_FILE);
+    } catch {
+      const initial = memoryCache ?? withMergedWatchlists(DEFAULT_DB);
+      await fs.writeFile(STORE_FILE, JSON.stringify(initial, null, 2), "utf8");
+      memoryCache = initial;
+    }
+    return STORE_FILE;
+  } catch {
+    return null;
+  }
+}
+
+async function tryWriteFile(db: AppDb): Promise<boolean> {
+  memoryCache = db;
+  try {
+    const file = await tryEnsureFile();
+    if (!file) return false;
+    await fs.writeFile(file, JSON.stringify(db, null, 2), "utf8");
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function readDb(): Promise<AppDb> {
+  try {
+    const file = await tryEnsureFile();
+    if (!file) {
+      if (!memoryCache) memoryCache = withMergedWatchlists(DEFAULT_DB);
+      return memoryCache;
+    }
+    const raw = await fs.readFile(file, "utf8");
+    const db = JSON.parse(raw) as AppDb;
+    const watchlists = mergeBinanceWatchlists(db.watchlists ?? []);
+    const next = { ...db, watchlists };
+
+    if (watchlists.length !== (db.watchlists ?? []).length) {
+      await tryWriteFile(next);
+      return next;
+    }
+    // also refresh if perp/ai lists are short
+    const before = JSON.stringify(
+      (db.watchlists ?? []).filter(
+        (w) => w.id === "binance-perp-usdt" || w.id === "binance-ai-usdt"
+      )
+    );
+    const after = JSON.stringify(
+      watchlists.filter(
+        (w) => w.id === "binance-perp-usdt" || w.id === "binance-ai-usdt"
+      )
+    );
+    if (before !== after) {
+      await tryWriteFile(next);
+      return next;
+    }
+    memoryCache = next;
+    return next;
+  } catch {
+    if (!memoryCache) memoryCache = withMergedWatchlists(DEFAULT_DB);
+    return memoryCache;
+  }
+}
+
 export async function writeDb(db: AppDb): Promise<void> {
-  const file = await ensure();
-  await fs.writeFile(file, JSON.stringify(db, null, 2), "utf8");
+  await tryWriteFile(db);
 }
 
 export async function patchDb(patch: Partial<AppDb>): Promise<AppDb> {
