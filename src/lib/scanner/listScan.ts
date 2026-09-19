@@ -20,6 +20,12 @@ import {
   GOLD_KEKO_MIN_BARS,
   GOLD_KEKO_FETCH_LIMIT,
 } from "@/lib/indicators/goldKeko";
+import {
+  computeOscDivergence,
+  pickOscSeries,
+  LIST_SCAN_DIV_OPTS,
+  type OscDivergenceOpts,
+} from "@/lib/indicators/oscDivergence";
 import type { ScannerFilter } from "@/lib/scanner/engine";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { convertAny } from "@/lib/scripts/pine/translate";
@@ -105,7 +111,9 @@ export type GoldCond =
   | "ao_x_score_sat"
   | "ao_x_rma_sat"
   | "pt_x_nt"
-  | "nt_x_pt";
+  | "nt_x_pt"
+  | "div_bull"
+  | "div_bear";
 
 /** All Gold chip ids — used when enabled with empty conds / on enable reset. */
 export const ALL_GOLD_CONDS: GoldCond[] = [
@@ -115,6 +123,8 @@ export const ALL_GOLD_CONDS: GoldCond[] = [
   "ao_x_rma_sat",
   "pt_x_nt",
   "nt_x_pt",
+  "div_bull",
+  "div_bear",
 ];
 
 export type Gold2Cond =
@@ -131,7 +141,9 @@ export type Gold2Cond =
   | "charge_full_bull"
   | "charge_full_bear"
   | "polarity_flip_up"
-  | "polarity_flip_down";
+  | "polarity_flip_down"
+  | "div_bull"
+  | "div_bear";
 
 /** All Gold2 chip ids — used when enabled with empty conds / on enable reset. */
 export const ALL_GOLD2_CONDS: Gold2Cond[] = [
@@ -149,6 +161,8 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
   "charge_full_bear",
   "polarity_flip_up",
   "polarity_flip_down",
+  "div_bull",
+  "div_bear",
 ];
 
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
@@ -316,6 +330,11 @@ export type ListScanConfig = {
     postSmooth?: number;
     normLen?: number;
     zLen?: number;
+    /** Divergence pivot-to-pivot min bars (default 50) */
+    divRangeLower?: number;
+    divRangeUpper?: number;
+    divLbL?: number;
+    divLbR?: number;
   };
   gold2?: {
     enabled: boolean;
@@ -351,6 +370,11 @@ export type ListScanConfig = {
     useTrendFilter?: boolean;
     requireRelease?: boolean;
     flagCounterBreakouts?: boolean;
+    /** Divergence pivot-to-pivot min bars (default 50) */
+    divRangeLower?: number;
+    divRangeUpper?: number;
+    divLbL?: number;
+    divLbR?: number;
   };
   pine?: {
     enabled: boolean;
@@ -1121,6 +1145,22 @@ function scanGold(
     normLen: cfg.normLen,
     zLen: cfg.zLen,
   });
+  const wantDiv =
+    conds.includes("div_bull") || conds.includes("div_bear");
+  const divOpts: OscDivergenceOpts = {
+    lbL: cfg.divLbL ?? LIST_SCAN_DIV_OPTS.lbL,
+    lbR: cfg.divLbR ?? LIST_SCAN_DIV_OPTS.lbR,
+    rangeLower: cfg.divRangeLower ?? LIST_SCAN_DIV_OPTS.rangeLower,
+    rangeUpper: cfg.divRangeUpper ?? LIST_SCAN_DIV_OPTS.rangeUpper,
+  };
+  // Prefer aoPlot (main signal); fall back to displayPlot if ao sparse
+  const divOsc = wantDiv
+    ? pickOscSeries(s.aoPlot, s.displayPlot ?? s.rawSigPlot)
+    : null;
+  const div = wantDiv && divOsc
+    ? computeOscDivergence(candles, divOsc, divOpts)
+    : null;
+
   const last = candles.length - 1;
   const best = new Map<string, ListScanHit>();
 
@@ -1161,6 +1201,16 @@ function scanGold(
           ok = s.ntXPt[i];
           bias = "bear";
           note = `NT↑ PT (−${ago})`;
+          break;
+        case "div_bull":
+          ok = div != null && div.bull[i] != null;
+          bias = "bull";
+          note = `Uyumsuzluk AL (−${ago})`;
+          break;
+        case "div_bear":
+          ok = div != null && div.bear[i] != null;
+          bias = "bear";
+          note = `Uyumsuzluk SAT (−${ago})`;
           break;
       }
       if (!ok) continue;
@@ -1216,6 +1266,22 @@ function scanGold2(
     requireRelease: cfg.requireRelease,
     flagCounterBreakouts: cfg.flagCounterBreakouts,
   });
+  const wantDiv =
+    conds.includes("div_bull") || conds.includes("div_bear");
+  const divOpts: OscDivergenceOpts = {
+    lbL: cfg.divLbL ?? LIST_SCAN_DIV_OPTS.lbL,
+    lbR: cfg.divLbR ?? LIST_SCAN_DIV_OPTS.lbR,
+    rangeLower: cfg.divRangeLower ?? LIST_SCAN_DIV_OPTS.rangeLower,
+    rangeUpper: cfg.divRangeUpper ?? LIST_SCAN_DIV_OPTS.rangeUpper,
+  };
+  // Prefer oscDisplay; fall back to oscMain if display is sparse
+  const divOsc = wantDiv
+    ? pickOscSeries(s.oscDisplay, s.oscMain)
+    : null;
+  const div = wantDiv && divOsc
+    ? computeOscDivergence(candles, divOsc, divOpts)
+    : null;
+
   const last = candles.length - 1;
   const best = new Map<string, ListScanHit>();
 
@@ -1296,6 +1362,16 @@ function scanGold2(
           ok = s.polarityFlipDown[i];
           bias = "bear";
           note = `Kutup↓ (−${ago})`;
+          break;
+        case "div_bull":
+          ok = div != null && div.bull[i] != null;
+          bias = "bull";
+          note = `Uyumsuzluk AL (−${ago})`;
+          break;
+        case "div_bear":
+          ok = div != null && div.bear[i] != null;
+          bias = "bear";
+          note = `Uyumsuzluk SAT (−${ago})`;
           break;
       }
       if (!ok) continue;

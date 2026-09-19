@@ -150,6 +150,8 @@ const GOLD_CHIPS: { id: GoldCond; label: string }[] = [
   { id: "ao_x_rma_sat", label: "AO↓ RMA" },
   { id: "pt_x_nt", label: "PT↑ NT" },
   { id: "nt_x_pt", label: "NT↑ PT" },
+  { id: "div_bull", label: "Uyumsuzluk AL" },
+  { id: "div_bear", label: "Uyumsuzluk SAT" },
 ];
 
 const GOLD2_CHIPS: { id: Gold2Cond; label: string }[] = [
@@ -167,6 +169,8 @@ const GOLD2_CHIPS: { id: Gold2Cond; label: string }[] = [
   { id: "charge_full_bear", label: "Şarj− doldu" },
   { id: "polarity_flip_up", label: "Kutup↑" },
   { id: "polarity_flip_down", label: "Kutup↓" },
+  { id: "div_bull", label: "Uyumsuzluk AL" },
+  { id: "div_bear", label: "Uyumsuzluk SAT" },
 ];
 
 const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
@@ -174,6 +178,32 @@ const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
   { id: "rsi70", label: "RSI>70", filter: { type: "rsi", op: "gt", value: 70 } },
   { id: "vol2", label: "Vol×2", filter: { type: "volumeSpike", mult: 2 } },
   { id: "ema_b", label: "EMA↑", filter: { type: "emaCross", direction: "bull" } },
+  {
+    id: "rsi_div_bull",
+    label: "RSI Uyumsuzluk AL",
+    filter: {
+      type: "rsiPuNu",
+      direction: "bull",
+      maxBarsAgo: 2,
+      rangeLower: 50,
+      rangeUpper: 150,
+      lbL: 5,
+      lbR: 2,
+    },
+  },
+  {
+    id: "rsi_div_bear",
+    label: "RSI Uyumsuzluk SAT",
+    filter: {
+      type: "rsiPuNu",
+      direction: "bear",
+      maxBarsAgo: 2,
+      rangeLower: 50,
+      rangeUpper: 150,
+      lbL: 5,
+      lbR: 2,
+    },
+  },
 ];
 
 type UniSrc = "crypto" | "bist" | "sector" | "active";
