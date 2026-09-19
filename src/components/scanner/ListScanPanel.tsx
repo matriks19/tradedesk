@@ -506,6 +506,32 @@ export function ListScanPanel() {
   );
   const [pineName, setPineName] = useState("Liste Pine");
   const [pineIds, setPineIds] = useState<string[]>([]);
+
+  /** Gold/Gold2 + matchMode=all + hamOn default → empty Liste; exclusive enable. */
+  const enableGoldOnly = useCallback(() => {
+    setGoldOn(true);
+    setGold2On(false);
+    setHamOn(false);
+    setDiagOn(false);
+    setMacdOn(false);
+    setStochOn(false);
+    setDiOn(false);
+    setHullOn(false);
+    setHamAoOn(false);
+    setPineIds([]);
+  }, []);
+  const enableGold2Only = useCallback(() => {
+    setGold2On(true);
+    setGoldOn(false);
+    setHamOn(false);
+    setDiagOn(false);
+    setMacdOn(false);
+    setStochOn(false);
+    setDiOn(false);
+    setHullOn(false);
+    setHamAoOn(false);
+    setPineIds([]);
+  }, []);
   const [pineConds, setPineConds] = useState<PineCond[]>(["zero_up", "cross_up"]);
   const [pineStatus, setPineStatus] = useState("");
 
@@ -751,9 +777,7 @@ export function ListScanPanel() {
             const useGold2 = !!cfg.gold2?.enabled;
             const useHamAo = !!cfg.hamAo?.enabled;
             const scanTf = useHull && cfg.hull?.tf ? String(cfg.hull.tf) : tf;
-            // Gold/Gold2 edge crosses are sparse — floor lookback so Liste isn't empty at maxBars=2
-            const effectiveMaxBars =
-              useGold || useGold2 ? Math.max(maxBars, 40) : maxBars;
+            // Warmup via klineLimit/minBars; edge lookback stays UI maxBars (default 2)
             const klineLimit = useHull
               ? DOKTOR_HULL_FETCH_LIMIT
               : useGold2
@@ -777,7 +801,7 @@ export function ListScanPanel() {
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
             if (candles.length < minBars) return null;
-            let found = scanSymbol(candles, cfg, effectiveMaxBars);
+            let found = scanSymbol(candles, cfg, maxBars);
             if (found.length && cfg.extraFilters?.length) {
               const m = matchFilters(q, candles, cfg.extraFilters);
               if (!m.ok) found = [];
@@ -820,10 +844,25 @@ export function ListScanPanel() {
           a.kind.localeCompare(b.kind)
       );
       setHits(out);
+      const cfgDone = buildConfig();
+      const byKind: string[] = [];
+      if (cfgDone.gold?.enabled) {
+        const n = out.filter((h) => h.kind === "gold").length;
+        byKind.push(`gold ${n}`);
+      }
+      if (cfgDone.gold2?.enabled) {
+        const n = out.filter((h) => h.kind === "gold2").length;
+        byKind.push(`gold2 ${n}`);
+      }
+      if (cfgDone.ham?.enabled) {
+        const n = out.filter((h) => h.kind === "ham").length;
+        byKind.push(`ham ${n}`);
+      }
+      const kindBit = byKind.length ? ` · ${byKind.join(" · ")}` : "";
       setStatus(
         ac.signal.aborted
-          ? `Durdu · ${out.length} hit · ${done}/${total}`
-          : `${out.length} hit · ${universe.name} · ${total} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}`
+          ? `Durdu · ${out.length} hit${kindBit} · ${done}/${total}`
+          : `${out.length} hit${kindBit} · ${universe.name} · ${total} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}`
       );
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
@@ -1468,13 +1507,13 @@ export function ListScanPanel() {
       <SectionCard
         title="Gold"
         enabled={goldOn}
-        onToggle={() => setGoldOn((v) => !v)}
+        onToggle={() => (goldOn ? setGoldOn(false) : enableGoldOnly())}
         open={openCard === "gold"}
         onOpen={() => setOpenCard((c) => (c === "gold" ? null : "gold"))}
       >
         <p className="text-2xs text-desk-muted">
           Pine AOHAM_JRMA_ENGINE · gerçek Jurik · AO×Score / AO×RMA (0–100) AL/SAT ·
-          PT↔NT · kenar-only · ≥{AOHAM_JRMA_MIN_BARS} mum · lookback min 40 bar (seyrek kenar)
+          PT↔NT · kenar-only · ≥{AOHAM_JRMA_MIN_BARS} mum
         </p>
         <div className="flex flex-wrap gap-1">
           {GOLD_CHIPS.map((c) => (
@@ -1483,7 +1522,7 @@ export function ListScanPanel() {
               active={goldConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setGoldOn(true);
+                enableGoldOnly();
                 setGoldConds((a) => toggleIn(a, c.id));
               }}
             />
@@ -1494,13 +1533,13 @@ export function ListScanPanel() {
       <SectionCard
         title="Gold2"
         enabled={gold2On}
-        onToggle={() => setGold2On((v) => !v)}
+        onToggle={() => (gold2On ? setGold2On(false) : enableGold2Only())}
         open={openCard === "gold2"}
         onOpen={() => setOpenCard((c) => (c === "gold2" ? null : "gold2"))}
       >
         <p className="text-2xs text-desk-muted">
           Pine GOLD / KEKO · Raw/Core/Disp × RMA AL/SAT · kırılım · şarj · kutup ·
-          kenar-only · ≥{GOLD_KEKO_MIN_BARS} mum · lookback min 40 bar
+          kenar-only · ≥{GOLD_KEKO_MIN_BARS} mum
         </p>
         <div className="flex flex-wrap gap-1">
           {GOLD2_CHIPS.map((c) => (
@@ -1509,7 +1548,7 @@ export function ListScanPanel() {
               active={gold2Conds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setGold2On(true);
+                enableGold2Only();
                 setGold2Conds((a) => toggleIn(a, c.id));
               }}
             />

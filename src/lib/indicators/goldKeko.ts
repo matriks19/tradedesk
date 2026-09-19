@@ -441,6 +441,15 @@ export function goldKeko(
     const sig = kineticSignal[i];
     const rel = releaseSmooth[i];
     const polar = polarBias[i];
+
+    // RMA-debug crosses only need kinetic series — do not gate on release/polar warmup
+    if (i >= 1) {
+      rawXRmaAl[i] = crossedAboveAt(kineticRaw, kineticSignal, i);
+      rawXRmaSat[i] = crossedBelowAt(kineticRaw, kineticSignal, i);
+      coreXRmaAl[i] = crossedAboveAt(kineticCore, kineticSignal, i);
+      coreXRmaSat[i] = crossedBelowAt(kineticCore, kineticSignal, i);
+    }
+
     const ready =
       core != null && sig != null && rel != null && polar != null;
 
@@ -524,11 +533,6 @@ export function goldKeko(
     prevChargedBull = chargedBull;
     prevChargedBear = chargedBear;
     prevTankFinal = tank;
-
-    rawXRmaAl[i] = crossedAboveAt(kineticRaw, kineticSignal, i);
-    rawXRmaSat[i] = crossedBelowAt(kineticRaw, kineticSignal, i);
-    coreXRmaAl[i] = coreUp;
-    coreXRmaSat[i] = coreDn;
   }
 
   // 10) Visual normalization
