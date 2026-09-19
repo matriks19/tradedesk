@@ -257,6 +257,9 @@ export type AohamJrmaEngineSeries = {
   posPlot: (number | null)[];
   negPlot: (number | null)[];
   scoreLongPlot: (number | null)[];
+  scoreShortPlot: (number | null)[];
+  hamPlot: (number | null)[];
+  displayPlot: (number | null)[];
   /** Edge flags */
   aoXScoreAl: boolean[];
   aoXRmaAl: boolean[];
@@ -388,6 +391,9 @@ export function aohamJrmaEngine(
   const posPlot = atanNormalize100(posTrend, zLen);
   const negPlot = atanNormalize100(negTrend, zLen);
   const scoreLongPlot = scoreLong.map((v) => (v == null ? null : v * 100));
+  const scoreShortPlot = scoreShort.map((v) => (v == null ? null : v * 100));
+  const hamPlot = atanNormalize100(hamSmooth, zLen);
+  const displayPlot = atanNormalize100(histSmooth, zLen);
 
   const aoXScoreAl = new Array(n).fill(false);
   const aoXRmaAl = new Array(n).fill(false);
@@ -421,6 +427,9 @@ export function aohamJrmaEngine(
     posPlot,
     negPlot,
     scoreLongPlot,
+    scoreShortPlot,
+    hamPlot,
+    displayPlot,
     aoXScoreAl,
     aoXRmaAl,
     aoXScoreSat,
