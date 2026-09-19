@@ -194,6 +194,37 @@ export const BB_TREND_FETCH_LIMIT = 300;
 /** Min bars before scanning — EMA200 needs ~250+. */
 export const BB_TREND_MIN_BARS = 250;
 
+export type HamBbCond =
+  | "raw_dual_up"
+  | "al"
+  | "setup"
+  | "lower_x_up"
+  | "bb_x_ema"
+  | "ham_dip";
+
+/** All HAM BB chip ids — used when enabled with empty conds. */
+export const ALL_HAM_BB_CONDS: HamBbCond[] = [
+  "raw_dual_up",
+  "al",
+  "setup",
+  "lower_x_up",
+  "bb_x_ema",
+  "ham_dip",
+];
+
+/** Default HAM BB chips — dips without empty scans. */
+export const DEFAULT_HAM_BB_CONDS: HamBbCond[] = [
+  "raw_dual_up",
+  "lower_x_up",
+  "ham_dip",
+];
+
+/** Fetch enough for HAM + EMA200 + BB warmup. */
+export const HAM_BB_FETCH_LIMIT = 300;
+
+/** Min bars before scanning — EMA200 needs ~200+, HAM ~80. */
+export const HAM_BB_MIN_BARS = 220;
+
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
 export const DEFAULT_HAM_CONDS: HamCond[] = ["raw_dual_up"];
 export const DEFAULT_DIAG_CONDS: DiagCond[] = ["bounce"];
@@ -209,6 +240,7 @@ export const DEFAULT_HAM_AO_CONDS: HamAoCond[] = [
 
 export type ListScanKind =
   | "ham"
+  | "hamBb"
   | "macd"
   | "stoch"
   | "diag"
@@ -265,6 +297,22 @@ export type ListScanConfig = {
     colorHistDn?: string;
     colorSlow?: string;
     colorRawSlow?: string;
+  };
+  hamBb?: {
+    enabled: boolean;
+    conds: HamBbCond[];
+    hamLen?: number;
+    hamLenSlow?: number;
+    rawLen?: number;
+    rawLenSlow?: number;
+    momSpan?: number;
+    normLen?: number;
+    jLen?: number;
+    jPhase?: number;
+    postSmooth?: number;
+    bbPeriod?: number;
+    bbMult?: number;
+    emaPeriod?: number;
   };
   diag?: {
     enabled: boolean;
@@ -1541,6 +1589,116 @@ function scanBbTrend(
   return [...best.values()];
 }
 
+
+function scanHamBb(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["hamBb"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_HAM_BB_CONDS;
+  const bbPeriod = cfg.bbPeriod ?? 20;
+  const bbMult = cfg.bbMult ?? 2;
+  const emaPeriod = cfg.emaPeriod ?? 200;
+  if (candles.length < HAM_BB_MIN_BARS) return [];
+
+  const h = hamJurikTpo(candles, {
+    hamLen: cfg.hamLen,
+    hamLenSlow: cfg.hamLenSlow,
+    rawLen: cfg.rawLen,
+    rawLenSlow: cfg.rawLenSlow,
+    momSpan: cfg.momSpan,
+    normLen: cfg.normLen,
+    jLen: cfg.jLen,
+    jPhase: cfg.jPhase,
+    postSmooth: cfg.postSmooth,
+  });
+  const c = closes(candles);
+  const bb = bollinger(c, bbPeriod, bbMult);
+  const e = ema(c, emaPeriod);
+  const n = candles.length;
+  const best = new Map<string, ListScanHit>();
+
+  const simpleConds = conds.filter((x) => x !== "ham_dip");
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = n - 1 - ago;
+    if (i < 1) break;
+    for (const cond of simpleConds) {
+      let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
+      let note = "";
+      switch (cond) {
+        case "raw_dual_up":
+          ok = h.rawDualUp[i];
+          bias = "bull";
+          note = `raw hızlı×yavaş↑ (−${ago})`;
+          break;
+        case "al":
+          ok =
+            h.rawUp[i] &&
+            (h.histPos[i] || h.histCross[i] || h.rawCrossHist[i]);
+          bias = "bull";
+          note = `HAM AL (−${ago})`;
+          break;
+        case "setup":
+          ok = h.rawUp[i] && h.histTurning[i];
+          bias = "bull";
+          note = `HAM setup (−${ago})`;
+          break;
+        case "lower_x_up":
+          ok = crossedAboveAt(c, bb.lower, i);
+          bias = "bull";
+          note = `BB alt band↑ (−${ago})`;
+          break;
+        case "bb_x_ema":
+          ok = crossedAboveAt(bb.mid, e, i);
+          bias = "bull";
+          note = `BB×EMA${emaPeriod}↑ (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, {
+          kind: "hamBb",
+          cond,
+          bias,
+          barsAgo: ago,
+          note,
+        });
+      }
+    }
+  }
+
+  // Soft combo: HAM bull (raw_dual_up|al) AND lower_x_up within window (different bars OK)
+  if (conds.includes("ham_dip")) {
+    let hamAgo: number | null = null;
+    let lowerAgo: number | null = null;
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = n - 1 - ago;
+      if (i < 1) break;
+      const alOk =
+        h.rawUp[i] &&
+        (h.histPos[i] || h.histCross[i] || h.rawCrossHist[i]);
+      if (hamAgo == null && (h.rawDualUp[i] || alOk)) hamAgo = ago;
+      if (lowerAgo == null && crossedAboveAt(c, bb.lower, i)) lowerAgo = ago;
+      if (hamAgo != null && lowerAgo != null) break;
+    }
+    if (hamAgo != null && lowerAgo != null) {
+      const ago = Math.max(hamAgo, lowerAgo);
+      best.set("ham_dip", {
+        kind: "hamBb",
+        cond: "ham_dip",
+        bias: "bull",
+        barsAgo: ago,
+        note: `HAM+Dip (−${ago})`,
+      });
+    }
+  }
+
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1548,6 +1706,7 @@ export function scanSymbol(
 ): ListScanHit[] {
   const enabledKinds: ListScanKind[] = [];
   if (cfg.ham?.enabled) enabledKinds.push("ham");
+  if (cfg.hamBb?.enabled) enabledKinds.push("hamBb");
   if (cfg.diag?.enabled) enabledKinds.push("diag");
   if (cfg.macd?.enabled) enabledKinds.push("macd");
   if (cfg.stoch?.enabled) enabledKinds.push("stoch");
@@ -1563,6 +1722,7 @@ export function scanSymbol(
 
   const byKind: Record<ListScanKind, ListScanHit[]> = {
     ham: cfg.ham ? scanHam(candles, cfg.ham, maxBarsAgo) : [],
+    hamBb: cfg.hamBb ? scanHamBb(candles, cfg.hamBb, maxBarsAgo) : [],
     diag: cfg.diag ? scanDiag(candles, cfg.diag, maxBarsAgo) : [],
     macd: cfg.macd ? scanMacd(candles, cfg.macd, maxBarsAgo) : [],
     stoch: cfg.stoch ? scanStoch(candles, cfg.stoch, maxBarsAgo) : [],
@@ -1661,6 +1821,23 @@ export function indicatorParamsFromConfig(
     if (h.colorSlow) p.colorSlow = h.colorSlow;
     if (h.colorRawSlow) p.colorRawSlow = h.colorRawSlow;
     return p;
+  }
+  if (kind === "hamBb" && cfg.hamBb) {
+    const h = cfg.hamBb;
+    return {
+      hamLen: h.hamLen ?? 21,
+      hamLenSlow: h.hamLenSlow ?? 34,
+      rawLen: h.rawLen ?? 10,
+      rawLenSlow: h.rawLenSlow ?? 21,
+      momSpan: h.momSpan ?? 10,
+      normLen: h.normLen ?? 80,
+      jLen: h.jLen ?? 20,
+      jPhase: h.jPhase ?? 0,
+      postSmooth: h.postSmooth ?? 5,
+      showRawHam: 1,
+      showHistogram: 1,
+      showMarkers: 1,
+    };
   }
   if (kind === "diag" && cfg.diag) {
     const d = cfg.diag;
@@ -1825,6 +2002,7 @@ export const KIND_TO_INDICATOR: Record<
   | "bollinger"
 > = {
   ham: "hamJurikTpo",
+  hamBb: "hamJurikTpo",
   diag: "diagonalSr",
   macd: "macd",
   stoch: "stochastic",
@@ -1845,6 +2023,22 @@ export function extraIndicatorsFromConfig(
   if (kind === "bbTrend" && cfg.bbTrend) {
     const b = cfg.bbTrend;
     return [
+      {
+        type: "ema",
+        params: { period: b.emaPeriod ?? 200 },
+      },
+    ];
+  }
+  if (kind === "hamBb" && cfg.hamBb) {
+    const b = cfg.hamBb;
+    return [
+      {
+        type: "bollinger",
+        params: {
+          period: b.bbPeriod ?? 20,
+          mult: b.bbMult ?? 2,
+        },
+      },
       {
         type: "ema",
         params: { period: b.emaPeriod ?? 200 },
