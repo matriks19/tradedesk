@@ -54,6 +54,8 @@ export type HamBbOpts = {
   postSmooth?: number;
   bbPeriod?: number;
   bbMult?: number;
+  /** Skip hamJurikTpo when caller already computed it (same HAM params). */
+  precomputedHam?: ReturnType<typeof hamJurikTpo>;
 };
 
 /**
@@ -64,17 +66,19 @@ export type HamBbOpts = {
 export function hamBb(candles: Candle[], opts: HamBbOpts = {}) {
   const bbPeriod = opts.bbPeriod ?? 20;
   const bbMult = opts.bbMult ?? 2;
-  const h = hamJurikTpo(candles, {
-    hamLen: opts.hamLen,
-    hamLenSlow: opts.hamLenSlow,
-    rawLen: opts.rawLen,
-    rawLenSlow: opts.rawLenSlow,
-    momSpan: opts.momSpan,
-    normLen: opts.normLen,
-    jLen: opts.jLen,
-    jPhase: opts.jPhase,
-    postSmooth: opts.postSmooth,
-  });
+  const h =
+    opts.precomputedHam ??
+    hamJurikTpo(candles, {
+      hamLen: opts.hamLen,
+      hamLenSlow: opts.hamLenSlow,
+      rawLen: opts.rawLen,
+      rawLenSlow: opts.rawLenSlow,
+      momSpan: opts.momSpan,
+      normLen: opts.normLen,
+      jLen: opts.jLen,
+      jPhase: opts.jPhase,
+      postSmooth: opts.postSmooth,
+    });
   const n = candles.length;
   const hamSrc: (number | null)[] = new Array(n);
   for (let i = 0; i < n; i++) {

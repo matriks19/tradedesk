@@ -14,6 +14,8 @@ export type HamBbPriceOpts = {
   postSmooth?: number;
   bbPeriod?: number;
   bbMult?: number;
+  /** Skip hamJurikTpo when caller already computed it (same HAM params). */
+  precomputedHam?: ReturnType<typeof hamJurikTpo>;
 };
 
 /**
@@ -25,17 +27,19 @@ export function hamBbPrice(candles: Candle[], opts: HamBbPriceOpts = {}) {
   const bbMult = opts.bbMult ?? 2;
   const closes = candles.map((c) => c.close);
   const bb = bollinger(closes, bbPeriod, bbMult);
-  const h = hamJurikTpo(candles, {
-    hamLen: opts.hamLen,
-    hamLenSlow: opts.hamLenSlow,
-    rawLen: opts.rawLen,
-    rawLenSlow: opts.rawLenSlow,
-    momSpan: opts.momSpan,
-    normLen: opts.normLen,
-    jLen: opts.jLen,
-    jPhase: opts.jPhase,
-    postSmooth: opts.postSmooth,
-  });
+  const h =
+    opts.precomputedHam ??
+    hamJurikTpo(candles, {
+      hamLen: opts.hamLen,
+      hamLenSlow: opts.hamLenSlow,
+      rawLen: opts.rawLen,
+      rawLenSlow: opts.rawLenSlow,
+      momSpan: opts.momSpan,
+      normLen: opts.normLen,
+      jLen: opts.jLen,
+      jPhase: opts.jPhase,
+      postSmooth: opts.postSmooth,
+    });
   return {
     ...h,
     closes,

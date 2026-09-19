@@ -968,6 +968,7 @@ export function ListScanPanel() {
 
       const out: ResultRow[] = [];
       let done = 0;
+      let lastProgressAt = 0;
       const isBist = universe.symbols[0]?.exchange === "bist";
       const concurrency = isBist ? 3 : total > 200 ? 6 : 8;
       const klineMs = isBist ? 6000 : 10000;
@@ -993,25 +994,29 @@ export function ListScanPanel() {
             const useHamBbPrice = !!cfg.hamBbPrice?.enabled;
             const scanTf = useHull && cfg.hull?.tf ? String(cfg.hull.tf) : tf;
             // Warmup via klineLimit/minBars; edge lookback stays UI maxBars (default 2)
+            // hamBb/hamBbPrice alone: 220 (+ historyBars if raised); bbTrend keeps 300 floor
+            const hamBbFetchNeed = Math.max(
+              useHamBb ? HAM_BB_FETCH_LIMIT : 0,
+              useHamBbPrice ? HAM_BB_PRICE_FETCH_LIMIT : 0
+            );
             const klineLimit = useHull
               ? DOKTOR_HULL_FETCH_LIMIT
               : useGold2
                 ? GOLD_KEKO_FETCH_LIMIT
                 : useMacdLong
                   ? Math.max(MACD_LONG_FETCH_LIMIT, historyBars, 500)
-                  : useBbTrend || useHamBb || useHamBbPrice
+                  : useBbTrend
                     ? Math.max(
-                        useBbTrend
-                          ? BB_TREND_FETCH_LIMIT
-                          : useHamBbPrice
-                            ? HAM_BB_PRICE_FETCH_LIMIT
-                            : HAM_BB_FETCH_LIMIT,
+                        BB_TREND_FETCH_LIMIT,
+                        hamBbFetchNeed,
                         historyBars,
                         300
                       )
-                    : useGold || useHamAo
-                      ? 260
-                      : 220;
+                    : hamBbFetchNeed
+                      ? Math.max(hamBbFetchNeed, historyBars)
+                      : useGold || useHamAo
+                        ? 260
+                        : 220;
             const minBars = useHull
               ? DOKTOR_HULL_MIN_BARS
               : useGold2
@@ -1055,8 +1060,16 @@ export function ListScanPanel() {
             /* skip timeout / 502 */
           } finally {
             done += 1;
-            setProgress(`${done}/${total} ${q.symbol}`);
-            if (done % 8 === 0 || done === total) {
+            const now = performance.now();
+            if (
+              done === total ||
+              done % 20 === 0 ||
+              now - lastProgressAt >= 150
+            ) {
+              lastProgressAt = now;
+              setProgress(`${done}/${total} ${q.symbol}`);
+            }
+            if (done % 30 === 0 || done === total) {
               setHits(
                 [...out].sort(
                   (a, b) =>
