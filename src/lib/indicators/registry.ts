@@ -190,6 +190,7 @@ import {
 } from "./descendingBreak";
 import { diagonalSr as computeDiagonalSr } from "./diagonalSr";
 import { hamJurikTpo } from "./hamJurikTpo";
+import { hamBb } from "./hamBb";
 import { hamAoJrmaZ } from "./hamAoJrmaZ";
 import { aohamJrmaEngine } from "./aohamJrmaEngine";
 import { goldKeko } from "./goldKeko";
@@ -474,6 +475,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   // —— Elizi Lab
   { id: "eliziEdge", label: "Elizi Edge (Uyum·Sürpriz·İvme)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "edgeTemp", description: "Elizi Lab — soft Temp hist + ±E lines; AL/SAT at +E/−E cross (below/above bar). Detail=On for raws. Not classic TA; validate in backtest.", inputs: [num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("volLen", "Vol Short", 5), num("volLong", "Vol Long", 10), num("flowSmooth", "Flow Smooth", 3), num("tempSmooth", "Temp Smooth", 4), num("effHigh", "Eff High", 0.45, 0.1, 1, 0.01), num("surpriseHigh", "Surprise High", 0.85, 0.2, 3, 0.05), num("coherenceArmed", "Coh Armed", 0.6, 0.2, 1, 0.05), num("fireTemp", "Fire Temp", 62, 20, 100, 1), num("armedTemp", "Armed Temp", 48, 10, 100, 1), num("probeTemp", "Probe Temp", 32, 5, 100, 1), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), sel("detailMode", "Detail Series", "0", [{ value: "0", label: "Primary (Temp/±E/Faz)" }, { value: "1", label: "Full (Uyum/Sürpriz/Verim…)" }])] },
   { id: "hamJurikTpo", label: "HAM Jurik TPO", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: "HAM + Jurik RMA Trend Pulse. Hızlı/yavaş HAM osc kesişimi. Semi-raw, 4 renk hist. Tarama: raw×osc, hızlı×yavaş, setup/onay/AL.", inputs: [num("hamLen", "HAM Hızlı", 21), num("hamLenSlow", "HAM Yavaş", 34), num("rawLen", "Raw Hızlı", 10), num("rawLenSlow", "Raw Yavaş", 21), num("momSpan", "Mom Span", 10), num("normLen", "Norm Len", 80), num("jLen", "Jurik RMA", 20), num("jPhase", "Phase", 0, -100, 100, 1), num("postSmooth", "Final Smooth", 5), num("showRawHam", "Semi-raw", 1, 0, 1, 1), num("showHistogram", "Histogram", 1, 0, 1, 1), num("showMarkers", "Flip işaretleri", 1, 0, 1, 1)] },
+  { id: "hamBb", label: "HAM BB", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "oscDisplay", description: "HAM osilatörü üzerine Bollinger — bantlar HAM serisiyle hareket eder (fiyat BB değil). Raw hızlı/yavaş + BB üst/orta/alt.", inputs: [num("hamLen", "HAM Hızlı", 21), num("hamLenSlow", "HAM Yavaş", 34), num("rawLen", "Raw Hızlı", 10), num("rawLenSlow", "Raw Yavaş", 21), num("momSpan", "Mom Span", 10), num("normLen", "Norm Len", 80), num("jLen", "Jurik RMA", 20), num("jPhase", "Phase", 0, -100, 100, 1), num("postSmooth", "Final Smooth", 5), num("bbPeriod", "BB Period", 20), num("bbMult", "BB Mult", 2, 0.5, 10, 0.1), num("showOsc", "Osc çizgileri", 0, 0, 1, 1)] },
   { id: "hamAoJrmaZ", label: "HAM+AO JRMA Z", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rmaSignal", description: "HAM momentum + Awesome Oscillator blend → softsign → pos/neg trend → Jurik-like core + RMA signal (z-scored). Liste: RMA↑PT, AO↑PT/NT, PT↔NT kesişim (kenar). TV Long = jurik×rma↑ olabilir (ters).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("trendLen", "Trend Len", 34), num("trendBoost", "Trend Boost", 1.3, 0.5, 3, 0.1), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89)] },
   { id: "aohamJrmaEngine", label: "Gold (AOHAM JRMA)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "aoPlot", description: "AOHAM_JRMA_ENGINE — real Jurik + AO/Score/RMA 0–100 plots. Liste Gold: AO×Score AL/SAT, AO×RMA AL/SAT (ana), PT↔NT (garanti). Edge-only.", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("wHam", "HAM W", 0.6, 0, 1, 0.05), num("wAo", "AO W", 0.4, 0, 1, 0.05), num("trendLen", "Trend Len", 34), num("trendBoost", "Trend Boost", 1.3, 0.5, 3, 0.1), num("jrmaLen", "Jurik Len", 8), num("jrmaPhase", "Jurik Phase", 0, -100, 100, 1), num("jrmaPower", "Jurik Power", 2, 0.1, 5, 0.1), num("jrmaRmaLen", "RMA Len", 13), num("preSmooth", "Pre Smooth", 3), num("postSmooth", "Post Smooth", 2), num("normLen", "Norm Len", 40), num("zLen", "Z Len", 89)] },
   { id: "goldKeko", label: "Gold2 (KEKO)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "oscMain", description: "GOLD/KEKO — kutuplu enerji kırılım osilatörü. Liste Gold2: Raw/Core/Disp × RMA AL/SAT, kırılım, şarj, kutup (kenar-only).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("bbLen", "BB Len", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("kcLen", "KC Len", 20), num("kcMult", "KC Mult", 1.5, 0.5, 5, 0.1), num("peLen", "PE Len", 100), num("compressionThresh", "Sıkışma Z", 0.5, 0, 3, 0.05), num("cmfLen", "CMF Len", 21), num("polarWeightCMF", "Polar CMF", 0.6, 0, 1, 0.05), num("polarWeightHam", "Polar HAM", 0.4, 0, 1, 0.05), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89), num("displaySignalLen", "Disp EMA", 5), num("histScale", "Hist Scale", 18, 1, 100, 0.5), num("minChargeForSignal", "Min Şarj", 30, 0, 100, 1)] },
@@ -3181,6 +3183,54 @@ export function computeBuiltin(
         if (markers.length) oscLine.markers = markers;
       }
       push(plots, { osc: h.osc, oscSlow: h.oscSlow, raw: h.oscDisplay, rawSlow: h.rawSlow, hist: h.hist });
+      break;
+    }
+
+    case "hamBb": {
+      const showOsc = n(p, "showOsc", 0) !== 0;
+      const h = hamBb(candles, {
+        hamLen: n(p, "hamLen", 21),
+        hamLenSlow: n(p, "hamLenSlow", 34),
+        rawLen: n(p, "rawLen", 10),
+        rawLenSlow: n(p, "rawLenSlow", 21),
+        momSpan: n(p, "momSpan", 10),
+        normLen: n(p, "normLen", 80),
+        jLen: n(p, "jLen", 20),
+        jPhase: n(p, "jPhase", 0),
+        postSmooth: n(p, "postSmooth", 5),
+        bbPeriod: n(p, "bbPeriod", 20),
+        bbMult: n(p, "bbMult", 2),
+      });
+      const c = (k: string, d: string) =>
+        typeof p[k] === "string" && p[k] ? String(p[k]) : d;
+      const colorRaw = c("colorRaw", "#8b95a8");
+      const colorRawSlow = c("colorRawSlow", "#ce93d8");
+      const colorOsc = c("colorOsc", "#18d0bd66");
+      const colorSlow = c("colorSlow", "#ffb74d66");
+      const colorBbUp = c("colorBbUp", "#ef535099");
+      const colorBbMid = c("colorBbMid", "#8b95a899");
+      const colorBbLo = c("colorBbLo", "#26a69a99");
+      const plots: PlotSeries[] = [
+        line(inst, "zero", "sub", "#8b95a888", candles, candles.map(() => 0), "0"),
+        line(inst, "bbUpper", "sub", colorBbUp, candles, h.bbUpper, "BB üst"),
+        line(inst, "bbMid", "sub", colorBbMid, candles, h.bbMid, "BB orta"),
+        line(inst, "bbLower", "sub", colorBbLo, candles, h.bbLower, "BB alt"),
+        line(inst, "oscDisplay", "sub", colorRaw, candles, h.oscDisplay, "Raw hızlı"),
+        line(inst, "rawSlow", "sub", colorRawSlow, candles, h.rawSlow, "Raw yavaş"),
+      ];
+      if (showOsc) {
+        plots.push(line(inst, "osc", "sub", colorOsc, candles, h.osc, "HAM Osc"));
+        plots.push(line(inst, "oscSlow", "sub", colorSlow, candles, h.oscSlow, "HAM Yavaş"));
+      }
+      push(plots, {
+        oscDisplay: h.oscDisplay,
+        rawSlow: h.rawSlow,
+        bbUpper: h.bbUpper,
+        bbMid: h.bbMid,
+        bbLower: h.bbLower,
+        osc: h.osc,
+        oscSlow: h.oscSlow,
+      });
       break;
     }
 
