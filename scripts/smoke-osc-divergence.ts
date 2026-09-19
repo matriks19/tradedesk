@@ -30,7 +30,7 @@ function candle(i: number, low: number, high: number, close?: number): Candle {
  * Flat-high oscillator with exactly two valleys (or peaks).
  * Ensures no intermediate pivots between p0 and p1.
  */
-function synthBull(gap: number, lbL = 5, lbR = 2): {
+function synthBull(gap: number, lbL = 5, lbR = 3): {
   candles: Candle[];
   osc: (number | null)[];
   confirmIdx: number;
@@ -70,7 +70,7 @@ function synthBull(gap: number, lbL = 5, lbR = 2): {
   return { candles, osc, confirmIdx: p1 + lbR };
 }
 
-function synthBear(gap: number, lbL = 5, lbR = 2): {
+function synthBear(gap: number, lbL = 5, lbR = 3): {
   candles: Candle[];
   osc: (number | null)[];
   confirmIdx: number;
@@ -105,31 +105,31 @@ function synthBear(gap: number, lbL = 5, lbR = 2): {
   return { candles, osc, confirmIdx: p1 + lbR };
 }
 
-// --- Bull fires when gap >= 50 ---
+// --- Bull fires when gap in [rangeLower, rangeUpper] ---
 {
-  const { candles, osc, confirmIdx } = synthBull(55);
+  const { candles, osc, confirmIdx } = synthBull(25);
   const r = computeOscDivergence(candles, osc, LIST_SCAN_DIV_OPTS);
-  assert(r.bull[confirmIdx] != null, "bull fires at confirm when gap>=50");
+  assert(r.bull[confirmIdx] != null, "bull fires at confirm when gap>=rangeLower");
   assert(r.bear.every((v) => v == null), "no bear on bull synth");
-  console.log("OK bull gap=55 @", confirmIdx, "val", r.bull[confirmIdx]);
+  console.log("OK bull gap=25 @", confirmIdx, "val", r.bull[confirmIdx]);
 }
 
-// --- Bear fires when gap >= 50 ---
+// --- Bear fires when gap in [rangeLower, rangeUpper] ---
 {
-  const { candles, osc, confirmIdx } = synthBear(55);
+  const { candles, osc, confirmIdx } = synthBear(25);
   const r = computeOscDivergence(candles, osc, LIST_SCAN_DIV_OPTS);
-  assert(r.bear[confirmIdx] != null, "bear fires at confirm when gap>=50");
+  assert(r.bear[confirmIdx] != null, "bear fires at confirm when gap>=rangeLower");
   assert(r.bull.every((v) => v == null), "no bull on bear synth");
-  console.log("OK bear gap=55 @", confirmIdx, "val", r.bear[confirmIdx]);
+  console.log("OK bear gap=25 @", confirmIdx, "val", r.bear[confirmIdx]);
 }
 
-// --- Bars between pivots < 50 → no fire ---
+// --- Bars between pivots < rangeLower (5) → no fire ---
 {
-  const { candles, osc, confirmIdx } = synthBull(40);
+  const { candles, osc, confirmIdx } = synthBull(3);
   const r = computeOscDivergence(candles, osc, LIST_SCAN_DIV_OPTS);
-  assert(r.bull[confirmIdx] == null, "bull must NOT fire when gap<50");
-  assert(r.bull.every((v) => v == null), "no bull markers when gap<50");
-  console.log("OK no-fire gap=40");
+  assert(r.bull[confirmIdx] == null, "bull must NOT fire when gap<rangeLower");
+  assert(r.bull.every((v) => v == null), "no bull markers when gap<rangeLower");
+  console.log("OK no-fire gap=3");
 }
 
 // --- computeRsiPuNu still works (wrapper) ---
@@ -172,7 +172,7 @@ function synthBear(gap: number, lbL = 5, lbR = 2): {
 }
 
 
-function synthHiddenBull(gap: number, lbL = 5, lbR = 2): {
+function synthHiddenBull(gap: number, lbL = 5, lbR = 3): {
   candles: Candle[];
   osc: (number | null)[];
   confirmIdx: number;
@@ -208,7 +208,7 @@ function synthHiddenBull(gap: number, lbL = 5, lbR = 2): {
   return { candles, osc, confirmIdx: p1 + lbR };
 }
 
-function synthHiddenBear(gap: number, lbL = 5, lbR = 2): {
+function synthHiddenBear(gap: number, lbL = 5, lbR = 3): {
   candles: Candle[];
   osc: (number | null)[];
   confirmIdx: number;

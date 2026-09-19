@@ -5,9 +5,9 @@ export type OscDivergenceOpts = {
   lbL?: number;
   /** Pivot right bars (Pine lbR) — signal confirms with this lag. */
   lbR?: number;
-  /** Min bars between pivots (Pine rangeLower). List-scan default 50. */
+  /** Min bars between pivots (Pine rangeLower). List-scan default 5. */
   rangeLower?: number;
-  /** Max bars between pivots (Pine rangeUpper). List-scan default 150. */
+  /** Max bars between pivots (Pine rangeUpper). List-scan default 60. */
   rangeUpper?: number;
 };
 
@@ -26,12 +26,12 @@ export type OscDivergenceResult = {
   pivotHigh: (number | null)[];
 };
 
-/** List-scan defaults: en az 50 mum between pivots. */
+/** List-scan research pack: pivot spacing 5–60 (not lookback). User lookback = maxBars. */
 export const LIST_SCAN_DIV_OPTS: Required<OscDivergenceOpts> = {
   lbL: 5,
-  lbR: 2,
-  rangeLower: 50,
-  rangeUpper: 150,
+  lbR: 3,
+  rangeLower: 5,
+  rangeUpper: 60,
 };
 
 export function isPivotLow(

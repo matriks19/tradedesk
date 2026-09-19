@@ -428,7 +428,7 @@ export type ListScanConfig = {
     postSmooth?: number;
     normLen?: number;
     zLen?: number;
-    /** Divergence pivot-to-pivot min bars (default 50) */
+    /** Divergence pivot-to-pivot min bars (default LIST_SCAN_DIV_OPTS.rangeLower=5) */
     divRangeLower?: number;
     divRangeUpper?: number;
     divLbL?: number;
@@ -468,7 +468,7 @@ export type ListScanConfig = {
     useTrendFilter?: boolean;
     requireRelease?: boolean;
     flagCounterBreakouts?: boolean;
-    /** Divergence pivot-to-pivot min bars (default 50) */
+    /** Divergence pivot-to-pivot min bars (default LIST_SCAN_DIV_OPTS.rangeLower=5) */
     divRangeLower?: number;
     divRangeUpper?: number;
     divLbL?: number;
