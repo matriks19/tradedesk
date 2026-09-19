@@ -15,6 +15,10 @@ export type RsiPuNuResult = {
   pu: (number | null)[];
   /** Regular bearish divergence (NU) marker at pivot confirm bar */
   nu: (number | null)[];
+  /** Hidden bullish (continuation) at pivot confirm bar */
+  puHidden: (number | null)[];
+  /** Hidden bearish (continuation) at pivot confirm bar */
+  nuHidden: (number | null)[];
   /** 1 at confirmed RSI pivot low bars */
   pivotLow: (number | null)[];
   /** 1 at confirmed RSI pivot high bars */
@@ -22,9 +26,9 @@ export type RsiPuNuResult = {
 };
 
 /**
- * RSI regular bullish (PU) / bearish (NU) divergences — Pine-style pivots on RSI.
- * PU: price lower low + RSI higher low at RSI pivot lows.
- * NU: price higher high + RSI lower high at RSI pivot highs.
+ * RSI regular (PU/NU) + hidden divergences — Pine-style pivots on RSI.
+ * PU: price LL + RSI HL. NU: price HH + RSI LH.
+ * Hidden PU: price HL + RSI LL. Hidden NU: price LH + RSI HH.
  * Defaults match common TV script: rsiLen=14, lbL=15, lbR=2, range 15–60.
  */
 export function computeRsiPuNu(
@@ -43,19 +47,24 @@ export function computeRsiPuNu(
     rsi: osc,
     pu: div.bull,
     nu: div.bear,
+    puHidden: div.hiddenBull,
+    nuHidden: div.hiddenBear,
     pivotLow: div.pivotLow,
     pivotHigh: div.pivotHigh,
   };
 }
 
-/** True if a PU/NU marker fired within the last `maxBarsAgo` bars (0 = last bar). */
+export type RsiPuNuMarkerKind = "pu" | "nu" | "puHidden" | "nuHidden";
+
+/** True if a PU/NU (regular or hidden) marker fired within the last `maxBarsAgo` bars. */
 export function recentRsiPuNu(
   candles: Candle[],
   direction: "bull" | "bear" | "any",
   maxBarsAgo = 2,
-  opts?: RsiPuNuOpts
-): { ok: boolean; barsAgo: number; kind: "pu" | "nu" | null } {
+  opts?: RsiPuNuOpts & { divKind?: "regular" | "hidden" | "any" }
+): { ok: boolean; barsAgo: number; kind: RsiPuNuMarkerKind | null } {
   const r = computeRsiPuNu(candles, opts);
+  const divKind = opts?.divKind ?? "regular";
   const end = candles.length - 1;
   if (end < 0) return { ok: false, barsAgo: -1, kind: null };
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
@@ -63,11 +72,17 @@ export function recentRsiPuNu(
     if (i < 0) break;
     const isPu = r.pu[i] != null;
     const isNu = r.nu[i] != null;
+    const isPuH = r.puHidden[i] != null;
+    const isNuH = r.nuHidden[i] != null;
+    const wantReg = divKind === "regular" || divKind === "any";
+    const wantHid = divKind === "hidden" || divKind === "any";
     if (direction === "bull" || direction === "any") {
-      if (isPu) return { ok: true, barsAgo: ago, kind: "pu" };
+      if (wantReg && isPu) return { ok: true, barsAgo: ago, kind: "pu" };
+      if (wantHid && isPuH) return { ok: true, barsAgo: ago, kind: "puHidden" };
     }
     if (direction === "bear" || direction === "any") {
-      if (isNu) return { ok: true, barsAgo: ago, kind: "nu" };
+      if (wantReg && isNu) return { ok: true, barsAgo: ago, kind: "nu" };
+      if (wantHid && isNuH) return { ok: true, barsAgo: ago, kind: "nuHidden" };
     }
   }
   return { ok: false, barsAgo: -1, kind: null };

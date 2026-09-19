@@ -171,4 +171,137 @@ function synthBear(gap: number, lbL = 5, lbR = 2): {
   );
 }
 
+
+function synthHiddenBull(gap: number, lbL = 5, lbR = 2): {
+  candles: Candle[];
+  osc: (number | null)[];
+  confirmIdx: number;
+} {
+  const p0 = lbL + 10;
+  const p1 = p0 + gap;
+  const n = p1 + lbR + 10;
+  const candles: Candle[] = [];
+  const osc: (number | null)[] = [];
+
+  for (let i = 0; i < n; i++) {
+    let o = 80;
+    let low = 100;
+    let high = 110;
+
+    if (i === p0) {
+      o = 20; // deeper osc low
+      low = 80; // lower price low
+      high = 95;
+    } else if (i === p1) {
+      o = 10; // lower osc low (hidden)
+      low = 90; // higher price low
+      high = 100;
+    } else if (Math.abs(i - p0) <= lbR || Math.abs(i - p1) <= lbR) {
+      o = 60;
+    } else if (Math.abs(i - p0) <= lbL || Math.abs(i - p1) <= lbL) {
+      o = 60;
+    }
+
+    candles.push(candle(i, low, high));
+    osc.push(o);
+  }
+  return { candles, osc, confirmIdx: p1 + lbR };
+}
+
+function synthHiddenBear(gap: number, lbL = 5, lbR = 2): {
+  candles: Candle[];
+  osc: (number | null)[];
+  confirmIdx: number;
+} {
+  const p0 = lbL + 10;
+  const p1 = p0 + gap;
+  const n = p1 + lbR + 10;
+  const candles: Candle[] = [];
+  const osc: (number | null)[] = [];
+
+  for (let i = 0; i < n; i++) {
+    let o = 20;
+    let low = 100;
+    let high = 110;
+
+    if (i === p0) {
+      o = 70;
+      low = 100;
+      high = 130; // higher price high first
+    } else if (i === p1) {
+      o = 85; // higher osc high (hidden)
+      low = 95;
+      high = 120; // lower price high
+    } else if (
+      Math.abs(i - p0) <= lbL ||
+      Math.abs(i - p0) <= lbR ||
+      Math.abs(i - p1) <= lbL ||
+      Math.abs(i - p1) <= lbR
+    ) {
+      o = 40;
+    }
+
+    candles.push(candle(i, low, high));
+    osc.push(o);
+  }
+  return { candles, osc, confirmIdx: p1 + lbR };
+}
+
+// --- Hidden bull: price HL + osc LL ---
+{
+  const { candles, osc, confirmIdx } = synthHiddenBull(55);
+  const r = computeOscDivergence(candles, osc, LIST_SCAN_DIV_OPTS);
+  assert(r.hiddenBull[confirmIdx] != null, "hiddenBull fires at confirm");
+  assert(r.bull.every((v) => v == null), "no regular bull on hiddenBull synth");
+  assert(r.bear.every((v) => v == null), "no bear on hiddenBull synth");
+  console.log("OK hiddenBull gap=55 @", confirmIdx, "val", r.hiddenBull[confirmIdx]);
+}
+
+// --- Hidden bear: price LH + osc HH ---
+{
+  const { candles, osc, confirmIdx } = synthHiddenBear(55);
+  const r = computeOscDivergence(candles, osc, LIST_SCAN_DIV_OPTS);
+  assert(r.hiddenBear[confirmIdx] != null, "hiddenBear fires at confirm");
+  assert(r.bear.every((v) => v == null), "no regular bear on hiddenBear synth");
+  assert(r.bull.every((v) => v == null), "no bull on hiddenBear synth");
+  console.log("OK hiddenBear gap=55 @", confirmIdx, "val", r.hiddenBear[confirmIdx]);
+}
+
+// --- Regular bull must not set hiddenBull ---
+{
+  const { candles, osc, confirmIdx } = synthBull(55);
+  const r = computeOscDivergence(candles, osc, LIST_SCAN_DIV_OPTS);
+  assert(r.bull[confirmIdx] != null, "regular bull still fires");
+  assert(r.hiddenBull.every((v) => v == null), "no hiddenBull on regular bull synth");
+  console.log("OK regular vs hidden separation (bull)");
+}
+
+// --- Gold2 accepts hidden div conds ---
+{
+  const n = 320;
+  const candles: Candle[] = [];
+  let px = 100;
+  for (let i = 0; i < n; i++) {
+    px = Math.max(1, px + Math.sin(i / 11) * 0.4);
+    candles.push(candle(i, px - 0.5, px + 0.5, px));
+  }
+  const cfg: ListScanConfig = {
+    matchMode: "any",
+    gold2: {
+      enabled: true,
+      conds: ["div_hid_bull", "div_hid_bear"],
+    },
+  };
+  const hits = scanSymbol(candles, cfg, 80);
+  assert(hits.every((h) => h.kind === "gold2"), "kind gold2 hidden");
+  assert(
+    hits.every((h) => h.cond === "div_hid_bull" || h.cond === "div_hid_bear"),
+    "only hidden div conds"
+  );
+  console.log(
+    "OK gold2 hidden div scan",
+    hits.map((h) => `${h.cond}@${h.barsAgo}`)
+  );
+}
+
 console.log("OK smoke-osc-divergence");

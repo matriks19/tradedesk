@@ -16,6 +16,10 @@ export type OscDivergenceResult = {
   bull: (number | null)[];
   /** Regular bearish divergence marker at pivot confirm bar */
   bear: (number | null)[];
+  /** Hidden bullish (continuation long): price HL + osc LL at osc pivot lows */
+  hiddenBull: (number | null)[];
+  /** Hidden bearish (continuation short): price LH + osc HH at osc pivot highs */
+  hiddenBear: (number | null)[];
   /** 1 at confirmed oscillator pivot low bars */
   pivotLow: (number | null)[];
   /** 1 at confirmed oscillator pivot high bars */
@@ -65,9 +69,9 @@ export function isPivotHigh(
 }
 
 /**
- * Regular oscillator divergence — Pine-style pivots on `osc`.
- * Bull: price lower low + osc higher low at osc pivot lows.
- * Bear: price higher high + osc lower high at osc pivot highs.
+ * Oscillator divergence — Pine-style pivots on `osc`.
+ * Regular bull: price LL + osc HL. Regular bear: price HH + osc LH.
+ * Hidden bull: price HL + osc LL. Hidden bear: price LH + osc HH.
  */
 export function computeOscDivergence(
   candles: Candle[],
@@ -82,6 +86,8 @@ export function computeOscDivergence(
 
   const bull: (number | null)[] = new Array(n).fill(null);
   const bear: (number | null)[] = new Array(n).fill(null);
+  const hiddenBull: (number | null)[] = new Array(n).fill(null);
+  const hiddenBear: (number | null)[] = new Array(n).fill(null);
   const pivotLow: (number | null)[] = new Array(n).fill(null);
   const pivotHigh: (number | null)[] = new Array(n).fill(null);
 
@@ -102,9 +108,14 @@ export function computeOscDivergence(
         const bars = pi - prev.pivot;
         if (bars >= rangeLower && bars <= rangeUpper) {
           const oscHL = ov > prev.osc;
+          const oscLL = ov < prev.osc;
           const priceLL = price < prev.price;
+          const priceHL = price > prev.price;
           if (oscHL && priceLL) {
             bull[i] = ov;
+          }
+          if (oscLL && priceHL) {
+            hiddenBull[i] = ov;
           }
         }
       }
@@ -120,9 +131,14 @@ export function computeOscDivergence(
         const bars = pi - prev.pivot;
         if (bars >= rangeLower && bars <= rangeUpper) {
           const oscLH = ov < prev.osc;
+          const oscHH = ov > prev.osc;
           const priceHH = price > prev.price;
+          const priceLH = price < prev.price;
           if (oscLH && priceHH) {
             bear[i] = ov;
+          }
+          if (oscHH && priceLH) {
+            hiddenBear[i] = ov;
           }
         }
       }
@@ -130,7 +146,7 @@ export function computeOscDivergence(
     }
   }
 
-  return { bull, bear, pivotLow, pivotHigh };
+  return { bull, bear, hiddenBull, hiddenBear, pivotLow, pivotHigh };
 }
 
 /** Count non-null samples in a series. */
@@ -154,14 +170,16 @@ export function pickOscSeries(
   return main;
 }
 
-/** True if a bull/bear marker fired within the last `maxBarsAgo` bars (0 = last bar). */
+export type OscDivKind = "bull" | "bear" | "hiddenBull" | "hiddenBear";
+
+/** True if a divergence marker fired within the last `maxBarsAgo` bars (0 = last bar). */
 export function recentOscDivergence(
   candles: Candle[],
   osc: (number | null)[],
-  direction: "bull" | "bear" | "any",
+  direction: "bull" | "bear" | "hiddenBull" | "hiddenBear" | "any" | "regular" | "hidden",
   maxBarsAgo = 2,
   opts?: OscDivergenceOpts
-): { ok: boolean; barsAgo: number; kind: "bull" | "bear" | null } {
+): { ok: boolean; barsAgo: number; kind: OscDivKind | null } {
   const r = computeOscDivergence(candles, osc, opts);
   const end = Math.min(candles.length, osc.length) - 1;
   if (end < 0) return { ok: false, barsAgo: -1, kind: null };
@@ -170,11 +188,35 @@ export function recentOscDivergence(
     if (i < 0) break;
     const isBull = r.bull[i] != null;
     const isBear = r.bear[i] != null;
-    if ((direction === "bull" || direction === "any") && isBull) {
+    const isHidBull = r.hiddenBull[i] != null;
+    const isHidBear = r.hiddenBear[i] != null;
+    if (
+      (direction === "bull" || direction === "any" || direction === "regular") &&
+      isBull
+    ) {
       return { ok: true, barsAgo: ago, kind: "bull" };
     }
-    if ((direction === "bear" || direction === "any") && isBear) {
+    if (
+      (direction === "bear" || direction === "any" || direction === "regular") &&
+      isBear
+    ) {
       return { ok: true, barsAgo: ago, kind: "bear" };
+    }
+    if (
+      (direction === "hiddenBull" ||
+        direction === "any" ||
+        direction === "hidden") &&
+      isHidBull
+    ) {
+      return { ok: true, barsAgo: ago, kind: "hiddenBull" };
+    }
+    if (
+      (direction === "hiddenBear" ||
+        direction === "any" ||
+        direction === "hidden") &&
+      isHidBear
+    ) {
+      return { ok: true, barsAgo: ago, kind: "hiddenBear" };
     }
   }
   return { ok: false, barsAgo: -1, kind: null };
