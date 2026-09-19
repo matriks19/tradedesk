@@ -248,6 +248,7 @@ export type BuiltinIndicatorId =
   | "hamJurikTpo"
   | "hamAoJrmaZ"
   | "aohamJrmaEngine"
+  | "goldKeko"
   | "vfi"
   | "waddahAttar"
   | "halfTrend"
