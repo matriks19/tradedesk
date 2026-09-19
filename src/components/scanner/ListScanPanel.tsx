@@ -22,10 +22,12 @@ import {
   type DiCond,
   type HullCond,
   type HamAoCond,
+  type GoldCond,
   type ListScanConfig,
   DOKTOR_HULL_FETCH_LIMIT,
   DOKTOR_HULL_MIN_BARS,
   HAM_AO_JRMA_Z_MIN_BARS,
+  AOHAM_JRMA_MIN_BARS,
   type ListScanHit,
   type ListScanKind,
   type PineCond,
@@ -120,6 +122,15 @@ const HAM_AO_CHIPS: { id: HamAoCond; label: string }[] = [
   { id: "rma_up_pt", label: "RMA↑ PT" },
   { id: "ao_up_pt", label: "AO↑ PT" },
   { id: "ao_up_nt", label: "AO↑ NT" },
+  { id: "pt_x_nt", label: "PT↑ NT" },
+  { id: "nt_x_pt", label: "NT↑ PT" },
+];
+
+const GOLD_CHIPS: { id: GoldCond; label: string }[] = [
+  { id: "ao_x_score_al", label: "AO↑ Score" },
+  { id: "ao_x_rma_al", label: "AO↑ RMA" },
+  { id: "ao_x_score_sat", label: "AO↓ Score" },
+  { id: "ao_x_rma_sat", label: "AO↓ RMA" },
   { id: "pt_x_nt", label: "PT↑ NT" },
   { id: "nt_x_pt", label: "NT↑ PT" },
 ];
@@ -386,6 +397,7 @@ export function ListScanPanel() {
   const [diOn, setDiOn] = useState(false);
   const [hullOn, setHullOn] = useState(false);
   const [hamAoOn, setHamAoOn] = useState(false);
+  const [goldOn, setGoldOn] = useState(false);
 
   const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
@@ -396,6 +408,11 @@ export function ListScanPanel() {
   const [hamAoConds, setHamAoConds] = useState<HamAoCond[]>([
     "rma_up_pt",
     "ao_up_pt",
+    "pt_x_nt",
+  ]);
+  const [goldConds, setGoldConds] = useState<GoldCond[]>([
+    "ao_x_rma_al",
+    "ao_x_rma_sat",
     "pt_x_nt",
   ]);
 
@@ -539,6 +556,10 @@ export function ListScanPanel() {
         enabled: hamAoOn,
         conds: hamAoConds,
       },
+      gold: {
+        enabled: goldOn,
+        conds: goldConds,
+      },
       extraFilters: EXTRA_CHIPS.filter((c) => extraIds.includes(c.id)).map(
         (c) => c.filter
       ),
@@ -608,6 +629,8 @@ export function ListScanPanel() {
     hullTf,
     hamAoOn,
     hamAoConds,
+    goldOn,
+    goldConds,
     colorH8,
     colorH13,
     colorH21,
@@ -632,7 +655,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -686,9 +709,21 @@ export function ListScanPanel() {
                 ? AbortSignal.any([ac.signal, AbortSignal.timeout(klineMs)])
                 : ac.signal;
             const useHull = !!cfg.hull?.enabled;
+            const useGold = !!cfg.gold?.enabled;
+            const useHamAo = !!cfg.hamAo?.enabled;
             const scanTf = useHull && cfg.hull?.tf ? String(cfg.hull.tf) : tf;
-            const klineLimit = useHull ? DOKTOR_HULL_FETCH_LIMIT : 220;
-            const minBars = useHull ? DOKTOR_HULL_MIN_BARS : 50;
+            const klineLimit = useHull
+              ? DOKTOR_HULL_FETCH_LIMIT
+              : useGold || useHamAo
+                ? 260
+                : 220;
+            const minBars = useHull
+              ? DOKTOR_HULL_MIN_BARS
+              : useGold
+                ? AOHAM_JRMA_MIN_BARS
+                : useHamAo
+                  ? HAM_AO_JRMA_Z_MIN_BARS
+                  : 50;
             const kr = await fetch(
               `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${encodeURIComponent(scanTf)}&limit=${klineLimit}`,
               { signal: fetchSignal }
@@ -766,6 +801,7 @@ export function ListScanPanel() {
       if (cfg.di?.enabled) kinds.push("di");
       if (cfg.hull?.enabled) kinds.push("hull");
       if (cfg.hamAo?.enabled) kinds.push("hamAo");
+      if (cfg.gold?.enabled) kinds.push("gold");
       for (const kind of kinds) {
         const type = KIND_TO_INDICATOR[kind];
         const params = indicatorParamsFromConfig(kind, cfg);
@@ -794,10 +830,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -819,7 +855,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -932,6 +968,31 @@ export function ListScanPanel() {
             hamAo: {
               enabled: true,
               conds: [h.cond as HamAoCond],
+            },
+          },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "gold") {
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "Gold",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            gold: {
+              enabled: true,
+              conds: [h.cond as GoldCond],
             },
           },
           timeframe: tf,
@@ -1326,6 +1387,32 @@ export function ListScanPanel() {
               onClick={() => {
                 setHamAoOn(true);
                 setHamAoConds((a) => toggleIn(a, c.id));
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Gold"
+        enabled={goldOn}
+        onToggle={() => setGoldOn((v) => !v)}
+        open={openCard === "gold"}
+        onOpen={() => setOpenCard((c) => (c === "gold" ? null : "gold"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Pine AOHAM_JRMA_ENGINE · gerçek Jurik · AO×Score / AO×RMA (0–100) AL/SAT ·
+          PT↔NT · kenar-only · ≥{AOHAM_JRMA_MIN_BARS} mum
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {GOLD_CHIPS.map((c) => (
+            <Chip
+              key={c.id}
+              active={goldConds.includes(c.id)}
+              label={c.label}
+              onClick={() => {
+                setGoldOn(true);
+                setGoldConds((a) => toggleIn(a, c.id));
               }}
             />
           ))}

@@ -247,6 +247,7 @@ export type BuiltinIndicatorId =
   | "diagonalSr"
   | "hamJurikTpo"
   | "hamAoJrmaZ"
+  | "aohamJrmaEngine"
   | "vfi"
   | "waddahAttar"
   | "halfTrend"
