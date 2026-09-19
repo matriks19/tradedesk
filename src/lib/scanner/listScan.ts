@@ -223,8 +223,8 @@ export const DEFAULT_HAM_BB_CONDS: HamBbCond[] = [
   "raw_xy_lower",
 ];
 
-/** Fetch enough for HAM warmup + BB on oscillator. */
-export const HAM_BB_FETCH_LIMIT = 300;
+/** Fetch enough for HAM warmup + BB on oscillator (HAM_BB_MIN 120 + BB). */
+export const HAM_BB_FETCH_LIMIT = 220;
 
 /** Min bars — HAM normLen (~80) + BB period (~20). */
 export const HAM_BB_MIN_BARS = 120;
@@ -253,7 +253,7 @@ export const DEFAULT_HAM_BB_PRICE_CONDS: HamBbPriceCond[] = [
 ];
 
 /** Same warmup as osc HAM BB. */
-export const HAM_BB_PRICE_FETCH_LIMIT = 300;
+export const HAM_BB_PRICE_FETCH_LIMIT = 220;
 export const HAM_BB_PRICE_MIN_BARS = 120;
 
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
@@ -567,25 +567,79 @@ function lineZeroCrossDn(line: (number | null)[], i: number): boolean {
   return v0 >= 0 && v1 < 0;
 }
 
+type HamJurikResult = ReturnType<typeof hamJurikTpo>;
+
+function hamJurikOptsKey(o: {
+  hamLen?: number;
+  hamLenSlow?: number;
+  rawLen?: number;
+  rawLenSlow?: number;
+  momSpan?: number;
+  normLen?: number;
+  jLen?: number;
+  jPhase?: number;
+  postSmooth?: number;
+}): string {
+  return [
+    o.hamLen ?? 21,
+    o.hamLenSlow ?? 34,
+    o.rawLen ?? 10,
+    o.rawLenSlow ?? 21,
+    o.momSpan ?? 10,
+    o.normLen ?? 80,
+    o.jLen ?? 20,
+    o.jPhase ?? 0,
+    o.postSmooth ?? 5,
+  ].join(",");
+}
+
+/** Per-scanSymbol memo: one hamJurikTpo per unique HAM params. */
+function getHamJurikCached(
+  candles: Candle[],
+  opts: {
+    hamLen?: number;
+    hamLenSlow?: number;
+    rawLen?: number;
+    rawLenSlow?: number;
+    momSpan?: number;
+    normLen?: number;
+    jLen?: number;
+    jPhase?: number;
+    postSmooth?: number;
+  },
+  cache: Map<string, HamJurikResult>
+): HamJurikResult {
+  const key = hamJurikOptsKey(opts);
+  let h = cache.get(key);
+  if (!h) {
+    h = hamJurikTpo(candles, opts);
+    cache.set(key, h);
+  }
+  return h;
+}
+
 function scanHam(
   candles: Candle[],
   cfg: NonNullable<ListScanConfig["ham"]>,
-  maxBarsAgo: number
+  maxBarsAgo: number,
+  precomputedHam?: HamJurikResult
 ): ListScanHit[] {
   if (!cfg.enabled) return [];
   const conds = cfg.conds.length ? cfg.conds : DEFAULT_HAM_CONDS;
   if (candles.length < 80) return [];
-  const h = hamJurikTpo(candles, {
-    hamLen: cfg.hamLen,
-    hamLenSlow: cfg.hamLenSlow,
-    rawLen: cfg.rawLen,
-    rawLenSlow: cfg.rawLenSlow,
-    momSpan: cfg.momSpan,
-    normLen: cfg.normLen,
-    jLen: cfg.jLen,
-    jPhase: cfg.jPhase,
-    postSmooth: cfg.postSmooth,
-  });
+  const h =
+    precomputedHam ??
+    hamJurikTpo(candles, {
+      hamLen: cfg.hamLen,
+      hamLenSlow: cfg.hamLenSlow,
+      rawLen: cfg.rawLen,
+      rawLenSlow: cfg.rawLenSlow,
+      momSpan: cfg.momSpan,
+      normLen: cfg.normLen,
+      jLen: cfg.jLen,
+      jPhase: cfg.jPhase,
+      postSmooth: cfg.postSmooth,
+    });
   const n = candles.length;
   const best = new Map<string, ListScanHit>();
 
@@ -1639,7 +1693,8 @@ function scanBbTrend(
 function scanHamBb(
   candles: Candle[],
   cfg: NonNullable<ListScanConfig["hamBb"]>,
-  maxBarsAgo: number
+  maxBarsAgo: number,
+  precomputedHam?: HamJurikResult
 ): ListScanHit[] {
   if (!cfg.enabled) return [];
   const conds = cfg.conds.length ? cfg.conds : DEFAULT_HAM_BB_CONDS;
@@ -1659,6 +1714,7 @@ function scanHamBb(
     postSmooth: cfg.postSmooth,
     bbPeriod,
     bbMult,
+    precomputedHam,
   });
   const osc = h.hamSrc;
   const n = candles.length;
@@ -1748,7 +1804,8 @@ function scanHamBb(
 function scanHamBbPrice(
   candles: Candle[],
   cfg: NonNullable<ListScanConfig["hamBbPrice"]>,
-  maxBarsAgo: number
+  maxBarsAgo: number,
+  precomputedHam?: HamJurikResult
 ): ListScanHit[] {
   if (!cfg.enabled) return [];
   const conds = cfg.conds.length ? cfg.conds : DEFAULT_HAM_BB_PRICE_CONDS;
@@ -1768,6 +1825,7 @@ function scanHamBbPrice(
     postSmooth: cfg.postSmooth,
     bbPeriod,
     bbMult,
+    precomputedHam,
   });
   const c = h.closes;
   const n = candles.length;
@@ -1865,10 +1923,38 @@ export function scanSymbol(
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
+  // One hamJurikTpo per unique HAM params when ham / hamBb / hamBbPrice share a pass
+  const hamCache = new Map<string, HamJurikResult>();
+  const hamPre = (
+    c:
+      | NonNullable<ListScanConfig["ham"]>
+      | NonNullable<ListScanConfig["hamBb"]>
+      | NonNullable<ListScanConfig["hamBbPrice"]>
+  ) =>
+    getHamJurikCached(
+      candles,
+      {
+        hamLen: c.hamLen,
+        hamLenSlow: c.hamLenSlow,
+        rawLen: c.rawLen,
+        rawLenSlow: c.rawLenSlow,
+        momSpan: c.momSpan,
+        normLen: c.normLen,
+        jLen: c.jLen,
+        jPhase: c.jPhase,
+        postSmooth: c.postSmooth,
+      },
+      hamCache
+    );
+
   const byKind: Record<ListScanKind, ListScanHit[]> = {
-    ham: cfg.ham ? scanHam(candles, cfg.ham, maxBarsAgo) : [],
-    hamBb: cfg.hamBb ? scanHamBb(candles, cfg.hamBb, maxBarsAgo) : [],
-    hamBbPrice: cfg.hamBbPrice ? scanHamBbPrice(candles, cfg.hamBbPrice, maxBarsAgo) : [],
+    ham: cfg.ham?.enabled ? scanHam(candles, cfg.ham, maxBarsAgo, hamPre(cfg.ham)) : [],
+    hamBb: cfg.hamBb?.enabled
+      ? scanHamBb(candles, cfg.hamBb, maxBarsAgo, hamPre(cfg.hamBb))
+      : [],
+    hamBbPrice: cfg.hamBbPrice?.enabled
+      ? scanHamBbPrice(candles, cfg.hamBbPrice, maxBarsAgo, hamPre(cfg.hamBbPrice))
+      : [],
     diag: cfg.diag ? scanDiag(candles, cfg.diag, maxBarsAgo) : [],
     macd: cfg.macd ? scanMacd(candles, cfg.macd, maxBarsAgo) : [],
     stoch: cfg.stoch ? scanStoch(candles, cfg.stoch, maxBarsAgo) : [],
@@ -2000,7 +2086,7 @@ export function indicatorParamsFromConfig(
       bbPeriod: h.bbPeriod ?? 20,
       bbMult: h.bbMult ?? 2,
       showMarkers: 1,
-      showCloseTint: 1,
+      showCloseTint: 0,
     };
   }
   if (kind === "diag" && cfg.diag) {
