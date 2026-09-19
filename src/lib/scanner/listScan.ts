@@ -151,6 +151,19 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
   "polarity_flip_down",
 ];
 
+/** UI default chip lists — used when enabled with empty conds (never silent []). */
+export const DEFAULT_HAM_CONDS: HamCond[] = ["raw_dual_up"];
+export const DEFAULT_DIAG_CONDS: DiagCond[] = ["bounce"];
+export const DEFAULT_MACD_CONDS: MacdCond[] = ["cross_up"];
+export const DEFAULT_STOCH_CONDS: StochCond[] = ["kx_up_os"];
+export const DEFAULT_DI_CONDS: DiCond[] = ["plus_x_minus"];
+export const DEFAULT_HULL_CONDS: HullCond[] = ["al"];
+export const DEFAULT_HAM_AO_CONDS: HamAoCond[] = [
+  "rma_up_pt",
+  "ao_up_pt",
+  "pt_x_nt",
+];
+
 export type ListScanKind =
   | "ham"
   | "macd"
@@ -396,7 +409,8 @@ function scanHam(
   cfg: NonNullable<ListScanConfig["ham"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_HAM_CONDS;
   if (candles.length < 80) return [];
   const h = hamJurikTpo(candles, {
     hamLen: cfg.hamLen,
@@ -415,7 +429,7 @@ function scanHam(
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = n - 1 - ago;
     if (i < 1) break;
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";
@@ -590,7 +604,8 @@ function scanMacd(
   cfg: NonNullable<ListScanConfig["macd"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_MACD_CONDS;
   const fast = cfg.fast ?? 12;
   const slow = cfg.slow ?? 26;
   const signalPeriod = cfg.signal ?? 9;
@@ -602,7 +617,7 @@ function scanMacd(
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";
@@ -653,7 +668,8 @@ function scanStoch(
   cfg: NonNullable<ListScanConfig["stoch"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_STOCH_CONDS;
   const kPeriod = cfg.kPeriod ?? 14;
   const dPeriod = cfg.dPeriod ?? 3;
   const os = cfg.os ?? 20;
@@ -667,7 +683,7 @@ function scanStoch(
     const i = last - ago;
     if (i < 1) break;
     const kv = s.k[i];
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";
@@ -726,10 +742,11 @@ function scanDiag(
   cfg: NonNullable<ListScanConfig["diag"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_DIAG_CONDS;
   const hits: ListScanHit[] = [];
   const seen = new Set<string>();
-  for (const cond of cfg.conds) {
+  for (const cond of conds) {
     let event: "bounce" | "break" | "twin" | "triple" = "bounce";
     let direction: "bull" | "bear" | "any" = "any";
     switch (cond) {
@@ -796,7 +813,8 @@ function scanDi(
   cfg: NonNullable<ListScanConfig["di"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_DI_CONDS;
   const period = cfg.period ?? 14;
   const adxMin = cfg.adxMin ?? 25;
   if (candles.length < period * 3 + 2) return [];
@@ -810,7 +828,7 @@ function scanDi(
     const p = d.plusDI[i];
     const m = d.minusDI[i];
     const ax = d.adx[i];
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";
@@ -857,7 +875,8 @@ function scanHull(
   cfg: NonNullable<ListScanConfig["hull"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_HULL_CONDS;
   if (candles.length < DOKTOR_HULL_MIN_BARS) return [];
   const mode = cfg.mode ?? "Hma";
   const d = doktorHull(candles, { mode });
@@ -867,7 +886,7 @@ function scanHull(
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";
@@ -1007,7 +1026,8 @@ function scanHamAo(
   cfg: NonNullable<ListScanConfig["hamAo"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_HAM_AO_CONDS;
   if (candles.length < HAM_AO_JRMA_Z_MIN_BARS) return [];
   const s = hamAoJrmaZ(candles, {
     hamMomLen: cfg.hamMomLen,
@@ -1031,7 +1051,7 @@ function scanHamAo(
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";
