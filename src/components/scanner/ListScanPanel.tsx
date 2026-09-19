@@ -23,11 +23,14 @@ import {
   type HullCond,
   type HamAoCond,
   type GoldCond,
+  type Gold2Cond,
   type ListScanConfig,
   DOKTOR_HULL_FETCH_LIMIT,
   DOKTOR_HULL_MIN_BARS,
   HAM_AO_JRMA_Z_MIN_BARS,
   AOHAM_JRMA_MIN_BARS,
+  GOLD_KEKO_MIN_BARS,
+  GOLD_KEKO_FETCH_LIMIT,
   type ListScanHit,
   type ListScanKind,
   type PineCond,
@@ -133,6 +136,23 @@ const GOLD_CHIPS: { id: GoldCond; label: string }[] = [
   { id: "ao_x_rma_sat", label: "AO↓ RMA" },
   { id: "pt_x_nt", label: "PT↑ NT" },
   { id: "nt_x_pt", label: "NT↑ PT" },
+];
+
+const GOLD2_CHIPS: { id: Gold2Cond; label: string }[] = [
+  { id: "raw_x_rma_al", label: "Raw↑ RMA AL" },
+  { id: "raw_x_rma_sat", label: "Raw↓ RMA SAT" },
+  { id: "core_x_rma_al", label: "Core↑ RMA AL" },
+  { id: "core_x_rma_sat", label: "Core↓ RMA SAT" },
+  { id: "disp_x_rma_al", label: "Disp↑ RMA AL" },
+  { id: "disp_x_rma_sat", label: "Disp↓ RMA SAT" },
+  { id: "breakout_up_aligned", label: "Kırılım↑ onay" },
+  { id: "breakout_down_aligned", label: "Kırılım↓ onay" },
+  { id: "breakout_up_counter", label: "Kırılım↑ şüphe" },
+  { id: "breakout_down_counter", label: "Kırılım↓ şüphe" },
+  { id: "charge_full_bull", label: "Şarj+ doldu" },
+  { id: "charge_full_bear", label: "Şarj− doldu" },
+  { id: "polarity_flip_up", label: "Kutup↑" },
+  { id: "polarity_flip_down", label: "Kutup↓" },
 ];
 
 const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
@@ -398,6 +418,7 @@ export function ListScanPanel() {
   const [hullOn, setHullOn] = useState(false);
   const [hamAoOn, setHamAoOn] = useState(false);
   const [goldOn, setGoldOn] = useState(false);
+  const [gold2On, setGold2On] = useState(false);
 
   const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
@@ -411,9 +432,20 @@ export function ListScanPanel() {
     "pt_x_nt",
   ]);
   const [goldConds, setGoldConds] = useState<GoldCond[]>([
+    "ao_x_score_al",
     "ao_x_rma_al",
+    "ao_x_score_sat",
     "ao_x_rma_sat",
     "pt_x_nt",
+    "nt_x_pt",
+  ]);
+  const [gold2Conds, setGold2Conds] = useState<Gold2Cond[]>([
+    "raw_x_rma_al",
+    "raw_x_rma_sat",
+    "core_x_rma_al",
+    "core_x_rma_sat",
+    "disp_x_rma_al",
+    "disp_x_rma_sat",
   ]);
 
   const [hamLen, setHamLen] = useState(21);
@@ -560,6 +592,10 @@ export function ListScanPanel() {
         enabled: goldOn,
         conds: goldConds,
       },
+      gold2: {
+        enabled: gold2On,
+        conds: gold2Conds,
+      },
       extraFilters: EXTRA_CHIPS.filter((c) => extraIds.includes(c.id)).map(
         (c) => c.filter
       ),
@@ -631,6 +667,8 @@ export function ListScanPanel() {
     hamAoConds,
     goldOn,
     goldConds,
+    gold2On,
+    gold2Conds,
     colorH8,
     colorH13,
     colorH21,
@@ -655,7 +693,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -710,20 +748,28 @@ export function ListScanPanel() {
                 : ac.signal;
             const useHull = !!cfg.hull?.enabled;
             const useGold = !!cfg.gold?.enabled;
+            const useGold2 = !!cfg.gold2?.enabled;
             const useHamAo = !!cfg.hamAo?.enabled;
             const scanTf = useHull && cfg.hull?.tf ? String(cfg.hull.tf) : tf;
+            // Gold/Gold2 edge crosses are sparse — floor lookback so Liste isn't empty at maxBars=2
+            const effectiveMaxBars =
+              useGold || useGold2 ? Math.max(maxBars, 40) : maxBars;
             const klineLimit = useHull
               ? DOKTOR_HULL_FETCH_LIMIT
-              : useGold || useHamAo
-                ? 260
-                : 220;
+              : useGold2
+                ? GOLD_KEKO_FETCH_LIMIT
+                : useGold || useHamAo
+                  ? 260
+                  : 220;
             const minBars = useHull
               ? DOKTOR_HULL_MIN_BARS
-              : useGold
-                ? AOHAM_JRMA_MIN_BARS
-                : useHamAo
-                  ? HAM_AO_JRMA_Z_MIN_BARS
-                  : 50;
+              : useGold2
+                ? GOLD_KEKO_MIN_BARS
+                : useGold
+                  ? AOHAM_JRMA_MIN_BARS
+                  : useHamAo
+                    ? HAM_AO_JRMA_Z_MIN_BARS
+                    : 50;
             const kr = await fetch(
               `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${encodeURIComponent(scanTf)}&limit=${klineLimit}`,
               { signal: fetchSignal }
@@ -731,7 +777,7 @@ export function ListScanPanel() {
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
             if (candles.length < minBars) return null;
-            let found = scanSymbol(candles, cfg, maxBars);
+            let found = scanSymbol(candles, cfg, effectiveMaxBars);
             if (found.length && cfg.extraFilters?.length) {
               const m = matchFilters(q, candles, cfg.extraFilters);
               if (!m.ok) found = [];
@@ -802,6 +848,7 @@ export function ListScanPanel() {
       if (cfg.hull?.enabled) kinds.push("hull");
       if (cfg.hamAo?.enabled) kinds.push("hamAo");
       if (cfg.gold?.enabled) kinds.push("gold");
+      if (cfg.gold2?.enabled) kinds.push("gold2");
       for (const kind of kinds) {
         const type = KIND_TO_INDICATOR[kind];
         const params = indicatorParamsFromConfig(kind, cfg);
@@ -830,10 +877,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -855,7 +902,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -993,6 +1040,31 @@ export function ListScanPanel() {
             gold: {
               enabled: true,
               conds: [h.cond as GoldCond],
+            },
+          },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "gold2") {
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "Gold2",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            gold2: {
+              enabled: true,
+              conds: [h.cond as Gold2Cond],
             },
           },
           timeframe: tf,
@@ -1402,7 +1474,7 @@ export function ListScanPanel() {
       >
         <p className="text-2xs text-desk-muted">
           Pine AOHAM_JRMA_ENGINE · gerçek Jurik · AO×Score / AO×RMA (0–100) AL/SAT ·
-          PT↔NT · kenar-only · ≥{AOHAM_JRMA_MIN_BARS} mum
+          PT↔NT · kenar-only · ≥{AOHAM_JRMA_MIN_BARS} mum · lookback min 40 bar (seyrek kenar)
         </p>
         <div className="flex flex-wrap gap-1">
           {GOLD_CHIPS.map((c) => (
@@ -1413,6 +1485,32 @@ export function ListScanPanel() {
               onClick={() => {
                 setGoldOn(true);
                 setGoldConds((a) => toggleIn(a, c.id));
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="Gold2"
+        enabled={gold2On}
+        onToggle={() => setGold2On((v) => !v)}
+        open={openCard === "gold2"}
+        onOpen={() => setOpenCard((c) => (c === "gold2" ? null : "gold2"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Pine GOLD / KEKO · Raw/Core/Disp × RMA AL/SAT · kırılım · şarj · kutup ·
+          kenar-only · ≥{GOLD_KEKO_MIN_BARS} mum · lookback min 40 bar
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {GOLD2_CHIPS.map((c) => (
+            <Chip
+              key={c.id}
+              active={gold2Conds.includes(c.id)}
+              label={c.label}
+              onClick={() => {
+                setGold2On(true);
+                setGold2Conds((a) => toggleIn(a, c.id));
               }}
             />
           ))}

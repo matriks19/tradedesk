@@ -15,6 +15,11 @@ import {
   aohamJrmaEngine,
   AOHAM_JRMA_MIN_BARS,
 } from "@/lib/indicators/aohamJrmaEngine";
+import {
+  goldKeko,
+  GOLD_KEKO_MIN_BARS,
+  GOLD_KEKO_FETCH_LIMIT,
+} from "@/lib/indicators/goldKeko";
 import type { ScannerFilter } from "@/lib/scanner/engine";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { convertAny } from "@/lib/scripts/pine/translate";
@@ -102,6 +107,22 @@ export type GoldCond =
   | "pt_x_nt"
   | "nt_x_pt";
 
+export type Gold2Cond =
+  | "raw_x_rma_al"
+  | "raw_x_rma_sat"
+  | "core_x_rma_al"
+  | "core_x_rma_sat"
+  | "disp_x_rma_al"
+  | "disp_x_rma_sat"
+  | "breakout_up_aligned"
+  | "breakout_down_aligned"
+  | "breakout_up_counter"
+  | "breakout_down_counter"
+  | "charge_full_bull"
+  | "charge_full_bear"
+  | "polarity_flip_up"
+  | "polarity_flip_down";
+
 export type ListScanKind =
   | "ham"
   | "macd"
@@ -111,6 +132,7 @@ export type ListScanKind =
   | "hull"
   | "hamAo"
   | "gold"
+  | "gold2"
   | "pine";
 
 export type PineCond =
@@ -253,6 +275,41 @@ export type ListScanConfig = {
     postSmooth?: number;
     normLen?: number;
     zLen?: number;
+  };
+  gold2?: {
+    enabled: boolean;
+    conds: Gold2Cond[];
+    hamMomLen?: number;
+    volBaseLen?: number;
+    hamPower?: number;
+    aoFast?: number;
+    aoSlow?: number;
+    hamWeight?: number;
+    aoWeight?: number;
+    bbLen?: number;
+    bbMult?: number;
+    kcLen?: number;
+    kcMult?: number;
+    peLen?: number;
+    compressionThresh?: number;
+    cmfLen?: number;
+    polarWeightCMF?: number;
+    polarWeightHam?: number;
+    preSmoothLen?: number;
+    jurikLen?: number;
+    rmaLen?: number;
+    postSmoothLen?: number;
+    kineticQuietThresh?: number;
+    chargeRate?: number;
+    idleDischarge?: number;
+    breakoutDischarge?: number;
+    minChargeForSignal?: number;
+    zLen?: number;
+    displaySignalLen?: number;
+    histScale?: number;
+    useTrendFilter?: boolean;
+    requireRelease?: boolean;
+    flagCounterBreakouts?: boolean;
   };
   pine?: {
     enabled: boolean;
@@ -1066,6 +1123,139 @@ function scanGold(
   return [...best.values()];
 }
 
+
+function scanGold2(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["gold2"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (candles.length < GOLD_KEKO_MIN_BARS) return [];
+  const s = goldKeko(candles, {
+    hamMomLen: cfg.hamMomLen,
+    volBaseLen: cfg.volBaseLen,
+    hamPower: cfg.hamPower,
+    aoFast: cfg.aoFast,
+    aoSlow: cfg.aoSlow,
+    hamWeight: cfg.hamWeight,
+    aoWeight: cfg.aoWeight,
+    bbLen: cfg.bbLen,
+    bbMult: cfg.bbMult,
+    kcLen: cfg.kcLen,
+    kcMult: cfg.kcMult,
+    peLen: cfg.peLen,
+    compressionThresh: cfg.compressionThresh,
+    cmfLen: cfg.cmfLen,
+    polarWeightCMF: cfg.polarWeightCMF,
+    polarWeightHam: cfg.polarWeightHam,
+    preSmoothLen: cfg.preSmoothLen,
+    jurikLen: cfg.jurikLen,
+    rmaLen: cfg.rmaLen,
+    postSmoothLen: cfg.postSmoothLen,
+    kineticQuietThresh: cfg.kineticQuietThresh,
+    chargeRate: cfg.chargeRate,
+    idleDischarge: cfg.idleDischarge,
+    breakoutDischarge: cfg.breakoutDischarge,
+    minChargeForSignal: cfg.minChargeForSignal,
+    zLen: cfg.zLen,
+    displaySignalLen: cfg.displaySignalLen,
+    histScale: cfg.histScale,
+    useTrendFilter: cfg.useTrendFilter,
+    requireRelease: cfg.requireRelease,
+    flagCounterBreakouts: cfg.flagCounterBreakouts,
+  });
+  const last = candles.length - 1;
+  const best = new Map<string, ListScanHit>();
+
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = last - ago;
+    if (i < 1) break;
+    for (const cond of cfg.conds) {
+      let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
+      let note = "";
+      switch (cond) {
+        case "raw_x_rma_al":
+          ok = s.rawXRmaAl[i];
+          bias = "bull";
+          note = `Raw↑ RMA (−${ago})`;
+          break;
+        case "raw_x_rma_sat":
+          ok = s.rawXRmaSat[i];
+          bias = "bear";
+          note = `Raw↓ RMA (−${ago})`;
+          break;
+        case "core_x_rma_al":
+          ok = s.coreXRmaAl[i];
+          bias = "bull";
+          note = `Core↑ RMA (−${ago})`;
+          break;
+        case "core_x_rma_sat":
+          ok = s.coreXRmaSat[i];
+          bias = "bear";
+          note = `Core↓ RMA (−${ago})`;
+          break;
+        case "disp_x_rma_al":
+          ok = s.dispXRmaAl[i];
+          bias = "bull";
+          note = `Disp↑ RMA (−${ago})`;
+          break;
+        case "disp_x_rma_sat":
+          ok = s.dispXRmaSat[i];
+          bias = "bear";
+          note = `Disp↓ RMA (−${ago})`;
+          break;
+        case "breakout_up_aligned":
+          ok = s.breakoutUpAligned[i];
+          bias = "bull";
+          note = `Kırılım↑ onay (−${ago})`;
+          break;
+        case "breakout_down_aligned":
+          ok = s.breakoutDownAligned[i];
+          bias = "bear";
+          note = `Kırılım↓ onay (−${ago})`;
+          break;
+        case "breakout_up_counter":
+          ok = s.breakoutUpCounter[i];
+          bias = "bull";
+          note = `Kırılım↑ şüphe (−${ago})`;
+          break;
+        case "breakout_down_counter":
+          ok = s.breakoutDownCounter[i];
+          bias = "bear";
+          note = `Kırılım↓ şüphe (−${ago})`;
+          break;
+        case "charge_full_bull":
+          ok = s.chargeFullBull[i];
+          bias = "bull";
+          note = `Şarj+ doldu (−${ago})`;
+          break;
+        case "charge_full_bear":
+          ok = s.chargeFullBear[i];
+          bias = "bear";
+          note = `Şarj− doldu (−${ago})`;
+          break;
+        case "polarity_flip_up":
+          ok = s.polarityFlipUp[i];
+          bias = "bull";
+          note = `Kutup↑ (−${ago})`;
+          break;
+        case "polarity_flip_down":
+          ok = s.polarityFlipDown[i];
+          bias = "bear";
+          note = `Kutup↓ (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "gold2", cond, bias, barsAgo: ago, note });
+      }
+    }
+  }
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1080,6 +1270,7 @@ export function scanSymbol(
   if (cfg.hull?.enabled) enabledKinds.push("hull");
   if (cfg.hamAo?.enabled) enabledKinds.push("hamAo");
   if (cfg.gold?.enabled) enabledKinds.push("gold");
+  if (cfg.gold2?.enabled) enabledKinds.push("gold2");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1092,6 +1283,7 @@ export function scanSymbol(
     hull: cfg.hull ? scanHull(candles, cfg.hull, maxBarsAgo) : [],
     hamAo: cfg.hamAo ? scanHamAo(candles, cfg.hamAo, maxBarsAgo) : [],
     gold: cfg.gold ? scanGold(candles, cfg.gold, maxBarsAgo) : [],
+    gold2: cfg.gold2 ? scanGold2(candles, cfg.gold2, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -1263,6 +1455,39 @@ export function indicatorParamsFromConfig(
       zLen: g.zLen ?? 89,
     };
   }
+  if (kind === "gold2" && cfg.gold2) {
+    const g = cfg.gold2;
+    return {
+      hamMomLen: g.hamMomLen ?? 21,
+      volBaseLen: g.volBaseLen ?? 34,
+      hamPower: g.hamPower ?? 1.2,
+      aoFast: g.aoFast ?? 5,
+      aoSlow: g.aoSlow ?? 34,
+      hamWeight: g.hamWeight ?? 0.6,
+      aoWeight: g.aoWeight ?? 0.4,
+      bbLen: g.bbLen ?? 20,
+      bbMult: g.bbMult ?? 2,
+      kcLen: g.kcLen ?? 20,
+      kcMult: g.kcMult ?? 1.5,
+      peLen: g.peLen ?? 100,
+      compressionThresh: g.compressionThresh ?? 0.5,
+      cmfLen: g.cmfLen ?? 21,
+      polarWeightCMF: g.polarWeightCMF ?? 0.6,
+      polarWeightHam: g.polarWeightHam ?? 0.4,
+      preSmoothLen: g.preSmoothLen ?? 3,
+      jurikLen: g.jurikLen ?? 8,
+      rmaLen: g.rmaLen ?? 13,
+      postSmoothLen: g.postSmoothLen ?? 2,
+      kineticQuietThresh: g.kineticQuietThresh ?? 0.35,
+      chargeRate: g.chargeRate ?? 1.4,
+      idleDischarge: g.idleDischarge ?? 0.15,
+      breakoutDischarge: g.breakoutDischarge ?? 35,
+      minChargeForSignal: g.minChargeForSignal ?? 30,
+      zLen: g.zLen ?? 89,
+      displaySignalLen: g.displaySignalLen ?? 5,
+      histScale: g.histScale ?? 18,
+    };
+  }
   if (kind === "hull" && cfg.hull) {
     const h = cfg.hull;
     const p: Record<string, number | string> = {
@@ -1291,6 +1516,7 @@ export const KIND_TO_INDICATOR: Record<
   | "doktorHull"
   | "hamAoJrmaZ"
   | "aohamJrmaEngine"
+  | "goldKeko"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -1300,8 +1526,10 @@ export const KIND_TO_INDICATOR: Record<
   hull: "doktorHull",
   hamAo: "hamAoJrmaZ",
   gold: "aohamJrmaEngine",
+  gold2: "goldKeko",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
 export { HAM_AO_JRMA_Z_MIN_BARS } from "@/lib/indicators/hamAoJrmaZ";
 export { AOHAM_JRMA_MIN_BARS } from "@/lib/indicators/aohamJrmaEngine";
+export { GOLD_KEKO_MIN_BARS, GOLD_KEKO_FETCH_LIMIT } from "@/lib/indicators/goldKeko";

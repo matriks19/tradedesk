@@ -192,6 +192,7 @@ import { diagonalSr as computeDiagonalSr } from "./diagonalSr";
 import { hamJurikTpo } from "./hamJurikTpo";
 import { hamAoJrmaZ } from "./hamAoJrmaZ";
 import { aohamJrmaEngine } from "./aohamJrmaEngine";
+import { goldKeko } from "./goldKeko";
 import { doktorHull as computeDoktorHull } from "./doktorHull";
 
 export type PlotMarker = {
@@ -475,6 +476,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "hamJurikTpo", label: "HAM Jurik TPO", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "osc", description: "HAM + Jurik RMA Trend Pulse. Hızlı/yavaş HAM osc kesişimi. Semi-raw, 4 renk hist. Tarama: raw×osc, hızlı×yavaş, setup/onay/AL.", inputs: [num("hamLen", "HAM Hızlı", 21), num("hamLenSlow", "HAM Yavaş", 34), num("rawLen", "Raw Hızlı", 10), num("rawLenSlow", "Raw Yavaş", 21), num("momSpan", "Mom Span", 10), num("normLen", "Norm Len", 80), num("jLen", "Jurik RMA", 20), num("jPhase", "Phase", 0, -100, 100, 1), num("postSmooth", "Final Smooth", 5), num("showRawHam", "Semi-raw", 1, 0, 1, 1), num("showHistogram", "Histogram", 1, 0, 1, 1), num("showMarkers", "Flip işaretleri", 1, 0, 1, 1)] },
   { id: "hamAoJrmaZ", label: "HAM+AO JRMA Z", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "rmaSignal", description: "HAM momentum + Awesome Oscillator blend → softsign → pos/neg trend → Jurik-like core + RMA signal (z-scored). Liste: RMA↑PT, AO↑PT/NT, PT↔NT kesişim (kenar). TV Long = jurik×rma↑ olabilir (ters).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("trendLen", "Trend Len", 34), num("trendBoost", "Trend Boost", 1.3, 0.5, 3, 0.1), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89)] },
   { id: "aohamJrmaEngine", label: "Gold (AOHAM JRMA)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "aoPlot", description: "AOHAM_JRMA_ENGINE — real Jurik + AO/Score/RMA 0–100 plots. Liste Gold: AO×Score AL/SAT, AO×RMA AL/SAT (ana), PT↔NT (garanti). Edge-only.", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("wHam", "HAM W", 0.6, 0, 1, 0.05), num("wAo", "AO W", 0.4, 0, 1, 0.05), num("trendLen", "Trend Len", 34), num("trendBoost", "Trend Boost", 1.3, 0.5, 3, 0.1), num("jrmaLen", "Jurik Len", 8), num("jrmaPhase", "Jurik Phase", 0, -100, 100, 1), num("jrmaPower", "Jurik Power", 2, 0.1, 5, 0.1), num("jrmaRmaLen", "RMA Len", 13), num("preSmooth", "Pre Smooth", 3), num("postSmooth", "Post Smooth", 2), num("normLen", "Norm Len", 40), num("zLen", "Z Len", 89)] },
+  { id: "goldKeko", label: "Gold2 (KEKO)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "oscMain", description: "GOLD/KEKO — kutuplu enerji kırılım osilatörü. Liste Gold2: Raw/Core/Disp × RMA AL/SAT, kırılım, şarj, kutup (kenar-only).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("bbLen", "BB Len", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("kcLen", "KC Len", 20), num("kcMult", "KC Mult", 1.5, 0.5, 5, 0.1), num("peLen", "PE Len", 100), num("compressionThresh", "Sıkışma Z", 0.5, 0, 3, 0.05), num("cmfLen", "CMF Len", 21), num("polarWeightCMF", "Polar CMF", 0.6, 0, 1, 0.05), num("polarWeightHam", "Polar HAM", 0.4, 0, 1, 0.05), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89), num("displaySignalLen", "Disp EMA", 5), num("histScale", "Hist Scale", 18, 1, 100, 0.5), num("minChargeForSignal", "Min Şarj", 30, 0, 100, 1)] },
   { id: "doktorHull", label: "Doktor Hull", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "h21", description: "Hull ribbon 8/13/21/50/100/200 (Hma/Ehma/Thma). Grafik AL: 13×50↑, SAT: 21×50↓. Tarama: 100↑200 AL, 21↓100 SAT + kesişimler. Liste TF≈4h, ≥400 mum.", inputs: [sel("mode", "Hull Type", "Hma", [{ value: "Hma", label: "Hma" }, { value: "Ehma", label: "Ehma" }, { value: "Thma", label: "Thma" }]), num("showRibbon", "Ribbon", 1, 0, 1, 1), num("showMarkers", "AL/SAT", 1, 0, 1, 1), num("thickness", "Kalınlık", 2, 1, 5, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
@@ -3265,6 +3267,61 @@ export function computeBuiltin(
         jurikCore: s.jurikCore,
         rmaSignal: s.rmaSignal,
         histSmooth: s.histSmooth,
+      });
+      break;
+    }
+
+    case "goldKeko": {
+      const s = goldKeko(candles, {
+        hamMomLen: n(p, "hamMomLen", 21),
+        volBaseLen: n(p, "volBaseLen", 34),
+        hamPower: n(p, "hamPower", 1.2),
+        aoFast: n(p, "aoFast", 5),
+        aoSlow: n(p, "aoSlow", 34),
+        hamWeight: n(p, "hamWeight", 0.6),
+        aoWeight: n(p, "aoWeight", 0.4),
+        bbLen: n(p, "bbLen", 20),
+        bbMult: n(p, "bbMult", 2),
+        kcLen: n(p, "kcLen", 20),
+        kcMult: n(p, "kcMult", 1.5),
+        peLen: n(p, "peLen", 100),
+        compressionThresh: n(p, "compressionThresh", 0.5),
+        cmfLen: n(p, "cmfLen", 21),
+        polarWeightCMF: n(p, "polarWeightCMF", 0.6),
+        polarWeightHam: n(p, "polarWeightHam", 0.4),
+        preSmoothLen: n(p, "preSmoothLen", 3),
+        jurikLen: n(p, "jurikLen", 8),
+        rmaLen: n(p, "rmaLen", 13),
+        postSmoothLen: n(p, "postSmoothLen", 2),
+        zLen: n(p, "zLen", 89),
+        displaySignalLen: n(p, "displaySignalLen", 5),
+        histScale: n(p, "histScale", 18),
+        minChargeForSignal: n(p, "minChargeForSignal", 30),
+      });
+      const cHam = String(p.colorHam ?? "#e91e8c");
+      const cCore = String(p.colorCore ?? "#212121");
+      const cRma = String(p.colorRma ?? "#2196f3");
+      const cDisp = String(p.colorDisp ?? "#ffffff");
+      const cHistUp = String(p.colorHistUp ?? "#76ff03");
+      const plots = [
+        line(inst, "zero", "sub", "#8b95a888", candles, candles.map(() => 0), "0"),
+        line(inst, "oscRawDebug", "sub", cHam, candles, s.oscRawDebug, "HAM/Raw"),
+        line(inst, "oscMain", "sub", cCore, candles, s.oscMain, "Core"),
+        line(inst, "oscSignal", "sub", cRma, candles, s.oscSignal, "RMA"),
+        line(inst, "oscDisplay", "sub", cDisp, candles, s.oscDisplay, "Display"),
+        line(inst, "energyTank", "sub", "#9e9e9e", candles, s.energyTank, "Tank"),
+        line(inst, "histPlot", "sub", cHistUp, candles, s.histPlot, "Hist"),
+      ];
+      push(plots, {
+        oscMain: s.oscMain,
+        oscDisplay: s.oscDisplay,
+        oscSignal: s.oscSignal,
+        oscRawDebug: s.oscRawDebug,
+        energyTank: s.energyTank,
+        histPlot: s.histPlot,
+        kineticRaw: s.kineticRaw,
+        kineticCore: s.kineticCore,
+        kineticSignal: s.kineticSignal,
       });
       break;
     }
