@@ -125,6 +125,8 @@ export type ScannerFilter =
   | {
       type: "rsiPuNu";
       direction: "bull" | "bear" | "any";
+      /** regular (default) | hidden | any */
+      divKind?: "regular" | "hidden" | "any";
       maxBarsAgo?: number;
       rsiLen?: number;
       lbL?: number;
@@ -1207,14 +1209,19 @@ export function matchFilters(
           lbR: f.lbR,
           rangeLower: f.rangeLower,
           rangeUpper: f.rangeUpper,
+          divKind: f.divKind ?? "regular",
         }
       );
       if (!hit.ok) return { ok: false, note: "" };
-      notes.push(
+      const label =
         hit.kind === "pu"
-          ? `RSI PU (−${hit.barsAgo})`
-          : `RSI NU (−${hit.barsAgo})`
-      );
+          ? "RSI PU"
+          : hit.kind === "nu"
+            ? "RSI NU"
+            : hit.kind === "puHidden"
+              ? "RSI Gizli AL"
+              : "RSI Gizli SAT";
+      notes.push(`${label} (−${hit.barsAgo})`);
     } else if (f.type === "descendingBreak") {
       if (!candles || candles.length < 80) return { ok: false, note: "" };
       const hit = recentDescendingBreak(candles, f.maxBarsAgo ?? 2);

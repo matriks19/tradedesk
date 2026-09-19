@@ -152,6 +152,8 @@ const GOLD_CHIPS: { id: GoldCond; label: string }[] = [
   { id: "nt_x_pt", label: "NT↑ PT" },
   { id: "div_bull", label: "Uyumsuzluk AL" },
   { id: "div_bear", label: "Uyumsuzluk SAT" },
+  { id: "div_hid_bull", label: "Gizli AL" },
+  { id: "div_hid_bear", label: "Gizli SAT" },
 ];
 
 const GOLD2_CHIPS: { id: Gold2Cond; label: string }[] = [
@@ -171,6 +173,8 @@ const GOLD2_CHIPS: { id: Gold2Cond; label: string }[] = [
   { id: "polarity_flip_down", label: "Kutup↓" },
   { id: "div_bull", label: "Uyumsuzluk AL" },
   { id: "div_bear", label: "Uyumsuzluk SAT" },
+  { id: "div_hid_bull", label: "Gizli AL" },
+  { id: "div_hid_bear", label: "Gizli SAT" },
 ];
 
 const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
@@ -197,6 +201,34 @@ const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
     filter: {
       type: "rsiPuNu",
       direction: "bear",
+      maxBarsAgo: 2,
+      rangeLower: 50,
+      rangeUpper: 150,
+      lbL: 5,
+      lbR: 2,
+    },
+  },
+  {
+    id: "rsi_div_hid_bull",
+    label: "RSI Gizli AL",
+    filter: {
+      type: "rsiPuNu",
+      direction: "bull",
+      divKind: "hidden",
+      maxBarsAgo: 2,
+      rangeLower: 50,
+      rangeUpper: 150,
+      lbL: 5,
+      lbR: 2,
+    },
+  },
+  {
+    id: "rsi_div_hid_bear",
+    label: "RSI Gizli SAT",
+    filter: {
+      type: "rsiPuNu",
+      direction: "bear",
+      divKind: "hidden",
       maxBarsAgo: 2,
       rangeLower: 50,
       rangeUpper: 150,

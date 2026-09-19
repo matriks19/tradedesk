@@ -113,7 +113,9 @@ export type GoldCond =
   | "pt_x_nt"
   | "nt_x_pt"
   | "div_bull"
-  | "div_bear";
+  | "div_bear"
+  | "div_hid_bull"
+  | "div_hid_bear";
 
 /** All Gold chip ids — used when enabled with empty conds / on enable reset. */
 export const ALL_GOLD_CONDS: GoldCond[] = [
@@ -125,6 +127,8 @@ export const ALL_GOLD_CONDS: GoldCond[] = [
   "nt_x_pt",
   "div_bull",
   "div_bear",
+  "div_hid_bull",
+  "div_hid_bear",
 ];
 
 export type Gold2Cond =
@@ -143,7 +147,9 @@ export type Gold2Cond =
   | "polarity_flip_up"
   | "polarity_flip_down"
   | "div_bull"
-  | "div_bear";
+  | "div_bear"
+  | "div_hid_bull"
+  | "div_hid_bear";
 
 /** All Gold2 chip ids — used when enabled with empty conds / on enable reset. */
 export const ALL_GOLD2_CONDS: Gold2Cond[] = [
@@ -163,6 +169,8 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
   "polarity_flip_down",
   "div_bull",
   "div_bear",
+  "div_hid_bull",
+  "div_hid_bear",
 ];
 
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
@@ -1146,7 +1154,10 @@ function scanGold(
     zLen: cfg.zLen,
   });
   const wantDiv =
-    conds.includes("div_bull") || conds.includes("div_bear");
+    conds.includes("div_bull") ||
+    conds.includes("div_bear") ||
+    conds.includes("div_hid_bull") ||
+    conds.includes("div_hid_bear");
   const divOpts: OscDivergenceOpts = {
     lbL: cfg.divLbL ?? LIST_SCAN_DIV_OPTS.lbL,
     lbR: cfg.divLbR ?? LIST_SCAN_DIV_OPTS.lbR,
@@ -1212,6 +1223,16 @@ function scanGold(
           bias = "bear";
           note = `Uyumsuzluk SAT (−${ago})`;
           break;
+        case "div_hid_bull":
+          ok = div != null && div.hiddenBull[i] != null;
+          bias = "bull";
+          note = `Gizli AL (−${ago})`;
+          break;
+        case "div_hid_bear":
+          ok = div != null && div.hiddenBear[i] != null;
+          bias = "bear";
+          note = `Gizli SAT (−${ago})`;
+          break;
       }
       if (!ok) continue;
       const prev = best.get(cond);
@@ -1267,7 +1288,10 @@ function scanGold2(
     flagCounterBreakouts: cfg.flagCounterBreakouts,
   });
   const wantDiv =
-    conds.includes("div_bull") || conds.includes("div_bear");
+    conds.includes("div_bull") ||
+    conds.includes("div_bear") ||
+    conds.includes("div_hid_bull") ||
+    conds.includes("div_hid_bear");
   const divOpts: OscDivergenceOpts = {
     lbL: cfg.divLbL ?? LIST_SCAN_DIV_OPTS.lbL,
     lbR: cfg.divLbR ?? LIST_SCAN_DIV_OPTS.lbR,
@@ -1372,6 +1396,16 @@ function scanGold2(
           ok = div != null && div.bear[i] != null;
           bias = "bear";
           note = `Uyumsuzluk SAT (−${ago})`;
+          break;
+        case "div_hid_bull":
+          ok = div != null && div.hiddenBull[i] != null;
+          bias = "bull";
+          note = `Gizli AL (−${ago})`;
+          break;
+        case "div_hid_bear":
+          ok = div != null && div.hiddenBear[i] != null;
+          bias = "bear";
+          note = `Gizli SAT (−${ago})`;
           break;
       }
       if (!ok) continue;

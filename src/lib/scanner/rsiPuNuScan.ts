@@ -11,7 +11,7 @@ export type DetectRsiPuNuOpts = RsiPuNuOpts & {
 };
 
 export type RsiPuNuHit = {
-  kind: "pu" | "nu";
+  kind: "pu" | "nu" | "puHidden" | "nuHidden";
   barsAgo: number;
   labelTr: string;
 };
@@ -31,7 +31,14 @@ export function detectRsiPuNu(
   return {
     kind: hit.kind,
     barsAgo: hit.barsAgo,
-    labelTr: hit.kind === "pu" ? "RSI PU" : "RSI NU",
+    labelTr:
+      hit.kind === "pu"
+        ? "RSI PU"
+        : hit.kind === "nu"
+          ? "RSI NU"
+          : hit.kind === "puHidden"
+            ? "RSI Gizli AL"
+            : "RSI Gizli SAT",
   };
 }
 
