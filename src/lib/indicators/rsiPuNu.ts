@@ -1,16 +1,12 @@
 import type { Candle } from "@/lib/types";
 import { closes, rsi } from "./math";
+import {
+  computeOscDivergence,
+  type OscDivergenceOpts,
+} from "./oscDivergence";
 
-export type RsiPuNuOpts = {
+export type RsiPuNuOpts = OscDivergenceOpts & {
   rsiLen?: number;
-  /** Pivot left bars (Pine lbL) */
-  lbL?: number;
-  /** Pivot right bars (Pine lbR) — signal confirms with this lag */
-  lbR?: number;
-  /** Min bars between pivots for divergence (Pine rangeLower) */
-  rangeLower?: number;
-  /** Max bars between pivots for divergence (Pine rangeUpper) */
-  rangeUpper?: number;
 };
 
 export type RsiPuNuResult = {
@@ -25,40 +21,6 @@ export type RsiPuNuResult = {
   pivotHigh: (number | null)[];
 };
 
-function isPivotLow(
-  series: (number | null)[],
-  i: number,
-  left: number,
-  right: number
-): boolean {
-  const v = series[i];
-  if (v == null) return false;
-  for (let j = i - left; j <= i + right; j++) {
-    if (j === i) continue;
-    if (j < 0 || j >= series.length) return false;
-    const o = series[j];
-    if (o == null || o <= v) return false;
-  }
-  return true;
-}
-
-function isPivotHigh(
-  series: (number | null)[],
-  i: number,
-  left: number,
-  right: number
-): boolean {
-  const v = series[i];
-  if (v == null) return false;
-  for (let j = i - left; j <= i + right; j++) {
-    if (j === i) continue;
-    if (j < 0 || j >= series.length) return false;
-    const o = series[j];
-    if (o == null || o >= v) return false;
-  }
-  return true;
-}
-
 /**
  * RSI regular bullish (PU) / bearish (NU) divergences — Pine-style pivots on RSI.
  * PU: price lower low + RSI higher low at RSI pivot lows.
@@ -70,64 +32,20 @@ export function computeRsiPuNu(
   opts: RsiPuNuOpts = {}
 ): RsiPuNuResult {
   const rsiLen = opts.rsiLen ?? 14;
-  const lbL = opts.lbL ?? 15;
-  const lbR = opts.lbR ?? 2;
-  const rangeLower = opts.rangeLower ?? 15;
-  const rangeUpper = opts.rangeUpper ?? 60;
-  const n = candles.length;
   const osc = rsi(closes(candles), rsiLen);
-
-  const pu: (number | null)[] = new Array(n).fill(null);
-  const nu: (number | null)[] = new Array(n).fill(null);
-  const pivotLow: (number | null)[] = new Array(n).fill(null);
-  const pivotHigh: (number | null)[] = new Array(n).fill(null);
-
-  type Pivot = { confirm: number; pivot: number; osc: number; price: number };
-  const lows: Pivot[] = [];
-  const highs: Pivot[] = [];
-
-  for (let i = 0; i < n; i++) {
-    const pi = i - lbR;
-    if (pi < lbL) continue;
-
-    if (isPivotLow(osc, pi, lbL, lbR)) {
-      const ov = osc[pi] as number;
-      const price = candles[pi]!.low;
-      pivotLow[i] = 1;
-      if (lows.length >= 1) {
-        const prev = lows[lows.length - 1]!;
-        const bars = pi - prev.pivot;
-        if (bars >= rangeLower && bars <= rangeUpper) {
-          const oscHL = ov > prev.osc;
-          const priceLL = price < prev.price;
-          if (oscHL && priceLL) {
-            pu[i] = ov;
-          }
-        }
-      }
-      lows.push({ confirm: i, pivot: pi, osc: ov, price });
-    }
-
-    if (isPivotHigh(osc, pi, lbL, lbR)) {
-      const ov = osc[pi] as number;
-      const price = candles[pi]!.high;
-      pivotHigh[i] = 1;
-      if (highs.length >= 1) {
-        const prev = highs[highs.length - 1]!;
-        const bars = pi - prev.pivot;
-        if (bars >= rangeLower && bars <= rangeUpper) {
-          const oscLH = ov < prev.osc;
-          const priceHH = price > prev.price;
-          if (oscLH && priceHH) {
-            nu[i] = ov;
-          }
-        }
-      }
-      highs.push({ confirm: i, pivot: pi, osc: ov, price });
-    }
-  }
-
-  return { rsi: osc, pu, nu, pivotLow, pivotHigh };
+  const div = computeOscDivergence(candles, osc, {
+    lbL: opts.lbL ?? 15,
+    lbR: opts.lbR ?? 2,
+    rangeLower: opts.rangeLower ?? 15,
+    rangeUpper: opts.rangeUpper ?? 60,
+  });
+  return {
+    rsi: osc,
+    pu: div.bull,
+    nu: div.bear,
+    pivotLow: div.pivotLow,
+    pivotHigh: div.pivotHigh,
+  };
 }
 
 /** True if a PU/NU marker fired within the last `maxBarsAgo` bars (0 = last bar). */

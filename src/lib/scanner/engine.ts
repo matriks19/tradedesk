@@ -126,6 +126,12 @@ export type ScannerFilter =
       type: "rsiPuNu";
       direction: "bull" | "bear" | "any";
       maxBarsAgo?: number;
+      rsiLen?: number;
+      lbL?: number;
+      lbR?: number;
+      /** Min bars between pivots (list-scan uyumsuzluk default 50) */
+      rangeLower?: number;
+      rangeUpper?: number;
     }
   | { type: "descendingBreak"; maxBarsAgo?: number }
   | { type: "priceVsOpen"; side: "above" | "below" }
@@ -1194,7 +1200,14 @@ export function matchFilters(
       const hit = recentRsiPuNu(
         candles,
         f.direction,
-        f.maxBarsAgo ?? 2
+        f.maxBarsAgo ?? 2,
+        {
+          rsiLen: f.rsiLen,
+          lbL: f.lbL,
+          lbR: f.lbR,
+          rangeLower: f.rangeLower,
+          rangeUpper: f.rangeUpper,
+        }
       );
       if (!hit.ok) return { ok: false, note: "" };
       notes.push(
