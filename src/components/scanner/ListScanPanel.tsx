@@ -210,11 +210,11 @@ const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
     filter: {
       type: "rsiPuNu",
       direction: "bull",
-      maxBarsAgo: 2,
-      rangeLower: 50,
-      rangeUpper: 150,
+      maxBarsAgo: 50,
+      rangeLower: 5,
+      rangeUpper: 60,
       lbL: 5,
-      lbR: 2,
+      lbR: 3,
     },
   },
   {
@@ -223,11 +223,11 @@ const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
     filter: {
       type: "rsiPuNu",
       direction: "bear",
-      maxBarsAgo: 2,
-      rangeLower: 50,
-      rangeUpper: 150,
+      maxBarsAgo: 50,
+      rangeLower: 5,
+      rangeUpper: 60,
       lbL: 5,
-      lbR: 2,
+      lbR: 3,
     },
   },
   {
@@ -237,11 +237,11 @@ const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
       type: "rsiPuNu",
       direction: "bull",
       divKind: "hidden",
-      maxBarsAgo: 2,
-      rangeLower: 50,
-      rangeUpper: 150,
+      maxBarsAgo: 50,
+      rangeLower: 5,
+      rangeUpper: 60,
       lbL: 5,
-      lbR: 2,
+      lbR: 3,
     },
   },
   {
@@ -251,11 +251,11 @@ const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [
       type: "rsiPuNu",
       direction: "bear",
       divKind: "hidden",
-      maxBarsAgo: 2,
-      rangeLower: 50,
-      rangeUpper: 150,
+      maxBarsAgo: 50,
+      rangeLower: 5,
+      rangeUpper: 60,
       lbL: 5,
-      lbR: 2,
+      lbR: 3,
     },
   },
 ];
@@ -375,14 +375,19 @@ function NumInput({
   value,
   onChange,
   step,
+  hint,
 }: {
   label: string;
   value: number;
   onChange: (v: number) => void;
   step?: number;
+  hint?: string;
 }) {
   return (
-    <label className="text-2xs text-desk-muted flex flex-col gap-0.5 min-w-0">
+    <label
+      className="text-2xs text-desk-muted flex flex-col gap-0.5 min-w-0"
+      title={hint}
+    >
       <span className="truncate">{label}</span>
       <input
         type="number"
@@ -643,6 +648,8 @@ export function ListScanPanel() {
     setMatchMode("any");
     setDivOscs([...DEFAULT_DIV_OSC]);
     setDivTypes([...DEFAULT_DIV_TYPES]);
+    // User "en az 50 mum geriyi kontrol et" = lookback (maxBars), not pivot rangeLower
+    setMaxBars((m) => (m < 50 ? 50 : m));
   }, []);
 
   /** If enabling a kind while another is already on → force Herhangi (any). */
@@ -1469,7 +1476,16 @@ export function ListScanPanel() {
             ))}
           </select>
         </label>
-        <NumInput label="Max bar" value={maxBars} onChange={setMaxBars} />
+        <NumInput
+          label="Max bar"
+          value={maxBars}
+          onChange={setMaxBars}
+          hint={
+            divScanOn
+              ? "Uyumsuzluk: en az 50 mum geri bak (pivot rangeLower ayrı)"
+              : undefined
+          }
+        />
         <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
           Eşleşme
           <select

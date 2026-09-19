@@ -131,7 +131,7 @@ export type ScannerFilter =
       rsiLen?: number;
       lbL?: number;
       lbR?: number;
-      /** Min bars between pivots (list-scan uyumsuzluk default 50) */
+      /** Min bars between pivots (list-scan uyumsuzluk default 5) */
       rangeLower?: number;
       rangeUpper?: number;
     }
