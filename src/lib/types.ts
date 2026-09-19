@@ -15,6 +15,7 @@ export type Timeframe =
   | "8h"
   | "12h"
   | "1d"
+  | "2d"
   | "3d"
   | "1w";
 

@@ -39,6 +39,7 @@ const NATIVE_MINUTES: Record<string, number> = {
   "8h": 480,
   "12h": 720,
   "1d": 1440,
+  "2d": 2880,
   "3d": 4320,
   "1w": 10080,
 };
