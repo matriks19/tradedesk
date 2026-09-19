@@ -1,7 +1,7 @@
 import type { Candle } from "@/lib/types";
 import { hamJurikTpo } from "@/lib/indicators/hamJurikTpo";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
-import { adx, closes, macd, stochastic } from "@/lib/indicators/math";
+import { adx, bollinger, closes, ema, macd, stochastic } from "@/lib/indicators/math";
 import {
   doktorHull,
   DOKTOR_HULL_MIN_BARS,
@@ -165,6 +165,13 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
   "div_bear",
 ];
 
+export type MacdBbCond = "al" | "macd_al_hist" | "bb_x_ema";
+
+/** Primary default — full recipe chip when enabled. */
+export const ALL_MACD_BB_CONDS: MacdBbCond[] = ["al"];
+
+export const MACD_BB_MIN_BARS = 220;
+
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
 export const DEFAULT_HAM_CONDS: HamCond[] = ["raw_dual_up"];
 export const DEFAULT_DIAG_CONDS: DiagCond[] = ["bounce"];
@@ -188,6 +195,7 @@ export type ListScanKind =
   | "hamAo"
   | "gold"
   | "gold2"
+  | "macdBb"
   | "pine";
 
 export type PineCond =
@@ -375,6 +383,16 @@ export type ListScanConfig = {
     divRangeUpper?: number;
     divLbL?: number;
     divLbR?: number;
+  };
+  macdBb?: {
+    enabled: boolean;
+    conds: MacdBbCond[];
+    fast?: number;
+    slow?: number;
+    signal?: number;
+    bbPeriod?: number;
+    bbMult?: number;
+    emaPeriod?: number;
   };
   pine?: {
     enabled: boolean;
@@ -1384,6 +1402,70 @@ function scanGold2(
   return [...best.values()];
 }
 
+
+function scanMacdBb(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["macdBb"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : ALL_MACD_BB_CONDS;
+  const fast = cfg.fast ?? 100;
+  const slow = cfg.slow ?? 200;
+  const signalPeriod = cfg.signal ?? 50;
+  const bbPeriod = cfg.bbPeriod ?? 20;
+  const bbMult = cfg.bbMult ?? 2;
+  const emaPeriod = cfg.emaPeriod ?? 200;
+  const need = Math.max(emaPeriod, slow + signalPeriod, bbPeriod) + 20;
+  if (candles.length < Math.max(MACD_BB_MIN_BARS, need)) return [];
+
+  const c = closes(candles);
+  const m = macd(c, fast, slow, signalPeriod);
+  const bb = bollinger(c, bbPeriod, bbMult);
+  const e200 = ema(c, emaPeriod);
+  const last = c.length - 1;
+  const best = new Map<string, ListScanHit>();
+
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = last - ago;
+    if (i < 1) break;
+    const histOk = m.hist[i] != null && (m.hist[i] as number) > 0;
+    const macdCross = crossedAboveAt(m.macd, m.signal, i);
+    const bbCross = crossedAboveAt(bb.mid, e200, i);
+
+    for (const cond of conds) {
+      let ok = false;
+      let note = "";
+      switch (cond) {
+        case "al":
+          ok = macdCross && histOk && bbCross;
+          note = `MACD BB AL (−${ago})`;
+          break;
+        case "macd_al_hist":
+          ok = macdCross && histOk;
+          note = `MACD↑ hist+ (−${ago})`;
+          break;
+        case "bb_x_ema":
+          ok = bbCross;
+          note = `BB×EMA200↑ (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, {
+          kind: "macdBb",
+          cond,
+          bias: "bull",
+          barsAgo: ago,
+          note,
+        });
+      }
+    }
+  }
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1399,6 +1481,7 @@ export function scanSymbol(
   if (cfg.hamAo?.enabled) enabledKinds.push("hamAo");
   if (cfg.gold?.enabled) enabledKinds.push("gold");
   if (cfg.gold2?.enabled) enabledKinds.push("gold2");
+  if (cfg.macdBb?.enabled) enabledKinds.push("macdBb");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1412,6 +1495,7 @@ export function scanSymbol(
     hamAo: cfg.hamAo ? scanHamAo(candles, cfg.hamAo, maxBarsAgo) : [],
     gold: cfg.gold ? scanGold(candles, cfg.gold, maxBarsAgo) : [],
     gold2: cfg.gold2 ? scanGold2(candles, cfg.gold2, maxBarsAgo) : [],
+    macdBb: cfg.macdBb ? scanMacdBb(candles, cfg.macdBb, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -1616,6 +1700,15 @@ export function indicatorParamsFromConfig(
       histScale: g.histScale ?? 18,
     };
   }
+  if (kind === "macdBb" && cfg.macdBb) {
+    const m = cfg.macdBb;
+    return {
+      fast: m.fast ?? 100,
+      slow: m.slow ?? 200,
+      signal: m.signal ?? 50,
+      showMarkers: 1,
+    };
+  }
   if (kind === "hull" && cfg.hull) {
     const h = cfg.hull;
     const p: Record<string, number | string> = {
@@ -1655,7 +1748,30 @@ export const KIND_TO_INDICATOR: Record<
   hamAo: "hamAoJrmaZ",
   gold: "aohamJrmaEngine",
   gold2: "goldKeko",
+  macdBb: "macd",
 };
+
+/** Extra chart indicators to drop alongside the primary KIND_TO_INDICATOR mapping. */
+export function extraIndicatorsFromConfig(
+  kind: ListScanKind,
+  cfg: ListScanConfig
+): { type: string; params: Record<string, number | string> }[] {
+  if (kind !== "macdBb" || !cfg.macdBb) return [];
+  const m = cfg.macdBb;
+  return [
+    {
+      type: "bollinger",
+      params: {
+        period: m.bbPeriod ?? 20,
+        mult: m.bbMult ?? 2,
+      },
+    },
+    {
+      type: "ema",
+      params: { period: m.emaPeriod ?? 200 },
+    },
+  ];
+}
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
 export { HAM_AO_JRMA_Z_MIN_BARS } from "@/lib/indicators/hamAoJrmaZ";
