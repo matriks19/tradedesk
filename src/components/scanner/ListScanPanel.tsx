@@ -237,6 +237,18 @@ function toggleIn<T>(arr: T[], v: T): T[] {
   return arr.includes(v) ? arr.filter((x) => x !== v) : [...arr, v];
 }
 
+/** Add id if missing — used when turning a scanner card on via chip. */
+function ensureCond<T>(arr: T[], id: T): T[] {
+  return arr.includes(id) ? arr : [...arr, id];
+}
+
+/** Toggle id but never empty the array (last chip stays selected). */
+function toggleCondKeepOne<T>(arr: T[], id: T): T[] {
+  if (!arr.includes(id)) return [...arr, id];
+  if (arr.length <= 1) return arr;
+  return arr.filter((x) => x !== id);
+}
+
 function Chip({
   active,
   label,
@@ -525,6 +537,14 @@ export function ListScanPanel() {
     setMatchMode("any");
     setGold2Conds([...ALL_GOLD2_CONDS]);
   }, []);
+
+  /** If enabling a kind while another is already on → force Herhangi (any). */
+  const bumpMatchModeOnSecondKind = useCallback(
+    (alreadyOn: boolean, otherOns: boolean[]) => {
+      if (!alreadyOn && otherOns.some(Boolean)) setMatchMode("any");
+    },
+    []
+  );
   const [pineConds, setPineConds] = useState<PineCond[]>(["zero_up", "cross_up"]);
   const [pineStatus, setPineStatus] = useState("");
 
@@ -852,10 +872,26 @@ export function ListScanPanel() {
         byKind.push(`ham ${n}`);
       }
       const kindBit = byKind.length ? ` · ${byKind.join(" · ")}` : "";
+      const enabledKindsCount = [
+        cfgDone.ham?.enabled,
+        cfgDone.diag?.enabled,
+        cfgDone.macd?.enabled,
+        cfgDone.stoch?.enabled,
+        cfgDone.di?.enabled,
+        cfgDone.hull?.enabled,
+        cfgDone.hamAo?.enabled,
+        cfgDone.gold?.enabled,
+        cfgDone.gold2?.enabled,
+        cfgDone.pine?.enabled,
+      ].filter(Boolean).length;
+      const hepsiWarn =
+        matchMode === "all" && enabledKindsCount > 1
+          ? " · Uyarı: Hepsi = aynı sembolde tüm göstergeler"
+          : "";
       setStatus(
         ac.signal.aborted
-          ? `Durdu · ${out.length} hit${kindBit} · ${done}/${total}`
-          : `${out.length} hit${kindBit} · ${universe.name} · ${total} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}`
+          ? `Durdu · ${out.length} hit${kindBit} · ${done}/${total}${hepsiWarn}`
+          : `${out.length} hit${kindBit} · ${universe.name} · ${total} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}${hepsiWarn}`
       );
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
@@ -1248,7 +1284,16 @@ export function ListScanPanel() {
       <SectionCard
         title="HAM"
         enabled={hamOn}
-        onToggle={() => setHamOn((v) => !v)}
+        onToggle={() => {
+          if (!hamOn) {
+            bumpMatchModeOnSecondKind(false, [
+              diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+            ]);
+            setHamOn(true);
+          } else {
+            setHamOn(false);
+          }
+        }}
         open={openCard === "ham"}
         onOpen={() => setOpenCard((c) => (c === "ham" ? null : "ham"))}
       >
@@ -1259,8 +1304,15 @@ export function ListScanPanel() {
               active={hamConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setHamOn(true);
-                setHamConds((a) => toggleIn(a, c.id));
+                if (!hamOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+                  ]);
+                  setHamOn(true);
+                  setHamConds((a) => ensureCond(a, c.id));
+                } else {
+                  setHamConds((a) => toggleCondKeepOne(a, c.id));
+                }
               }}
             />
           ))}
@@ -1289,7 +1341,16 @@ export function ListScanPanel() {
       <SectionCard
         title="Diag"
         enabled={diagOn}
-        onToggle={() => setDiagOn((v) => !v)}
+        onToggle={() => {
+          if (!diagOn) {
+            bumpMatchModeOnSecondKind(false, [
+              hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+            ]);
+            setDiagOn(true);
+          } else {
+            setDiagOn(false);
+          }
+        }}
         open={openCard === "diag"}
         onOpen={() => setOpenCard((c) => (c === "diag" ? null : "diag"))}
       >
@@ -1300,8 +1361,15 @@ export function ListScanPanel() {
               active={diagConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setDiagOn(true);
-                setDiagConds((a) => toggleIn(a, c.id));
+                if (!diagOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+                  ]);
+                  setDiagOn(true);
+                  setDiagConds((a) => ensureCond(a, c.id));
+                } else {
+                  setDiagConds((a) => toggleCondKeepOne(a, c.id));
+                }
               }}
             />
           ))}
@@ -1321,7 +1389,16 @@ export function ListScanPanel() {
       <SectionCard
         title="MACD"
         enabled={macdOn}
-        onToggle={() => setMacdOn((v) => !v)}
+        onToggle={() => {
+          if (!macdOn) {
+            bumpMatchModeOnSecondKind(false, [
+              hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+            ]);
+            setMacdOn(true);
+          } else {
+            setMacdOn(false);
+          }
+        }}
         open={openCard === "macd"}
         onOpen={() => setOpenCard((c) => (c === "macd" ? null : "macd"))}
       >
@@ -1332,8 +1409,15 @@ export function ListScanPanel() {
               active={macdConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setMacdOn(true);
-                setMacdConds((a) => toggleIn(a, c.id));
+                if (!macdOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+                  ]);
+                  setMacdOn(true);
+                  setMacdConds((a) => ensureCond(a, c.id));
+                } else {
+                  setMacdConds((a) => toggleCondKeepOne(a, c.id));
+                }
               }}
             />
           ))}
@@ -1353,7 +1437,16 @@ export function ListScanPanel() {
       <SectionCard
         title="Stoch"
         enabled={stochOn}
-        onToggle={() => setStochOn((v) => !v)}
+        onToggle={() => {
+          if (!stochOn) {
+            bumpMatchModeOnSecondKind(false, [
+              hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+            ]);
+            setStochOn(true);
+          } else {
+            setStochOn(false);
+          }
+        }}
         open={openCard === "stoch"}
         onOpen={() => setOpenCard((c) => (c === "stoch" ? null : "stoch"))}
       >
@@ -1364,8 +1457,15 @@ export function ListScanPanel() {
               active={stochConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setStochOn(true);
-                setStochConds((a) => toggleIn(a, c.id));
+                if (!stochOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On
+                  ]);
+                  setStochOn(true);
+                  setStochConds((a) => ensureCond(a, c.id));
+                } else {
+                  setStochConds((a) => toggleCondKeepOne(a, c.id));
+                }
               }}
             />
           ))}
@@ -1385,7 +1485,16 @@ export function ListScanPanel() {
       <SectionCard
         title="DI"
         enabled={diOn}
-        onToggle={() => setDiOn((v) => !v)}
+        onToggle={() => {
+          if (!diOn) {
+            bumpMatchModeOnSecondKind(false, [
+              hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On
+            ]);
+            setDiOn(true);
+          } else {
+            setDiOn(false);
+          }
+        }}
         open={openCard === "di"}
         onOpen={() => setOpenCard((c) => (c === "di" ? null : "di"))}
       >
@@ -1396,8 +1505,15 @@ export function ListScanPanel() {
               active={diConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setDiOn(true);
-                setDiConds((a) => toggleIn(a, c.id));
+                if (!diOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On
+                  ]);
+                  setDiOn(true);
+                  setDiConds((a) => ensureCond(a, c.id));
+                } else {
+                  setDiConds((a) => toggleCondKeepOne(a, c.id));
+                }
               }}
             />
           ))}
@@ -1411,7 +1527,16 @@ export function ListScanPanel() {
       <SectionCard
         title="Doktor Hull"
         enabled={hullOn}
-        onToggle={() => setHullOn((v) => !v)}
+        onToggle={() => {
+          if (!hullOn) {
+            bumpMatchModeOnSecondKind(false, [
+              hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On
+            ]);
+            setHullOn(true);
+          } else {
+            setHullOn(false);
+          }
+        }}
         open={openCard === "hull"}
         onOpen={() => setOpenCard((c) => (c === "hull" ? null : "hull"))}
       >
@@ -1425,8 +1550,15 @@ export function ListScanPanel() {
               active={hullConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setHullOn(true);
-                setHullConds((a) => toggleIn(a, c.id));
+                if (!hullOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On
+                  ]);
+                  setHullOn(true);
+                  setHullConds((a) => ensureCond(a, c.id));
+                } else {
+                  setHullConds((a) => toggleCondKeepOne(a, c.id));
+                }
               }}
             />
           ))}
@@ -1474,7 +1606,16 @@ export function ListScanPanel() {
       <SectionCard
         title="HAM+AO JRMA Z"
         enabled={hamAoOn}
-        onToggle={() => setHamAoOn((v) => !v)}
+        onToggle={() => {
+          if (!hamAoOn) {
+            bumpMatchModeOnSecondKind(false, [
+              hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On
+            ]);
+            setHamAoOn(true);
+          } else {
+            setHamAoOn(false);
+          }
+        }}
         open={openCard === "hamAo"}
         onOpen={() => setOpenCard((c) => (c === "hamAo" ? null : "hamAo"))}
       >
@@ -1489,8 +1630,15 @@ export function ListScanPanel() {
               active={hamAoConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                setHamAoOn(true);
-                setHamAoConds((a) => toggleIn(a, c.id));
+                if (!hamAoOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On
+                  ]);
+                  setHamAoOn(true);
+                  setHamAoConds((a) => ensureCond(a, c.id));
+                } else {
+                  setHamAoConds((a) => toggleCondKeepOne(a, c.id));
+                }
               }}
             />
           ))}
@@ -1516,17 +1664,16 @@ export function ListScanPanel() {
               label={c.label}
               onClick={() => {
                 if (!goldOn) {
-                  enableGold(); // resets to all chips (includes this one)
-                  return;
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, gold2On
+                  ]);
+                  setGoldOn(true);
+                  setGold2On(false);
+                  setMatchMode("any");
+                  setGoldConds((a) => ensureCond(a, c.id));
+                } else {
+                  setGoldConds((a) => toggleCondKeepOne(a, c.id));
                 }
-                setGoldConds((a) => {
-                  if (a.includes(c.id)) {
-                    // Never allow empty conds while enabled
-                    if (a.length <= 1) return a;
-                    return a.filter((x) => x !== c.id);
-                  }
-                  return [...a, c.id];
-                });
               }}
             />
           ))}
@@ -1552,17 +1699,16 @@ export function ListScanPanel() {
               label={c.label}
               onClick={() => {
                 if (!gold2On) {
-                  enableGold2(); // resets to all chips (includes this one)
-                  return;
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn
+                  ]);
+                  setGold2On(true);
+                  setGoldOn(false);
+                  setMatchMode("any");
+                  setGold2Conds((a) => ensureCond(a, c.id));
+                } else {
+                  setGold2Conds((a) => toggleCondKeepOne(a, c.id));
                 }
-                setGold2Conds((a) => {
-                  if (a.includes(c.id)) {
-                    // Never allow empty conds while enabled
-                    if (a.length <= 1) return a;
-                    return a.filter((x) => x !== c.id);
-                  }
-                  return [...a, c.id];
-                });
               }}
             />
           ))}
