@@ -41,7 +41,19 @@ import { convertAny } from "@/lib/scripts/pine/translate";
 import type { CustomScript } from "@/lib/types";
 import clsx from "clsx";
 
-const TFS: Timeframe[] = ["5m", "15m", "30m", "1h", "4h", "1d"];
+const TFS: Timeframe[] = [
+  "5m",
+  "15m",
+  "30m",
+  "1h",
+  "2h",
+  "4h",
+  "8h",
+  "12h",
+  "1d",
+  "2d",
+  "3d",
+];
 
 const HAM_CHIPS: { id: HamCond; label: string }[] = [
   { id: "raw_up", label: "Raw↑" },
