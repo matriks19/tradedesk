@@ -179,7 +179,7 @@ const GOLD2_CHIPS: { id: Gold2Cond; label: string }[] = [
 
 const MACD_BB_CHIPS: { id: MacdBbCond; label: string }[] = [
   { id: "al", label: "AL" },
-  { id: "macd_al_hist", label: "MACD↑ hist+" },
+  { id: "macd_x_sig", label: "MACD↑ sinyal" },
   { id: "bb_x_ema", label: "BB×EMA↑" },
 ];
 
@@ -1905,7 +1905,7 @@ export function ListScanPanel() {
         onOpen={() => setOpenCard((c) => (c === "macdBb" ? null : "macdBb"))}
       >
         <p className="text-2xs text-desk-muted">
-          MACD↑ + hist yeşil + BB orta↑ EMA200 · kenar-only · ≥{MACD_BB_MIN_BARS} mum ·
+          MACD↑ sinyal + BB orta↑ EMA200 · kenar-only · ≥{MACD_BB_MIN_BARS} mum ·
           varsayılan 100/200/50 · BB 20×2 · EMA 200
         </p>
         <div className="flex flex-wrap gap-1">
