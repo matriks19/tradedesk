@@ -107,6 +107,16 @@ export type GoldCond =
   | "pt_x_nt"
   | "nt_x_pt";
 
+/** All Gold chip ids — used when enabled with empty conds / on enable reset. */
+export const ALL_GOLD_CONDS: GoldCond[] = [
+  "ao_x_score_al",
+  "ao_x_rma_al",
+  "ao_x_score_sat",
+  "ao_x_rma_sat",
+  "pt_x_nt",
+  "nt_x_pt",
+];
+
 export type Gold2Cond =
   | "raw_x_rma_al"
   | "raw_x_rma_sat"
@@ -122,6 +132,24 @@ export type Gold2Cond =
   | "charge_full_bear"
   | "polarity_flip_up"
   | "polarity_flip_down";
+
+/** All Gold2 chip ids — used when enabled with empty conds / on enable reset. */
+export const ALL_GOLD2_CONDS: Gold2Cond[] = [
+  "raw_x_rma_al",
+  "raw_x_rma_sat",
+  "core_x_rma_al",
+  "core_x_rma_sat",
+  "disp_x_rma_al",
+  "disp_x_rma_sat",
+  "breakout_up_aligned",
+  "breakout_down_aligned",
+  "breakout_up_counter",
+  "breakout_down_counter",
+  "charge_full_bull",
+  "charge_full_bear",
+  "polarity_flip_up",
+  "polarity_flip_down",
+];
 
 export type ListScanKind =
   | "ham"
@@ -1050,7 +1078,9 @@ function scanGold(
   cfg: NonNullable<ListScanConfig["gold"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  // Empty conds while enabled → all defaults (never silent [])
+  const conds = cfg.conds.length ? cfg.conds : ALL_GOLD_CONDS;
   if (candles.length < AOHAM_JRMA_MIN_BARS) return [];
   const s = aohamJrmaEngine(candles, {
     hamMomLen: cfg.hamMomLen,
@@ -1077,7 +1107,7 @@ function scanGold(
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";
@@ -1129,7 +1159,9 @@ function scanGold2(
   cfg: NonNullable<ListScanConfig["gold2"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
-  if (!cfg.enabled || !cfg.conds.length) return [];
+  if (!cfg.enabled) return [];
+  // Empty conds while enabled → all defaults (never silent [])
+  const conds = cfg.conds.length ? cfg.conds : ALL_GOLD2_CONDS;
   if (candles.length < GOLD_KEKO_MIN_BARS) return [];
   const s = goldKeko(candles, {
     hamMomLen: cfg.hamMomLen,
@@ -1170,7 +1202,7 @@ function scanGold2(
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
-    for (const cond of cfg.conds) {
+    for (const cond of conds) {
       let ok = false;
       let bias: ListScanHit["bias"] = "neutral";
       let note = "";

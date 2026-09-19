@@ -31,6 +31,8 @@ import {
   AOHAM_JRMA_MIN_BARS,
   GOLD_KEKO_MIN_BARS,
   GOLD_KEKO_FETCH_LIMIT,
+  ALL_GOLD_CONDS,
+  ALL_GOLD2_CONDS,
   type ListScanHit,
   type ListScanKind,
   type PineCond,
@@ -507,30 +509,21 @@ export function ListScanPanel() {
   const [pineName, setPineName] = useState("Liste Pine");
   const [pineIds, setPineIds] = useState<string[]>([]);
 
-  /** Gold/Gold2 + matchMode=all + hamOn default → empty Liste; exclusive enable. */
-  const enableGoldOnly = useCallback(() => {
+  /**
+   * Enable Gold without killing HAM/etc. Only: matchMode=any (so Hepsi can't
+   * AND-gate with ham), mutual-exclude Gold2, reset conds to full chip list.
+   */
+  const enableGold = useCallback(() => {
     setGoldOn(true);
     setGold2On(false);
-    setHamOn(false);
-    setDiagOn(false);
-    setMacdOn(false);
-    setStochOn(false);
-    setDiOn(false);
-    setHullOn(false);
-    setHamAoOn(false);
-    setPineIds([]);
+    setMatchMode("any");
+    setGoldConds([...ALL_GOLD_CONDS]);
   }, []);
-  const enableGold2Only = useCallback(() => {
+  const enableGold2 = useCallback(() => {
     setGold2On(true);
     setGoldOn(false);
-    setHamOn(false);
-    setDiagOn(false);
-    setMacdOn(false);
-    setStochOn(false);
-    setDiOn(false);
-    setHullOn(false);
-    setHamAoOn(false);
-    setPineIds([]);
+    setMatchMode("any");
+    setGold2Conds([...ALL_GOLD2_CONDS]);
   }, []);
   const [pineConds, setPineConds] = useState<PineCond[]>(["zero_up", "cross_up"]);
   const [pineStatus, setPineStatus] = useState("");
@@ -1507,7 +1500,7 @@ export function ListScanPanel() {
       <SectionCard
         title="Gold"
         enabled={goldOn}
-        onToggle={() => (goldOn ? setGoldOn(false) : enableGoldOnly())}
+        onToggle={() => (goldOn ? setGoldOn(false) : enableGold())}
         open={openCard === "gold"}
         onOpen={() => setOpenCard((c) => (c === "gold" ? null : "gold"))}
       >
@@ -1522,8 +1515,18 @@ export function ListScanPanel() {
               active={goldConds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                enableGoldOnly();
-                setGoldConds((a) => toggleIn(a, c.id));
+                if (!goldOn) {
+                  enableGold(); // resets to all chips (includes this one)
+                  return;
+                }
+                setGoldConds((a) => {
+                  if (a.includes(c.id)) {
+                    // Never allow empty conds while enabled
+                    if (a.length <= 1) return a;
+                    return a.filter((x) => x !== c.id);
+                  }
+                  return [...a, c.id];
+                });
               }}
             />
           ))}
@@ -1533,7 +1536,7 @@ export function ListScanPanel() {
       <SectionCard
         title="Gold2"
         enabled={gold2On}
-        onToggle={() => (gold2On ? setGold2On(false) : enableGold2Only())}
+        onToggle={() => (gold2On ? setGold2On(false) : enableGold2())}
         open={openCard === "gold2"}
         onOpen={() => setOpenCard((c) => (c === "gold2" ? null : "gold2"))}
       >
@@ -1548,8 +1551,18 @@ export function ListScanPanel() {
               active={gold2Conds.includes(c.id)}
               label={c.label}
               onClick={() => {
-                enableGold2Only();
-                setGold2Conds((a) => toggleIn(a, c.id));
+                if (!gold2On) {
+                  enableGold2(); // resets to all chips (includes this one)
+                  return;
+                }
+                setGold2Conds((a) => {
+                  if (a.includes(c.id)) {
+                    // Never allow empty conds while enabled
+                    if (a.length <= 1) return a;
+                    return a.filter((x) => x !== c.id);
+                  }
+                  return [...a, c.id];
+                });
               }}
             />
           ))}
