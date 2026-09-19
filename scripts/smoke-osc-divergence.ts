@@ -304,4 +304,58 @@ function synthHiddenBear(gap: number, lbL = 5, lbR = 2): {
   );
 }
 
+
+// --- divScan multi-osc kind ---
+{
+  const { candles, osc, confirmIdx } = synthBull(55);
+  // Feed price/osc so RSI can diverge: reuse synth candles but scan with RSI-only
+  // may not fire on flat synth — instead verify wiring + cond format with gold-style random
+  const n = 220;
+  const candles2: Candle[] = [];
+  let px = 100;
+  for (let i = 0; i < n; i++) {
+    px = Math.max(1, px + Math.sin(i / 9) * 0.8 + Math.cos(i / 17) * 0.3);
+    candles2.push(candle(i, px - 1, px + 1, px));
+  }
+  const cfg: ListScanConfig = {
+    matchMode: "any",
+    divScan: {
+      enabled: true,
+      oscillators: ["rsi", "mfi", "cci", "roc"],
+      types: ["reg_bull", "reg_bear", "hid_bull", "hid_bear"],
+    },
+  };
+  const hits = scanSymbol(candles2, cfg, 80);
+  assert(hits.every((h) => h.kind === "divScan"), "kind divScan");
+  assert(
+    hits.every((h) => /^[a-z_]+\|(reg_bull|reg_bear|hid_bull|hid_bear)$/.test(h.cond)),
+    "cond format osc|type"
+  );
+  assert(
+    hits.every((h) => h.bias === "bull" || h.bias === "bear"),
+    "bias bull/bear"
+  );
+  // Disabled by default path: empty when enabled=false
+  const off = scanSymbol(
+    candles2,
+    { matchMode: "any", divScan: { enabled: false, oscillators: ["rsi"], types: ["reg_bull"] } },
+    80
+  );
+  assert(off.length === 0, "divScan off → no hits");
+  // Only selected osc computed — macd_hist not in list → no macd conds
+  assert(
+    hits.every((h) => !h.cond.startsWith("macd_hist|")),
+    "no unselected osc"
+  );
+  console.log(
+    "OK divScan",
+    hits.length,
+    "hits",
+    hits.slice(0, 6).map((h) => `${h.cond}@${h.barsAgo}`)
+  );
+  void candles;
+  void osc;
+  void confirmIdx;
+}
+
 console.log("OK smoke-osc-divergence");

@@ -1,7 +1,18 @@
 import type { Candle } from "@/lib/types";
 import { hamJurikTpo } from "@/lib/indicators/hamJurikTpo";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
-import { adx, closes, macd, stochastic } from "@/lib/indicators/math";
+import {
+  adx,
+  closes,
+  macd,
+  stochastic,
+  rsi,
+  mfi,
+  cci,
+  cmf,
+  roc,
+  obv,
+} from "@/lib/indicators/math";
 import {
   doktorHull,
   DOKTOR_HULL_MIN_BARS,
@@ -173,6 +184,84 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
   "div_hid_bear",
 ];
 
+
+export type DivOscId =
+  | "rsi"
+  | "mfi"
+  | "cci"
+  | "cmf"
+  | "roc"
+  | "macd_hist"
+  | "stoch"
+  | "obv";
+
+export type DivTypeId =
+  | "reg_bull"
+  | "reg_bear"
+  | "hid_bull"
+  | "hid_bear";
+
+/** Cond id for hits/alarms: `rsi|reg_bull`, `mfi|hid_bear`, … */
+export type DivScanCond = `${DivOscId}|${DivTypeId}`;
+
+export const ALL_DIV_OSC: DivOscId[] = [
+  "rsi",
+  "mfi",
+  "cci",
+  "cmf",
+  "roc",
+  "macd_hist",
+  "stoch",
+  "obv",
+];
+
+/** Research shortlist — default oscillators ON. */
+export const DEFAULT_DIV_OSC: DivOscId[] = ["rsi", "mfi", "cci", "roc"];
+
+export const ALL_DIV_TYPES: DivTypeId[] = [
+  "reg_bull",
+  "reg_bear",
+  "hid_bull",
+  "hid_bear",
+];
+
+/** Default types: all four ON (“ne varsa çıksın”). */
+export const DEFAULT_DIV_TYPES: DivTypeId[] = [...ALL_DIV_TYPES];
+
+export const DIV_OSC_LABEL: Record<DivOscId, string> = {
+  rsi: "RSI",
+  mfi: "MFI",
+  cci: "CCI",
+  cmf: "CMF",
+  roc: "ROC",
+  macd_hist: "MACD hist",
+  stoch: "Stoch %K",
+  obv: "OBV",
+};
+
+export const DIV_TYPE_LABEL: Record<DivTypeId, string> = {
+  reg_bull: "Reg AL",
+  reg_bear: "Reg SAT",
+  hid_bull: "Gizli AL",
+  hid_bear: "Gizli SAT",
+};
+
+/** Chart indicator to drop for a given oscillator. */
+export const DIV_OSC_TO_INDICATOR: Record<DivOscId, string> = {
+  rsi: "rsiPuNu",
+  mfi: "mfi",
+  cci: "cci",
+  cmf: "cmf",
+  roc: "roc",
+  macd_hist: "macd",
+  stoch: "stochastic",
+  obv: "obv",
+};
+
+/** Fetch ≥ max(150, rangeUpper+50) ≈ 220 — do not pull 500. */
+export const DIV_SCAN_FETCH_LIMIT = 220;
+export const DIV_SCAN_MIN_BARS = 150;
+
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
 export const DEFAULT_HAM_CONDS: HamCond[] = ["raw_dual_up"];
 export const DEFAULT_DIAG_CONDS: DiagCond[] = ["bounce"];
@@ -196,6 +285,7 @@ export type ListScanKind =
   | "hamAo"
   | "gold"
   | "gold2"
+  | "divScan"
   | "pine";
 
 export type PineCond =
@@ -379,6 +469,26 @@ export type ListScanConfig = {
     requireRelease?: boolean;
     flagCounterBreakouts?: boolean;
     /** Divergence pivot-to-pivot min bars (default 50) */
+    divRangeLower?: number;
+    divRangeUpper?: number;
+    divLbL?: number;
+    divLbR?: number;
+  };
+  /** Multi-oscillator divergence — Uyumsuzluk kartı (off by default). */
+  divScan?: {
+    enabled: boolean;
+    oscillators: DivOscId[];
+    types: DivTypeId[];
+    rsiPeriod?: number;
+    mfiPeriod?: number;
+    cciPeriod?: number;
+    cmfPeriod?: number;
+    rocPeriod?: number;
+    macdFast?: number;
+    macdSlow?: number;
+    macdSignal?: number;
+    stochK?: number;
+    stochD?: number;
     divRangeLower?: number;
     divRangeUpper?: number;
     divLbL?: number;
@@ -1418,6 +1528,109 @@ function scanGold2(
   return [...best.values()];
 }
 
+
+function buildDivOscSeries(
+  candles: Candle[],
+  oscId: DivOscId,
+  cfg: NonNullable<ListScanConfig["divScan"]>
+): (number | null)[] {
+  const c = closes(candles);
+  switch (oscId) {
+    case "rsi":
+      return rsi(c, cfg.rsiPeriod ?? 14);
+    case "mfi":
+      return mfi(candles, cfg.mfiPeriod ?? 14);
+    case "cci":
+      return cci(candles, cfg.cciPeriod ?? 20);
+    case "cmf":
+      return cmf(candles, cfg.cmfPeriod ?? 20);
+    case "roc":
+      return roc(c, cfg.rocPeriod ?? 12);
+    case "macd_hist":
+      return macd(
+        c,
+        cfg.macdFast ?? 12,
+        cfg.macdSlow ?? 26,
+        cfg.macdSignal ?? 9
+      ).hist;
+    case "stoch":
+      return stochastic(candles, cfg.stochK ?? 14, cfg.stochD ?? 3).k;
+    case "obv":
+      return obv(candles);
+  }
+}
+
+function scanDivScan(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["divScan"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const oscillators = cfg.oscillators.length
+    ? cfg.oscillators
+    : DEFAULT_DIV_OSC;
+  const types = cfg.types.length ? cfg.types : DEFAULT_DIV_TYPES;
+  if (!oscillators.length || !types.length) return [];
+  if (candles.length < DIV_SCAN_MIN_BARS) return [];
+
+  const divOpts: OscDivergenceOpts = {
+    lbL: cfg.divLbL ?? LIST_SCAN_DIV_OPTS.lbL,
+    lbR: cfg.divLbR ?? LIST_SCAN_DIV_OPTS.lbR,
+    rangeLower: cfg.divRangeLower ?? LIST_SCAN_DIV_OPTS.rangeLower,
+    rangeUpper: cfg.divRangeUpper ?? LIST_SCAN_DIV_OPTS.rangeUpper,
+  };
+
+  const last = candles.length - 1;
+  const best = new Map<string, ListScanHit>();
+
+  // Only compute selected oscillators; one computeOscDivergence per series.
+  for (const oscId of oscillators) {
+    const series = buildDivOscSeries(candles, oscId, cfg);
+    const div = computeOscDivergence(candles, series, divOpts);
+    const oscLabel = DIV_OSC_LABEL[oscId];
+
+    for (const divType of types) {
+      const cond: DivScanCond = `${oscId}|${divType}`;
+      const bias: ListScanHit["bias"] =
+        divType === "reg_bull" || divType === "hid_bull" ? "bull" : "bear";
+      const typeLabel = DIV_TYPE_LABEL[divType];
+
+      for (let ago = 0; ago <= maxBarsAgo; ago++) {
+        const i = last - ago;
+        if (i < 1) break;
+        let ok = false;
+        switch (divType) {
+          case "reg_bull":
+            ok = div.bull[i] != null;
+            break;
+          case "reg_bear":
+            ok = div.bear[i] != null;
+            break;
+          case "hid_bull":
+            ok = div.hiddenBull[i] != null;
+            break;
+          case "hid_bear":
+            ok = div.hiddenBear[i] != null;
+            break;
+        }
+        if (!ok) continue;
+        const prev = best.get(cond);
+        if (!prev || ago < prev.barsAgo) {
+          best.set(cond, {
+            kind: "divScan",
+            cond,
+            bias,
+            barsAgo: ago,
+            note: `${oscLabel} ${typeLabel} (−${ago})`,
+          });
+        }
+      }
+    }
+  }
+
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1433,6 +1646,7 @@ export function scanSymbol(
   if (cfg.hamAo?.enabled) enabledKinds.push("hamAo");
   if (cfg.gold?.enabled) enabledKinds.push("gold");
   if (cfg.gold2?.enabled) enabledKinds.push("gold2");
+  if (cfg.divScan?.enabled) enabledKinds.push("divScan");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1446,6 +1660,7 @@ export function scanSymbol(
     hamAo: cfg.hamAo ? scanHamAo(candles, cfg.hamAo, maxBarsAgo) : [],
     gold: cfg.gold ? scanGold(candles, cfg.gold, maxBarsAgo) : [],
     gold2: cfg.gold2 ? scanGold2(candles, cfg.gold2, maxBarsAgo) : [],
+    divScan: cfg.divScan ? scanDivScan(candles, cfg.divScan, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -1665,6 +1880,17 @@ export function indicatorParamsFromConfig(
     if (h.color200) p.color200 = h.color200;
     return p;
   }
+  if (kind === "divScan" && cfg.divScan) {
+    const d = cfg.divScan;
+    return {
+      rsiLen: d.rsiPeriod ?? 14,
+      lbL: d.divLbL ?? LIST_SCAN_DIV_OPTS.lbL,
+      lbR: d.divLbR ?? LIST_SCAN_DIV_OPTS.lbR,
+      rangeLower: d.divRangeLower ?? LIST_SCAN_DIV_OPTS.rangeLower,
+      rangeUpper: d.divRangeUpper ?? LIST_SCAN_DIV_OPTS.rangeUpper,
+      showMarkers: 1,
+    };
+  }
   return {};
 }
 
@@ -1679,6 +1905,7 @@ export const KIND_TO_INDICATOR: Record<
   | "hamAoJrmaZ"
   | "aohamJrmaEngine"
   | "goldKeko"
+  | "rsiPuNu"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -1689,9 +1916,11 @@ export const KIND_TO_INDICATOR: Record<
   hamAo: "hamAoJrmaZ",
   gold: "aohamJrmaEngine",
   gold2: "goldKeko",
+  divScan: "rsiPuNu",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
 export { HAM_AO_JRMA_Z_MIN_BARS } from "@/lib/indicators/hamAoJrmaZ";
 export { AOHAM_JRMA_MIN_BARS } from "@/lib/indicators/aohamJrmaEngine";
 export { GOLD_KEKO_MIN_BARS, GOLD_KEKO_FETCH_LIMIT } from "@/lib/indicators/goldKeko";
+// DIV_SCAN_FETCH_LIMIT / DIV_SCAN_MIN_BARS exported above with DivScan types
