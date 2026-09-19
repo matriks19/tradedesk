@@ -3245,25 +3245,34 @@ export function computeBuiltin(
         normLen: n(p, "normLen", 40),
         zLen: n(p, "zLen", 89),
       });
-      const cAo = String(p.colorAo ?? "#ffd54f");
-      const cRma = String(p.colorRma ?? "#18d0bd");
-      const cScore = String(p.colorScore ?? "#ff8a65");
-      const cPos = String(p.colorPos ?? "#26a69a");
-      const cNeg = String(p.colorNeg ?? "#ef5350");
+      const cAo = String(p.colorAo ?? "#ff9800");
+      const cRma = String(p.colorRma ?? "#e040fb");
+      const cScore = String(p.colorScore ?? "#76ff03");
+      const cScoreShort = String(p.colorScoreShort ?? "#ff1744");
+      const cPos = String(p.colorPos ?? "#76ff03");
+      const cNeg = String(p.colorNeg ?? "#ff1744");
+      const cHam = String(p.colorHam ?? "#2979ff");
+      const cDisplay = String(p.colorDisplay ?? "#ffffff");
       const plots = [
         line(inst, "mid50", "sub", "#8b95a888", candles, candles.map(() => 50), "50"),
-        line(inst, "aoPlot", "sub", cAo, candles, s.aoPlot, "AO"),
-        line(inst, "rawSigPlot", "sub", cRma, candles, s.rawSigPlot, "RMA"),
-        line(inst, "scoreLongPlot", "sub", cScore, candles, s.scoreLongPlot, "Score L"),
+        line(inst, "displayPlot", "sub", cDisplay, candles, s.displayPlot, "Display"),
         line(inst, "posPlot", "sub", cPos, candles, s.posPlot, "PT"),
         line(inst, "negPlot", "sub", cNeg, candles, s.negPlot, "NT"),
+        line(inst, "scoreLongPlot", "sub", cScore, candles, s.scoreLongPlot, "Score L"),
+        line(inst, "scoreShortPlot", "sub", cScoreShort, candles, s.scoreShortPlot, "Score S"),
+        line(inst, "aoPlot", "sub", cAo, candles, s.aoPlot, "AO"),
+        line(inst, "rawSigPlot", "sub", cRma, candles, s.rawSigPlot, "RMA"),
+        line(inst, "hamPlot", "sub", cHam, candles, s.hamPlot, "HAM"),
       ];
       push(plots, {
-        aoPlot: s.aoPlot,
-        rawSigPlot: s.rawSigPlot,
-        scoreLongPlot: s.scoreLongPlot,
+        displayPlot: s.displayPlot,
         posPlot: s.posPlot,
         negPlot: s.negPlot,
+        scoreLongPlot: s.scoreLongPlot,
+        scoreShortPlot: s.scoreShortPlot,
+        aoPlot: s.aoPlot,
+        rawSigPlot: s.rawSigPlot,
+        hamPlot: s.hamPlot,
         jurikCore: s.jurikCore,
         rmaSignal: s.rmaSignal,
         histSmooth: s.histSmooth,
