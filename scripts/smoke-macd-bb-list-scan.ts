@@ -1,12 +1,15 @@
-/** Smoke: MACD BB Trend list scan — separate chips + soft AL window.
+/** Smoke: MACD Uzun + BB Trend — independent list-scan kinds.
  *  npx tsx scripts/smoke-macd-bb-list-scan.ts
  */
 import type { Candle } from "../src/lib/types";
 import {
   scanSymbol,
-  ALL_MACD_BB_CONDS,
-  MACD_BB_MIN_BARS,
-  MACD_BB_FETCH_LIMIT,
+  DEFAULT_MACD_LONG_CONDS,
+  DEFAULT_BB_TREND_CONDS,
+  MACD_LONG_MIN_BARS,
+  MACD_LONG_FETCH_LIMIT,
+  BB_TREND_MIN_BARS,
+  BB_TREND_FETCH_LIMIT,
   type ListScanConfig,
 } from "../src/lib/scanner/listScan";
 
@@ -36,90 +39,124 @@ function synthPlanted(n: number): Candle[] {
   return out;
 }
 
-assert(ALL_MACD_BB_CONDS.includes("macd_x_sig"), "default has macd_x_sig");
-assert(ALL_MACD_BB_CONDS.includes("bb_x_ema"), "default has bb_x_ema");
-assert(ALL_MACD_BB_CONDS.includes("al"), "default has al");
-assert(ALL_MACD_BB_CONDS.length === 3, "three default chips");
-assert(MACD_BB_MIN_BARS >= 280, "min bars ≥280");
-assert(MACD_BB_FETCH_LIMIT >= 500, "fetch ≥500");
+assert(DEFAULT_MACD_LONG_CONDS.includes("cross_up"), "macdLong default cross_up");
+assert(DEFAULT_BB_TREND_CONDS.includes("bb_x_ema"), "bbTrend default bb_x_ema");
+assert(MACD_LONG_MIN_BARS >= 280, "macdLong min bars ≥280");
+assert(MACD_LONG_FETCH_LIMIT >= 500, "macdLong fetch ≥500");
+assert(BB_TREND_MIN_BARS >= 250, "bbTrend min bars ≥250");
+assert(BB_TREND_FETCH_LIMIT >= 300, "bbTrend fetch ≥300");
 
-const n = Math.max(MACD_BB_MIN_BARS + 40, 320);
+const n = Math.max(MACD_LONG_MIN_BARS + 40, 320);
 const candles = synthPlanted(n);
 
 // Fast params so planted rallies create real edges within 40 bars
-const baseMacdBb = {
-  enabled: true as const,
-  fast: 12,
-  slow: 26,
-  signal: 9,
-  bbPeriod: 20,
-  bbMult: 2,
-  emaPeriod: 50,
-};
-
 const cfgMacd: ListScanConfig = {
   matchMode: "any",
-  macdBb: { ...baseMacdBb, conds: ["macd_x_sig"] },
+  macdLong: {
+    enabled: true,
+    conds: ["cross_up"],
+    fast: 12,
+    slow: 26,
+    signal: 9,
+  },
 };
 const cfgBb: ListScanConfig = {
   matchMode: "any",
-  macdBb: { ...baseMacdBb, conds: ["bb_x_ema"] },
+  bbTrend: {
+    enabled: true,
+    conds: ["bb_x_ema"],
+    bbPeriod: 20,
+    bbMult: 2,
+    emaPeriod: 50,
+  },
 };
-const cfgAl: ListScanConfig = {
+const cfgBoth: ListScanConfig = {
   matchMode: "any",
-  macdBb: { ...baseMacdBb, conds: ["al"] },
+  macdLong: {
+    enabled: true,
+    conds: ["cross_up"],
+    fast: 12,
+    slow: 26,
+    signal: 9,
+  },
+  bbTrend: {
+    enabled: true,
+    conds: ["bb_x_ema"],
+    bbPeriod: 20,
+    bbMult: 2,
+    emaPeriod: 50,
+  },
 };
-const cfgAll: ListScanConfig = {
+const cfgEmptyMacd: ListScanConfig = {
   matchMode: "any",
-  macdBb: { ...baseMacdBb, conds: [...ALL_MACD_BB_CONDS] },
+  macdLong: {
+    enabled: true,
+    conds: [],
+    fast: 12,
+    slow: 26,
+    signal: 9,
+  },
+};
+const cfgEmptyBb: ListScanConfig = {
+  matchMode: "any",
+  bbTrend: {
+    enabled: true,
+    conds: [],
+    bbPeriod: 20,
+    bbMult: 2,
+    emaPeriod: 50,
+  },
 };
 
 const maxBars = 40;
 const hMacd = scanSymbol(candles, cfgMacd, maxBars);
 const hBb = scanSymbol(candles, cfgBb, maxBars);
-const hAl = scanSymbol(candles, cfgAl, maxBars);
-const hAll = scanSymbol(candles, cfgAll, maxBars);
+const hBoth = scanSymbol(candles, cfgBoth, maxBars);
+const hEmptyMacd = scanSymbol(candles, cfgEmptyMacd, maxBars);
+const hEmptyBb = scanSymbol(candles, cfgEmptyBb, maxBars);
 
-console.log("macd-only", hMacd.map((h) => `${h.cond}@${h.barsAgo}`));
-console.log("bb-only", hBb.map((h) => `${h.cond}@${h.barsAgo}`));
-console.log("al-only", hAl.map((h) => `${h.cond}@${h.barsAgo} ${h.note}`));
+console.log("macdLong-only", hMacd.map((h) => `${h.kind}:${h.cond}@${h.barsAgo}`));
+console.log("bbTrend-only", hBb.map((h) => `${h.kind}:${h.cond}@${h.barsAgo}`));
+console.log("both", hBoth.map((h) => `${h.kind}:${h.cond}@${h.barsAgo}`));
 console.log(
-  "all-chips",
-  hAll.map((h) => `${h.cond}@${h.barsAgo}`)
+  "empty defaults",
+  hEmptyMacd.map((h) => h.cond),
+  hEmptyBb.map((h) => h.cond)
 );
 
-assert(hMacd.length >= 1, "macd_x_sig chip fires independently");
-assert(hMacd.every((h) => h.cond === "macd_x_sig"), "macd-only cond");
-assert(hBb.length >= 1, "bb_x_ema chip fires independently");
-assert(hBb.every((h) => h.cond === "bb_x_ema"), "bb-only cond");
+assert(hMacd.length >= 1, "macdLong fires alone");
+assert(hMacd.every((h) => h.kind === "macdLong" && h.cond === "cross_up"), "macdLong-only kind/cond");
+assert(hBb.length >= 1, "bbTrend fires alone");
+assert(hBb.every((h) => h.kind === "bbTrend" && h.cond === "bb_x_ema"), "bbTrend-only kind/cond");
 
-assert(hAl.length >= 1, "AL fires when both edges in same window");
-assert(hAl[0]!.note.includes("MACD↑ + BB×EMA"), "AL note format");
-assert(/−\d+\/−\d+/.test(hAl[0]!.note), "AL note shows (−a/−b)");
-
-const macdAgo = hMacd[0]!.barsAgo;
-const bbAgo = hBb[0]!.barsAgo;
 assert(
-  macdAgo !== bbAgo,
-  `expected different bars for soft AL (got both @${macdAgo})`
+  hBoth.some((h) => h.kind === "macdLong") && hBoth.some((h) => h.kind === "bbTrend"),
+  "both kinds independent under matchMode any"
 );
-console.log(`soft AL OK — different bars (macd −${macdAgo}, bb −${bbAgo})`);
 
-const allConds = new Set(hAll.map((h) => h.cond));
-assert(allConds.has("macd_x_sig"), "all scan includes macd");
-assert(allConds.has("bb_x_ema"), "all scan includes bb");
-assert(allConds.has("al"), "all scan includes al");
+assert(hEmptyMacd.length >= 1, "empty macdLong conds → DEFAULT_MACD_LONG_CONDS");
+assert(hEmptyMacd.every((h) => h.cond === "cross_up"), "empty macdLong → cross_up");
+assert(hEmptyBb.length >= 1, "empty bbTrend conds → DEFAULT_BB_TREND_CONDS");
+assert(hEmptyBb.every((h) => h.cond === "bb_x_ema"), "empty bbTrend → bb_x_ema");
 
-// Empty conds while enabled → ALL defaults
-const cfgEmpty: ListScanConfig = {
-  matchMode: "any",
-  macdBb: { ...baseMacdBb, conds: [] },
-};
-const hEmpty = scanSymbol(candles, cfgEmpty, maxBars);
+// Too-short candles must not hit
+const short = synthPlanted(100);
 assert(
-  hEmpty.every((h) => (ALL_MACD_BB_CONDS as string[]).includes(h.cond)),
-  "empty conds use ALL_MACD_BB_CONDS"
+  scanSymbol(short, cfgMacd, maxBars).length === 0,
+  "macdLong rejects short series"
 );
-assert(hEmpty.length >= 1, "empty conds still produce hits");
+assert(
+  scanSymbol(short, {
+    matchMode: "any",
+    bbTrend: {
+      enabled: true,
+      conds: ["bb_x_ema"],
+      bbPeriod: 20,
+      bbMult: 2,
+      emaPeriod: 200,
+    },
+  }, maxBars).length === 0,
+  "bbTrend rejects short series for EMA200"
+);
 
-console.log("OK smoke-macd-bb-list-scan");
+console.log("smoke-macd-uzun-bb-trend: OK");

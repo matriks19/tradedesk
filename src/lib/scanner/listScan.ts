@@ -165,16 +165,27 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
   "div_bear",
 ];
 
-export type MacdBbCond = "al" | "macd_x_sig" | "bb_x_ema";
+export type MacdLongCond = "cross_up" | "cross_dn";
 
-/** All MACD BB chips — each scanned independently when enabled. */
-export const ALL_MACD_BB_CONDS: MacdBbCond[] = ["macd_x_sig", "bb_x_ema", "al"];
+/** Default MACD Uzun chips. */
+export const DEFAULT_MACD_LONG_CONDS: MacdLongCond[] = ["cross_up"];
 
-/** Binance allows up to 1000; 500 covers MACD(100,200,50)+EMA200 warmup. */
-export const MACD_BB_FETCH_LIMIT = 500;
+/** Binance allows up to 1000; 500 covers MACD(100,200,50) warmup. */
+export const MACD_LONG_FETCH_LIMIT = 500;
 
-/** Min bars before scanning — avoid half-warm MACD/EMA. */
-export const MACD_BB_MIN_BARS = 280;
+/** Min bars before scanning — avoid half-warm MACD(100/200/50). */
+export const MACD_LONG_MIN_BARS = 280;
+
+export type BbTrendCond = "bb_x_ema" | "bb_x_ema_dn";
+
+/** Default BB Trend chips. */
+export const DEFAULT_BB_TREND_CONDS: BbTrendCond[] = ["bb_x_ema"];
+
+/** Fetch enough for EMA200 + BB warmup. */
+export const BB_TREND_FETCH_LIMIT = 300;
+
+/** Min bars before scanning — EMA200 needs ~250+. */
+export const BB_TREND_MIN_BARS = 250;
 
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
 export const DEFAULT_HAM_CONDS: HamCond[] = ["raw_dual_up"];
@@ -199,7 +210,8 @@ export type ListScanKind =
   | "hamAo"
   | "gold"
   | "gold2"
-  | "macdBb"
+  | "macdLong"
+  | "bbTrend"
   | "pine";
 
 export type PineCond =
@@ -388,12 +400,16 @@ export type ListScanConfig = {
     divLbL?: number;
     divLbR?: number;
   };
-  macdBb?: {
+  macdLong?: {
     enabled: boolean;
-    conds: MacdBbCond[];
+    conds: MacdLongCond[];
     fast?: number;
     slow?: number;
     signal?: number;
+  };
+  bbTrend?: {
+    enabled: boolean;
+    conds: BbTrendCond[];
     bbPeriod?: number;
     bbMult?: number;
     emaPeriod?: number;
@@ -1407,96 +1423,109 @@ function scanGold2(
 }
 
 
-function scanMacdBb(
+function scanMacdLong(
   candles: Candle[],
-  cfg: NonNullable<ListScanConfig["macdBb"]>,
+  cfg: NonNullable<ListScanConfig["macdLong"]>,
   maxBarsAgo: number
 ): ListScanHit[] {
   if (!cfg.enabled) return [];
-  const conds = cfg.conds.length ? cfg.conds : ALL_MACD_BB_CONDS;
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_MACD_LONG_CONDS;
   const fast = cfg.fast ?? 100;
   const slow = cfg.slow ?? 200;
   const signalPeriod = cfg.signal ?? 50;
-  const bbPeriod = cfg.bbPeriod ?? 20;
-  const bbMult = cfg.bbMult ?? 2;
-  const emaPeriod = cfg.emaPeriod ?? 200;
-  const need = Math.max(emaPeriod, slow + signalPeriod, bbPeriod) + 20;
-  if (candles.length < Math.max(MACD_BB_MIN_BARS, need)) return [];
+  const need = slow + signalPeriod + 20;
+  if (candles.length < Math.max(MACD_LONG_MIN_BARS, need)) return [];
 
-  const c = closes(candles);
-  const m = macd(c, fast, slow, signalPeriod);
-  const bb = bollinger(c, bbPeriod, bbMult);
-  const e200 = ema(c, emaPeriod);
-  const last = c.length - 1;
+  const m = macd(closes(candles), fast, slow, signalPeriod);
+  const last = m.macd.length - 1;
   const best = new Map<string, ListScanHit>();
 
-  // Nearest edges in window — AL needs both (can be different bars)
-  let nearestMacdAgo: number | null = null;
-  let nearestBbAgo: number | null = null;
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
-    if (nearestMacdAgo == null && crossedAboveAt(m.macd, m.signal, i)) {
-      nearestMacdAgo = ago;
-    }
-    if (nearestBbAgo == null && crossedAboveAt(bb.mid, e200, i)) {
-      nearestBbAgo = ago;
-    }
-    if (nearestMacdAgo != null && nearestBbAgo != null) break;
-  }
-
-  for (let ago = 0; ago <= maxBarsAgo; ago++) {
-    const i = last - ago;
-    if (i < 1) break;
-    const macdCross = crossedAboveAt(m.macd, m.signal, i);
-    const bbCross = crossedAboveAt(bb.mid, e200, i);
-
     for (const cond of conds) {
-      if (cond === "al") continue; // handled below (same-window, not same-bar)
       let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
       let note = "";
       switch (cond) {
-        case "macd_x_sig":
-          ok = macdCross;
-          note = `MACD↑ sinyal (−${ago})`;
+        case "cross_up":
+          ok = crossedAboveAt(m.macd, m.signal, i);
+          bias = "bull";
+          note = `MACD Uzun ×sig↑ (−${ago})`;
           break;
-        case "bb_x_ema":
-          ok = bbCross;
-          note = `BB×EMA200↑ (−${ago})`;
+        case "cross_dn":
+          ok = crossedBelowAt(m.macd, m.signal, i);
+          bias = "bear";
+          note = `MACD Uzun ×sig↓ (−${ago})`;
           break;
       }
       if (!ok) continue;
       const prev = best.get(cond);
       if (!prev || ago < prev.barsAgo) {
         best.set(cond, {
-          kind: "macdBb",
+          kind: "macdLong",
           cond,
-          bias: "bull",
+          bias,
           barsAgo: ago,
           note,
         });
       }
     }
   }
+  return [...best.values()];
+}
 
-  if (
-    conds.includes("al") &&
-    nearestMacdAgo != null &&
-    nearestBbAgo != null
-  ) {
-    const a = nearestMacdAgo;
-    const b = nearestBbAgo;
-    // barsAgo = more recent of the two (combo completes when 2nd edge fires)
-    const barsAgo = Math.min(a, b);
-    best.set("al", {
-      kind: "macdBb",
-      cond: "al",
-      bias: "bull",
-      barsAgo,
-      note: `MACD↑ + BB×EMA (−${a}/−${b})`,
-    });
+function scanBbTrend(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["bbTrend"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_BB_TREND_CONDS;
+  const bbPeriod = cfg.bbPeriod ?? 20;
+  const bbMult = cfg.bbMult ?? 2;
+  const emaPeriod = cfg.emaPeriod ?? 200;
+  const need = Math.max(emaPeriod, bbPeriod) + 20;
+  if (candles.length < Math.max(BB_TREND_MIN_BARS, need)) return [];
+
+  const c = closes(candles);
+  const bb = bollinger(c, bbPeriod, bbMult);
+  const e = ema(c, emaPeriod);
+  const last = c.length - 1;
+  const best = new Map<string, ListScanHit>();
+
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = last - ago;
+    if (i < 1) break;
+    for (const cond of conds) {
+      let ok = false;
+      let bias: ListScanHit["bias"] = "neutral";
+      let note = "";
+      switch (cond) {
+        case "bb_x_ema":
+          ok = crossedAboveAt(bb.mid, e, i);
+          bias = "bull";
+          note = `BB×EMA${emaPeriod}↑ (−${ago})`;
+          break;
+        case "bb_x_ema_dn":
+          ok = crossedBelowAt(bb.mid, e, i);
+          bias = "bear";
+          note = `BB×EMA${emaPeriod}↓ (−${ago})`;
+          break;
+      }
+      if (!ok) continue;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, {
+          kind: "bbTrend",
+          cond,
+          bias,
+          barsAgo: ago,
+          note,
+        });
+      }
+    }
   }
-
   return [...best.values()];
 }
 
@@ -1515,7 +1544,8 @@ export function scanSymbol(
   if (cfg.hamAo?.enabled) enabledKinds.push("hamAo");
   if (cfg.gold?.enabled) enabledKinds.push("gold");
   if (cfg.gold2?.enabled) enabledKinds.push("gold2");
-  if (cfg.macdBb?.enabled) enabledKinds.push("macdBb");
+  if (cfg.macdLong?.enabled) enabledKinds.push("macdLong");
+  if (cfg.bbTrend?.enabled) enabledKinds.push("bbTrend");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1529,7 +1559,8 @@ export function scanSymbol(
     hamAo: cfg.hamAo ? scanHamAo(candles, cfg.hamAo, maxBarsAgo) : [],
     gold: cfg.gold ? scanGold(candles, cfg.gold, maxBarsAgo) : [],
     gold2: cfg.gold2 ? scanGold2(candles, cfg.gold2, maxBarsAgo) : [],
-    macdBb: cfg.macdBb ? scanMacdBb(candles, cfg.macdBb, maxBarsAgo) : [],
+    macdLong: cfg.macdLong ? scanMacdLong(candles, cfg.macdLong, maxBarsAgo) : [],
+    bbTrend: cfg.bbTrend ? scanBbTrend(candles, cfg.bbTrend, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -1734,13 +1765,20 @@ export function indicatorParamsFromConfig(
       histScale: g.histScale ?? 18,
     };
   }
-  if (kind === "macdBb" && cfg.macdBb) {
-    const m = cfg.macdBb;
+  if (kind === "macdLong" && cfg.macdLong) {
+    const m = cfg.macdLong;
     return {
       fast: m.fast ?? 100,
       slow: m.slow ?? 200,
       signal: m.signal ?? 50,
       showMarkers: 1,
+    };
+  }
+  if (kind === "bbTrend" && cfg.bbTrend) {
+    const b = cfg.bbTrend;
+    return {
+      period: b.bbPeriod ?? 20,
+      mult: b.bbMult ?? 2,
     };
   }
   if (kind === "hull" && cfg.hull) {
@@ -1772,6 +1810,7 @@ export const KIND_TO_INDICATOR: Record<
   | "hamAoJrmaZ"
   | "aohamJrmaEngine"
   | "goldKeko"
+  | "bollinger"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -1782,7 +1821,8 @@ export const KIND_TO_INDICATOR: Record<
   hamAo: "hamAoJrmaZ",
   gold: "aohamJrmaEngine",
   gold2: "goldKeko",
-  macdBb: "macd",
+  macdLong: "macd",
+  bbTrend: "bollinger",
 };
 
 /** Extra chart indicators to drop alongside the primary KIND_TO_INDICATOR mapping. */
@@ -1790,21 +1830,16 @@ export function extraIndicatorsFromConfig(
   kind: ListScanKind,
   cfg: ListScanConfig
 ): { type: string; params: Record<string, number | string> }[] {
-  if (kind !== "macdBb" || !cfg.macdBb) return [];
-  const m = cfg.macdBb;
-  return [
-    {
-      type: "bollinger",
-      params: {
-        period: m.bbPeriod ?? 20,
-        mult: m.bbMult ?? 2,
+  if (kind === "bbTrend" && cfg.bbTrend) {
+    const b = cfg.bbTrend;
+    return [
+      {
+        type: "ema",
+        params: { period: b.emaPeriod ?? 200 },
       },
-    },
-    {
-      type: "ema",
-      params: { period: m.emaPeriod ?? 200 },
-    },
-  ];
+    ];
+  }
+  return [];
 }
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
