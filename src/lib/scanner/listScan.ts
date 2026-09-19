@@ -165,7 +165,7 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
   "div_bear",
 ];
 
-export type MacdBbCond = "al" | "macd_al_hist" | "bb_x_ema";
+export type MacdBbCond = "al" | "macd_x_sig" | "bb_x_ema";
 
 /** Primary default — full recipe chip when enabled. */
 export const ALL_MACD_BB_CONDS: MacdBbCond[] = ["al"];
@@ -1429,7 +1429,6 @@ function scanMacdBb(
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
-    const histOk = m.hist[i] != null && (m.hist[i] as number) > 0;
     const macdCross = crossedAboveAt(m.macd, m.signal, i);
     const bbCross = crossedAboveAt(bb.mid, e200, i);
 
@@ -1438,12 +1437,12 @@ function scanMacdBb(
       let note = "";
       switch (cond) {
         case "al":
-          ok = macdCross && histOk && bbCross;
+          ok = macdCross && bbCross;
           note = `MACD BB AL (−${ago})`;
           break;
-        case "macd_al_hist":
-          ok = macdCross && histOk;
-          note = `MACD↑ hist+ (−${ago})`;
+        case "macd_x_sig":
+          ok = macdCross;
+          note = `MACD↑ sinyal (−${ago})`;
           break;
         case "bb_x_ema":
           ok = bbCross;
