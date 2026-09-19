@@ -190,6 +190,7 @@ const MACD_LONG_CHIPS: { id: MacdLongCond; label: string }[] = [
 const BB_TREND_CHIPS: { id: BbTrendCond; label: string }[] = [
   { id: "bb_x_ema", label: "BB×EMA↑" },
   { id: "bb_x_ema_dn", label: "BB×EMA↓" },
+  { id: "lower_x_up", label: "Alt band↑" },
 ];
 
 const EXTRA_CHIPS: { id: string; label: string; filter: ScannerFilter }[] = [

@@ -176,10 +176,17 @@ export const MACD_LONG_FETCH_LIMIT = 500;
 /** Min bars before scanning — avoid half-warm MACD(100/200/50). */
 export const MACD_LONG_MIN_BARS = 280;
 
-export type BbTrendCond = "bb_x_ema" | "bb_x_ema_dn";
+export type BbTrendCond = "bb_x_ema" | "bb_x_ema_dn" | "lower_x_up";
+
+/** All BB Trend chip ids — used when enabled with empty conds. */
+export const ALL_BB_TREND_CONDS: BbTrendCond[] = [
+  "bb_x_ema",
+  "bb_x_ema_dn",
+  "lower_x_up",
+];
 
 /** Default BB Trend chips. */
-export const DEFAULT_BB_TREND_CONDS: BbTrendCond[] = ["bb_x_ema"];
+export const DEFAULT_BB_TREND_CONDS: BbTrendCond[] = ["bb_x_ema", "lower_x_up"];
 
 /** Fetch enough for EMA200 + BB warmup. */
 export const BB_TREND_FETCH_LIMIT = 300;
@@ -1481,7 +1488,7 @@ function scanBbTrend(
   maxBarsAgo: number
 ): ListScanHit[] {
   if (!cfg.enabled) return [];
-  const conds = cfg.conds.length ? cfg.conds : DEFAULT_BB_TREND_CONDS;
+  const conds = cfg.conds.length ? cfg.conds : ALL_BB_TREND_CONDS;
   const bbPeriod = cfg.bbPeriod ?? 20;
   const bbMult = cfg.bbMult ?? 2;
   const emaPeriod = cfg.emaPeriod ?? 200;
@@ -1511,6 +1518,11 @@ function scanBbTrend(
           ok = crossedBelowAt(bb.mid, e, i);
           bias = "bear";
           note = `BB×EMA${emaPeriod}↓ (−${ago})`;
+          break;
+        case "lower_x_up":
+          ok = crossedAboveAt(c, bb.lower, i);
+          bias = "bull";
+          note = `BB alt band↑ (−${ago})`;
           break;
       }
       if (!ok) continue;
