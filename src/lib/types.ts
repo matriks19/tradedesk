@@ -247,6 +247,7 @@ export type BuiltinIndicatorId =
   | "descendingBreakV2"
   | "diagonalSr"
   | "hamJurikTpo"
+  | "hamBb"
   | "hamAoJrmaZ"
   | "aohamJrmaEngine"
   | "goldKeko"

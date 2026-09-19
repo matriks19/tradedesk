@@ -103,11 +103,12 @@ const HAM_CHIPS: { id: HamCond; label: string }[] = [
 
 const HAM_BB_CHIPS: { id: HamBbCond; label: string }[] = [
   { id: "raw_dual_up", label: "Raw H×Y↑" },
-  { id: "al", label: "AL" },
-  { id: "setup", label: "Setup" },
-  { id: "lower_x_up", label: "Alt band↑" },
-  { id: "bb_x_ema", label: "BB×EMA↑" },
-  { id: "ham_dip", label: "HAM+Dip" },
+  { id: "raw_dual_dn", label: "Raw H×Y↓" },
+  { id: "ham_x_mid_up", label: "HAM×BB orta↑" },
+  { id: "ham_x_mid_dn", label: "HAM×BB orta↓" },
+  { id: "ham_x_lower_up", label: "HAM×alt↑ (dip)" },
+  { id: "ham_x_upper_dn", label: "HAM×üst↓" },
+  { id: "raw_xy_lower", label: "Raw+Alt" },
 ];
 
 const DIAG_CHIPS: { id: DiagCond; label: string }[] = [
@@ -587,7 +588,6 @@ export function ListScanPanel() {
   const [bbTrendEmaPeriod, setBbTrendEmaPeriod] = useState(200);
   const [hamBbBbPeriod, setHamBbBbPeriod] = useState(20);
   const [hamBbBbMult, setHamBbBbMult] = useState(2);
-  const [hamBbEmaPeriod, setHamBbEmaPeriod] = useState(200);
 
   const [kPeriod, setKPeriod] = useState(14);
   const [dPeriod, setDPeriod] = useState(3);
@@ -702,7 +702,6 @@ export function ListScanPanel() {
         postSmooth,
         bbPeriod: hamBbBbPeriod,
         bbMult: hamBbBbMult,
-        emaPeriod: hamBbEmaPeriod,
       },
       diag: {
         enabled: diagOn,
@@ -801,7 +800,6 @@ export function ListScanPanel() {
     hamBbConds,
     hamBbBbPeriod,
     hamBbBbMult,
-    hamBbEmaPeriod,
     hamConds,
     hamLen,
     hamLenSlow,
@@ -1437,7 +1435,6 @@ export function ListScanPanel() {
               postSmooth: cfg.hamBb?.postSmooth ?? 5,
               bbPeriod: cfg.hamBb?.bbPeriod ?? 20,
               bbMult: cfg.hamBb?.bbMult ?? 2,
-              emaPeriod: cfg.hamBb?.emaPeriod ?? 200,
             },
           },
           timeframe: tf,
@@ -1698,8 +1695,8 @@ export function ListScanPanel() {
         onOpen={() => setOpenCard((c) => (c === "hamBb" ? null : "hamBb"))}
       >
         <p className="text-2xs text-desk-muted">
-          HAM + Bollinger (dip / trend) · ≥{HAM_BB_MIN_BARS} mum · fetch{" "}
-          {HAM_BB_FETCH_LIMIT}+
+          HAM üzerine Bollinger (bantlar HAM&apos;la hareket eder) · ≥
+          {HAM_BB_MIN_BARS} mum · fetch {HAM_BB_FETCH_LIMIT}+
         </p>
         <div className="flex flex-wrap gap-1">
           {HAM_BB_CHIPS.map((c) => (
@@ -1722,10 +1719,9 @@ export function ListScanPanel() {
             />
           ))}
         </div>
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-2 gap-1">
           <NumInput label="BB period" value={hamBbBbPeriod} onChange={setHamBbBbPeriod} />
           <NumInput label="BB mult" value={hamBbBbMult} onChange={setHamBbBbMult} step={0.1} />
-          <NumInput label="EMA" value={hamBbEmaPeriod} onChange={setHamBbEmaPeriod} />
         </div>
       </SectionCard>
 
