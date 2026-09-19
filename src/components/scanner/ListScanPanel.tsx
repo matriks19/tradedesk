@@ -813,6 +813,7 @@ export function ListScanPanel() {
 
       const out: ResultRow[] = [];
       let done = 0;
+      let lastProgressAt = 0;
       const isBist = universe.symbols[0]?.exchange === "bist";
       const concurrency = isBist ? 3 : total > 200 ? 6 : 8;
       const klineMs = isBist ? 6000 : 10000;
@@ -876,8 +877,16 @@ export function ListScanPanel() {
             /* skip timeout / 502 */
           } finally {
             done += 1;
-            setProgress(`${done}/${total} ${q.symbol}`);
-            if (done % 8 === 0 || done === total) {
+            const now = performance.now();
+            if (
+              done === total ||
+              done % 20 === 0 ||
+              now - lastProgressAt >= 150
+            ) {
+              lastProgressAt = now;
+              setProgress(`${done}/${total} ${q.symbol}`);
+            }
+            if (done % 30 === 0 || done === total) {
               setHits(
                 [...out].sort(
                   (a, b) =>
