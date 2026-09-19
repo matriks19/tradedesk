@@ -7,6 +7,8 @@ import {
   type ISeriesApi,
   type IPriceLine,
   type LogicalRange,
+  type MouseEventParams,
+  type Time,
   ColorType,
   CrosshairMode,
   PriceScaleMode,
@@ -38,6 +40,15 @@ interface SubPaneGroup {
   plots: PlotSeries[];
 }
 
+interface HoverBarInfo {
+  idx: number;
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
 type ChartWithMeta = IChartApi & {
   __ro?: ResizeObserver;
   __el?: HTMLDivElement;
@@ -58,6 +69,9 @@ function chartOptions(height: number, width: number, showTime: boolean) {
       borderColor: "#2a3140",
       // Prefer time-scale pan; price axis drag shouldn't fight horizontal sync
       entireTextOnly: true,
+      // Lock gutter width so main + osc plot areas share the same pixel width
+      // (unequal labels like 0.013229 vs 200.00 otherwise desync bar X).
+      minimumWidth: 72,
     },
     timeScale: {
       borderColor: "#2a3140",
@@ -138,8 +152,16 @@ export function ChartPane({ pane, compact }: Props) {
   const rangeRaf = useRef(0);
   const pendingRange = useRef<LogicalRange | null>(null);
   const pendingSource = useRef<IChartApi | null>(null);
+  const syncingCross = useRef(false);
+  const crossRaf = useRef(0);
+  const pendingCross = useRef<{
+    source: IChartApi;
+    time: Time | undefined;
+    logical: number | undefined;
+  } | null>(null);
   const subGroupsRef = useRef<SubPaneGroup[]>([]);
   const [chartReady, setChartReady] = useState(0);
+  const [hoverBar, setHoverBar] = useState<HoverBarInfo | null>(null);
   /** Bumped only when sub charts are created/destroyed (series effect). */
   const [subReady, setSubReady] = useState(0);
   const [logScale, setLogScale] = useState(false);
@@ -174,6 +196,12 @@ export function ChartPane({ pane, compact }: Props) {
     pane.exchange,
     pane.timeframe
   );
+  const candlesRef = useRef(candles);
+  candlesRef.current = candles;
+
+  useEffect(() => {
+    setHoverBar(null);
+  }, [pane.symbol, pane.timeframe, pane.exchange]);
 
   useEffect(() => {
     if (pendingDiagPaneId !== pane.id) return;
@@ -461,6 +489,7 @@ export function ChartPane({ pane, compact }: Props) {
     chart.priceScale("right").applyOptions({
       scaleMargins: { top: 0.08, bottom: 0.18 },
       autoScale: true,
+      minimumWidth: 72,
     });
     chart.priceScale("vol").applyOptions({
       scaleMargins: { top: 0.8, bottom: 0 },
@@ -680,6 +709,7 @@ export function ChartPane({ pane, compact }: Props) {
   useEffect(() => {
     return () => {
       if (rangeRaf.current) cancelAnimationFrame(rangeRaf.current);
+      if (crossRaf.current) cancelAnimationFrame(crossRaf.current);
       for (const id of Array.from(subChartsRef.current.keys())) {
         destroySubChart(id);
       }
@@ -688,10 +718,44 @@ export function ChartPane({ pane, compact }: Props) {
 
   // Time sync: any pane (main or sub) can be the drag source; flush to all others.
   // programmaticUntil + rangesNearlyEqual prevent A↔B thrash from setVisibleLogicalRange.
-  // Crosshair multi-pane sync disabled by default (expensive on every mousemove).
+  // Crosshair sync (rAF-throttled): same bar time on every pane + OHLC readout.
   useEffect(() => {
     const main = chartRef.current;
     if (!main) return;
+
+    const allCharts = (): IChartApi[] => [
+      main,
+      ...Array.from(subChartsRef.current.values()),
+    ];
+
+    const seriesFor = (chart: IChartApi) => {
+      if (chart === main && candleRef.current) return candleRef.current;
+      for (const [gid, c] of Array.from(subChartsRef.current.entries())) {
+        if (c !== chart) continue;
+        const smap = subSeriesRef.current.get(gid);
+        if (!smap) return null;
+        // Prefer a series with a real value at the hovered index when possible.
+        return smap.values().next().value ?? null;
+      }
+      return null;
+    };
+
+    const priceAtLogical = (
+      series: ISeriesApi<"Candlestick"> | ISeriesApi<"Line"> | ISeriesApi<"Histogram">,
+      logical: number
+    ): number | null => {
+      try {
+        const d = series.dataByIndex(Math.round(logical), -1) as
+          | { value?: number; close?: number }
+          | null
+          | undefined;
+        if (!d) return null;
+        const v = (d as { value?: number }).value ?? (d as { close?: number }).close;
+        return v != null && Number.isFinite(v) ? v : null;
+      } catch {
+        return null;
+      }
+    };
 
     const flushRange = () => {
       rangeRaf.current = 0;
@@ -719,23 +783,147 @@ export function ChartPane({ pane, compact }: Props) {
       rangeRaf.current = requestAnimationFrame(flushRange);
     };
 
-    const subs: Array<{ chart: IChartApi; handler: (r: LogicalRange | null) => void }> = [];
-    const onMain = makeHandler(main);
-    main.timeScale().subscribeVisibleLogicalRangeChange(onMain);
-    subs.push({ chart: main, handler: onMain });
+    const flushCross = () => {
+      crossRaf.current = 0;
+      const pending = pendingCross.current;
+      pendingCross.current = null;
+      if (!pending || syncingCross.current) return;
+      syncingCross.current = true;
+      try {
+        const charts = allCharts();
+        const { source, time, logical } = pending;
+        if (time == null) {
+          for (const other of charts) {
+            if (other !== source) {
+              try {
+                other.clearCrosshairPosition();
+              } catch {
+                /* */
+              }
+            }
+          }
+          setHoverBar(null);
+          return;
+        }
 
-    for (const c of Array.from(subChartsRef.current.values())) {
-      const handler = makeHandler(c);
-      c.timeScale().subscribeVisibleLogicalRangeChange(handler);
-      subs.push({ chart: c, handler });
+        const cs = candlesRef.current;
+        let idx =
+          typeof logical === "number" && Number.isFinite(logical)
+            ? Math.round(logical)
+            : nearestCandleIndex(
+                cs.map((c) => c.time),
+                time as number
+              );
+        if (idx < 0) idx = 0;
+        if (cs.length && idx >= cs.length) idx = cs.length - 1;
+        const bar = cs[idx];
+        if (bar) {
+          setHoverBar({
+            idx,
+            time: bar.time,
+            open: bar.open,
+            high: bar.high,
+            low: bar.low,
+            close: bar.close,
+          });
+        }
+
+        for (const other of charts) {
+          if (other === source) continue;
+          const series = seriesFor(other);
+          if (!series) continue;
+          let price = priceAtLogical(series, idx);
+          if (price == null) {
+            // Whitespace / warm-up bar: still place vertical line via any finite price.
+            try {
+              const n = series.data().length;
+              for (let j = idx; j >= 0 && j < n && j >= idx - 40; j--) {
+                price = priceAtLogical(series, j);
+                if (price != null) break;
+              }
+              if (price == null) {
+                for (let j = idx + 1; j < n && j <= idx + 40; j++) {
+                  price = priceAtLogical(series, j);
+                  if (price != null) break;
+                }
+              }
+            } catch {
+              /* */
+            }
+          }
+          if (price == null) price = 0;
+          try {
+            other.setCrosshairPosition(price, time, series);
+          } catch {
+            /* */
+          }
+        }
+      } finally {
+        syncingCross.current = false;
+      }
+    };
+
+    const onCrossMove = (chart: IChartApi) => (param: MouseEventParams) => {
+      if (syncingCross.current) return;
+      pendingCross.current = {
+        source: chart,
+        time: param.time,
+        logical: typeof param.logical === "number" ? param.logical : undefined,
+      };
+      if (crossRaf.current) return;
+      crossRaf.current = requestAnimationFrame(flushCross);
+    };
+
+    const onClick = (chart: IChartApi) => (param: MouseEventParams) => {
+      // Click snaps readout + crosshair to that bar on every pane.
+      if (param.time == null) return;
+      pendingCross.current = {
+        source: chart,
+        time: param.time,
+        logical: typeof param.logical === "number" ? param.logical : undefined,
+      };
+      if (crossRaf.current) cancelAnimationFrame(crossRaf.current);
+      crossRaf.current = 0;
+      flushCross();
+    };
+
+    const rangeSubs: Array<{ chart: IChartApi; handler: (r: LogicalRange | null) => void }> = [];
+    const crossSubs: Array<{
+      chart: IChartApi;
+      move: (p: MouseEventParams) => void;
+      click: (p: MouseEventParams) => void;
+    }> = [];
+
+    for (const c of allCharts()) {
+      const rh = makeHandler(c);
+      c.timeScale().subscribeVisibleLogicalRangeChange(rh);
+      rangeSubs.push({ chart: c, handler: rh });
+
+      const move = onCrossMove(c);
+      const click = onClick(c);
+      c.subscribeCrosshairMove(move);
+      c.subscribeClick(click);
+      crossSubs.push({ chart: c, move, click });
     }
 
     syncLogicalRanges(main);
 
     return () => {
-      for (const { chart, handler } of subs) {
+      for (const { chart, handler } of rangeSubs) {
         try {
           chart.timeScale().unsubscribeVisibleLogicalRangeChange(handler);
+        } catch {
+          /* */
+        }
+      }
+      for (const { chart, move, click } of crossSubs) {
+        try {
+          chart.unsubscribeCrosshairMove(move);
+        } catch {
+          /* */
+        }
+        try {
+          chart.unsubscribeClick(click);
         } catch {
           /* */
         }
@@ -743,6 +931,10 @@ export function ChartPane({ pane, compact }: Props) {
       if (rangeRaf.current) {
         cancelAnimationFrame(rangeRaf.current);
         rangeRaf.current = 0;
+      }
+      if (crossRaf.current) {
+        cancelAnimationFrame(crossRaf.current);
+        crossRaf.current = 0;
       }
     };
   }, [chartReady, subReady, subGroupIds, syncLogicalRanges, rangesNearlyEqual]);
@@ -871,8 +1063,11 @@ export function ChartPane({ pane, compact }: Props) {
     requestAnimationFrame(() => syncLogicalRanges(main));
   }, [mainPlots, chartReady, syncLogicalRanges]);
 
-  // Sub pane series — data already one-point-per-candle (whitespace for nulls)
+  // Sub pane series — must be one-point-per-candle (whitespace for nulls) so
+  // logical indices match the main candle series. Pad if a plot is short.
   useEffect(() => {
+    const nCandles = candlesRef.current.length;
+    const times = candlesRef.current.map((c) => c.time);
     for (const g of subGroups) {
       const chart = subChartsRef.current.get(g.id);
       if (!chart) continue;
@@ -890,6 +1085,19 @@ export function ChartPane({ pane, compact }: Props) {
       }
       seriesMap.clear();
       for (const p of g.plots) {
+        let data = p.data as { time: number; value?: number; color?: string }[];
+        if (nCandles > 0 && data.length !== nCandles) {
+          // Rebuild on candle times so logical index == candle index.
+          const byTime = new Map<number, (typeof data)[number]>();
+          for (const pt of data) byTime.set(pt.time as number, pt);
+          data = times.map((t) => {
+            const pt = byTime.get(t);
+            if (pt && "value" in pt && pt.value != null && Number.isFinite(pt.value)) {
+              return pt;
+            }
+            return { time: t };
+          });
+        }
         if (p.type === "histogram") {
           const s = chart.addHistogramSeries({
             color: p.color,
@@ -898,7 +1106,7 @@ export function ChartPane({ pane, compact }: Props) {
             priceLineVisible: false,
             lastValueVisible: false,
           });
-          s.setData(p.data as never);
+          s.setData(data as never);
           if (p.markers?.length) {
             try {
               s.setMarkers(p.markers as never);
@@ -915,7 +1123,7 @@ export function ChartPane({ pane, compact }: Props) {
             priceLineVisible: false,
             lastValueVisible: false,
           });
-          s.setData(p.data as never);
+          s.setData(data as never);
           if (p.markers?.length) {
             try {
               s.setMarkers(p.markers as never);
@@ -925,6 +1133,11 @@ export function ChartPane({ pane, compact }: Props) {
           }
           seriesMap.set(p.id, s);
         }
+      }
+      try {
+        chart.priceScale("right").applyOptions({ minimumWidth: 72 });
+      } catch {
+        /* */
       }
     }
     requestAnimationFrame(() => syncLogicalRanges(chartRef.current));
@@ -1093,6 +1306,25 @@ export function ChartPane({ pane, compact }: Props) {
         )}
         {oscCount > 0 && (
           <span className="text-2xs text-desk-muted">{oscCount} osc</span>
+        )}
+        {hoverBar && (
+          <span
+            className="text-2xs text-desk-muted font-mono truncate max-w-[340px]"
+            title="Çaprazın / tıklanan mum (tüm paneller senkron)"
+          >
+            #{hoverBar.idx}{" "}
+            {new Date(hoverBar.time * 1000).toLocaleString("tr-TR", {
+              day: "2-digit",
+              month: "short",
+              year: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            })}{" "}
+            O{hoverBar.open.toLocaleString(undefined, { maximumFractionDigits: 6 })}{" "}
+            H{hoverBar.high.toLocaleString(undefined, { maximumFractionDigits: 6 })}{" "}
+            L{hoverBar.low.toLocaleString(undefined, { maximumFractionDigits: 6 })}{" "}
+            C{hoverBar.close.toLocaleString(undefined, { maximumFractionDigits: 6 })}
+          </span>
         )}
         {active && overlayPattern && (
           <>
