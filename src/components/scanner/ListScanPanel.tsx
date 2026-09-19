@@ -36,6 +36,7 @@ import {
   ALL_GOLD2_CONDS,
   ALL_MACD_BB_CONDS,
   MACD_BB_MIN_BARS,
+  MACD_BB_FETCH_LIMIT,
   extraIndicatorsFromConfig,
   type ListScanHit,
   type ListScanKind,
@@ -883,9 +884,11 @@ export function ListScanPanel() {
               ? DOKTOR_HULL_FETCH_LIMIT
               : useGold2
                 ? GOLD_KEKO_FETCH_LIMIT
-                : useGold || useHamAo || useMacdBb
-                  ? 260
-                  : 220;
+                : useMacdBb
+                  ? Math.max(MACD_BB_FETCH_LIMIT, historyBars, 500)
+                  : useGold || useHamAo
+                    ? 260
+                    : 220;
             const minBars = useHull
               ? DOKTOR_HULL_MIN_BARS
               : useGold2
@@ -998,7 +1001,7 @@ export function ListScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [universe, buildConfig, tf, maxBars, matchMode]);
+  }, [universe, buildConfig, tf, maxBars, matchMode, historyBars]);
 
   const upsertIndicators = useCallback(
     (cfg: ListScanConfig) => {
@@ -1905,8 +1908,9 @@ export function ListScanPanel() {
         onOpen={() => setOpenCard((c) => (c === "macdBb" ? null : "macdBb"))}
       >
         <p className="text-2xs text-desk-muted">
-          MACD↑ sinyal + BB orta↑ EMA200 · kenar-only · ≥{MACD_BB_MIN_BARS} mum ·
-          varsayılan 100/200/50 · BB 20×2 · EMA 200
+          Her chip ayrı taranır · AL = aynı pencerede MACD↑ + BB×EMA↑ (farklı
+          bar OK) · kenar-only · ≥{MACD_BB_MIN_BARS} mum · fetch{" "}
+          {MACD_BB_FETCH_LIMIT}+ · varsayılan 100/200/50 · BB 20×2 · EMA 200
         </p>
         <div className="flex flex-wrap gap-1">
           {MACD_BB_CHIPS.map((c) => (

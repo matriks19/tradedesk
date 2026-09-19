@@ -167,10 +167,14 @@ export const ALL_GOLD2_CONDS: Gold2Cond[] = [
 
 export type MacdBbCond = "al" | "macd_x_sig" | "bb_x_ema";
 
-/** Primary default — full recipe chip when enabled. */
-export const ALL_MACD_BB_CONDS: MacdBbCond[] = ["al"];
+/** All MACD BB chips — each scanned independently when enabled. */
+export const ALL_MACD_BB_CONDS: MacdBbCond[] = ["macd_x_sig", "bb_x_ema", "al"];
 
-export const MACD_BB_MIN_BARS = 220;
+/** Binance allows up to 1000; 500 covers MACD(100,200,50)+EMA200 warmup. */
+export const MACD_BB_FETCH_LIMIT = 500;
+
+/** Min bars before scanning — avoid half-warm MACD/EMA. */
+export const MACD_BB_MIN_BARS = 280;
 
 /** UI default chip lists — used when enabled with empty conds (never silent []). */
 export const DEFAULT_HAM_CONDS: HamCond[] = ["raw_dual_up"];
@@ -1426,6 +1430,21 @@ function scanMacdBb(
   const last = c.length - 1;
   const best = new Map<string, ListScanHit>();
 
+  // Nearest edges in window — AL needs both (can be different bars)
+  let nearestMacdAgo: number | null = null;
+  let nearestBbAgo: number | null = null;
+  for (let ago = 0; ago <= maxBarsAgo; ago++) {
+    const i = last - ago;
+    if (i < 1) break;
+    if (nearestMacdAgo == null && crossedAboveAt(m.macd, m.signal, i)) {
+      nearestMacdAgo = ago;
+    }
+    if (nearestBbAgo == null && crossedAboveAt(bb.mid, e200, i)) {
+      nearestBbAgo = ago;
+    }
+    if (nearestMacdAgo != null && nearestBbAgo != null) break;
+  }
+
   for (let ago = 0; ago <= maxBarsAgo; ago++) {
     const i = last - ago;
     if (i < 1) break;
@@ -1433,13 +1452,10 @@ function scanMacdBb(
     const bbCross = crossedAboveAt(bb.mid, e200, i);
 
     for (const cond of conds) {
+      if (cond === "al") continue; // handled below (same-window, not same-bar)
       let ok = false;
       let note = "";
       switch (cond) {
-        case "al":
-          ok = macdCross && bbCross;
-          note = `MACD BB AL (−${ago})`;
-          break;
         case "macd_x_sig":
           ok = macdCross;
           note = `MACD↑ sinyal (−${ago})`;
@@ -1462,6 +1478,25 @@ function scanMacdBb(
       }
     }
   }
+
+  if (
+    conds.includes("al") &&
+    nearestMacdAgo != null &&
+    nearestBbAgo != null
+  ) {
+    const a = nearestMacdAgo;
+    const b = nearestBbAgo;
+    // barsAgo = more recent of the two (combo completes when 2nd edge fires)
+    const barsAgo = Math.min(a, b);
+    best.set("al", {
+      kind: "macdBb",
+      cond: "al",
+      bias: "bull",
+      barsAgo,
+      note: `MACD↑ + BB×EMA (−${a}/−${b})`,
+    });
+  }
+
   return [...best.values()];
 }
 
