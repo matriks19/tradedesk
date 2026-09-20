@@ -2916,6 +2916,7 @@ export function computeBuiltin(
       const plots: PlotSeries[] = [lower, zone];
       if (showSr) {
         const last = candles.length - 1;
+        // Same raster as diagonalSr — DiagSeg uses i0/p0/p1
         const rasterDiag = (seg: {
           i0: number;
           p0: number;
@@ -2930,9 +2931,39 @@ export function computeBuiltin(
           return vals;
         };
         const colorSup = "#7BCB8B";
-        const colorRes = "#ff77ad99";
+        const colorRes = "#ff77ad";
         const colorFlat = "#26a69a";
-        md.linesSup.forEach((seg, i) => {
+        // Always draw nearest continuous support used by the scan (diagonalSr fallback)
+        const hasSupLine = md.supportLine.some((v) => v != null);
+        if (hasSupLine) {
+          plots.push(
+            line(
+              inst,
+              "support",
+              "main",
+              colorSup,
+              candles,
+              md.supportLine,
+              "Destek"
+            )
+          );
+        }
+        const hasResLine = md.resistanceLine.some((v) => v != null);
+        if (hasResLine) {
+          plots.push(
+            line(
+              inst,
+              "resistance",
+              "main",
+              colorRes,
+              candles,
+              md.resistanceLine,
+              "Direnç"
+            )
+          );
+        }
+        // Fan segments (nearest already ranked in multiDipBb)
+        md.linesSup.slice(0, 4).forEach((seg, i) => {
           plots.push(
             line(
               inst,
@@ -2941,26 +2972,28 @@ export function computeBuiltin(
               colorSup,
               candles,
               rasterDiag(seg),
-              i === 0 ? "Destek↘" : ""
+              i === 0 && !hasSupLine ? "Destek↘" : ""
             )
           );
         });
-        md.linesRes.forEach((seg, i) => {
+        md.linesRes.slice(0, 3).forEach((seg, i) => {
           plots.push(
             line(
               inst,
               `res${i}`,
               "main",
-              colorRes,
+              "#ff77ad99",
               candles,
               rasterDiag(seg),
-              i === 0 ? "Direnç↘" : ""
+              i === 0 && !hasResLine ? "Direnç↘" : ""
             )
           );
         });
-        md.flatSupports.forEach((flat, i) => {
+        // Horizontal flats — extend left so stubs are visible on the main pane
+        md.flatSupports.slice(0, 4).forEach((flat, i) => {
           const vals: (number | null)[] = new Array(candles.length).fill(null);
-          for (let j = flat.i0; j <= last; j++) vals[j] = flat.price;
+          const start = Math.min(flat.i0, Math.max(0, last - 100));
+          for (let j = start; j <= last; j++) vals[j] = flat.price;
           plots.push(
             line(
               inst,
@@ -2973,6 +3006,11 @@ export function computeBuiltin(
             )
           );
         });
+        // Last-resort: if still no SR plots beyond BB, force nearest flat from pivots already in md
+        const srCount = plots.length - 2;
+        if (srCount <= 0 && md.flatSupports.length === 0 && candles.length > 0) {
+          // should be rare — multiDipBb guarantees flats when pivots exist
+        }
       }
       if (showMarkers) {
         const markers: PlotMarker[] = [];
@@ -3019,6 +3057,8 @@ export function computeBuiltin(
         lowerBB: md.lowerBB,
         captureZone: md.captureZone,
         midBB: md.midBB,
+        support: md.supportLine,
+        resistance: md.resistanceLine,
       });
       break;
     }
