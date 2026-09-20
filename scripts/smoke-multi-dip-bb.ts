@@ -1,5 +1,5 @@
 /**
- * Unit smoke: Multi-Dip + BB (+ S/R) list scan.
+ * Unit smoke: Multi-Dip + BB (+ S/R + majör düşen kırılım) list scan.
  * Run: npx --yes tsx scripts/smoke-multi-dip-bb.ts
  */
 import type { Candle } from "../src/lib/types";
@@ -43,6 +43,9 @@ assert(s.doubleDip.length === candles.length, "len double");
 assert(s.tripleDip.length === candles.length, "len triple");
 assert(s.dipSr.length === candles.length, "len dipSr");
 assert(s.dipBbSr.length === candles.length, "len dipBbSr");
+assert(s.majResBreak.length === candles.length, "len majResBreak");
+assert(s.dipBbBreak.length === candles.length, "len dipBbBreak");
+assert(s.majResTrend.length === candles.length, "len majResTrend");
 assert(Array.isArray(s.linesSup), "linesSup array");
 assert(Array.isArray(s.linesRes), "linesRes array");
 assert(Array.isArray(s.flatSupports), "flatSupports array");
@@ -51,15 +54,27 @@ let doubles = 0,
   triples = 0,
   both = 0,
   dipSrN = 0,
-  dipBbSrN = 0;
+  dipBbSrN = 0,
+  majBreakN = 0,
+  dipBbBreakN = 0;
 for (let i = 0; i < candles.length; i++) {
   if (s.doubleDip[i] === 1) doubles++;
   if (s.tripleDip[i] === 1) triples++;
   if (s.doubleDip[i] === 1 && s.tripleDip[i] === 1) both++;
   if (s.dipSr[i] === 1) dipSrN++;
   if (s.dipBbSr[i] === 1) dipBbSrN++;
+  if (s.majResBreak[i] === 1) majBreakN++;
+  if (s.dipBbBreak[i] === 1) dipBbBreakN++;
 }
-console.log("signals", { doubles, triples, both, dipSrN, dipBbSrN });
+console.log("signals", {
+  doubles,
+  triples,
+  both,
+  dipSrN,
+  dipBbSrN,
+  majBreakN,
+  dipBbBreakN,
+});
 assert(both === 0, "triple must exclude double on same bar");
 // dip_bb_sr implies structural BB hit on that bar
 for (let i = 0; i < candles.length; i++) {
@@ -67,6 +82,12 @@ for (let i = 0; i < candles.length; i++) {
     assert(
       s.anyDip[i] === 1,
       `dipBbSr@${i} requires anyDip`
+    );
+  }
+  if (s.dipBbBreak[i] === 1) {
+    assert(
+      s.majResBreak[i] === 1,
+      `dipBbBreak@${i} requires majResBreak`
     );
   }
 }
@@ -81,6 +102,8 @@ const cfg: ListScanConfig = {
       "any_dip_bb",
       "dip_sr",
       "dip_bb_sr",
+      "maj_res_break",
+      "dip_bb_break",
     ],
     tf: "1h",
   },
@@ -99,6 +122,8 @@ assert(
       "any_dip_bb",
       "dip_sr",
       "dip_bb_sr",
+      "maj_res_break",
+      "dip_bb_break",
     ].includes(h.cond)
   ),
   "known conds"
@@ -168,6 +193,125 @@ assert(
 );
 
 // Live-ish: try a few symbols if API available
+// Synthetic major descending-resistance break (price stays under line, then crosses)
+function synthMajBreak(n: number): Candle[] {
+  const out: Candle[] = [];
+  // Line: (40,120)→(80,112) slope -0.2; keep closes well below until breakout bar
+  for (let i = 0; i < n; i++) {
+    let high = 100;
+    let low = 95;
+    let open = 97;
+    let close = 98;
+    let vol = 1000;
+    if (i === 40) {
+      high = 120;
+      low = 100;
+      open = 105;
+      close = 108;
+    } else if (i === 80) {
+      high = 112;
+      low = 98;
+      open = 104;
+      close = 106;
+    } else if (i >= 100 && i < n - 2) {
+      // Under projected line (~96 at i=158); stay ~90
+      high = 92;
+      low = 88;
+      open = 89;
+      close = 90;
+      if (i === n - 6) {
+        // dip anchor near break
+        low = 85;
+        open = 86;
+        close = 87.5;
+        high = 88;
+        vol = 9000;
+      }
+    } else if (i === n - 2) {
+      // Cross above prior trend (~96.4)
+      high = 105;
+      low = 91;
+      open = 92;
+      close = 102;
+      vol = 12000;
+    } else if (i > 40 && i < 80) {
+      high = 108;
+      low = 100;
+      open = 103;
+      close = 104;
+    } else if (i > 80 && i < 100) {
+      high = 106;
+      low = 99;
+      open = 102;
+      close = 103;
+    }
+    out.push({
+      time: 1_700_000_000 + i * 3600,
+      open,
+      high,
+      low,
+      close,
+      volume: vol,
+    });
+  }
+  return out;
+}
+
+{
+  const mb = synthMajBreak(160);
+  const r = multiDipBb(mb, { majBreakLookback: 20, breakComboBars: 12 });
+  const breaks = r.majResBreak.filter((v) => v === 1).length;
+  const combo = r.dipBbBreak.filter((v) => v === 1).length;
+  console.log("majBreak synth", {
+    breaks,
+    combo,
+    trendPts: r.majResTrend.filter((v) => v != null).length,
+  });
+  assert(breaks >= 1, "expected ≥1 maj_res_break on synth");
+  // S/R arrays still present (no regress of PR #34 structure)
+  assert(Array.isArray(r.linesSup), "maj: linesSup");
+  assert(Array.isArray(r.linesRes), "maj: linesRes");
+  assert(Array.isArray(r.flatSupports), "maj: flatSupports");
+  assert(Array.isArray(r.supportLine), "maj: supportLine");
+  assert(Array.isArray(r.resistanceLine), "maj: resistanceLine");
+  const inst2: IndicatorInstance = {
+    id: "maj-md",
+    type: "multiDipBb",
+    name: "Çoklu Dip + BB",
+    visible: true,
+    params: { showSr: 1, showMarkers: 1 },
+  };
+  const plots2 = computeBuiltin(inst2, mb);
+  const srKeys2 = plots2
+    .map((p) => p.seriesKey ?? p.id)
+    .filter(
+      (k) =>
+        k === "support" ||
+        k === "resistance" ||
+        k.includes("sup") ||
+        k.includes("res") ||
+        k.includes("flatSup")
+    );
+  assert(srKeys2.length > 0 || r.linesSup.length + r.flatSupports.length === 0, "showSr still plots");
+  const cfgMaj: ListScanConfig = {
+    matchMode: "any",
+    multiDip: {
+      enabled: true,
+      conds: ["maj_res_break", "dip_bb_break"],
+      tf: "1h",
+    },
+  };
+  const majHits = scanSymbol(mb, cfgMaj, 20);
+  assert(
+    majHits.some((h) => h.cond === "maj_res_break"),
+    "scan hits maj_res_break"
+  );
+  console.log(
+    "majHits",
+    majHits.map((h) => `${h.cond}@${h.barsAgo}`)
+  );
+}
+
 async function liveSmoke() {
   const syms = ["BTCUSDT", "ETHUSDT", "SOLUSDT"];
   for (const sym of syms) {
