@@ -47,6 +47,11 @@ import {
   OB_FALL_FETCH_LIMIT,
 } from "@/lib/indicators/obFall";
 import {
+  maSimple,
+  MA_SIMPLE_MIN_BARS,
+  MA_SIMPLE_FETCH_LIMIT,
+} from "@/lib/indicators/maSimple";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -395,6 +400,40 @@ export const OB_FALL_COND_LABEL: Record<ObFallCond, string> = {
   ob_bear: "Bear OB",
 };
 
+export type MaSimpleCond =
+  | "stack_bull"
+  | "stack_bear"
+  | "x_20_50"
+  | "x_50_100"
+  | "x_100_200"
+  | "price_x_20"
+  | "price_x_50";
+
+export const ALL_MA_SIMPLE_CONDS: MaSimpleCond[] = [
+  "stack_bull",
+  "stack_bear",
+  "x_20_50",
+  "x_50_100",
+  "x_100_200",
+  "price_x_20",
+  "price_x_50",
+];
+
+export const DEFAULT_MA_SIMPLE_CONDS: MaSimpleCond[] = [
+  "stack_bull",
+  "x_20_50",
+];
+
+export const MA_SIMPLE_COND_LABEL: Record<MaSimpleCond, string> = {
+  stack_bull: "Boğa yığını",
+  stack_bear: "Ayı yığını",
+  x_20_50: "SMA20↑50",
+  x_50_100: "SMA50↑100",
+  x_100_200: "SMA100↑200",
+  price_x_20: "Fiyat↑SMA20",
+  price_x_50: "Fiyat↑SMA50",
+};
+
 export type ListScanKind =
   | "ham"
   | "macd"
@@ -409,6 +448,7 @@ export type ListScanKind =
   | "multiDip"
   | "bbDivLg"
   | "obFall"
+  | "maSimple"
   | "pine";
 
 export type PineCond =
@@ -673,6 +713,15 @@ export type ListScanConfig = {
     pivotLookback?: number;
     /** Proximity bars for OB + fall combo (default 5) */
     comboBars?: number;
+  };
+  /** MA Basit SMA 20/50/100/200 crossovers (off by default). */
+  maSimple?: {
+    enabled: boolean;
+    conds: MaSimpleCond[];
+    p20?: number;
+    p50?: number;
+    p100?: number;
+    p200?: number;
   };
   pine?: {
     enabled: boolean;
@@ -1962,6 +2011,61 @@ function scanObFall(
   return [...best.values()];
 }
 
+
+function scanMaSimple(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["maSimple"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_MA_SIMPLE_CONDS;
+  if (candles.length < MA_SIMPLE_MIN_BARS) return [];
+  const s = maSimple(candles, {
+    p20: cfg.p20,
+    p50: cfg.p50,
+    p100: cfg.p100,
+    p200: cfg.p200,
+  });
+  const seriesFor = (cond: MaSimpleCond): (number | null)[] => {
+    switch (cond) {
+      case "stack_bull":
+        return s.stack_bull;
+      case "stack_bear":
+        return s.stack_bear;
+      case "x_20_50":
+        return s.x_20_50;
+      case "x_50_100":
+        return s.x_50_100;
+      case "x_100_200":
+        return s.x_100_200;
+      case "price_x_20":
+        return s.price_x_20;
+      case "price_x_50":
+        return s.price_x_50;
+    }
+  };
+  const best = new Map<string, ListScanHit>();
+  const last = candles.length - 1;
+  for (const cond of conds) {
+    const series = seriesFor(cond);
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = last - ago;
+      if (i < 0) break;
+      if (series[i] !== 1) continue;
+      const bias: ListScanHit["bias"] =
+        cond === "stack_bear" ? "bear" : "bull";
+      const label = MA_SIMPLE_COND_LABEL[cond] ?? cond;
+      const note = `MA Basit ${label} (−${ago})`;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "maSimple", cond, bias, barsAgo: ago, note });
+      }
+      break;
+    }
+  }
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1981,6 +2085,7 @@ export function scanSymbol(
   if (cfg.multiDip?.enabled) enabledKinds.push("multiDip");
   if (cfg.bbDivLg?.enabled) enabledKinds.push("bbDivLg");
   if (cfg.obFall?.enabled) enabledKinds.push("obFall");
+  if (cfg.maSimple?.enabled) enabledKinds.push("maSimple");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1998,6 +2103,7 @@ export function scanSymbol(
     multiDip: cfg.multiDip ? scanMultiDip(candles, cfg.multiDip, maxBarsAgo) : [],
     bbDivLg: cfg.bbDivLg ? scanBbDivLg(candles, cfg.bbDivLg, maxBarsAgo) : [],
     obFall: cfg.obFall ? scanObFall(candles, cfg.obFall, maxBarsAgo) : [],
+    maSimple: cfg.maSimple ? scanMaSimple(candles, cfg.maSimple, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2036,6 +2142,8 @@ const STATE_CONDS = new Set([
   "bb_os",
   "ob_bull",
   "ob_bear",
+  "stack_bull",
+  "stack_bear",
 ]);
 
 export function alertScanHits(
@@ -2279,6 +2387,16 @@ export function indicatorParamsFromConfig(
       showMarkers: 1,
     };
   }
+  if (kind === "maSimple" && cfg.maSimple) {
+    const m = cfg.maSimple;
+    return {
+      p20: m.p20 ?? 20,
+      p50: m.p50 ?? 50,
+      p100: m.p100 ?? 100,
+      p200: m.p200 ?? 200,
+      showMarkers: 1,
+    };
+  }
   return {};
 }
 
@@ -2297,6 +2415,7 @@ export const KIND_TO_INDICATOR: Record<
   | "multiDipBb"
   | "bbDivLg"
   | "orderBlocks"
+  | "maSimple"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2311,6 +2430,7 @@ export const KIND_TO_INDICATOR: Record<
   multiDip: "multiDipBb",
   bbDivLg: "bbDivLg",
   obFall: "orderBlocks",
+  maSimple: "maSimple",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2329,4 +2449,8 @@ export {
   OB_FALL_MIN_BARS,
   OB_FALL_FETCH_LIMIT,
 } from "@/lib/indicators/obFall";
+export {
+  MA_SIMPLE_MIN_BARS,
+  MA_SIMPLE_FETCH_LIMIT,
+} from "@/lib/indicators/maSimple";
 // DIV_SCAN_FETCH_LIMIT / DIV_SCAN_MIN_BARS exported above with DivScan types

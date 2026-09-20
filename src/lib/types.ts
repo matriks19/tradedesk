@@ -278,7 +278,8 @@ export type BuiltinIndicatorId =
   | "macdEliziHybrid"
   | "doktorHull"
   | "multiDipBb"
-  | "bbDivLg";
+  | "bbDivLg"
+  | "maSimple";
 
 export interface IndicatorInputDef {
   key: string;
