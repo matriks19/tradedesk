@@ -42,6 +42,11 @@ import {
   BB_DIV_LG_FETCH_LIMIT,
 } from "@/lib/indicators/bbDivLg";
 import {
+  obFall,
+  OB_FALL_MIN_BARS,
+  OB_FALL_FETCH_LIMIT,
+} from "@/lib/indicators/obFall";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -349,6 +354,28 @@ export const BB_DIV_LG_COND_LABEL: Record<BbDivLgCond, string> = {
   at_upper: "BB üst dokunuş",
 };
 
+export type ObFallCond = "ob_bull" | "fall_break" | "ob_fall" | "ob_bear";
+
+export const ALL_OB_FALL_CONDS: ObFallCond[] = [
+  "ob_bull",
+  "fall_break",
+  "ob_fall",
+  "ob_bear",
+];
+
+export const DEFAULT_OB_FALL_CONDS: ObFallCond[] = [
+  "ob_bull",
+  "fall_break",
+  "ob_fall",
+];
+
+export const OB_FALL_COND_LABEL: Record<ObFallCond, string> = {
+  ob_bull: "Bull OB",
+  fall_break: "Düşen kırılım",
+  ob_fall: "OB+Düşen",
+  ob_bear: "Bear OB",
+};
+
 export type ListScanKind =
   | "ham"
   | "macd"
@@ -362,6 +389,7 @@ export type ListScanKind =
   | "divScan"
   | "multiDip"
   | "bbDivLg"
+  | "obFall"
   | "pine";
 
 export type PineCond =
@@ -608,6 +636,16 @@ export type ListScanConfig = {
     useADX?: boolean;
     adxLen?: number;
     adxMin?: number;
+  };
+  /** Order Block + Düşen Kırılımı (off by default). Scan TF only. */
+  obFall?: {
+    enabled: boolean;
+    conds: ObFallCond[];
+    swing?: number;
+    impulseMult?: number;
+    pivotLookback?: number;
+    /** Proximity bars for OB + fall combo (default 5) */
+    comboBars?: number;
   };
   pine?: {
     enabled: boolean;
@@ -1849,6 +1887,46 @@ function scanBbDivLg(
   return [...best.values()];
 }
 
+function scanObFall(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["obFall"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_OB_FALL_CONDS;
+  const s = obFall(candles, {
+    swing: cfg.swing,
+    impulseMult: cfg.impulseMult,
+    pivotLookback: cfg.pivotLookback,
+    comboBars: cfg.comboBars,
+  });
+  const seriesFor = (cond: ObFallCond): (number | null)[] => {
+    if (cond === "ob_bull") return s.obBull;
+    if (cond === "fall_break") return s.fallBreak;
+    if (cond === "ob_fall") return s.obFall;
+    return s.obBear;
+  };
+  const best = new Map<string, ListScanHit>();
+  const last = candles.length - 1;
+  for (const cond of conds) {
+    const series = seriesFor(cond);
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = last - ago;
+      if (i < 0) break;
+      if (series[i] !== 1) continue;
+      const bias: ListScanHit["bias"] = cond === "ob_bear" ? "bear" : "bull";
+      const label = OB_FALL_COND_LABEL[cond] ?? cond;
+      const note = `OB+Düşen ${label} (−${ago})`;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "obFall", cond, bias, barsAgo: ago, note });
+      }
+      break;
+    }
+  }
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1867,6 +1945,7 @@ export function scanSymbol(
   if (cfg.divScan?.enabled) enabledKinds.push("divScan");
   if (cfg.multiDip?.enabled) enabledKinds.push("multiDip");
   if (cfg.bbDivLg?.enabled) enabledKinds.push("bbDivLg");
+  if (cfg.obFall?.enabled) enabledKinds.push("obFall");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1883,6 +1962,7 @@ export function scanSymbol(
     divScan: cfg.divScan ? scanDivScan(candles, cfg.divScan, maxBarsAgo) : [],
     multiDip: cfg.multiDip ? scanMultiDip(candles, cfg.multiDip, maxBarsAgo) : [],
     bbDivLg: cfg.bbDivLg ? scanBbDivLg(candles, cfg.bbDivLg, maxBarsAgo) : [],
+    obFall: cfg.obFall ? scanObFall(candles, cfg.obFall, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -1919,6 +1999,8 @@ const STATE_CONDS = new Set([
   "minus_above",
   "adx_above",
   "bb_os",
+  "ob_bull",
+  "ob_bear",
 ]);
 
 export function alertScanHits(
@@ -2149,6 +2231,14 @@ export function indicatorParamsFromConfig(
       showMarkers: 1,
     };
   }
+  if (kind === "obFall" && cfg.obFall) {
+    const o = cfg.obFall;
+    return {
+      swing: o.swing ?? 3,
+      impulseMult: o.impulseMult ?? 1.2,
+      showMarkers: 1,
+    };
+  }
   return {};
 }
 
@@ -2166,6 +2256,7 @@ export const KIND_TO_INDICATOR: Record<
   | "rsiPuNu"
   | "multiDipBb"
   | "bbDivLg"
+  | "orderBlocks"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2179,6 +2270,7 @@ export const KIND_TO_INDICATOR: Record<
   divScan: "rsiPuNu",
   multiDip: "multiDipBb",
   bbDivLg: "bbDivLg",
+  obFall: "orderBlocks",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2193,4 +2285,8 @@ export {
   BB_DIV_LG_MIN_BARS,
   BB_DIV_LG_FETCH_LIMIT,
 } from "@/lib/indicators/bbDivLg";
+export {
+  OB_FALL_MIN_BARS,
+  OB_FALL_FETCH_LIMIT,
+} from "@/lib/indicators/obFall";
 // DIV_SCAN_FETCH_LIMIT / DIV_SCAN_MIN_BARS exported above with DivScan types
