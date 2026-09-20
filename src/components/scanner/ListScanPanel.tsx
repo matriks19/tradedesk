@@ -165,6 +165,8 @@ const MULTI_DIP_CHIPS: { id: MultiDipCond; label: string }[] = [
   { id: "double_dip_bb", label: "İkili" },
   { id: "triple_dip_bb", label: "Üçlü" },
   { id: "any_dip_bb", label: "Herhangi" },
+  { id: "dip_sr", label: "Dip+S/R" },
+  { id: "dip_bb_sr", label: "BB+S/R" },
 ];
 
 const BB_DIV_LG_CHIPS: { id: BbDivLgCond; label: string }[] = [
@@ -2224,8 +2226,9 @@ export function ListScanPanel() {
         onOpen={() => setOpenCard((c) => (c === "multiDip" ? null : "multiDip"))}
       >
         <p className="text-2xs text-desk-muted">
-          İkili/üçlü dip · BB alt yakalama · momentum ≥1 · pivot lbL/lbR onay
-          (offset yok) · üçlü &gt; ikili · tarama TF mumları · ≥{MULTI_DIP_MIN_BARS} mum
+          İkili/üçlü dip · BB alt yakalama · Dip+S/R (diyagonal/yatay destek) ·
+          BB+S/R kombo · momentum ≥1 · pivot onay · üçlü &gt; ikili · chart&apos;ta
+          S/R çizgileri · ≥{MULTI_DIP_MIN_BARS} mum
         </p>
         <div className="flex flex-wrap gap-1">
           {MULTI_DIP_CHIPS.map((c) => (

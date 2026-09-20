@@ -481,7 +481,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "goldKeko", label: "Gold2 (KEKO)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "oscMain", description: "GOLD/KEKO — kutuplu enerji kırılım osilatörü. Liste Gold2: Raw/Core/Disp × RMA AL/SAT, kırılım, şarj, kutup (kenar-only).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("bbLen", "BB Len", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("kcLen", "KC Len", 20), num("kcMult", "KC Mult", 1.5, 0.5, 5, 0.1), num("peLen", "PE Len", 100), num("compressionThresh", "Sıkışma Z", 0.5, 0, 3, 0.05), num("cmfLen", "CMF Len", 21), num("polarWeightCMF", "Polar CMF", 0.6, 0, 1, 0.05), num("polarWeightHam", "Polar HAM", 0.4, 0, 1, 0.05), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89), num("displaySignalLen", "Disp EMA", 5), num("histScale", "Hist Scale", 18, 1, 100, 0.5), num("minChargeForSignal", "Min Şarj", 30, 0, 100, 1)] },
   { id: "doktorHull", label: "Doktor Hull", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "h21", description: "Hull ribbon 8/13/21/50/100/200 (Hma/Ehma/Thma). Grafik AL: 13×50↑, SAT: 21×50↓. Tarama: 100↑200 AL, 21↓100 SAT + kesişimler. Liste TF≈4h, ≥400 mum.", inputs: [sel("mode", "Hull Type", "Hma", [{ value: "Hma", label: "Hma" }, { value: "Ehma", label: "Ehma" }, { value: "Thma", label: "Thma" }]), num("showRibbon", "Ribbon", 1, 0, 1, 1), num("showMarkers", "AL/SAT", 1, 0, 1, 1), num("thickness", "Kalınlık", 2, 1, 5, 1)] },
   { id: "bbDivLg", label: "BB+RSI Div + LG", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "BB alt dokunuş + RSI OS + bullish RSI div VEYA unconfirmed Liquidity Grab. Opsiyonel EMA50+ADX trend. BUY = sinyal + mum onayı. Liste tarama TF mumları.", inputs: [num("bbLen", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("rsiLen", "RSI Periyot", 14), num("rsiOS", "RSI OS", 30), num("divLbL", "Div Pivot Sol", 5), num("divLbR", "Div Pivot Sağ", 5), num("divRangeLower", "Div Min Bar", 5), num("lgWickMult", "LG Fitil", 2, 1, 5, 0.1), num("lgVolMult", "LG Hacim", 1.3, 1, 3, 0.1), num("useTrend", "Trend Filtre", 1, 0, 1, 1), num("emaLen", "EMA", 50), num("useADX", "ADX Filtre", 1, 0, 1, 1), num("adxLen", "ADX Periyot", 14), num("adxMin", "ADX Min", 20), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1)] },
-  { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band yakalama. Pivot lbL/lbR onayında sinyal (offset yok). Üçlü > ikili öncelik. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1)] },
+  { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1), num("showSr", "S/R çizgileri", 1, 0, 1, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
 
@@ -2897,6 +2897,7 @@ export function computeBuiltin(
 
     case "multiDipBb": {
       const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const showSr = n(p, "showSr", 1) !== 0;
       const md = computeMultiDipBb(candles, {
         lbL: n(p, "lbL", 3),
         lbR: n(p, "lbR", 3),
@@ -2907,17 +2908,95 @@ export function computeBuiltin(
         minDipDistance: n(p, "minDipDistance", 5),
         maxDipDistance: n(p, "maxDipDistance", 30),
         rsiOversold: n(p, "rsiOversold", 40),
+        srTolAtr: n(p, "srTolAtr", 0.75),
+        srTolPct: n(p, "srTolPct", 0.35),
       });
       const lower = line(inst, "lowerBB", "main", "#42a5f5", candles, md.lowerBB, "BB Alt");
       const zone = line(inst, "captureZone", "main", "#90caf9", candles, md.captureZone, "Yakalama");
       const plots: PlotSeries[] = [lower, zone];
+      if (showSr) {
+        const last = candles.length - 1;
+        const rasterDiag = (seg: {
+          i0: number;
+          p0: number;
+          p1: number;
+        }) => {
+          const vals: (number | null)[] = new Array(candles.length).fill(null);
+          if (last < 0 || last === seg.i0) return vals;
+          for (let i = seg.i0; i <= last; i++) {
+            vals[i] =
+              seg.p0 + ((seg.p1 - seg.p0) * (i - seg.i0)) / (last - seg.i0);
+          }
+          return vals;
+        };
+        const colorSup = "#7BCB8B";
+        const colorRes = "#ff77ad99";
+        const colorFlat = "#26a69a";
+        md.linesSup.forEach((seg, i) => {
+          plots.push(
+            line(
+              inst,
+              `sup${i}`,
+              "main",
+              colorSup,
+              candles,
+              rasterDiag(seg),
+              i === 0 ? "Destek↘" : ""
+            )
+          );
+        });
+        md.linesRes.forEach((seg, i) => {
+          plots.push(
+            line(
+              inst,
+              `res${i}`,
+              "main",
+              colorRes,
+              candles,
+              rasterDiag(seg),
+              i === 0 ? "Direnç↘" : ""
+            )
+          );
+        });
+        md.flatSupports.forEach((flat, i) => {
+          const vals: (number | null)[] = new Array(candles.length).fill(null);
+          for (let j = flat.i0; j <= last; j++) vals[j] = flat.price;
+          plots.push(
+            line(
+              inst,
+              `flatSup${i}`,
+              "main",
+              colorFlat,
+              candles,
+              vals,
+              i === 0 ? "Yatay destek" : ""
+            )
+          );
+        });
+      }
       if (showMarkers) {
         const markers: PlotMarker[] = [];
         for (let i = 0; i < candles.length; i++) {
-          const t = candles[i]!.time;
-          if (md.tripleDip[i] === 1) {
+          const tm = candles[i]!.time;
+          if (md.dipBbSr[i] === 1) {
             markers.push({
-              time: t,
+              time: tm,
+              position: "belowBar",
+              color: "#00e676",
+              shape: "arrowUp",
+              text: "BB+S/R",
+            });
+          } else if (md.dipSr[i] === 1) {
+            markers.push({
+              time: tm,
+              position: "belowBar",
+              color: "#69f0ae",
+              shape: "circle",
+              text: "Dip+S/R",
+            });
+          } else if (md.tripleDip[i] === 1) {
+            markers.push({
+              time: tm,
               position: "belowBar",
               color: "#ff9800",
               shape: "arrowUp",
@@ -2925,7 +3004,7 @@ export function computeBuiltin(
             });
           } else if (md.doubleDip[i] === 1) {
             markers.push({
-              time: t,
+              time: tm,
               position: "belowBar",
               color: "#4caf50",
               shape: "arrowUp",
