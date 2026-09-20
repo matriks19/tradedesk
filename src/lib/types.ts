@@ -276,7 +276,8 @@ export type BuiltinIndicatorId =
   // Elizi Lab
   | "eliziEdge"
   | "macdEliziHybrid"
-  | "doktorHull";
+  | "doktorHull"
+  | "multiDipBb";
 
 export interface IndicatorInputDef {
   key: string;

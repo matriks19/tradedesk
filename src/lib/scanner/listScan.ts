@@ -32,6 +32,11 @@ import {
   GOLD_KEKO_FETCH_LIMIT,
 } from "@/lib/indicators/goldKeko";
 import {
+  multiDipBb,
+  MULTI_DIP_MIN_BARS,
+  MULTI_DIP_FETCH_LIMIT,
+} from "@/lib/indicators/multiDipBb";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -275,6 +280,26 @@ export const DEFAULT_HAM_AO_CONDS: HamAoCond[] = [
   "pt_x_nt",
 ];
 
+export type MultiDipCond = "double_dip_bb" | "triple_dip_bb" | "any_dip_bb";
+
+export const ALL_MULTI_DIP_CONDS: MultiDipCond[] = [
+  "double_dip_bb",
+  "triple_dip_bb",
+  "any_dip_bb",
+];
+
+export const DEFAULT_MULTI_DIP_CONDS: MultiDipCond[] = [
+  "double_dip_bb",
+  "triple_dip_bb",
+  "any_dip_bb",
+];
+
+export const MULTI_DIP_COND_LABEL: Record<MultiDipCond, string> = {
+  double_dip_bb: "İkili",
+  triple_dip_bb: "Üçlü",
+  any_dip_bb: "Herhangi",
+};
+
 export type ListScanKind =
   | "ham"
   | "macd"
@@ -286,6 +311,7 @@ export type ListScanKind =
   | "gold"
   | "gold2"
   | "divScan"
+  | "multiDip"
   | "pine";
 
 export type PineCond =
@@ -493,6 +519,24 @@ export type ListScanConfig = {
     divRangeUpper?: number;
     divLbL?: number;
     divLbR?: number;
+  };
+  /** Multi-Dip + BB capture — İkili/Üçlü dip (off by default). */
+  multiDip?: {
+    enabled: boolean;
+    conds: MultiDipCond[];
+    /** Preferred scan TF (Pine default 60 → 1h). Uses scan candles only — no HTF security. */
+    tf?: string;
+    lbL?: number;
+    lbR?: number;
+    bbLength?: number;
+    bbMult?: number;
+    bbProximity?: number;
+    dipSensitivity?: number;
+    minDipDistance?: number;
+    maxDipDistance?: number;
+    rsiOversold?: number;
+    volumeFilter?: boolean;
+    rsiFilter?: boolean;
   };
   pine?: {
     enabled: boolean;
@@ -1631,6 +1675,53 @@ function scanDivScan(
   return [...best.values()];
 }
 
+
+function scanMultiDip(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["multiDip"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_MULTI_DIP_CONDS;
+  const s = multiDipBb(candles, {
+    lbL: cfg.lbL,
+    lbR: cfg.lbR,
+    bbLength: cfg.bbLength,
+    bbMult: cfg.bbMult,
+    bbProximity: cfg.bbProximity,
+    dipSensitivity: cfg.dipSensitivity,
+    minDipDistance: cfg.minDipDistance,
+    maxDipDistance: cfg.maxDipDistance,
+    rsiOversold: cfg.rsiOversold,
+    volumeFilter: cfg.volumeFilter,
+    rsiFilter: cfg.rsiFilter,
+  });
+  const seriesFor = (cond: MultiDipCond): (number | null)[] => {
+    if (cond === "double_dip_bb") return s.doubleDip;
+    if (cond === "triple_dip_bb") return s.tripleDip;
+    return s.anyDip;
+  };
+  const best = new Map<string, ListScanHit>();
+  const last = candles.length - 1;
+  for (const cond of conds) {
+    const series = seriesFor(cond);
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = last - ago;
+      if (i < 0) break;
+      if (series[i] !== 1) continue;
+      const bias: ListScanHit["bias"] = "bull";
+      const label = MULTI_DIP_COND_LABEL[cond] ?? cond;
+      const note = `Dip+BB ${label} (−${ago})`;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "multiDip", cond, bias, barsAgo: ago, note });
+      }
+      break;
+    }
+  }
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1647,6 +1738,7 @@ export function scanSymbol(
   if (cfg.gold?.enabled) enabledKinds.push("gold");
   if (cfg.gold2?.enabled) enabledKinds.push("gold2");
   if (cfg.divScan?.enabled) enabledKinds.push("divScan");
+  if (cfg.multiDip?.enabled) enabledKinds.push("multiDip");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1661,6 +1753,7 @@ export function scanSymbol(
     gold: cfg.gold ? scanGold(candles, cfg.gold, maxBarsAgo) : [],
     gold2: cfg.gold2 ? scanGold2(candles, cfg.gold2, maxBarsAgo) : [],
     divScan: cfg.divScan ? scanDivScan(candles, cfg.divScan, maxBarsAgo) : [],
+    multiDip: cfg.multiDip ? scanMultiDip(candles, cfg.multiDip, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -1891,6 +1984,21 @@ export function indicatorParamsFromConfig(
       showMarkers: 1,
     };
   }
+  if (kind === "multiDip" && cfg.multiDip) {
+    const m = cfg.multiDip;
+    return {
+      lbL: m.lbL ?? 3,
+      lbR: m.lbR ?? 3,
+      bbLength: m.bbLength ?? 20,
+      bbMult: m.bbMult ?? 2,
+      bbProximity: m.bbProximity ?? 0.5,
+      dipSensitivity: m.dipSensitivity ?? 1.5,
+      minDipDistance: m.minDipDistance ?? 5,
+      maxDipDistance: m.maxDipDistance ?? 30,
+      rsiOversold: m.rsiOversold ?? 40,
+      showMarkers: 1,
+    };
+  }
   return {};
 }
 
@@ -1906,6 +2014,7 @@ export const KIND_TO_INDICATOR: Record<
   | "aohamJrmaEngine"
   | "goldKeko"
   | "rsiPuNu"
+  | "multiDipBb"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -1917,10 +2026,15 @@ export const KIND_TO_INDICATOR: Record<
   gold: "aohamJrmaEngine",
   gold2: "goldKeko",
   divScan: "rsiPuNu",
+  multiDip: "multiDipBb",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
 export { HAM_AO_JRMA_Z_MIN_BARS } from "@/lib/indicators/hamAoJrmaZ";
 export { AOHAM_JRMA_MIN_BARS } from "@/lib/indicators/aohamJrmaEngine";
 export { GOLD_KEKO_MIN_BARS, GOLD_KEKO_FETCH_LIMIT } from "@/lib/indicators/goldKeko";
+export {
+  MULTI_DIP_MIN_BARS,
+  MULTI_DIP_FETCH_LIMIT,
+} from "@/lib/indicators/multiDipBb";
 // DIV_SCAN_FETCH_LIMIT / DIV_SCAN_MIN_BARS exported above with DivScan types
