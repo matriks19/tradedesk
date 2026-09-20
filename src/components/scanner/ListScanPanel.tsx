@@ -168,6 +168,10 @@ const BB_DIV_LG_CHIPS: { id: BbDivLgCond; label: string }[] = [
   { id: "signal", label: "Sinyal" },
   { id: "buy", label: "BUY" },
   { id: "bb_os", label: "BB+OS" },
+  { id: "lower_x_up", label: "Alt↑" },
+  { id: "at_lower", label: "Alt değdi" },
+  { id: "upper_x_dn", label: "Üst↓" },
+  { id: "at_upper", label: "Üst değdi" },
 ];
 
 
@@ -2204,7 +2208,7 @@ export function ListScanPanel() {
       >
         <p className="text-2xs text-desk-muted">
           BB alt · RSI OS · bullish RSI div VEYA unconfirmed LG (fitil+hacim) ·
-          opsiyonel EMA50+ADX · BUY = sinyal + mum onayı · ≥{BB_DIV_LG_MIN_BARS} mum
+          opsiyonel EMA50+ADX · BUY = sinyal + mum onayı · Alt↑ dip / Üst↓ hedef · ≥{BB_DIV_LG_MIN_BARS} mum
         </p>
         <div className="flex flex-wrap gap-1">
           {BB_DIV_LG_CHIPS.map((c) => (
