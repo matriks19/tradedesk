@@ -3,6 +3,10 @@
  *
  * Pine: bb_div_lg_optimize.pine
  * - atLowerBB: low <= lowerBB
+ * - lower_x_up: close crosses UP through lower BB
+ * - at_lower: low <= lower BB (standalone chip)
+ * - upper_x_dn: close crosses DOWN through upper BB (target/exit)
+ * - at_upper: high >= upper BB (standalone chip)
  * - RSI oversold
  * - bullish RSI div OR unconfirmed same-bar Liquidity Grab
  * - optional trend: close > EMA50 && ADX >= min (defaults ON)
@@ -58,6 +62,14 @@ export type BbDivLgResult = {
   buy: (number | null)[];
   /** At BB + RSI OS (+ trend) without requiring LG/div */
   bbOs: (number | null)[];
+  /** Close crosses UP through BB lower (classic dip bounce) */
+  lowerXUp: (number | null)[];
+  /** low <= lower BB */
+  atLower: (number | null)[];
+  /** Close crosses DOWN through BB upper (target/exit) */
+  upperXDn: (number | null)[];
+  /** high >= upper BB */
+  atUpper: (number | null)[];
 };
 
 export const BB_DIV_LG_MIN_BARS = 80;
@@ -101,6 +113,10 @@ export function bbDivLg(
   const signal = empty();
   const buy = empty();
   const bbOs = empty();
+  const lowerXUp = empty();
+  const atLower = empty();
+  const upperXDn = empty();
+  const atUpper = empty();
 
   if (n < BB_DIV_LG_MIN_BARS) {
     return {
@@ -115,6 +131,10 @@ export function bbDivLg(
       signal,
       buy,
       bbOs,
+      lowerXUp,
+      atLower,
+      upperXDn,
+      atUpper,
     };
   }
 
@@ -143,9 +163,44 @@ export function bbDivLg(
 
     const bar = candles[i]!;
     const loBand = bb.lower[i];
+    const upBand = bb.upper[i];
     const rsiV = rsiVals[i];
     const emaV = emaVals[i];
     const adxV = adxPack.adx[i];
+
+    // Standalone BB band chips (no RSI/trend required)
+    if (loBand != null) {
+      const atLowerBB = bar.low <= loBand;
+      if (atLowerBB) atLower[i] = 1;
+      // close crosses UP through lower BB (78aecbb)
+      if (i >= 1) {
+        const prevClose = candles[i - 1]!.close;
+        const prevLower = bb.lower[i - 1];
+        if (
+          prevLower != null &&
+          prevClose <= prevLower &&
+          bar.close > loBand
+        ) {
+          lowerXUp[i] = 1;
+        }
+      }
+    }
+    if (upBand != null) {
+      if (bar.high >= upBand) atUpper[i] = 1;
+      // close crosses DOWN through upper BB (target/exit)
+      if (i >= 1) {
+        const prevClose = candles[i - 1]!.close;
+        const prevUpper = bb.upper[i - 1];
+        if (
+          prevUpper != null &&
+          prevClose >= prevUpper &&
+          bar.close < upBand
+        ) {
+          upperXDn[i] = 1;
+        }
+      }
+    }
+
     if (loBand == null || rsiV == null) continue;
 
     const atLowerBB = bar.low <= loBand;
@@ -203,5 +258,9 @@ export function bbDivLg(
     signal,
     buy,
     bbOs,
+    lowerXUp,
+    atLower,
+    upperXDn,
+    atUpper,
   };
 }

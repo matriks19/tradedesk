@@ -305,7 +305,16 @@ export const MULTI_DIP_COND_LABEL: Record<MultiDipCond, string> = {
   any_dip_bb: "Herhangi",
 };
 
-export type BbDivLgCond = "lg" | "div_bb" | "signal" | "buy" | "bb_os";
+export type BbDivLgCond =
+  | "lg"
+  | "div_bb"
+  | "signal"
+  | "buy"
+  | "bb_os"
+  | "lower_x_up"
+  | "at_lower"
+  | "upper_x_dn"
+  | "at_upper";
 
 export const ALL_BB_DIV_LG_CONDS: BbDivLgCond[] = [
   "lg",
@@ -313,6 +322,10 @@ export const ALL_BB_DIV_LG_CONDS: BbDivLgCond[] = [
   "signal",
   "buy",
   "bb_os",
+  "lower_x_up",
+  "at_lower",
+  "upper_x_dn",
+  "at_upper",
 ];
 
 export const DEFAULT_BB_DIV_LG_CONDS: BbDivLgCond[] = [
@@ -320,6 +333,8 @@ export const DEFAULT_BB_DIV_LG_CONDS: BbDivLgCond[] = [
   "div_bb",
   "signal",
   "buy",
+  "lower_x_up",
+  "upper_x_dn",
 ];
 
 export const BB_DIV_LG_COND_LABEL: Record<BbDivLgCond, string> = {
@@ -328,6 +343,10 @@ export const BB_DIV_LG_COND_LABEL: Record<BbDivLgCond, string> = {
   signal: "Sinyal",
   buy: "BUY",
   bb_os: "BB+RSI OS",
+  lower_x_up: "BB alt band↑",
+  at_lower: "BB alt dokunuş",
+  upper_x_dn: "BB üst band↓",
+  at_upper: "BB üst dokunuş",
 };
 
 export type ListScanKind =
@@ -1802,6 +1821,10 @@ function scanBbDivLg(
     if (cond === "div_bb") return s.divBb;
     if (cond === "signal") return s.signal;
     if (cond === "buy") return s.buy;
+    if (cond === "lower_x_up") return s.lowerXUp;
+    if (cond === "at_lower") return s.atLower;
+    if (cond === "upper_x_dn") return s.upperXDn;
+    if (cond === "at_upper") return s.atUpper;
     return s.bbOs;
   };
   const best = new Map<string, ListScanHit>();
@@ -1812,7 +1835,8 @@ function scanBbDivLg(
       const i = last - ago;
       if (i < 0) break;
       if (series[i] !== 1) continue;
-      const bias: ListScanHit["bias"] = "bull";
+      const bias: ListScanHit["bias"] =
+        cond === "upper_x_dn" || cond === "at_upper" ? "bear" : "bull";
       const label = BB_DIV_LG_COND_LABEL[cond] ?? cond;
       const note = `BB+LG ${label} (−${ago})`;
       const prev = best.get(cond);
