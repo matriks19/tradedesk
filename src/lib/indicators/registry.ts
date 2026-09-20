@@ -195,6 +195,7 @@ import { aohamJrmaEngine } from "./aohamJrmaEngine";
 import { goldKeko } from "./goldKeko";
 import { doktorHull as computeDoktorHull } from "./doktorHull";
 import { multiDipBb as computeMultiDipBb } from "./multiDipBb";
+import { bbDivLg as computeBbDivLg } from "./bbDivLg";
 
 export type PlotMarker = {
   time: number;
@@ -479,6 +480,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "aohamJrmaEngine", label: "Gold (AOHAM JRMA)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "aoPlot", description: "AOHAM_JRMA_ENGINE — real Jurik + AO/Score/RMA 0–100 plots. Liste Gold: AO×Score AL/SAT, AO×RMA AL/SAT (ana), PT↔NT (garanti). Edge-only.", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("wHam", "HAM W", 0.6, 0, 1, 0.05), num("wAo", "AO W", 0.4, 0, 1, 0.05), num("trendLen", "Trend Len", 34), num("trendBoost", "Trend Boost", 1.3, 0.5, 3, 0.1), num("jrmaLen", "Jurik Len", 8), num("jrmaPhase", "Jurik Phase", 0, -100, 100, 1), num("jrmaPower", "Jurik Power", 2, 0.1, 5, 0.1), num("jrmaRmaLen", "RMA Len", 13), num("preSmooth", "Pre Smooth", 3), num("postSmooth", "Post Smooth", 2), num("normLen", "Norm Len", 40), num("zLen", "Z Len", 89)] },
   { id: "goldKeko", label: "Gold2 (KEKO)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "oscMain", description: "GOLD/KEKO — kutuplu enerji kırılım osilatörü. Liste Gold2: Raw/Core/Disp × RMA AL/SAT, kırılım, şarj, kutup (kenar-only).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("bbLen", "BB Len", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("kcLen", "KC Len", 20), num("kcMult", "KC Mult", 1.5, 0.5, 5, 0.1), num("peLen", "PE Len", 100), num("compressionThresh", "Sıkışma Z", 0.5, 0, 3, 0.05), num("cmfLen", "CMF Len", 21), num("polarWeightCMF", "Polar CMF", 0.6, 0, 1, 0.05), num("polarWeightHam", "Polar HAM", 0.4, 0, 1, 0.05), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89), num("displaySignalLen", "Disp EMA", 5), num("histScale", "Hist Scale", 18, 1, 100, 0.5), num("minChargeForSignal", "Min Şarj", 30, 0, 100, 1)] },
   { id: "doktorHull", label: "Doktor Hull", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "h21", description: "Hull ribbon 8/13/21/50/100/200 (Hma/Ehma/Thma). Grafik AL: 13×50↑, SAT: 21×50↓. Tarama: 100↑200 AL, 21↓100 SAT + kesişimler. Liste TF≈4h, ≥400 mum.", inputs: [sel("mode", "Hull Type", "Hma", [{ value: "Hma", label: "Hma" }, { value: "Ehma", label: "Ehma" }, { value: "Thma", label: "Thma" }]), num("showRibbon", "Ribbon", 1, 0, 1, 1), num("showMarkers", "AL/SAT", 1, 0, 1, 1), num("thickness", "Kalınlık", 2, 1, 5, 1)] },
+  { id: "bbDivLg", label: "BB+RSI Div + LG", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "BB alt dokunuş + RSI OS + bullish RSI div VEYA unconfirmed Liquidity Grab. Opsiyonel EMA50+ADX trend. BUY = sinyal + mum onayı. Liste tarama TF mumları.", inputs: [num("bbLen", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("rsiLen", "RSI Periyot", 14), num("rsiOS", "RSI OS", 30), num("divLbL", "Div Pivot Sol", 5), num("divLbR", "Div Pivot Sağ", 5), num("divRangeLower", "Div Min Bar", 5), num("lgWickMult", "LG Fitil", 2, 1, 5, 0.1), num("lgVolMult", "LG Hacim", 1.3, 1, 3, 0.1), num("useTrend", "Trend Filtre", 1, 0, 1, 1), num("emaLen", "EMA", 50), num("useADX", "ADX Filtre", 1, 0, 1, 1), num("adxLen", "ADX Periyot", 14), num("adxMin", "ADX Min", 20), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1)] },
   { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band yakalama. Pivot lbL/lbR onayında sinyal (offset yok). Üçlü > ikili öncelik. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
@@ -2825,6 +2827,70 @@ export function computeBuiltin(
         h50: dh.h50,
         h100: dh.h100,
         h200: dh.h200,
+      });
+      break;
+    }
+
+
+    case "bbDivLg": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const s = computeBbDivLg(candles, {
+        bbLen: n(p, "bbLen", 20),
+        bbMult: n(p, "bbMult", 2),
+        rsiLen: n(p, "rsiLen", 14),
+        rsiOS: n(p, "rsiOS", 30),
+        divLbL: n(p, "divLbL", 5),
+        divLbR: n(p, "divLbR", 5),
+        divRangeLower: n(p, "divRangeLower", 5),
+        lgWickMult: n(p, "lgWickMult", 2),
+        lgVolMult: n(p, "lgVolMult", 1.3),
+        useTrend: n(p, "useTrend", 1) !== 0,
+        emaLen: n(p, "emaLen", 50),
+        useADX: n(p, "useADX", 1) !== 0,
+        adxLen: n(p, "adxLen", 14),
+        adxMin: n(p, "adxMin", 20),
+      });
+      const lower = line(inst, "lowerBB", "main", "#42a5f5", candles, s.lowerBB, "BB Alt");
+      const emaL = line(inst, "ema", "main", "#ab47bc", candles, s.ema, "EMA");
+      const plots: PlotSeries[] = [lower, emaL];
+      if (showMarkers) {
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          const t = candles[i]!.time;
+          if (s.buy[i] === 1) {
+            markers.push({
+              time: t,
+              position: "belowBar",
+              color: "#76ff03",
+              shape: "arrowUp",
+              text: "BUY",
+            });
+          } else if (s.lg[i] === 1) {
+            markers.push({
+              time: t,
+              position: "belowBar",
+              color: "#ef5350",
+              shape: "circle",
+              text: "LG",
+            });
+          } else if (s.divBb[i] === 1) {
+            markers.push({
+              time: t,
+              position: "belowBar",
+              color: "#66bb6a",
+              shape: "arrowUp",
+              text: "DIV",
+            });
+          }
+        }
+        markers.sort((a, b) => a.time - b.time);
+        if (plots[0]) plots[0].markers = markers;
+      }
+      push(plots, {
+        lowerBB: s.lowerBB,
+        midBB: s.midBB,
+        upperBB: s.upperBB,
+        ema: s.ema,
       });
       break;
     }

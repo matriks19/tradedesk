@@ -37,6 +37,11 @@ import {
   MULTI_DIP_FETCH_LIMIT,
 } from "@/lib/indicators/multiDipBb";
 import {
+  bbDivLg,
+  BB_DIV_LG_MIN_BARS,
+  BB_DIV_LG_FETCH_LIMIT,
+} from "@/lib/indicators/bbDivLg";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -300,6 +305,31 @@ export const MULTI_DIP_COND_LABEL: Record<MultiDipCond, string> = {
   any_dip_bb: "Herhangi",
 };
 
+export type BbDivLgCond = "lg" | "div_bb" | "signal" | "buy" | "bb_os";
+
+export const ALL_BB_DIV_LG_CONDS: BbDivLgCond[] = [
+  "lg",
+  "div_bb",
+  "signal",
+  "buy",
+  "bb_os",
+];
+
+export const DEFAULT_BB_DIV_LG_CONDS: BbDivLgCond[] = [
+  "lg",
+  "div_bb",
+  "signal",
+  "buy",
+];
+
+export const BB_DIV_LG_COND_LABEL: Record<BbDivLgCond, string> = {
+  lg: "Liquidity Grab",
+  div_bb: "BB+RSI bullish div",
+  signal: "Sinyal",
+  buy: "BUY",
+  bb_os: "BB+RSI OS",
+};
+
 export type ListScanKind =
   | "ham"
   | "macd"
@@ -312,6 +342,7 @@ export type ListScanKind =
   | "gold2"
   | "divScan"
   | "multiDip"
+  | "bbDivLg"
   | "pine";
 
 export type PineCond =
@@ -537,6 +568,27 @@ export type ListScanConfig = {
     rsiOversold?: number;
     volumeFilter?: boolean;
     rsiFilter?: boolean;
+  };
+  /** BB Alt + RSI Div + Liquidity Grab (off by default). Scan TF only. */
+  bbDivLg?: {
+    enabled: boolean;
+    conds: BbDivLgCond[];
+    bbLen?: number;
+    bbMult?: number;
+    rsiLen?: number;
+    rsiOS?: number;
+    divLbL?: number;
+    divLbR?: number;
+    divRangeLower?: number;
+    lgWickMult?: number;
+    lgVolMult?: number;
+    /** Pine useTrend default true */
+    useTrend?: boolean;
+    emaLen?: number;
+    /** Pine useADX default true */
+    useADX?: boolean;
+    adxLen?: number;
+    adxMin?: number;
   };
   pine?: {
     enabled: boolean;
@@ -1722,6 +1774,57 @@ function scanMultiDip(
   return [...best.values()];
 }
 
+function scanBbDivLg(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["bbDivLg"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_BB_DIV_LG_CONDS;
+  const s = bbDivLg(candles, {
+    bbLen: cfg.bbLen,
+    bbMult: cfg.bbMult,
+    rsiLen: cfg.rsiLen,
+    rsiOS: cfg.rsiOS,
+    divLbL: cfg.divLbL,
+    divLbR: cfg.divLbR,
+    divRangeLower: cfg.divRangeLower,
+    lgWickMult: cfg.lgWickMult,
+    lgVolMult: cfg.lgVolMult,
+    useTrend: cfg.useTrend,
+    emaLen: cfg.emaLen,
+    useADX: cfg.useADX,
+    adxLen: cfg.adxLen,
+    adxMin: cfg.adxMin,
+  });
+  const seriesFor = (cond: BbDivLgCond): (number | null)[] => {
+    if (cond === "lg") return s.lg;
+    if (cond === "div_bb") return s.divBb;
+    if (cond === "signal") return s.signal;
+    if (cond === "buy") return s.buy;
+    return s.bbOs;
+  };
+  const best = new Map<string, ListScanHit>();
+  const last = candles.length - 1;
+  for (const cond of conds) {
+    const series = seriesFor(cond);
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = last - ago;
+      if (i < 0) break;
+      if (series[i] !== 1) continue;
+      const bias: ListScanHit["bias"] = "bull";
+      const label = BB_DIV_LG_COND_LABEL[cond] ?? cond;
+      const note = `BB+LG ${label} (−${ago})`;
+      const prev = best.get(cond);
+      if (!prev || ago < prev.barsAgo) {
+        best.set(cond, { kind: "bbDivLg", cond, bias, barsAgo: ago, note });
+      }
+      break;
+    }
+  }
+  return [...best.values()];
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -1739,6 +1842,7 @@ export function scanSymbol(
   if (cfg.gold2?.enabled) enabledKinds.push("gold2");
   if (cfg.divScan?.enabled) enabledKinds.push("divScan");
   if (cfg.multiDip?.enabled) enabledKinds.push("multiDip");
+  if (cfg.bbDivLg?.enabled) enabledKinds.push("bbDivLg");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -1754,6 +1858,7 @@ export function scanSymbol(
     gold2: cfg.gold2 ? scanGold2(candles, cfg.gold2, maxBarsAgo) : [],
     divScan: cfg.divScan ? scanDivScan(candles, cfg.divScan, maxBarsAgo) : [],
     multiDip: cfg.multiDip ? scanMultiDip(candles, cfg.multiDip, maxBarsAgo) : [],
+    bbDivLg: cfg.bbDivLg ? scanBbDivLg(candles, cfg.bbDivLg, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -1789,6 +1894,7 @@ const STATE_CONDS = new Set([
   "plus_above",
   "minus_above",
   "adx_above",
+  "bb_os",
 ]);
 
 export function alertScanHits(
@@ -1999,6 +2105,26 @@ export function indicatorParamsFromConfig(
       showMarkers: 1,
     };
   }
+  if (kind === "bbDivLg" && cfg.bbDivLg) {
+    const b = cfg.bbDivLg;
+    return {
+      bbLen: b.bbLen ?? 20,
+      bbMult: b.bbMult ?? 2,
+      rsiLen: b.rsiLen ?? 14,
+      rsiOS: b.rsiOS ?? 30,
+      divLbL: b.divLbL ?? 5,
+      divLbR: b.divLbR ?? 5,
+      divRangeLower: b.divRangeLower ?? 5,
+      lgWickMult: b.lgWickMult ?? 2,
+      lgVolMult: b.lgVolMult ?? 1.3,
+      useTrend: b.useTrend === false ? 0 : 1,
+      emaLen: b.emaLen ?? 50,
+      useADX: b.useADX === false ? 0 : 1,
+      adxLen: b.adxLen ?? 14,
+      adxMin: b.adxMin ?? 20,
+      showMarkers: 1,
+    };
+  }
   return {};
 }
 
@@ -2015,6 +2141,7 @@ export const KIND_TO_INDICATOR: Record<
   | "goldKeko"
   | "rsiPuNu"
   | "multiDipBb"
+  | "bbDivLg"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2027,6 +2154,7 @@ export const KIND_TO_INDICATOR: Record<
   gold2: "goldKeko",
   divScan: "rsiPuNu",
   multiDip: "multiDipBb",
+  bbDivLg: "bbDivLg",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2037,4 +2165,8 @@ export {
   MULTI_DIP_MIN_BARS,
   MULTI_DIP_FETCH_LIMIT,
 } from "@/lib/indicators/multiDipBb";
+export {
+  BB_DIV_LG_MIN_BARS,
+  BB_DIV_LG_FETCH_LIMIT,
+} from "@/lib/indicators/bbDivLg";
 // DIV_SCAN_FETCH_LIMIT / DIV_SCAN_MIN_BARS exported above with DivScan types
