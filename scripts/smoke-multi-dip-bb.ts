@@ -1,9 +1,11 @@
 /**
- * Unit smoke: Multi-Dip + BB list scan.
+ * Unit smoke: Multi-Dip + BB (+ S/R) list scan.
  * Run: npx --yes tsx scripts/smoke-multi-dip-bb.ts
  */
 import type { Candle } from "../src/lib/types";
 import { multiDipBb } from "../src/lib/indicators/multiDipBb";
+import { computeBuiltin } from "../src/lib/indicators/registry";
+import type { IndicatorInstance } from "../src/lib/types";
 import { scanSymbol, type ListScanConfig } from "../src/lib/scanner/listScan";
 
 function assert(cond: boolean, msg: string) {
@@ -39,23 +41,47 @@ assert(s.lowerBB.length === candles.length, "len lowerBB");
 assert(s.captureZone.length === candles.length, "len zone");
 assert(s.doubleDip.length === candles.length, "len double");
 assert(s.tripleDip.length === candles.length, "len triple");
+assert(s.dipSr.length === candles.length, "len dipSr");
+assert(s.dipBbSr.length === candles.length, "len dipBbSr");
+assert(Array.isArray(s.linesSup), "linesSup array");
+assert(Array.isArray(s.linesRes), "linesRes array");
+assert(Array.isArray(s.flatSupports), "flatSupports array");
 
 let doubles = 0,
   triples = 0,
-  both = 0;
+  both = 0,
+  dipSrN = 0,
+  dipBbSrN = 0;
 for (let i = 0; i < candles.length; i++) {
   if (s.doubleDip[i] === 1) doubles++;
   if (s.tripleDip[i] === 1) triples++;
   if (s.doubleDip[i] === 1 && s.tripleDip[i] === 1) both++;
+  if (s.dipSr[i] === 1) dipSrN++;
+  if (s.dipBbSr[i] === 1) dipBbSrN++;
 }
-console.log("signals", { doubles, triples, both });
+console.log("signals", { doubles, triples, both, dipSrN, dipBbSrN });
 assert(both === 0, "triple must exclude double on same bar");
+// dip_bb_sr implies structural BB hit on that bar
+for (let i = 0; i < candles.length; i++) {
+  if (s.dipBbSr[i] === 1) {
+    assert(
+      s.anyDip[i] === 1,
+      `dipBbSr@${i} requires anyDip`
+    );
+  }
+}
 
 const cfg: ListScanConfig = {
   matchMode: "any",
   multiDip: {
     enabled: true,
-    conds: ["double_dip_bb", "triple_dip_bb", "any_dip_bb"],
+    conds: [
+      "double_dip_bb",
+      "triple_dip_bb",
+      "any_dip_bb",
+      "dip_sr",
+      "dip_bb_sr",
+    ],
     tf: "1h",
   },
 };
@@ -67,10 +93,52 @@ console.log(
 assert(hits.every((h) => h.kind === "multiDip"), "kind multiDip");
 assert(
   hits.every((h) =>
-    ["double_dip_bb", "triple_dip_bb", "any_dip_bb"].includes(h.cond)
+    [
+      "double_dip_bb",
+      "triple_dip_bb",
+      "any_dip_bb",
+      "dip_sr",
+      "dip_bb_sr",
+    ].includes(h.cond)
   ),
   "known conds"
 );
+
+// Registry plotSeries must include S/R line segments (sup*/flatSup*)
+const inst: IndicatorInstance = {
+  id: "test-md",
+  type: "multiDipBb",
+  name: "Çoklu Dip + BB",
+  visible: true,
+  params: { showMarkers: 1, showSr: 1 },
+};
+const plots = computeBuiltin(inst, candles);
+const keys = plots.map((p) => p.seriesKey ?? p.id);
+console.log("plot keys sample", keys.slice(0, 24), "total", keys.length);
+assert(
+  keys.some((k) => k.includes("lowerBB") || k.includes("BB")),
+  "has BB plot"
+);
+if (s.flatSupports.length > 0) {
+  assert(
+    keys.some((k) => k.includes("flatSup")),
+    "flatSup segments in computeBuiltin"
+  );
+}
+if (s.linesSup.length > 0) {
+  assert(
+    keys.some((k) => k.includes("sup")),
+    "diagonal sup segments in computeBuiltin"
+  );
+}
+console.log("sr segments", {
+  linesSup: s.linesSup.length,
+  linesRes: s.linesRes.length,
+  flatSupports: s.flatSupports.length,
+  plotSr: keys.filter(
+    (k) => k.includes("sup") || k.includes("res") || k.includes("flatSup")
+  ),
+});
 
 // Live-ish: try a few symbols if API available
 async function liveSmoke() {
@@ -93,11 +161,35 @@ async function liveSmoke() {
         volume: Number(k[5]),
       }));
       const h = scanSymbol(cs, cfg, 30);
+      const md = multiDipBb(cs);
+      const liveInst: IndicatorInstance = {
+        id: "live-md",
+        type: "multiDipBb",
+        name: "Çoklu Dip + BB",
+        visible: true,
+        params: { showSr: 1, showMarkers: 1 },
+      };
+      const livePlots = computeBuiltin(liveInst, cs);
+      const srKeys = livePlots
+        .map((p) => p.seriesKey ?? p.id)
+        .filter(
+          (k) =>
+            k.includes("sup") ||
+            k.includes("res") ||
+            k.includes("flatSup")
+        );
       console.log(
         sym,
         "hits",
-        h.map((x) => `${x.cond}@${x.barsAgo}`)
+        h.map((x) => `${x.cond}@${x.barsAgo}`),
+        "srPlots",
+        srKeys.length,
+        "linesSup",
+        md.linesSup.length,
+        "flat",
+        md.flatSupports.length
       );
+      assert(srKeys.length > 0 || md.linesSup.length + md.flatSupports.length === 0, "live S/R plots");
     } catch (e) {
       console.log("live err", sym, e instanceof Error ? e.message : e);
     }

@@ -290,24 +290,35 @@ export const DEFAULT_HAM_AO_CONDS: HamAoCond[] = [
   "pt_x_nt",
 ];
 
-export type MultiDipCond = "double_dip_bb" | "triple_dip_bb" | "any_dip_bb";
+export type MultiDipCond =
+  | "double_dip_bb"
+  | "triple_dip_bb"
+  | "any_dip_bb"
+  | "dip_sr"
+  | "dip_bb_sr";
 
 export const ALL_MULTI_DIP_CONDS: MultiDipCond[] = [
   "double_dip_bb",
   "triple_dip_bb",
   "any_dip_bb",
+  "dip_sr",
+  "dip_bb_sr",
 ];
 
 export const DEFAULT_MULTI_DIP_CONDS: MultiDipCond[] = [
   "double_dip_bb",
   "triple_dip_bb",
   "any_dip_bb",
+  "dip_sr",
+  "dip_bb_sr",
 ];
 
 export const MULTI_DIP_COND_LABEL: Record<MultiDipCond, string> = {
   double_dip_bb: "İkili",
   triple_dip_bb: "Üçlü",
   any_dip_bb: "Herhangi",
+  dip_sr: "Dip+S/R",
+  dip_bb_sr: "BB+S/R",
 };
 
 export type BbDivLgCond =
@@ -615,6 +626,10 @@ export type ListScanConfig = {
     rsiOversold?: number;
     volumeFilter?: boolean;
     rsiFilter?: boolean;
+    /** ATR× for dip↔S/R proximity (default 0.75). */
+    srTolAtr?: number;
+    /** % fallback proximity (default 0.35). */
+    srTolPct?: number;
   };
   /** BB Alt + RSI Div + Liquidity Grab (off by default). Scan TF only. */
   bbDivLg?: {
@@ -1804,10 +1819,14 @@ function scanMultiDip(
     rsiOversold: cfg.rsiOversold,
     volumeFilter: cfg.volumeFilter,
     rsiFilter: cfg.rsiFilter,
+    srTolAtr: cfg.srTolAtr,
+    srTolPct: cfg.srTolPct,
   });
   const seriesFor = (cond: MultiDipCond): (number | null)[] => {
     if (cond === "double_dip_bb") return s.doubleDip;
     if (cond === "triple_dip_bb") return s.tripleDip;
+    if (cond === "dip_sr") return s.dipSr;
+    if (cond === "dip_bb_sr") return s.dipBbSr;
     return s.anyDip;
   };
   const best = new Map<string, ListScanHit>();
@@ -2208,7 +2227,10 @@ export function indicatorParamsFromConfig(
       minDipDistance: m.minDipDistance ?? 5,
       maxDipDistance: m.maxDipDistance ?? 30,
       rsiOversold: m.rsiOversold ?? 40,
+      srTolAtr: m.srTolAtr ?? 0.75,
+      srTolPct: m.srTolPct ?? 0.35,
       showMarkers: 1,
+      showSr: 1,
     };
   }
   if (kind === "bbDivLg" && cfg.bbDivLg) {
