@@ -481,7 +481,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "goldKeko", label: "Gold2 (KEKO)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "oscMain", description: "GOLD/KEKO — kutuplu enerji kırılım osilatörü. Liste Gold2: Raw/Core/Disp × RMA AL/SAT, kırılım, şarj, kutup (kenar-only).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("bbLen", "BB Len", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("kcLen", "KC Len", 20), num("kcMult", "KC Mult", 1.5, 0.5, 5, 0.1), num("peLen", "PE Len", 100), num("compressionThresh", "Sıkışma Z", 0.5, 0, 3, 0.05), num("cmfLen", "CMF Len", 21), num("polarWeightCMF", "Polar CMF", 0.6, 0, 1, 0.05), num("polarWeightHam", "Polar HAM", 0.4, 0, 1, 0.05), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89), num("displaySignalLen", "Disp EMA", 5), num("histScale", "Hist Scale", 18, 1, 100, 0.5), num("minChargeForSignal", "Min Şarj", 30, 0, 100, 1)] },
   { id: "doktorHull", label: "Doktor Hull", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "h21", description: "Hull ribbon 8/13/21/50/100/200 (Hma/Ehma/Thma). Grafik AL: 13×50↑, SAT: 21×50↓. Tarama: 100↑200 AL, 21↓100 SAT + kesişimler. Liste TF≈4h, ≥400 mum.", inputs: [sel("mode", "Hull Type", "Hma", [{ value: "Hma", label: "Hma" }, { value: "Ehma", label: "Ehma" }, { value: "Thma", label: "Thma" }]), num("showRibbon", "Ribbon", 1, 0, 1, 1), num("showMarkers", "AL/SAT", 1, 0, 1, 1), num("thickness", "Kalınlık", 2, 1, 5, 1)] },
   { id: "bbDivLg", label: "BB+RSI Div + LG", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "BB alt dokunuş + RSI OS + bullish RSI div VEYA unconfirmed Liquidity Grab. Opsiyonel EMA50+ADX trend. BUY = sinyal + mum onayı. Liste tarama TF mumları.", inputs: [num("bbLen", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("rsiLen", "RSI Periyot", 14), num("rsiOS", "RSI OS", 30), num("divLbL", "Div Pivot Sol", 5), num("divLbR", "Div Pivot Sağ", 5), num("divRangeLower", "Div Min Bar", 5), num("lgWickMult", "LG Fitil", 2, 1, 5, 0.1), num("lgVolMult", "LG Hacim", 1.3, 1, 3, 0.1), num("useTrend", "Trend Filtre", 1, 0, 1, 1), num("emaLen", "EMA", 50), num("useADX", "ADX Filtre", 1, 0, 1, 1), num("adxLen", "ADX Periyot", 14), num("adxMin", "ADX Min", 20), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1)] },
-  { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1), num("showSr", "S/R çizgileri", 1, 0, 1, 1)] },
+  { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık + majör düşen direnç kırılımı. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("majBreakLookback", "Majör kırılım pivot", 20, 5, 50, 1), num("breakComboBars", "Dip→kırılım pencere", 8, 1, 30, 1), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1), num("showSr", "S/R çizgileri", 1, 0, 1, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
 
@@ -2910,6 +2910,8 @@ export function computeBuiltin(
         rsiOversold: n(p, "rsiOversold", 40),
         srTolAtr: n(p, "srTolAtr", 0.75),
         srTolPct: n(p, "srTolPct", 0.35),
+        majBreakLookback: n(p, "majBreakLookback", 20),
+        breakComboBars: n(p, "breakComboBars", 8),
       });
       const lower = line(inst, "lowerBB", "main", "#42a5f5", candles, md.lowerBB, "BB Alt");
       const zone = line(inst, "captureZone", "main", "#90caf9", candles, md.captureZone, "Yakalama");
@@ -3016,7 +3018,23 @@ export function computeBuiltin(
         const markers: PlotMarker[] = [];
         for (let i = 0; i < candles.length; i++) {
           const tm = candles[i]!.time;
-          if (md.dipBbSr[i] === 1) {
+          if (md.dipBbBreak[i] === 1) {
+            markers.push({
+              time: tm,
+              position: "belowBar",
+              color: "#ffd54f",
+              shape: "arrowUp",
+              text: "Dip+Kırılım",
+            });
+          } else if (md.majResBreak[i] === 1) {
+            markers.push({
+              time: tm,
+              position: "aboveBar",
+              color: "#ea80fc",
+              shape: "arrowUp",
+              text: "Majör kırılım",
+            });
+          } else if (md.dipBbSr[i] === 1) {
             markers.push({
               time: tm,
               position: "belowBar",

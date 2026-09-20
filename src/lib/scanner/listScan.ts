@@ -295,7 +295,9 @@ export type MultiDipCond =
   | "triple_dip_bb"
   | "any_dip_bb"
   | "dip_sr"
-  | "dip_bb_sr";
+  | "dip_bb_sr"
+  | "maj_res_break"
+  | "dip_bb_break";
 
 export const ALL_MULTI_DIP_CONDS: MultiDipCond[] = [
   "double_dip_bb",
@@ -303,6 +305,8 @@ export const ALL_MULTI_DIP_CONDS: MultiDipCond[] = [
   "any_dip_bb",
   "dip_sr",
   "dip_bb_sr",
+  "maj_res_break",
+  "dip_bb_break",
 ];
 
 export const DEFAULT_MULTI_DIP_CONDS: MultiDipCond[] = [
@@ -311,6 +315,8 @@ export const DEFAULT_MULTI_DIP_CONDS: MultiDipCond[] = [
   "any_dip_bb",
   "dip_sr",
   "dip_bb_sr",
+  "maj_res_break",
+  "dip_bb_break",
 ];
 
 export const MULTI_DIP_COND_LABEL: Record<MultiDipCond, string> = {
@@ -319,6 +325,8 @@ export const MULTI_DIP_COND_LABEL: Record<MultiDipCond, string> = {
   any_dip_bb: "Herhangi",
   dip_sr: "Dip+S/R",
   dip_bb_sr: "BB+S/R",
+  maj_res_break: "Majör kırılım",
+  dip_bb_break: "Dip+BB+Kırılım",
 };
 
 export type BbDivLgCond =
@@ -630,6 +638,10 @@ export type ListScanConfig = {
     srTolAtr?: number;
     /** % fallback proximity (default 0.35). */
     srTolPct?: number;
+    /** Major descending-break pivot lookback (default 20). */
+    majBreakLookback?: number;
+    /** Dip→break combo window bars (default 8). */
+    breakComboBars?: number;
   };
   /** BB Alt + RSI Div + Liquidity Grab (off by default). Scan TF only. */
   bbDivLg?: {
@@ -1821,12 +1833,16 @@ function scanMultiDip(
     rsiFilter: cfg.rsiFilter,
     srTolAtr: cfg.srTolAtr,
     srTolPct: cfg.srTolPct,
+    majBreakLookback: cfg.majBreakLookback,
+    breakComboBars: cfg.breakComboBars,
   });
   const seriesFor = (cond: MultiDipCond): (number | null)[] => {
     if (cond === "double_dip_bb") return s.doubleDip;
     if (cond === "triple_dip_bb") return s.tripleDip;
     if (cond === "dip_sr") return s.dipSr;
     if (cond === "dip_bb_sr") return s.dipBbSr;
+    if (cond === "maj_res_break") return s.majResBreak;
+    if (cond === "dip_bb_break") return s.dipBbBreak;
     return s.anyDip;
   };
   const best = new Map<string, ListScanHit>();
@@ -2229,6 +2245,8 @@ export function indicatorParamsFromConfig(
       rsiOversold: m.rsiOversold ?? 40,
       srTolAtr: m.srTolAtr ?? 0.75,
       srTolPct: m.srTolPct ?? 0.35,
+      majBreakLookback: m.majBreakLookback ?? 20,
+      breakComboBars: m.breakComboBars ?? 8,
       showMarkers: 1,
       showSr: 1,
     };

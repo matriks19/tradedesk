@@ -13,7 +13,12 @@
  * S/R chips (scan + chart):
  * - dip_sr: structural ikili/üçlü near diagonal OR horizontal support
  * - dip_bb_sr: BB-capture multi-dip + near S/R (combo)
+ * Break chips (düşen / majör direnç kırılımı):
+ * - maj_res_break: close breaks above major descending resistance
+ *   (computeDescendingBreak with longer pivot lookback — not tiny fan lines)
+ * - dip_bb_break: any_dip_bb (or dip_sr) then maj_res_break within combo window
  * Existing BB chips unchanged (double_dip_bb / triple_dip_bb / any_dip_bb).
+ * showSr line plotting (support/resistance/flatSup) unchanged.
  */
 import type { Candle } from "@/lib/types";
 import { atr, bollinger, closes, rsi, sma } from "@/lib/indicators/math";
@@ -22,6 +27,7 @@ import {
   diagonalSr,
   type DiagSeg,
 } from "@/lib/indicators/diagonalSr";
+import { computeDescendingBreak } from "@/lib/indicators/descendingBreak";
 
 export type MultiDipBbOpts = {
   /** Pivot left bars (Pine leftBars / lbL). Default 3. */
@@ -50,6 +56,13 @@ export type MultiDipBbOpts = {
   /** Diagonal history for pikusov lines (default 300, capped by n). */
   srHistoryBars?: number;
   srPivotWindow?: number;
+  /**
+   * Pivot lookback for major descending-resistance break
+   * (computeDescendingBreak; default 20 = strong pivots, not fan noise).
+   */
+  majBreakLookback?: number;
+  /** Bars of proximity for dip_bb_break combo (default 8). */
+  breakComboBars?: number;
 };
 
 export type MultiDipFlatLevel = {
@@ -74,6 +87,12 @@ export type MultiDipBbResult = {
   dipSr: (number | null)[];
   /** BB multi-dip + near S/R */
   dipBbSr: (number | null)[];
+  /** 1 on major descending-resistance breakout bar (düşen kırılımı) */
+  majResBreak: (number | null)[];
+  /** 1 when multi-dip BB (or dip+SR) then maj break within breakComboBars */
+  dipBbBreak: (number | null)[];
+  /** Projected major descending resistance (optional chart aid) */
+  majResTrend: (number | null)[];
   momentumScore: (number | null)[];
   /** Active diagonal supports (pikusov + nearest) for chart */
   linesSup: DiagSeg[];
@@ -135,6 +154,8 @@ export function multiDipBb(
   const srTolAtr = opts.srTolAtr ?? 0.75;
   const srTolPct = opts.srTolPct ?? 0.35;
   const flatLevelCount = opts.flatLevelCount ?? 8;
+  const majBreakLookback = opts.majBreakLookback ?? 20;
+  const breakComboBars = opts.breakComboBars ?? 8;
 
   const n = candles.length;
   const midBB: (number | null)[] = new Array(n).fill(null);
@@ -146,6 +167,9 @@ export function multiDipBb(
   const anyDip: (number | null)[] = new Array(n).fill(null);
   const dipSr: (number | null)[] = new Array(n).fill(null);
   const dipBbSr: (number | null)[] = new Array(n).fill(null);
+  const majResBreak: (number | null)[] = new Array(n).fill(null);
+  const dipBbBreak: (number | null)[] = new Array(n).fill(null);
+  const majResTrend: (number | null)[] = new Array(n).fill(null);
   const momentumScore: (number | null)[] = new Array(n).fill(null);
 
   const empty = (): MultiDipBbResult => ({
@@ -158,6 +182,9 @@ export function multiDipBb(
     anyDip,
     dipSr,
     dipBbSr,
+    majResBreak,
+    dipBbBreak,
+    majResTrend,
     momentumScore,
     linesSup: [],
     linesRes: [],
@@ -370,6 +397,34 @@ export function multiDipBb(
     if (nearSr) dipSr[i] = 1;
   }
 
+  // Major descending resistance break (düşen kırılımı) — longer lookback pivots
+  const db = computeDescendingBreak(candles, {
+    lookback: majBreakLookback,
+    srBoxes: false,
+  });
+  const dipAnchorBars: number[] = [];
+  for (let i = 0; i < n; i++) {
+    majResTrend[i] = db.trend[i];
+    if (db.breakOut[i] === 1) majResBreak[i] = 1;
+    // Anchor for combo: BB multi-dip preferred; else structural dip+SR
+    if (anyDip[i] === 1 || dipSr[i] === 1) dipAnchorBars.push(i);
+  }
+  const breakBars: number[] = [];
+  for (let i = 0; i < n; i++) {
+    if (majResBreak[i] === 1) breakBars.push(i);
+  }
+  // Combo: mark break bar when a prior/nearby dip+BB (or dip+SR) is in window
+  for (const bi of breakBars) {
+    for (const di of dipAnchorBars) {
+      const dist = bi - di;
+      // Dip first (or same bar), then break within window — classic bounce→break
+      if (dist >= 0 && dist <= breakComboBars) {
+        dipBbBreak[bi] = 1;
+        break;
+      }
+    }
+  }
+
   return {
     midBB,
     lowerBB,
@@ -380,6 +435,9 @@ export function multiDipBb(
     anyDip,
     dipSr,
     dipBbSr,
+    majResBreak,
+    dipBbBreak,
+    majResTrend,
     momentumScore,
     linesSup,
     linesRes,
