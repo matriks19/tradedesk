@@ -81,6 +81,10 @@ export type MultiDipBbResult = {
   linesRes: DiagSeg[];
   /** Horizontal pivot-low levels used for proximity (chart as flat segments) */
   flatSupports: MultiDipFlatLevel[];
+  /** Nearest continuous diagonal support (pikusov) — always plot when showSr */
+  supportLine: (number | null)[];
+  /** Nearest continuous diagonal resistance */
+  resistanceLine: (number | null)[];
 };
 
 /** Warmup: maxDip*3 + BB + ATR + lbR + buffer + S/R */
@@ -158,6 +162,8 @@ export function multiDipBb(
     linesSup: [],
     linesRes: [],
     flatSupports: [],
+    supportLine: new Array(n).fill(null),
+    resistanceLine: new Array(n).fill(null),
   });
 
   if (n < MULTI_DIP_MIN_BARS) return empty();
@@ -176,8 +182,49 @@ export function multiDipBb(
     historyBars: opts.srHistoryBars ?? 300,
     pivotWindow: opts.srPivotWindow ?? 6,
   });
-  const linesSup = diag.linesSup.slice(0, 8);
-  const linesRes = diag.linesRes.slice(0, 6);
+  const lastClose = candles[last]!.close;
+  const atrLast = atrVals[last] ?? lastClose * 0.01;
+
+  // Prefer supports nearest to last close (scan-relevant), then fill up to 8
+  const rankedSup = [...diag.linesSup].sort((a, b) => {
+    const pa = segPriceAt(a, last, last);
+    const pb = segPriceAt(b, last, last);
+    return Math.abs(pa - lastClose) - Math.abs(pb - lastClose);
+  });
+  let linesSup = rankedSup.slice(0, 8);
+  const rankedRes = [...diag.linesRes].sort((a, b) => {
+    const pa = segPriceAt(a, last, last);
+    const pb = segPriceAt(b, last, last);
+    return Math.abs(pa - lastClose) - Math.abs(pb - lastClose);
+  });
+  const linesRes = rankedRes.slice(0, 6);
+
+  // If pikusov fan empty but nearest support series exists, synthesize one segment for chart
+  if (!linesSup.length) {
+    let i0 = -1;
+    for (let i = 0; i <= last; i++) {
+      if (diag.support[i] != null) {
+        i0 = i;
+        break;
+      }
+    }
+    const p1 = diag.support[last];
+    if (i0 >= 0 && i0 < last && p1 != null) {
+      const p0 = diag.support[i0] as number;
+      linesSup = [
+        {
+          t0: candles[i0]!.time,
+          p0,
+          t1: candles[last]!.time,
+          p1,
+          slope: (p1 - p0) / Math.max(1, last - i0),
+          descending: p1 < p0,
+          i0,
+          i1: last,
+        },
+      ];
+    }
+  }
 
   // Horizontal supports from recent confirmed pivot lows (dedupe by ATR cluster)
   const flatRaw: MultiDipFlatLevel[] = [];
@@ -189,15 +236,26 @@ export function multiDipBb(
       t0: candles[pi]!.time,
     });
   }
+  // Nearest-to-price first so chart always gets active scan levels
+  flatRaw.sort(
+    (a, b) => Math.abs(a.price - lastClose) - Math.abs(b.price - lastClose)
+  );
   const flatSupports: MultiDipFlatLevel[] = [];
-  for (let k = flatRaw.length - 1; k >= 0 && flatSupports.length < flatLevelCount; k--) {
+  for (let k = 0; k < flatRaw.length && flatSupports.length < flatLevelCount; k++) {
     const cand = flatRaw[k]!;
-    const atrAt = atrVals[Math.min(cand.i0 + lbR, last)] ?? atrVals[last] ?? 0;
+    const atrAt = atrVals[Math.min(cand.i0 + lbR, last)] ?? atrLast;
     const dup = flatSupports.some((f) =>
       nearLevel(cand.price, f.price, atrAt || cand.price * 0.01, srTolAtr, srTolPct)
     );
     if (!dup) flatSupports.push(cand);
   }
+  // Guarantee at least one flat when any pivot exists (even if clustered)
+  if (!flatSupports.length && flatRaw.length) {
+    flatSupports.push(flatRaw[0]!);
+  }
+
+  const supportLine = diag.support.slice();
+  const resistanceLine = diag.resistance.slice();
 
   const nearSupportAt = (price: number, barIdx: number, atrV: number): boolean => {
     // Nearest pikusov / touch support series
@@ -326,5 +384,7 @@ export function multiDipBb(
     linesSup,
     linesRes,
     flatSupports,
+    supportLine,
+    resistanceLine,
   };
 }

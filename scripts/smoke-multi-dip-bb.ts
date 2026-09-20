@@ -131,14 +131,41 @@ if (s.linesSup.length > 0) {
     "diagonal sup segments in computeBuiltin"
   );
 }
+assert(Array.isArray(s.supportLine), "supportLine array");
+assert(Array.isArray(s.resistanceLine), "resistanceLine array");
+assert(
+  keys.some((k) => k === "support" || k.includes("sup") || k.includes("flatSup")),
+  "S/R plot keys present when showSr=1"
+);
+const valued = (key: string) => {
+  const pl = plots.find((x) => (x.seriesKey ?? "") === key || x.id.endsWith("-" + key));
+  if (!pl) return 0;
+  return pl.data.filter((pt) => "value" in pt && (pt as { value?: number }).value != null).length;
+};
 console.log("sr segments", {
   linesSup: s.linesSup.length,
   linesRes: s.linesRes.length,
   flatSupports: s.flatSupports.length,
+  supportLinePts: s.supportLine.filter((v) => v != null).length,
   plotSr: keys.filter(
-    (k) => k.includes("sup") || k.includes("res") || k.includes("flatSup")
+    (k) =>
+      k === "support" ||
+      k === "resistance" ||
+      k.includes("sup") ||
+      k.includes("res") ||
+      k.includes("flatSup")
   ),
+  valuedSupport: valued("support"),
+  valuedFlat0: valued("flatSup0"),
 });
+// With enough bars, chart must expose at least one visible S/R series
+assert(
+  valued("support") > 0 ||
+    valued("flatSup0") > 0 ||
+    valued("sup0") > 0 ||
+    s.flatSupports.length + s.linesSup.length > 0,
+  "expected visible S/R data for chart"
+);
 
 // Live-ish: try a few symbols if API available
 async function liveSmoke() {

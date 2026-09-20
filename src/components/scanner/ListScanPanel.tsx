@@ -1181,7 +1181,14 @@ export function ListScanPanel() {
 
   const upsertIndicators = useCallback(
     (cfg: ListScanConfig) => {
-      if (!pane) return;
+      // Always read fresh pane from store (avoid stale closure after symbol open)
+      const st = useDeskStore.getState();
+      const paneId = st.activePaneId || pane?.id;
+      const live =
+        st.panes.find((p) => p.id === paneId) ??
+        st.panes[0] ??
+        pane;
+      if (!live) return;
       const kinds: Exclude<ListScanKind, "pine">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
@@ -1208,24 +1215,28 @@ export function ListScanPanel() {
             "rsiPuNu") as BuiltinIndicatorId;
         }
         const params = indicatorParamsFromConfig(kind, cfg);
-        const existing = pane.indicators.find((i) => i.type === type);
+        // Force S/R lines on for Multi-Dip chart
+        if (type === "multiDipBb") {
+          params.showSr = 1;
+          params.showMarkers = params.showMarkers ?? 1;
+        }
+        const existing = live.indicators.find((i) => i.type === type);
         if (existing) {
-          updateIndicatorParams(pane.id, existing.id, params);
+          updateIndicatorParams(live.id, existing.id, params);
         } else {
-          addIndicator(pane.id, type);
-          // params applied after add — re-read from store
+          addIndicator(live.id, type);
           const fresh = useDeskStore
             .getState()
-            .panes.find((p) => p.id === pane.id);
+            .panes.find((p) => p.id === live.id);
           const added = fresh?.indicators
             .slice()
             .reverse()
             .find((i) => i.type === type);
-          if (added) updateIndicatorParams(pane.id, added.id, params);
+          if (added) updateIndicatorParams(live.id, added.id, params);
         }
       }
       for (const sc of cfg.pine?.scripts ?? []) {
-        const has = pane.indicators.some((i) => i.scriptId === sc.id);
+        const has = live.indicators.some((i) => i.scriptId === sc.id);
         if (!has) applyScriptToActive(sc.id);
       }
     },
@@ -1250,7 +1261,38 @@ export function ListScanPanel() {
       openSymbolInActive(row.symbol, row.exchange, openTf);
       // slight delay so pane symbol updates first
       setTimeout(() => {
+        // Ensure Multi-Dip is enabled in cfg when this hit is multiDip
+        if (row.kind === "multiDip" && cfg.multiDip) {
+          cfg.multiDip = { ...cfg.multiDip, enabled: true };
+        }
         upsertIndicators(cfg);
+        if (row.kind === "multiDip") {
+          const st = useDeskStore.getState();
+          const live =
+            st.panes.find((p) => p.id === st.activePaneId) ?? st.panes[0];
+          if (live) {
+            const type = "multiDipBb" as BuiltinIndicatorId;
+            const params = {
+              ...indicatorParamsFromConfig("multiDip", cfg),
+              showSr: 1,
+              showMarkers: 1,
+            };
+            const existing = live.indicators.find((i) => i.type === type);
+            if (existing) {
+              updateIndicatorParams(live.id, existing.id, params);
+            } else {
+              addIndicator(live.id, type);
+              const fresh = useDeskStore
+                .getState()
+                .panes.find((p) => p.id === live.id);
+              const added = fresh?.indicators
+                .slice()
+                .reverse()
+                .find((i) => i.type === type);
+              if (added) updateIndicatorParams(live.id, added.id, params);
+            }
+          }
+        }
         if (row.kind === "divScan" && pane) {
           const oscId = row.cond.split("|")[0] as DivOscId;
           const type = (DIV_OSC_TO_INDICATOR[oscId] ??
@@ -1262,7 +1304,15 @@ export function ListScanPanel() {
         }
       }, 0);
     },
-    [buildConfig, openSymbolInActive, tf, upsertIndicators, pane, addIndicator]
+    [
+      buildConfig,
+      openSymbolInActive,
+      tf,
+      upsertIndicators,
+      pane,
+      addIndicator,
+      updateIndicatorParams,
+    ]
   );
 
   const armListAlerts = useCallback(() => {
