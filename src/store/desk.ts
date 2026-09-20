@@ -147,6 +147,9 @@ interface DeskState {
     exchange: Exchange
   ) => void;
   removeWatchlistSymbol: (listId: string, symbol: string) => void;
+  /** Boot: chart/klines deferred until idle unless user opens a symbol. Not persisted. */
+  chartEager: boolean;
+  requestChartEager: () => void;
   openSymbolInActive: (
     symbol: string,
     exchange: Exchange,
@@ -277,6 +280,8 @@ export const useDeskStore = create<DeskState>()(
         recentCustomTimeframes: [],
         favoriteIndicators: ["sma", "ema", "rsi", "macd", "bollinger"],
         indicatorMenuOpen: false,
+        chartEager: false,
+        requestChartEager: () => set({ chartEager: true }),
         lastBacktest: null,
         backtestParams: {
           symbol: "BTCUSDT",
@@ -331,6 +336,8 @@ export const useDeskStore = create<DeskState>()(
           })),
         openSymbolInActive: (symbol, exchange, timeframe) => {
           const { activePaneId, updatePane, setActivePane } = get();
+          // Liste / watchlist hit — mount chart + fetch klines now (cancel boot defer).
+          set({ chartEager: true });
           // Keep focus on the pane we are opening into so overlay draws (active-only).
           setActivePane(activePaneId);
           updatePane(activePaneId, {

@@ -7,7 +7,9 @@ import { BinanceProvider } from "@/lib/data/binance";
 export function useKlines(
   symbol: string,
   exchange: Exchange,
-  timeframe: string
+  timeframe: string,
+  /** When false, skip REST/WS — used so boot can mount shell without hammering /api/klines. */
+  enabled = true
 ) {
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(true);
@@ -18,6 +20,7 @@ export function useKlines(
   const wsRef = useRef<WebSocket | null>(null);
 
   const load = useCallback(async () => {
+    if (!enabled) return;
     setLoading(true);
     setError(null);
     try {
@@ -35,13 +38,18 @@ export function useKlines(
     } finally {
       setLoading(false);
     }
-  }, [symbol, exchange, timeframe]);
+  }, [symbol, exchange, timeframe, enabled]);
 
   useEffect(() => {
+    if (!enabled) {
+      setLoading(true);
+      return;
+    }
     load();
-  }, [load]);
+  }, [load, enabled]);
 
   useEffect(() => {
+    if (!enabled) return;
     if (exchange !== "binance") return;
     if (feed && feed !== "binance") return;
     wsRef.current?.close();
@@ -77,7 +85,7 @@ export function useKlines(
     return () => {
       ws.close();
     };
-  }, [symbol, exchange, timeframe, feed]);
+  }, [symbol, exchange, timeframe, feed, enabled]);
 
   return { candles, loading, error, delayed, note, reload: load };
 }

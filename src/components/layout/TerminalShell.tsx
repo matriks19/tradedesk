@@ -1,24 +1,83 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import dynamic from "next/dynamic";
+import { useEffect, useRef, useState } from "react";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
-import { ChartGrid } from "@/components/chart/ChartGrid";
 import { AlertWatcher } from "@/components/alerts/AlertWatcher";
 import { useDeskStore } from "@/store/desk";
 import { getPopularSeedScripts } from "@/lib/scripts/catalog";
 import type { CustomScript } from "@/lib/types";
 import { parseDeskOpenSearch } from "@/lib/deskLink";
 
+/** Heavy: lightweight-charts + indicator registry + ChartPane — load after Liste shell. */
+const ChartGrid = dynamic(
+  () =>
+    import("@/components/chart/ChartGrid").then((m) => m.ChartGrid),
+  {
+    ssr: false,
+    loading: () => <ChartBootPlaceholder label="Grafik yükleniyor…" />,
+  }
+);
+
+function ChartBootPlaceholder({ label }: { label: string }) {
+  return (
+    <div className="h-full w-full flex items-center justify-center text-desk-muted text-xs select-none">
+      {label}
+    </div>
+  );
+}
+
+/**
+ * Defer ChartGrid (and thus /api/klines) until after first paint + idle so Liste /
+ * sidebar stay interactive on boot. Mount immediately when chartEager (symbol open
+ * / deep-link) or after a short idle timeout.
+ */
+function useDeferChartMount(chartEager: boolean): boolean {
+  const [idleReady, setIdleReady] = useState(false);
+
+  useEffect(() => {
+    if (chartEager) return;
+    let cancelled = false;
+    const enable = () => {
+      if (!cancelled) setIdleReady(true);
+    };
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: IdleRequestCallback,
+        opts?: IdleRequestOptions
+      ) => number;
+      cancelIdleCallback?: (id: number) => void;
+    };
+    let idleId: number | undefined;
+    if (typeof w.requestIdleCallback === "function") {
+      idleId = w.requestIdleCallback(() => enable(), { timeout: 1500 });
+    }
+    // Guarantees mount even without ric / if main thread stays busy (scan UI first ~0.6–1.5s).
+    const t = window.setTimeout(enable, 750);
+    return () => {
+      cancelled = true;
+      if (idleId != null) w.cancelIdleCallback?.(idleId);
+      window.clearTimeout(t);
+    };
+  }, [chartEager]);
+
+  return chartEager || idleReady;
+}
+
 export function TerminalShell() {
   const hydrateFromServer = useDeskStore((s) => s.hydrateFromServer);
   const upsertScript = useDeskStore((s) => s.upsertScript);
+  const chartEager = useDeskStore((s) => s.chartEager);
   const seeded = useRef(false);
+  const showChart = useDeferChartMount(chartEager);
 
   useEffect(() => {
     const applyLink = () => {
       const hit = parseDeskOpenSearch(window.location.search);
       if (!hit) return;
+      // Deep-link: need chart + klines immediately.
+      useDeskStore.getState().requestChartEager();
       useDeskStore
         .getState()
         .openSymbolInActive(hit.symbol, hit.exchange, hit.timeframe);
@@ -91,7 +150,11 @@ export function TerminalShell() {
       <div className="flex flex-1 min-h-0">
         <Sidebar />
         <main className="flex-1 min-w-0 min-h-0 bg-desk-bg">
-          <ChartGrid />
+          {showChart ? (
+            <ChartGrid />
+          ) : (
+            <ChartBootPlaceholder label="Tarama hazır — grafik birazdan…" />
+          )}
         </main>
       </div>
     </div>
