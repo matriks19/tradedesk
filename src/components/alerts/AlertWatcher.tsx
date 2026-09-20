@@ -10,7 +10,6 @@ import type {
   TickerQuote,
 } from "@/lib/types";
 import { buildDeskOpenUrl } from "@/lib/deskLink";
-import { checkScanAlert } from "@/lib/alerts/scanAlert";
 import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
@@ -252,7 +251,9 @@ export function AlertWatcher() {
           const json = await res.json();
           const candles = (json.candles ?? []) as Candle[];
           if (candles.length) {
-            const hit = checkScanAlert(candles, a.scanKey!, a.scanPayload);
+            // Lazy: do not pull scanAlert → listScan into first-paint bundle
+            const { checkScanAlert } = await import("@/lib/alerts/scanAlert");
+            const hit = await checkScanAlert(candles, a.scanKey!, a.scanPayload);
             const last = candles[candles.length - 1]!.close;
             const sig = hit.sig || hit.note || "";
             if (a.scanPrimed !== true) {
