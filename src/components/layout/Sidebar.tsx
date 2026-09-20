@@ -1,20 +1,68 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useDeskStore } from "@/store/desk";
 import { WatchlistPanel } from "@/components/watchlist/WatchlistPanel";
-import { ScannerPanel } from "@/components/scanner/ScannerPanel";
-import { HeatmapPanel } from "@/components/heatmap/HeatmapPanel";
-import { PatternPanel } from "@/components/patterns/PatternPanel";
-import { RiskPanel } from "@/components/risk/RiskPanel";
-import { IndicatorPanel } from "@/components/indicators/IndicatorPanel";
-import { ScriptEditor } from "@/components/editor/ScriptEditor";
-import { BacktestPanel } from "@/components/backtest/BacktestPanel";
-import { StrategiesPanel } from "@/components/strategies/StrategiesPanel";
-import { AlertsPanel } from "@/components/alerts/AlertsPanel";
-import { BotPanel } from "@/components/bot/BotPanel";
-import { ListScanPanel } from "@/components/scanner/ListScanPanel";
-import { PairHealthPanel } from "@/components/pairs/PairHealthPanel";
 import clsx from "clsx";
+
+const StrategiesPanel = dynamic(
+  () =>
+    import("@/components/strategies/StrategiesPanel").then((m) => m.StrategiesPanel),
+  { ssr: false }
+);
+const ListScanPanel = dynamic(
+  () =>
+    import("@/components/scanner/ListScanPanel").then((m) => m.ListScanPanel),
+  { ssr: false }
+);
+const IndicatorPanel = dynamic(
+  () =>
+    import("@/components/indicators/IndicatorPanel").then((m) => m.IndicatorPanel),
+  { ssr: false }
+);
+const ScannerPanel = dynamic(
+  () =>
+    import("@/components/scanner/ScannerPanel").then((m) => m.ScannerPanel),
+  { ssr: false }
+);
+const HeatmapPanel = dynamic(
+  () =>
+    import("@/components/heatmap/HeatmapPanel").then((m) => m.HeatmapPanel),
+  { ssr: false }
+);
+const PatternPanel = dynamic(
+  () =>
+    import("@/components/patterns/PatternPanel").then((m) => m.PatternPanel),
+  { ssr: false }
+);
+const BacktestPanel = dynamic(
+  () =>
+    import("@/components/backtest/BacktestPanel").then((m) => m.BacktestPanel),
+  { ssr: false }
+);
+const RiskPanel = dynamic(
+  () => import("@/components/risk/RiskPanel").then((m) => m.RiskPanel),
+  { ssr: false }
+);
+const PairHealthPanel = dynamic(
+  () =>
+    import("@/components/pairs/PairHealthPanel").then((m) => m.PairHealthPanel),
+  { ssr: false }
+);
+const AlertsPanel = dynamic(
+  () =>
+    import("@/components/alerts/AlertsPanel").then((m) => m.AlertsPanel),
+  { ssr: false }
+);
+const BotPanel = dynamic(
+  () => import("@/components/bot/BotPanel").then((m) => m.BotPanel),
+  { ssr: false }
+);
+const ScriptEditor = dynamic(
+  () =>
+    import("@/components/editor/ScriptEditor").then((m) => m.ScriptEditor),
+  { ssr: false }
+);
 
 const TABS = [
   { id: "strategies", label: "Strateji" },

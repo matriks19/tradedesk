@@ -1,7 +1,7 @@
 import type { AlertScanKey, Candle } from "@/lib/types";
+import type { ListScanConfig } from "@/lib/scanner/listScan";
 import { recentHamJurik } from "@/lib/indicators/hamJurikTpo";
 import { recentDiagonalSr } from "@/lib/indicators/diagonalSr";
-import { alertScanHits, alertScanSig, type ListScanConfig } from "@/lib/scanner/listScan";
 
 export const SCAN_OPTIONS: { key: AlertScanKey; label: string; group: string }[] = [
   { key: "ham_setup", label: "HAM erken AL", group: "HAM" },
@@ -14,11 +14,11 @@ export const SCAN_OPTIONS: { key: AlertScanKey; label: string; group: string }[]
   { key: "list_scan", label: "Liste koşulu", group: "Liste" },
 ];
 
-export function checkScanAlert(
+export async function checkScanAlert(
   candles: Candle[],
   scanKey: AlertScanKey,
   payload?: Record<string, unknown>
-): { ok: boolean; note: string; sig?: string } {
+): Promise<{ ok: boolean; note: string; sig?: string }> {
   switch (scanKey) {
     case "ham_setup":
       return recentHamJurik(candles, "setup", 2);
@@ -44,6 +44,8 @@ export function checkScanAlert(
       });
     case "list_scan": {
       if (!payload) return { ok: false, note: "", sig: "" };
+      // Lazy: keep listScan+indicators out of first-paint AlertWatcher bundle
+      const { alertScanHits, alertScanSig } = await import("@/lib/scanner/listScan");
       const hits = alertScanHits(candles, payload as ListScanConfig, 1);
       if (!hits.length) return { ok: false, note: "", sig: "" };
       return {
