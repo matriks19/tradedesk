@@ -59,6 +59,11 @@ import {
   OB_FALL_MIN_BARS,
   OB_FALL_FETCH_LIMIT,
   type ObFallCond,
+  ALL_MA_SIMPLE_CONDS,
+  DEFAULT_MA_SIMPLE_CONDS,
+  MA_SIMPLE_MIN_BARS,
+  MA_SIMPLE_FETCH_LIMIT,
+  type MaSimpleCond,
   type ListScanHit,
   type ListScanKind,
   type PineCond,
@@ -188,6 +193,16 @@ const OB_FALL_CHIPS: { id: ObFallCond; label: string }[] = [
   { id: "fall_break", label: "Düşen kırılım" },
   { id: "ob_fall", label: "OB+Düşen" },
   { id: "ob_bear", label: "Bear OB" },
+];
+
+const MA_SIMPLE_CHIPS: { id: MaSimpleCond; label: string }[] = [
+  { id: "stack_bull", label: "Boğa yığını" },
+  { id: "stack_bear", label: "Ayı yığını" },
+  { id: "x_20_50", label: "SMA20↑50" },
+  { id: "x_50_100", label: "SMA50↑100" },
+  { id: "x_100_200", label: "SMA100↑200" },
+  { id: "price_x_20", label: "Fiyat↑SMA20" },
+  { id: "price_x_50", label: "Fiyat↑SMA50" },
 ];
 
 
@@ -586,6 +601,7 @@ export function ListScanPanel() {
   /** BB+RSI Div + LG — off by default. */
   const [bbDivLgOn, setBbDivLgOn] = useState(false);
   const [obFallOn, setObFallOn] = useState(false);
+  const [maSimpleOn, setMaSimpleOn] = useState(false);
 
   const [hamConds, setHamConds] = useState<HamCond[]>(["raw_dual_up"]);
   const [diagConds, setDiagConds] = useState<DiagCond[]>(["bounce"]);
@@ -628,6 +644,9 @@ export function ListScanPanel() {
   const [bbDivLgUseAdx, setBbDivLgUseAdx] = useState(true);
   const [obFallConds, setObFallConds] = useState<ObFallCond[]>([
     ...DEFAULT_OB_FALL_CONDS,
+  ]);
+  const [maSimpleConds, setMaSimpleConds] = useState<MaSimpleCond[]>([
+    ...DEFAULT_MA_SIMPLE_CONDS,
   ]);
 
   const [hamLen, setHamLen] = useState(21);
@@ -728,6 +747,11 @@ export function ListScanPanel() {
     setObFallOn(true);
     setMatchMode("any");
     setObFallConds([...ALL_OB_FALL_CONDS]);
+  }, []);
+  const enableMaSimple = useCallback(() => {
+    setMaSimpleOn(true);
+    setMatchMode("any");
+    setMaSimpleConds([...DEFAULT_MA_SIMPLE_CONDS]);
   }, []);
 
   /** If enabling a kind while another is already on → force Herhangi (any). */
@@ -847,6 +871,10 @@ export function ListScanPanel() {
         enabled: obFallOn,
         conds: obFallConds,
       },
+      maSimple: {
+        enabled: maSimpleOn,
+        conds: maSimpleConds,
+      },
       extraFilters: EXTRA_CHIPS.filter((c) => extraIds.includes(c.id)).map(
         (c) => c.filter
       ),
@@ -932,6 +960,8 @@ export function ListScanPanel() {
     bbDivLgUseAdx,
     obFallOn,
     obFallConds,
+    maSimpleOn,
+    maSimpleConds,
     colorH8,
     colorH13,
     colorH21,
@@ -956,7 +986,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1018,6 +1048,7 @@ export function ListScanPanel() {
             const useMultiDip = !!cfg.multiDip?.enabled;
             const useBbDivLg = !!cfg.bbDivLg?.enabled;
             const useObFall = !!cfg.obFall?.enabled;
+            const useMaSimple = !!cfg.maSimple?.enabled;
             const scanTf = useHull && cfg.hull?.tf
               ? String(cfg.hull.tf)
               : useMultiDip && cfg.multiDip?.tf
@@ -1038,7 +1069,9 @@ export function ListScanPanel() {
                         ? BB_DIV_LG_FETCH_LIMIT
                         : useObFall
                           ? OB_FALL_FETCH_LIMIT
-                          : 220;
+                          : useMaSimple
+                            ? MA_SIMPLE_FETCH_LIMIT
+                            : 220;
             const minBars = useHull
               ? DOKTOR_HULL_MIN_BARS
               : useGold2
@@ -1055,7 +1088,9 @@ export function ListScanPanel() {
                           ? BB_DIV_LG_MIN_BARS
                           : useObFall
                             ? OB_FALL_MIN_BARS
-                            : 50;
+                            : useMaSimple
+                              ? MA_SIMPLE_MIN_BARS
+                              : 50;
             const kr = await fetch(
               `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${encodeURIComponent(scanTf)}&limit=${klineLimit}`,
               { signal: fetchSignal }
@@ -1140,6 +1175,10 @@ export function ListScanPanel() {
         const n = out.filter((h) => h.kind === "obFall").length;
         byKind.push(`obFall ${n}`);
       }
+      if (cfgDone.maSimple?.enabled) {
+        const n = out.filter((h) => h.kind === "maSimple").length;
+        byKind.push(`maSimple ${n}`);
+      }
       if (cfgDone.ham?.enabled) {
         const n = out.filter((h) => h.kind === "ham").length;
         byKind.push(`ham ${n}`);
@@ -1159,6 +1198,7 @@ export function ListScanPanel() {
         cfgDone.multiDip?.enabled,
         cfgDone.bbDivLg?.enabled,
         cfgDone.obFall?.enabled,
+        cfgDone.maSimple?.enabled,
         cfgDone.pine?.enabled,
       ].filter(Boolean).length;
       const hepsiWarn =
@@ -1205,6 +1245,7 @@ export function ListScanPanel() {
       if (cfg.multiDip?.enabled) kinds.push("multiDip");
       if (cfg.bbDivLg?.enabled) kinds.push("bbDivLg");
       if (cfg.obFall?.enabled) kinds.push("obFall");
+      if (cfg.maSimple?.enabled) kinds.push("maSimple");
       for (const kind of kinds) {
         let type: BuiltinIndicatorId = KIND_TO_INDICATOR[kind];
         if (kind === "divScan" && cfg.divScan) {
@@ -1246,10 +1287,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -1323,7 +1364,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1579,6 +1620,31 @@ export function ListScanPanel() {
         });
         continue;
       }
+      if (h.kind === "maSimple") {
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "MA Basit",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            maSimple: {
+              enabled: true,
+              conds: [h.cond as MaSimpleCond],
+            },
+          },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
       if (h.kind === "divScan") {
         const [oscRaw, typeRaw] = h.cond.split("|");
         const osc = (oscRaw ?? "rsi") as DivOscId;
@@ -1683,10 +1749,11 @@ export function ListScanPanel() {
     if (multiDipOn) names.push("Dip+BB");
     if (bbDivLgOn) names.push("BB+LG");
     if (obFallOn) names.push("OB+Düşen");
+    if (maSimpleOn) names.push("MA Basit");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs">
@@ -1800,7 +1867,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!hamOn) {
             bumpMatchModeOnSecondKind(false, [
-              diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+              diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
             setHamOn(true);
           } else {
             setHamOn(false);
@@ -1818,7 +1885,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!hamOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setHamOn(true);
                   setHamConds((a) => ensureCond(a, c.id));
                 } else {
@@ -1855,7 +1922,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!diagOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+              hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
             setDiagOn(true);
           } else {
             setDiagOn(false);
@@ -1873,7 +1940,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!diagOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setDiagOn(true);
                   setDiagConds((a) => ensureCond(a, c.id));
                 } else {
@@ -1901,7 +1968,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!macdOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+              hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
             setMacdOn(true);
           } else {
             setMacdOn(false);
@@ -1919,7 +1986,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!macdOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setMacdOn(true);
                   setMacdConds((a) => ensureCond(a, c.id));
                 } else {
@@ -1947,7 +2014,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!stochOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+              hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
             setStochOn(true);
           } else {
             setStochOn(false);
@@ -1965,7 +2032,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!stochOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setStochOn(true);
                   setStochConds((a) => ensureCond(a, c.id));
                 } else {
@@ -1993,7 +2060,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!diOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+              hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
             setDiOn(true);
           } else {
             setDiOn(false);
@@ -2011,7 +2078,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!diOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setDiOn(true);
                   setDiConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2033,7 +2100,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!hullOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+              hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
             setHullOn(true);
           } else {
             setHullOn(false);
@@ -2054,7 +2121,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!hullOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setHullOn(true);
                   setHullConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2110,7 +2177,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!hamAoOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+              hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
             setHamAoOn(true);
           } else {
             setHamAoOn(false);
@@ -2132,7 +2199,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!hamAoOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setHamAoOn(true);
                   setHamAoConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2164,7 +2231,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!goldOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setGoldOn(true);
                   setGold2On(false);
                   setMatchMode("any");
@@ -2198,7 +2265,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!gold2On) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setGold2On(true);
                   setGoldOn(false);
                   setMatchMode("any");
@@ -2234,7 +2301,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!divScanOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setDivScanOn(true);
                   setMatchMode("any");
                   setDivOscs([c.id]);
@@ -2256,7 +2323,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!divScanOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setDivScanOn(true);
                   setMatchMode("any");
                   setDivOscs([...DEFAULT_DIV_OSC]);
@@ -2291,7 +2358,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!multiDipOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setMultiDipOn(true);
                   setMatchMode("any");
                   setMultiDipConds((a) => ensureCond(a, c.id));
@@ -2338,7 +2405,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!bbDivLgOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setBbDivLgOn(true);
                   setMatchMode("any");
                   setBbDivLgConds((a) => ensureCond(a, c.id));
@@ -2389,12 +2456,46 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!obFallOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn]);
                   setObFallOn(true);
                   setMatchMode("any");
                   setObFallConds((a) => ensureCond(a, c.id));
                 } else {
                   setObFallConds((a) => toggleCondKeepOne(a, c.id));
+                }
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+
+      <SectionCard
+        title="MA Basit"
+        enabled={maSimpleOn}
+        onToggle={() => (maSimpleOn ? setMaSimpleOn(false) : enableMaSimple())}
+        open={openCard === "maSimple"}
+        onOpen={() => setOpenCard((c) => (c === "maSimple" ? null : "maSimple"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          SMA 20/50/100/200 · boğa/ayı yığını · SMA×SMA↑ · fiyat×SMA↑ · ≥
+          {MA_SIMPLE_MIN_BARS} mum · grafik: 4 SMA
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {MA_SIMPLE_CHIPS.map((c) => (
+            <Chip
+              key={c.id}
+              active={maSimpleConds.includes(c.id)}
+              label={c.label}
+              onClick={() => {
+                if (!maSimpleOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn]);
+                  setMaSimpleOn(true);
+                  setMatchMode("any");
+                  setMaSimpleConds((a) => ensureCond(a, c.id));
+                } else {
+                  setMaSimpleConds((a) => toggleCondKeepOne(a, c.id));
                 }
               }}
             />
