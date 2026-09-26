@@ -279,7 +279,8 @@ export type BuiltinIndicatorId =
   | "doktorHull"
   | "multiDipBb"
   | "bbDivLg"
-  | "maSimple";
+  | "maSimple"
+  | "kijunBb";
 
 export interface IndicatorInputDef {
   key: string;
