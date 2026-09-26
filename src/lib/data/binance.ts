@@ -7,6 +7,7 @@ import {
 } from "@/lib/data/timeframes";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
+import { TRADFI_USDT_PERPS } from "@/lib/data/binanceTradfiSnapshot";
 import { FALLBACK_USDT_PERPS } from "@/lib/data/binancePerpSnapshot";
 import {
   PERP_FETCH_HEADERS,
@@ -240,13 +241,21 @@ export class BinanceProvider {
     }
   }
 
-  /** Spot + perp USDT symbols for search catalogs. */
+  /** Spot + perp USDT symbols (+ TradFi perp snapshot) for search catalogs. */
   static async getAllUsdtSymbols(): Promise<SymbolInfo[]> {
     const [spot, perp] = await Promise.all([
       this.getUsdtSymbols(),
       this.getUsdtPerpSymbols(),
     ]);
-    return [...spot, ...perp];
+    const seen = new Set(perp.map((p) => p.symbol));
+    const tradfi = TRADFI_USDT_PERPS.filter((s) => !seen.has(s)).map((s) => ({
+      symbol: s,
+      exchange: "binance" as const,
+      base: toBinanceRestSymbol(s).replace(/USDT$/i, ""),
+      quote: "USDT",
+      name: "TRADFI PERP",
+    }));
+    return [...spot, ...perp, ...tradfi];
   }
 
   static async getKlines(

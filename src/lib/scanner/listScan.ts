@@ -56,6 +56,12 @@ import {
   KIJUN_BB_MIN_BARS,
 } from "@/lib/indicators/kijunBb";
 import {
+  pdoScan,
+  DEFAULT_PDO_CONDS,
+  PDO_BEAR_CONDS,
+  type PdoCond,
+} from "@/lib/indicators/pdo";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -504,6 +510,7 @@ export type ListScanKind =
   | "obFall"
   | "maSimple"
   | "kijunBb"
+  | "pdo"
   | "pine";
 
 export type PineCond =
@@ -785,6 +792,16 @@ export type ListScanConfig = {
     basePeriods?: number;
     bbLength?: number;
     bbStdDev?: number;
+  };
+  /** PDO (Stoch hibrit) — kripto-tarayici T10/T11 port'u, tarama TF. */
+  pdo?: {
+    enabled: boolean;
+    conds: PdoCond[];
+    stochWeight?: number;
+    smooth?: number;
+    crossMode?: "kd" | "ema";
+    low?: number;
+    high?: number;
   };
   pine?: {
     enabled: boolean;
@@ -2181,6 +2198,28 @@ function scanKijunBb(
   return out;
 }
 
+function scanPdo(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["pdo"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_PDO_CONDS;
+  return pdoScan(candles, conds, maxBarsAgo, {
+    stochWeight: cfg.stochWeight,
+    smooth: cfg.smooth,
+    crossMode: cfg.crossMode,
+    low: cfg.low,
+    high: cfg.high,
+  }).map((h) => ({
+    kind: "pdo" as const,
+    cond: h.cond,
+    bias: PDO_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -2202,6 +2241,7 @@ export function scanSymbol(
   if (cfg.obFall?.enabled) enabledKinds.push("obFall");
   if (cfg.maSimple?.enabled) enabledKinds.push("maSimple");
   if (cfg.kijunBb?.enabled) enabledKinds.push("kijunBb");
+  if (cfg.pdo?.enabled) enabledKinds.push("pdo");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2221,6 +2261,7 @@ export function scanSymbol(
     obFall: cfg.obFall ? scanObFall(candles, cfg.obFall, maxBarsAgo) : [],
     maSimple: cfg.maSimple ? scanMaSimple(candles, cfg.maSimple, maxBarsAgo) : [],
     kijunBb: cfg.kijunBb ? scanKijunBb(candles, cfg.kijunBb, maxBarsAgo) : [],
+    pdo: cfg.pdo ? scanPdo(candles, cfg.pdo, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2261,6 +2302,8 @@ const STATE_CONDS = new Set([
   "ob_bear",
   "stack_bull",
   "stack_bear",
+  "zone_low",
+  "zone_high",
 ]);
 
 export function alertScanHits(
@@ -2515,6 +2558,18 @@ export function indicatorParamsFromConfig(
       showEma10: m.conds.some((c) => c.startsWith("ema10_")) ? 1 : 0,
     };
   }
+  if (kind === "pdo" && cfg.pdo) {
+    const d = cfg.pdo;
+    return {
+      stochWeight: d.stochWeight ?? 70,
+      smooth: d.smooth ?? 2,
+      crossMode: d.crossMode ?? "kd",
+      low: d.low ?? 30,
+      high: d.high ?? 70,
+      showMarkers: 1,
+      showPatterns: 1,
+    };
+  }
   if (kind === "kijunBb" && cfg.kijunBb) {
     const k = cfg.kijunBb;
     return {
@@ -2544,6 +2599,7 @@ export const KIND_TO_INDICATOR: Record<
   | "orderBlocks"
   | "maSimple"
   | "kijunBb"
+  | "pdo"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2560,6 +2616,7 @@ export const KIND_TO_INDICATOR: Record<
   obFall: "orderBlocks",
   maSimple: "maSimple",
   kijunBb: "kijunBb",
+  pdo: "pdo",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2587,3 +2644,11 @@ export {
   KIJUN_BB_FETCH_LIMIT,
 } from "@/lib/indicators/kijunBb";
 // DIV_SCAN_FETCH_LIMIT / DIV_SCAN_MIN_BARS exported above with DivScan types
+export {
+  PDO_MIN_BARS,
+  PDO_FETCH_LIMIT,
+  DEFAULT_PDO_CONDS,
+  ALL_PDO_CONDS,
+  PDO_COND_LABEL,
+  type PdoCond,
+} from "@/lib/indicators/pdo";
