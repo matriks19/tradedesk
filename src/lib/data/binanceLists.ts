@@ -125,16 +125,27 @@ export function binanceTradfiWatchlistMeta(): Array<{
   );
   const crypto = sortPerpsAiFirst(fallbackUsdtPerps());
   return [
-    { id: "binance-tradfi-usdt", name: `BN TradFi · Tümü (${tf.length})`, symbols: tf },
-    { id: "binance-tradfi-stocks", name: `BN TradFi · Hisse/Pre-IPO (${stocks.length})`, symbols: stocks },
-    { id: "binance-tradfi-etf", name: `BN TradFi · ETF/Endeks (${etf.length})`, symbols: etf },
-    { id: "binance-tradfi-comm", name: `BN TradFi · Emtia/FX (${comm.length})`, symbols: comm },
+    { id: "binance-tradfi-usdt", name: "BN TradFi · Tümü", symbols: tf },
+    { id: "binance-tradfi-stocks", name: "BN TradFi · Hisse/Pre-IPO", symbols: stocks },
+    { id: "binance-tradfi-etf", name: "BN TradFi · ETF/Endeks", symbols: etf },
+    { id: "binance-tradfi-comm", name: "BN TradFi · Emtia/FX", symbols: comm },
     {
-      id: "binance-perp-all-usdt",
-      name: `BN Perp + TradFi (${crypto.length + tf.length})`,
+      id: PERP_ALL_ID,
+      name: PERP_ALL_NAME,
       symbols: [...crypto, ...tf],
     },
   ];
+}
+
+/** Varsayılan kripto evreni: 528 PERPETUAL + 199 TRADIFI_PERPETUAL = 727 */
+export const PERP_ALL_ID = "binance-perp-all-usdt";
+export const PERP_ALL_NAME = "BN Perp · Tümü (kripto + TradFi)";
+export const PERP_CRYPTO_NAME = "BN Perp · yalnız kripto";
+
+const TRADFI_DISPLAY = new Set(TRADFI_USDT_PERPS);
+/** TradFi perp mi (snapshot; canlı listede SymbolInfo.name = "TRADFI PERP") */
+export function isTradfiPerp(sym: string): boolean {
+  return TRADFI_DISPLAY.has(toPerpDisplay(sym));
 }
 
 export function mergeBinanceWatchlists(watchlists: Watchlist[]): Watchlist[] {

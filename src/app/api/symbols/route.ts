@@ -38,8 +38,14 @@ export async function GET(req: NextRequest) {
       : 5000;
 
   try {
+    // market=perp: yalnız USDT-M perp evreni (kind=all|crypto|tradfi)
+    const market = req.nextUrl.searchParams.get("market");
+    const kindRaw = req.nextUrl.searchParams.get("kind");
+    const kind = kindRaw === "crypto" || kindRaw === "tradfi" ? kindRaw : "all";
     let symbols =
-      exchange === "bist"
+      market === "perp"
+        ? await BinanceProvider.getPerpUniverse(kind)
+        : exchange === "bist"
         ? BistProvider.listSymbols()
         : exchange === "binance"
           ? await BinanceProvider.getAllUsdtSymbols()

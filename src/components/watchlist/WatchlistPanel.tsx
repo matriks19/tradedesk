@@ -191,7 +191,7 @@ export function WatchlistPanel() {
               let live: string[] = [];
               try {
                 const res = await fetch(
-                  "/api/ticker?exchange=binance&market=perp"
+                  "/api/ticker?exchange=binance&market=perp&kind=crypto"
                 );
                 const json = await res.json();
                 live = (json.quotes ?? [])
@@ -205,7 +205,7 @@ export function WatchlistPanel() {
               if (!live.length) {
                 try {
                   const res = await fetch(
-                    "/api/symbols?exchange=binance&limit=5000"
+                    "/api/symbols?exchange=binance&market=perp&kind=crypto&limit=5000"
                   );
                   const json = await res.json();
                   live = (json.symbols ?? [])
