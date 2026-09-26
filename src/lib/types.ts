@@ -286,7 +286,10 @@ export type BuiltinIndicatorId =
 export interface IndicatorInputDef {
   key: string;
   label: string;
-  type: "number" | "select";
+  /** "bool" = açık/kapalı anahtar; param olarak 1/0 saklanır */
+  type: "number" | "select" | "bool";
+  /** Ayar penceresinde bölüm başlığı (örn. "Sinyaller", "Çizgiler") */
+  group?: string;
   min?: number;
   max?: number;
   step?: number;
