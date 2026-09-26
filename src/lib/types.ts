@@ -284,7 +284,8 @@ export type BuiltinIndicatorId =
   | "pdo"
   | "cmoChande"
   | "pliDir"
-  | "pliDmiHybrid";
+  | "pliDmiHybrid"
+  | "pliDtDiv";
 
 export interface IndicatorInputDef {
   key: string;

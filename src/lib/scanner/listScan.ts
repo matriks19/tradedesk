@@ -80,6 +80,12 @@ import {
   type PliDmiCond,
 } from "@/lib/indicators/pliDmi";
 import {
+  pliDtDivScan,
+  DEFAULT_PLI_DT_DIV_CONDS,
+  PLI_DT_DIV_BEAR_CONDS,
+  type PliDtDivCond,
+} from "@/lib/indicators/pliDtDiv";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -532,6 +538,7 @@ export type ListScanKind =
   | "cmo"
   | "pliDir"
   | "pliDmi"
+  | "pliDtDiv"
   | "pine";
 
 export type PineCond =
@@ -854,6 +861,20 @@ export type ListScanConfig = {
     adxMin?: number;
     dmSrc?: "price" | "band";
     useWk?: boolean;
+  };
+  /** PLI-DT Uyumsuzluk — pos (0–1) osilatörü: klasik/gizli + onaylı D/T uyumsuz (onay mumunda). */
+  pliDtDiv?: {
+    enabled: boolean;
+    conds: PliDtDivCond[];
+    length?: number;
+    x?: number;
+    topTh?: number;
+    botTh?: number;
+    minSwing?: number;
+    lbL?: number;
+    lbR?: number;
+    rangeLower?: number;
+    rangeUpper?: number;
   };
   pine?: {
     enabled: boolean;
@@ -2339,6 +2360,32 @@ function scanPliDmi(
   }));
 }
 
+function scanPliDtDiv(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["pliDtDiv"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_PLI_DT_DIV_CONDS;
+  return pliDtDivScan(candles, conds, maxBarsAgo, {
+    length: cfg.length,
+    x: cfg.x,
+    topTh: cfg.topTh,
+    botTh: cfg.botTh,
+    minSwing: cfg.minSwing,
+    lbL: cfg.lbL,
+    lbR: cfg.lbR,
+    rangeLower: cfg.rangeLower,
+    rangeUpper: cfg.rangeUpper,
+  }).map((h) => ({
+    kind: "pliDtDiv" as const,
+    cond: h.cond,
+    bias: PLI_DT_DIV_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -2364,6 +2411,7 @@ export function scanSymbol(
   if (cfg.cmo?.enabled) enabledKinds.push("cmo");
   if (cfg.pliDir?.enabled) enabledKinds.push("pliDir");
   if (cfg.pliDmi?.enabled) enabledKinds.push("pliDmi");
+  if (cfg.pliDtDiv?.enabled) enabledKinds.push("pliDtDiv");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2387,6 +2435,7 @@ export function scanSymbol(
     cmo: cfg.cmo ? scanCmo(candles, cfg.cmo, maxBarsAgo) : [],
     pliDir: cfg.pliDir ? scanPliDir(candles, cfg.pliDir, maxBarsAgo) : [],
     pliDmi: cfg.pliDmi ? scanPliDmi(candles, cfg.pliDmi, maxBarsAgo) : [],
+    pliDtDiv: cfg.pliDtDiv ? scanPliDtDiv(candles, cfg.pliDtDiv, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2695,6 +2744,28 @@ export function indicatorParamsFromConfig(
       showPatterns: 1,
     };
   }
+  if (kind === "pliDtDiv" && cfg.pliDtDiv) {
+    const c = cfg.pliDtDiv;
+    const has = (x: PliDtDivCond) => (c.conds.length ? c.conds : DEFAULT_PLI_DT_DIV_CONDS).includes(x);
+    return {
+      length: c.length ?? 50,
+      x: c.x ?? 5,
+      topTh: c.topTh ?? 0.3,
+      botTh: c.botTh ?? 0.7,
+      minSwing: c.minSwing ?? 3,
+      lbL: c.lbL ?? 5,
+      lbR: c.lbR ?? 3,
+      rangeLower: c.rangeLower ?? 5,
+      rangeUpper: c.rangeUpper ?? 60,
+      showMarkers: 1,
+      sigBull: has("pdt_bull") ? 1 : 0,
+      sigBear: has("pdt_bear") ? 1 : 0,
+      sigHBull: has("pdt_hbull") ? 1 : 0,
+      sigHBear: has("pdt_hbear") ? 1 : 0,
+      sigDDiv: has("pdt_d_div") ? 1 : 0,
+      sigTDiv: has("pdt_t_div") ? 1 : 0,
+    };
+  }
   if (kind === "pliDmi" && cfg.pliDmi) {
     const c = cfg.pliDmi;
     return {
@@ -2768,6 +2839,7 @@ export const KIND_TO_INDICATOR: Record<
   | "cmoChande"
   | "pliDir"
   | "pliDmiHybrid"
+  | "pliDtDiv"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2788,6 +2860,7 @@ export const KIND_TO_INDICATOR: Record<
   cmo: "cmoChande",
   pliDir: "pliDir",
   pliDmi: "pliDmiHybrid",
+  pliDtDiv: "pliDtDiv",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2852,3 +2925,14 @@ export {
   PLI_DMI_COND_LABEL,
   type PliDmiCond,
 } from "@/lib/indicators/pliDmi";
+export {
+  PLI_DT_DIV_MIN_BARS,
+  PLI_DT_DIV_FETCH_LIMIT,
+  PLI_DT_DIV_DEFAULTS,
+  DEFAULT_PLI_DT_DIV_CONDS,
+  ALL_PLI_DT_DIV_CONDS,
+  PLI_DT_DIV_COND_LABEL,
+  pliDtDivFetchLimit,
+  pliDtDivMinBars,
+  type PliDtDivCond,
+} from "@/lib/indicators/pliDtDiv";
