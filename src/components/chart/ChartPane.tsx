@@ -1101,6 +1101,7 @@ export function ChartPane({ pane, compact }: Props) {
         if (p.type === "histogram") {
           const s = chart.addHistogramSeries({
             color: p.color,
+            ...(p.base != null ? { base: p.base } : {}),
             priceFormat: { type: "price", precision: 4, minMove: 0.0001 },
             title: p.title,
             priceLineVisible: false,
@@ -1118,7 +1119,7 @@ export function ChartPane({ pane, compact }: Props) {
         } else {
           const s = chart.addLineSeries({
             color: p.color,
-            lineWidth: 2,
+            lineWidth: p.lineWidth ?? 2,
             title: p.title,
             priceLineVisible: false,
             lastValueVisible: false,

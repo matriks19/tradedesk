@@ -198,6 +198,18 @@ import { multiDipBb as computeMultiDipBb } from "./multiDipBb";
 import { bbDivLg as computeBbDivLg } from "./bbDivLg";
 import { maSimple as computeMaSimple } from "./maSimple";
 import { kijunBb as computeKijunBb } from "./kijunBb";
+import {
+  pdoSeries as computePdoSeries,
+  pdoPatternScan as computePdoPatterns,
+  pdoCrossEvents,
+  pdoSeparatedBandAt,
+  pdoZone as pdoZoneOf,
+  candlesToK as pdoCandlesToK,
+  resolvePdoOpts,
+  refBoll as pdoRefBoll,
+  toNullable as pdoToNullable,
+  type PdoPatternEvent,
+} from "./pdo";
 
 export type PlotMarker = {
   time: number;
@@ -223,6 +235,10 @@ export interface PlotSeries {
   indicatorId?: string;
   /** Lightweight-charts series markers (AL/SAT etc.) */
   markers?: PlotMarker[];
+  /** Histogram taban değeri (LWC `base`, örn. PDO P/D çubukları 50'den) */
+  base?: number;
+  /** Çizgi kalınlığı (varsayılan 2) */
+  lineWidth?: 1 | 2 | 3 | 4;
 }
 
 const SOURCE_OPTIONS = [
@@ -484,6 +500,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "doktorHull", label: "Doktor Hull", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "h21", description: "Hull ribbon 8/13/21/50/100/200 (Hma/Ehma/Thma). Grafik AL: 13×50↑, SAT: 21×50↓. Tarama: 100↑200 AL, 21↓100 SAT + kesişimler. Liste TF≈4h, ≥400 mum.", inputs: [sel("mode", "Hull Type", "Hma", [{ value: "Hma", label: "Hma" }, { value: "Ehma", label: "Ehma" }, { value: "Thma", label: "Thma" }]), num("showRibbon", "Ribbon", 1, 0, 1, 1), num("showMarkers", "AL/SAT", 1, 0, 1, 1), num("thickness", "Kalınlık", 2, 1, 5, 1)] },
   { id: "bbDivLg", label: "BB+RSI Div + LG", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "BB alt dokunuş + RSI OS + bullish RSI div VEYA unconfirmed Liquidity Grab. Opsiyonel EMA50+ADX trend. BUY = sinyal + mum onayı. Liste tarama TF mumları.", inputs: [num("bbLen", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("rsiLen", "RSI Periyot", 14), num("rsiOS", "RSI OS", 30), num("divLbL", "Div Pivot Sol", 5), num("divLbR", "Div Pivot Sağ", 5), num("divRangeLower", "Div Min Bar", 5), num("lgWickMult", "LG Fitil", 2, 1, 5, 0.1), num("lgVolMult", "LG Hacim", 1.3, 1, 3, 0.1), num("useTrend", "Trend Filtre", 1, 0, 1, 1), num("emaLen", "EMA", 50), num("useADX", "ADX Filtre", 1, 0, 1, 1), num("adxLen", "ADX Periyot", 14), num("adxMin", "ADX Min", 20), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1)] },
   { id: "maSimple", label: "MA Basit (20-50-100-200)", category: "ma", pane: "main", acceptsSeries: false, primarySeriesKey: "sma20", description: "SMA 20/50/100/200 şerit. Liste: boğa/ayı yığını, SMA×SMA↑, fiyat×SMA↑, EMA10×SMA20 (hızlı). Hafif kart.", inputs: [num("p20", "SMA20", 20), num("p50", "SMA50", 50), num("p100", "SMA100", 100), num("p200", "SMA200", 200), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1), num("showEma10", "EMA10 çiz", 0, 0, 1, 1)] },
+  { id: "pdo", label: "PDO (Stoch hibrit)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "pdo", description: "PDO — Pump/Dump Osilatörü (kripto-tarayici). Mavi PDO = Stoch %K + yapı sapması, turuncu sinyal = %D + aynı sapma, EMA2. Yeşil P = PUMP skoru, kırmızı D = DUMP skoru (EMA2) + 50 tabanlı yeşil/kırmızı çubuklar; P×D kesişimi = trend↑/↓. AL: ≤30 bölgeden yukarı kesişim, SAT: ≥70'ten aşağı. T10: kesişim + ayrı mumda alt BB teması. UA/US uyumsuzluk + 2D/3D/2T/3T yapı çizgileri. Mod 'ema' = eski PDO.", inputs: [num("stochWeight", "Stoch ağırlığı %", 70, 50, 100, 1), num("smooth", "Yumuşatma (EMA)", 2, 1, 30, 1), sel("crossMode", "Kesişim modu", "kd", [{ value: "kd", label: "Yeni (K/D)" }, { value: "ema", label: "Eski (EMA)" }]), num("low", "Dip bölge", 30, 5, 50, 1), num("high", "Tepe bölge", 70, 50, 95, 1), num("showMarkers", "AL/SAT/T10 işaretleri", 1, 0, 1, 1), num("showPatterns", "UA/US + 2D/3D çizgileri", 1, 0, 1, 1), num("showPD", "Yeşil P / kırmızı D çizgileri", 1, 0, 1, 1), num("showTrend", "Trend kesişimi (P×D) işaretleri", 1, 0, 1, 1), num("trendColor", "PDO çizgisini trende göre boya", 0, 0, 1, 1), num("showOld", "Eski kesişim işaretleri", 0, 0, 1, 1)] },
   { id: "kijunBb", label: "Kijun + BB", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "kijun", description: "Kijun (Donchian orta, 26) + Kijun üzerinde Bollinger (24, 2σ). Liste: fiyat×alt/üst band (erken), Kijun×orta (trend onayı). Hafif kart.", inputs: [num("basePeriods", "Kijun periyot", 26), num("bbLength", "BB Periyot", 24), num("bbStdDev", "BB StdDev", 2, 0.5, 5, 0.1), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1)] },
   { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık + majör düşen direnç kırılımı. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("majBreakLookback", "Majör kırılım pivot", 20, 5, 50, 1), num("breakComboBars", "Dip→kırılım pencere", 8, 1, 30, 1), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1), num("showSr", "S/R çizgileri", 1, 0, 1, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
@@ -2992,6 +3009,168 @@ export function computeBuiltin(
         sma100: s.sma100,
         sma200: s.sma200,
         ...(showEma10 ? { ema10: s.ema10 } : {}),
+      });
+      break;
+    }
+
+    case "pdo": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const showPatterns = n(p, "showPatterns", 1) !== 0;
+      const P = resolvePdoOpts({
+        stochWeight: n(p, "stochWeight", 70),
+        smooth: n(p, "smooth", 2),
+        crossMode: p.crossMode === "ema" ? "ema" : "kd",
+        low: n(p, "low", 30),
+        high: n(p, "high", 70),
+      });
+      const k = pdoCandlesToK(candles);
+      const ser = computePdoSeries(k, P);
+      const N = candles.length;
+      const lvl = (v: number) => new Array<number | null>(N).fill(v);
+      const showPD = n(p, "showPD", 1) !== 0;
+      const showTrend = n(p, "showTrend", 1) !== 0;
+      const trendColor = n(p, "trendColor", 0) !== 0;
+      const showOld = n(p, "showOld", 0) !== 0;
+      const GREEN = "#16a34a";
+      const RED = "#dc2626";
+      const plots: PlotSeries[] = [];
+      if (showPD) {
+        // Referans moveOscSeries: 50 tabanlı P (yeşil) ve D (kırmızı) çubuklar + çizgiler.
+        const bar = (key: string, arr: number[], col: string): PlotSeries => ({
+          id: `${inst.id}-${key}`,
+          pane: "sub",
+          type: "histogram",
+          color: col,
+          base: 50,
+          data: candles.map((c, i) => (Number.isFinite(arr[i]!) ? { time: c.time, value: arr[i]! } : { time: c.time })),
+          title: "",
+          seriesKey: key,
+          indicatorId: inst.id,
+        });
+        plots.push(bar("pumpBar", ser.pump, "rgba(22,163,74,0.34)"));
+        plots.push(bar("dumpBar", ser.dump, "rgba(220,38,38,0.34)"));
+        const pl = line(inst, "pump", "sub", GREEN, candles, pdoToNullable(ser.pump), "P");
+        const dl = line(inst, "dump", "sub", RED, candles, pdoToNullable(ser.dump), "D");
+        pl.lineWidth = 1;
+        dl.lineWidth = 1;
+        plots.push(pl, dl);
+      }
+      const pdoLine = line(inst, "pdo", "sub", "#2563eb", candles, pdoToNullable(ser.raw), "PDO");
+      if (trendColor) {
+        // İsteğe bağlı: PDO çizgisi P>D iken yeşil, D>P iken kırmızı (referansta yok).
+        pdoLine.data = pdoLine.data.map((pt, i) =>
+          "value" in pt && Number.isFinite(ser.pump[i]!) && Number.isFinite(ser.dump[i]!)
+            ? { ...pt, color: ser.pump[i]! > ser.dump[i]! ? GREEN : RED }
+            : pt
+        );
+      }
+      plots.push(
+        pdoLine,
+        line(inst, "signal", "sub", "#ff6d00", candles, pdoToNullable(ser.signal), "Sinyal"),
+        line(inst, "lvlLow", "sub", "#26a69a88", candles, lvl(P.low), String(P.low)),
+        line(inst, "lvl50", "sub", "#787b8655", candles, lvl(50), "50"),
+        line(inst, "lvlHigh", "sub", "#ef535088", candles, lvl(P.high), String(P.high))
+      );
+      const markers: PlotMarker[] = [];
+      if (showTrend && N > 1) {
+        // Trend kesişimi: yeşil P çizgisi kırmızı D'yi yukarı keser → trend↑; tersi → trend↓.
+        for (let i = 1; i < N; i++) {
+          const a0 = ser.pump[i - 1]!, a1 = ser.pump[i]!, b0 = ser.dump[i - 1]!, b1 = ser.dump[i]!;
+          if (!Number.isFinite(a0) || !Number.isFinite(a1) || !Number.isFinite(b0) || !Number.isFinite(b1)) continue;
+          if (a0 <= b0 && a1 > b1)
+            markers.push({ time: candles[i]!.time, position: "belowBar", color: GREEN, shape: "circle", text: "T↑" });
+          else if (a0 >= b0 && a1 < b1)
+            markers.push({ time: candles[i]!.time, position: "aboveBar", color: RED, shape: "circle", text: "T↓" });
+        }
+      }
+      if (showOld && N > 1) {
+        const o = computePdoSeries(k, { ...P, crossMode: "ema", smooth: 5, signal: 5 });
+        for (const e of pdoCrossEvents(o.raw, o.signal, null)) {
+          markers.push({
+            time: candles[e.index]!.time,
+            position: e.direction === "up" ? "belowBar" : "aboveBar",
+            color: e.direction === "up" ? "#65a30d" : "#b91c1c",
+            shape: "square",
+            text: e.direction === "up" ? "E↑" : "E↓",
+          });
+        }
+      }
+      const zone = pdoZoneOf(P);
+      if (showMarkers && N > 1) {
+        for (const e of pdoCrossEvents(ser.raw, ser.signal, zone)) {
+          const v = ser.raw[e.index]!;
+          markers.push({
+            time: candles[e.index]!.time,
+            position: e.direction === "up" ? "belowBar" : "aboveBar",
+            color: e.direction === "up" ? GREEN : RED,
+            shape: e.direction === "up" ? "arrowUp" : "arrowDown",
+            text: `${e.direction === "up" ? "AL" : "SAT"} ${Math.round(v)}`,
+          });
+        }
+        // T10: durumun açıldığı mum (kesişim + ayrı mumda alt bant)
+        const bb = pdoRefBoll(k.c, P.bollLen, P.bollMult);
+        let prevUp = false;
+        let prevDn = false;
+        for (let m = 1; m < N; m++) {
+          const up = !!pdoSeparatedBandAt(k, ser.raw, ser.signal, bb.lo, m + 1, "up", P.t10SignalBars, P.t10BandWindow, P.t10BandTol, zone);
+          const dn = !!pdoSeparatedBandAt(k, ser.raw, ser.signal, bb.lo, m + 1, "down", P.t10SignalBars, P.t10BandWindow, P.t10BandTol, zone);
+          if (up && !prevUp)
+            markers.push({ time: candles[m]!.time, position: "belowBar", color: "#7c3aed", shape: "circle", text: "T10" });
+          if (dn && !prevDn)
+            markers.push({ time: candles[m]!.time, position: "aboveBar", color: "#7c3aed", shape: "circle", text: "T10" });
+          prevUp = up;
+          prevDn = dn;
+        }
+      }
+      if (showPatterns && N > 30) {
+        const pat = computePdoPatterns(k, ser.raw, {
+          bars: P.patternBars,
+          pivot: P.pivot,
+          tol: P.tol,
+          rise: P.rise,
+          divMin: P.divMin,
+          live: P.live,
+          touch: P.touch,
+          from: 0,
+        });
+        const all: PdoPatternEvent[] = [
+          ...pat.ua,
+          ...pat.us,
+          ...pat.uaLive,
+          ...pat.usLive,
+          ...pat.doubleBottom,
+          ...pat.tripleBottom,
+          ...pat.doubleTop,
+          ...pat.tripleTop,
+        ].sort((x, y) => x.to - y.to);
+        for (const e of all) {
+          markers.push({
+            time: candles[e.to]!.time,
+            position: e.side === "buy" ? "belowBar" : "aboveBar",
+            color: e.side === "buy" ? "#00c853" : "#ff1744",
+            shape: "square",
+            text: e.live ? `${e.label}*` : e.label,
+          });
+        }
+        // Son 3 yapı için pivot çizgileri (fiyat + PDO paneli), hafif tut.
+        const seg = (a: number, b: number, va: number, vb: number) => {
+          const vals: (number | null)[] = new Array(N).fill(null);
+          for (let i = a; i <= b; i++) vals[i] = va + ((vb - va) * (i - a)) / Math.max(1, b - a);
+          return vals;
+        };
+        all.slice(-3).forEach((e, i) => {
+          const col = e.side === "buy" ? "#00c853" : "#ff1744";
+          plots.push(line(inst, `patPx${i}`, "main", col, candles, seg(e.from, e.to, e.priceFrom, e.priceTo), i === 0 ? "PDO yapı" : ""));
+          plots.push(line(inst, `patOsc${i}`, "sub", col, candles, seg(e.from, e.to, e.oscFrom, e.oscTo), ""));
+        });
+      }
+      markers.sort((a, b) => a.time - b.time);
+      if (markers.length) pdoLine.markers = markers;
+      push(plots, {
+        pdo: pdoToNullable(ser.raw),
+        signal: pdoToNullable(ser.signal),
+        pump: pdoToNullable(ser.pump),
+        dump: pdoToNullable(ser.dump),
       });
       break;
     }

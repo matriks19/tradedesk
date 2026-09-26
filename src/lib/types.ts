@@ -280,7 +280,8 @@ export type BuiltinIndicatorId =
   | "multiDipBb"
   | "bbDivLg"
   | "maSimple"
-  | "kijunBb";
+  | "kijunBb"
+  | "pdo";
 
 export interface IndicatorInputDef {
   key: string;
