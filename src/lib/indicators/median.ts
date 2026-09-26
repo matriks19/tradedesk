@@ -407,6 +407,10 @@ export interface PliDirOpts {
   sqPct?: number;
   /** Squeeze son kaç mumda (bu mum dahil) görülmüş olmalı (varsayılan 5) */
   sqMemory?: number;
+  /** Hull MA uzunluğu (varsayılan 55) */
+  hullLen?: number;
+  /** Bant kesişimlerinde kesen çizgi: "hull" (varsayılan) veya "price" (kaynak/close) */
+  crossSrc?: "hull" | "price";
 }
 
 export const PLI_DIR_DEFAULTS = {
@@ -416,7 +420,9 @@ export const PLI_DIR_DEFAULTS = {
   sqLookback: 50,
   sqPct: 25,
   sqMemory: 5,
-} as const;
+  hullLen: 55,
+  crossSrc: "hull" as "hull" | "price",
+};
 
 export interface PliDirResult {
   upper: (number | null)[];
@@ -433,6 +439,58 @@ export interface PliDirResult {
   /** ta.crossover(yonlu, 0) / ta.crossunder(yonlu, 0) */
   crossUp: (0 | 1)[];
   crossDn: (0 | 1)[];
+  /** TV-style HMA(src, hullLen) */
+  hma: (number | null)[];
+  /** Kesen çizgi (hma veya src) × bantlar: ta.crossover / ta.crossunder */
+  loUp: (0 | 1)[];
+  hiUp: (0 | 1)[];
+  midUp: (0 | 1)[];
+  midDn: (0 | 1)[];
+}
+
+/** na-aware WMA (window must be fully non-null). */
+function wmaNa(values: (number | null)[], period: number): (number | null)[] {
+  const n = values.length;
+  const p = Math.max(1, Math.floor(period));
+  const out: (number | null)[] = new Array(n).fill(null);
+  const denom = (p * (p + 1)) / 2;
+  for (let i = p - 1; i < n; i++) {
+    let sum = 0;
+    let ok = true;
+    for (let j = 0; j < p; j++) {
+      const v = values[i - p + 1 + j];
+      if (v == null) {
+        ok = false;
+        break;
+      }
+      sum += v * (j + 1);
+    }
+    if (ok) out[i] = sum / denom;
+  }
+  return out;
+}
+
+/**
+ * TradingView-style Hull MA: wma(2·wma(src, floor(n/2)) − wma(src, n), floor(√n)).
+ * na until every inner window is complete (first value at index n − 1 + floor(√n) − 1).
+ */
+export function hmaTv(values: number[], length = 55): (number | null)[] {
+  const n = Math.max(1, Math.floor(length));
+  const half = wmaNa(values, Math.max(1, Math.floor(n / 2)));
+  const full = wmaNa(values, n);
+  const raw = values.map((_, i) => (half[i] != null && full[i] != null ? 2 * half[i]! - full[i]! : null));
+  return wmaNa(raw, Math.max(1, Math.floor(Math.sqrt(n))));
+}
+
+/** ta.crossover(a, b) / ta.crossunder(a, b) with na → false. */
+function crossArr(a: (number | null)[], b: (number | null)[], dir: "up" | "down"): (0 | 1)[] {
+  const out: (0 | 1)[] = new Array(a.length).fill(0);
+  for (let i = 1; i < a.length; i++) {
+    const a0 = a[i - 1], a1 = a[i], b0 = b[i - 1], b1 = b[i];
+    if (a0 == null || a1 == null || b0 == null || b1 == null) continue;
+    if (dir === "up" ? a1 > b1 && a0 <= b0 : a1 < b1 && a0 >= b0) out[i] = 1;
+  }
+  return out;
 }
 
 const finiteOrNull = (v: number): number | null => (Number.isFinite(v) ? v : null);
@@ -509,21 +567,42 @@ export function pliDir(values: number[], opts: PliDirOpts = {}): PliDirResult {
     else if (a >= 0 && b < 0) crossDn[i] = 1;
   }
 
-  return { upper, lower, med, oran, d, dir, yonlu, squeeze, squeezeRecent, crossUp, crossDn };
+  const hma = hmaTv(values, opts.hullLen ?? PLI_DIR_DEFAULTS.hullLen);
+  const xs: (number | null)[] = (opts.crossSrc ?? PLI_DIR_DEFAULTS.crossSrc) === "price" ? values : hma;
+  const loUp = crossArr(xs, lower, "up");
+  const hiUp = crossArr(xs, upper, "up");
+  const midUp = crossArr(xs, med, "up");
+  const midDn = crossArr(xs, med, "down");
+
+  return { upper, lower, med, oran, d, dir, yonlu, squeeze, squeezeRecent, crossUp, crossDn, hma, loUp, hiUp, midUp, midDn };
 }
 
 // ── Liste taraması ──────────────────────────────────────────────────────────
 
-export type PliDirCond = "pli_up" | "pli_dn" | "pli_up_sq" | "pli_dn_sq";
-export const ALL_PLI_DIR_CONDS: PliDirCond[] = ["pli_up", "pli_dn", "pli_up_sq", "pli_dn_sq"];
+export type PliDirCond =
+  | "pli_up"
+  | "pli_dn"
+  | "pli_up_sq"
+  | "pli_dn_sq"
+  | "pli_lo_up"
+  | "pli_hi_up"
+  | "pli_mid_up"
+  | "pli_mid_dn";
+export const PLI_DIR_BAND_CONDS: PliDirCond[] = ["pli_lo_up", "pli_hi_up", "pli_mid_up", "pli_mid_dn"];
+export const ALL_PLI_DIR_CONDS: PliDirCond[] = ["pli_up", "pli_dn", "pli_up_sq", "pli_dn_sq", ...PLI_DIR_BAND_CONDS];
 export const DEFAULT_PLI_DIR_CONDS: PliDirCond[] = ["pli_up", "pli_dn"];
-export const PLI_DIR_BEAR_CONDS = new Set<PliDirCond>(["pli_dn", "pli_dn_sq"]);
+export const PLI_DIR_BEAR_CONDS = new Set<PliDirCond>(["pli_dn", "pli_dn_sq", "pli_mid_dn"]);
 export const PLI_DIR_COND_LABEL: Record<PliDirCond, string> = {
   pli_up: "PLI± yükseliş",
   pli_dn: "PLI± düşüş",
   pli_up_sq: "PLI± yükseliş (sıkışma)",
   pli_dn_sq: "PLI± düşüş (sıkışma)",
+  pli_lo_up: "Alt band↑",
+  pli_hi_up: "Üst band↑",
+  pli_mid_up: "Orta band↑",
+  pli_mid_dn: "Orta band↓",
 };
+export { pliDirFetchLimit } from "./pliDirLimits";
 /** len 50 + oran lookback 50 − 1 = 99 mum squeeze için; 60 temel kesişim için yeter. */
 export const PLI_DIR_MIN_BARS = 60;
 export const PLI_DIR_FETCH_LIMIT = 220;
@@ -541,19 +620,24 @@ export function pliDirScan(
   const last = candles.length - 1;
   const out: PliDirHit[] = [];
   for (const cond of conds) {
+    const band =
+      cond === "pli_lo_up" ? r.loUp : cond === "pli_hi_up" ? r.hiUp : cond === "pli_mid_up" ? r.midUp : cond === "pli_mid_dn" ? r.midDn : null;
     const up = cond === "pli_up" || cond === "pli_up_sq";
     const sq = cond.endsWith("_sq");
+    const xsName = (opts.crossSrc ?? PLI_DIR_DEFAULTS.crossSrc) === "price" ? "Fiyat" : `Hull ${opts.hullLen ?? PLI_DIR_DEFAULTS.hullLen}`;
     for (let ago = 0; ago <= maxBarsAgo; ago++) {
       const i = last - ago;
       if (i < 1) break;
-      if (!(up ? r.crossUp[i] : r.crossDn[i])) continue;
+      if (band ? !band[i] : !(up ? r.crossUp[i] : r.crossDn[i])) continue;
       if (sq && !r.squeezeRecent[i]) continue;
-      const y = r.yonlu[i] as number;
+      const y = (r.yonlu[i] ?? 0) as number;
       out.push({
         cond,
         barsAgo: ago,
         yonlu: y,
-        note: `${PLI_DIR_COND_LABEL[cond]} oran ${(y * 100).toFixed(2)}% (−${ago})`,
+        note: band
+          ? `${PLI_DIR_COND_LABEL[cond]} (${xsName}) (−${ago})`
+          : `${PLI_DIR_COND_LABEL[cond]} oran ${(y * 100).toFixed(2)}% (−${ago})`,
       });
       break;
     }

@@ -4,7 +4,7 @@
  * Run: npx --yes tsx scripts/smoke-pli-dir.ts
  */
 import type { Candle, IndicatorInstance } from "../src/lib/types";
-import { pliDir, pliChannel, PLI_DIR_COND_LABEL } from "../src/lib/indicators/median";
+import { pliDir, pliChannel, hmaTv, PLI_DIR_COND_LABEL, DEFAULT_PLI_DIR_CONDS, pliDirFetchLimit } from "../src/lib/indicators/median";
 import {
   scanSymbol,
   alertScanHits,
@@ -72,6 +72,34 @@ function reference(src: number[], len: number, x: number, k: number) {
     if (a >= 0 && b < 0) dn.push(i);
   }
   return { upper, lower, med, oran, yonlu, sqRecent, up, dn };
+}
+
+/** Direct TV reference: ta.wma / ta.hma = wma(2·wma(src, n/2) − wma(src, n), floor(sqrt(n))), na-propagating. */
+function refWma(src: (number | null)[], len: number): (number | null)[] {
+  return src.map((_, i) => {
+    if (i < len - 1) return null;
+    let num = 0, den = 0;
+    for (let j = 0; j < len; j++) {
+      const v = src[i - j];
+      if (v == null) return null;
+      num += v * (len - j);
+      den += len - j;
+    }
+    return num / den;
+  });
+}
+function refHma(src: number[], n: number): (number | null)[] {
+  const a = refWma(src, Math.floor(n / 2)), b = refWma(src, n);
+  return refWma(a.map((v, i) => (v == null || b[i] == null ? null : 2 * v - b[i]!)), Math.floor(Math.sqrt(n)));
+}
+function refCross(x: (number | null)[], y: (number | null)[], dir: "up" | "down"): number[] {
+  const out: number[] = [];
+  for (let i = 1; i < x.length; i++) {
+    const x0 = x[i - 1], x1 = x[i], y0 = y[i - 1], y1 = y[i];
+    if (x0 == null || x1 == null || y0 == null || y1 == null) continue;
+    if (dir === "up" ? x1 > y1 && x0 <= y0 : x1 < y1 && x0 >= y0) out.push(i);
+  }
+  return out;
 }
 
 function synth(n = 700, seed0 = 5): Candle[] {
@@ -146,11 +174,24 @@ function main() {
   const cfgFor = (conds: PliDirCond[], extra: Partial<NonNullable<ListScanConfig["pliDir"]>> = {}): ListScanConfig => ({
     pliDir: { enabled: true, conds, ...extra },
   });
+  const closes = cs.map((c) => c.close);
+  const hRef = refHma(closes, 55);
+  const bandRef = {
+    pli_lo_up: refCross(hRef, ref.lower, "up"),
+    pli_hi_up: refCross(hRef, ref.upper, "up"),
+    pli_mid_up: refCross(hRef, ref.med, "up"),
+    pli_mid_dn: refCross(hRef, ref.med, "down"),
+  };
+  for (const [c, v] of Object.entries(bandRef)) assert(v.length >= 1, `need ${c} crosses in test data`);
   const expected: Record<PliDirCond, Set<number>> = {
     pli_up: upIdx,
     pli_dn: dnIdx,
     pli_up_sq: new Set(sqUp),
     pli_dn_sq: new Set(sqDn),
+    pli_lo_up: new Set(bandRef.pli_lo_up),
+    pli_hi_up: new Set(bandRef.pli_hi_up),
+    pli_mid_up: new Set(bandRef.pli_mid_up),
+    pli_mid_dn: new Set(bandRef.pli_mid_dn),
   };
   let edgeChecks = 0;
   for (const cond of Object.keys(expected) as PliDirCond[]) {
@@ -161,7 +202,7 @@ function main() {
       if (hits.length) {
         const h = hits[0]!;
         assert(h.kind === "pliDir" && h.barsAgo === 0, "hit shape");
-        assert(h.bias === (cond.startsWith("pli_dn") ? "bear" : "bull"), `bias ${cond}`);
+        assert(h.bias === (cond.startsWith("pli_dn") || cond === "pli_mid_dn" ? "bear" : "bull"), `bias ${cond}`);
         assert(h.note.startsWith(PLI_DIR_COND_LABEL[cond]), `note ${h.note}`);
         assert(alertScanHits(cut, cfgFor([cond]), 1).some((x) => x.cond === cond), `alarm ${cond}`);
         edgeChecks++;
@@ -210,13 +251,82 @@ function main() {
   assert(mk.filter((m) => m.text === "PLI↑").length === ref.up.length && mk.filter((m) => m.text === "PLI↓").length === ref.dn.length, "markers = reference");
   const mkSq = by("yonlu", run({ ...params, sigSq: 1 }))!.markers ?? [];
   assert(mkSq.filter((m) => m.text === "PLI↑ S").length === sqUp.length && mkSq.filter((m) => m.text === "PLI↓ S").length === sqDn.length, "squeeze markers");
-  const noLines = run({ ...params, lineUpper: 0, lineLower: 0, lineMedian: 0, lineZero: 0 });
-  assert(noLines.length === 1 && noLines[0]!.seriesKey === "yonlu", "line toggles");
+  const noLines = run({ ...params, lineUpper: 0, lineLower: 0, lineMedian: 0, lineZero: 0, lineHull: 0 });
+  const visLines = noLines.filter((pl) => pl.color !== "rgba(0,0,0,0)");
+  assert(visLines.length === 1 && visLines[0]!.seriesKey === "yonlu", "line toggles");
+  assert(noLines.filter((pl) => pl.color === "rgba(0,0,0,0)").every((pl) => pl.pane === "main" && (pl.markers ?? []).length > 0), "band-cross markers kept on a transparent carrier");
+  assert(run({ ...params, lineUpper: 0, lineLower: 0, lineMedian: 0, lineZero: 0 }).map((pl) => pl.seriesKey).sort().join() === "hull,yonlu", "hull stays when bands off");
   assert(!(by("yonlu", run({ ...params, sigUp: 0 }))!.markers ?? []).some((m) => m.text === "PLI↑"), "sigUp off");
   assert(!(by("yonlu", run({ ...params, showMarkers: 0 }))!.markers ?? []).length, "master off");
 
+  // 5) Hull MA (TV) parity + band crosses (Hull / Fiyat)
+  let hmaCompared = 0;
+  for (const seed of [5, 17, 41]) {
+    const c2 = synth(700, seed).map((c) => c.close);
+    for (const hl of [4, 9, 20, 55, 100]) {
+      const a = hmaTv(c2, hl), b = refHma(c2, hl);
+      const first = hl - 1 + Math.floor(Math.sqrt(hl)) - 1;
+      assert(a[first - 1] == null && a[first] != null, `hma first value at ${first} (len ${hl})`);
+      for (let i = 0; i < c2.length; i++) {
+        assert(close9(a[i]!, b[i]!), `hma len ${hl} seed ${seed} i ${i}: ${a[i]} vs ${b[i]}`);
+        if (a[i] != null) hmaCompared++;
+      }
+    }
+    for (const [hl, xs] of [[55, "hull"], [21, "hull"], [55, "price"]] as const) {
+      const r = pliDir(c2, { hullLen: hl, crossSrc: xs });
+      const rf = reference(c2, 50, 5, 5);
+      const line = xs === "price" ? c2 : refHma(c2, hl);
+      const idx = (a: (0 | 1)[]) => a.flatMap((v, i) => (v ? [i] : [])).join();
+      assert(idx(r.loUp) === refCross(line, rf.lower, "up").join(), `loUp ${hl}/${xs}`);
+      assert(idx(r.hiUp) === refCross(line, rf.upper, "up").join(), `hiUp ${hl}/${xs}`);
+      assert(idx(r.midUp) === refCross(line, rf.med, "up").join(), `midUp ${hl}/${xs}`);
+      assert(idx(r.midDn) === refCross(line, rf.med, "down").join(), `midDn ${hl}/${xs}`);
+    }
+  }
+  // crossSrc "price" reaches the scan, note names the source
+  const pxMid = refCross(closes, ref.med, "up");
+  const pm = pxMid[pxMid.length - 1]!;
+  const hPx = scanSymbol(cs.slice(0, pm + 1), cfgFor(["pli_mid_up"], { crossSrc: "price" }), 0);
+  assert(hPx.length === 1 && hPx[0]!.note.includes("(Fiyat)"), "crossSrc price in scan");
+  const hh = scanSymbol(cs.slice(0, bandRef.pli_mid_up.at(-1)! + 1), cfgFor(["pli_mid_up"]), 0);
+  assert(hh.length === 1 && hh[0]!.note.includes("(Hull 55)"), "crossSrc hull note");
+  // editable Hull length
+  const h21 = refCross(refHma(closes, 21), ref.lower, "up");
+  const e21 = h21[h21.length - 1]!;
+  assert(scanSymbol(cs.slice(0, e21 + 1), cfgFor(["pli_lo_up"], { hullLen: 21 }), 0).length === 1, "hullLen editable");
+  // existing defaults unchanged; band chips off by default
+  assert(DEFAULT_PLI_DIR_CONDS.join() === "pli_up,pli_dn", "default chips unchanged");
+  assert(scanSymbol(cs, cfgFor([]), 700).every((h) => h.cond === "pli_up" || h.cond === "pli_dn"), "band chips not in defaults");
+  // alarm candle count covers PLI window + Hull warmup
+  for (const hl of [55, 100, 200, 300, 500]) {
+    const lim = pliDirFetchLimit(hl, 50);
+    assert(lim >= hl + Math.floor(Math.sqrt(hl)) + 2 && lim >= 50 + 50 + 2, `fetch limit ${hl}: ${lim}`);
+  }
+  assert(pliDirFetchLimit() === 220, "default fetch limit stays 220");
+  // chart: Hull line + cross markers + toggles
+  const hullPlot = by("hull")!;
+  assert(hullPlot.pane === "main" && hullPlot.toggle === "lineHull", "hull on main");
+  const hv = hullPlot.data.filter((d) => "value" in d) as { value: number; color?: string }[];
+  assert(hv.length === hRef.filter((v) => v != null).length, "hull points");
+  assert(hv.slice(1).every((d, q) => d.color === (d.value > hv[q]!.value ? "#26a69a" : d.value < hv[q]!.value ? "#ef5350" : "#ab47bc")), "hull slope colors");
+  const hm = hullPlot.markers ?? [];
+  assert(hm.filter((m) => m.text === "A↑").length === bandRef.pli_lo_up.length, "A↑ markers");
+  assert(hm.filter((m) => m.text === "Ü↑").length === bandRef.pli_hi_up.length, "Ü↑ markers");
+  assert(!hm.some((m) => m.text === "O↑" || m.text === "O↓"), "mid markers off by default");
+  const midOn = by("hull", run({ ...params, sigMidUp: 1, sigMidDn: 1 }))!.markers ?? [];
+  assert(midOn.filter((m) => m.text === "O↑").length === bandRef.pli_mid_up.length && midOn.filter((m) => m.text === "O↓").length === bandRef.pli_mid_dn.length, "mid markers");
+  const pMid = indicatorParamsFromConfig("pliDir", cfgFor(["pli_mid_dn"]));
+  assert(pMid.sigMidDn === 1 && pMid.sigMidUp === 0 && pMid.hullLen === 55 && pMid.crossSrc === "hull", "params from band chips");
+  const noHull = run({ ...params, lineHull: 0 });
+  assert(!by("hull", noHull), "lineHull off");
+  const hostMk = noHull.filter((pl) => pl.pane === "main").flatMap((pl) => pl.markers ?? []);
+  assert(hostMk.filter((m) => m.text === "A↑").length === bandRef.pli_lo_up.length, "cross markers move to a visible main line");
+  const plain = by("hull", run({ ...params, hullSlopeColor: 0 }))!;
+  assert(plain.data.every((d) => !("color" in d) || d.color == null), "slope color off → plain purple");
+  assert(!(by("hull", run({ ...params, sigLoUp: 0 }))!.markers ?? []).some((m) => m.text === "A↑"), "sigLoUp off");
+
   console.log(
-    `pliDir: ${compared} yonlu values = reference · crosses up ${ref.up.length} dn ${ref.dn.length} · squeeze-release up ${sqUp.length} dn ${sqDn.length} · ${edgeChecks} scan+alarm edge checks`
+    `pliDir: hma ${hmaCompared} values = reference · band crosses lo↑ ${bandRef.pli_lo_up.length} hi↑ ${bandRef.pli_hi_up.length} mid↑ ${bandRef.pli_mid_up.length} mid↓ ${bandRef.pli_mid_dn.length} · ${compared} yonlu values = reference · crosses up ${ref.up.length} dn ${ref.dn.length} · squeeze-release up ${sqUp.length} dn ${sqDn.length} · ${edgeChecks} scan+alarm edge checks`
   );
   console.log("OK");
 }
