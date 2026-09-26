@@ -52,6 +52,10 @@ import {
   MA_SIMPLE_FETCH_LIMIT,
 } from "@/lib/indicators/maSimple";
 import {
+  kijunBb,
+  KIJUN_BB_MIN_BARS,
+} from "@/lib/indicators/kijunBb";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -407,7 +411,9 @@ export type MaSimpleCond =
   | "x_50_100"
   | "x_100_200"
   | "price_x_20"
-  | "price_x_50";
+  | "price_x_50"
+  | "ema10_x_sma20"
+  | "ema10_x_sma20_dn";
 
 export const ALL_MA_SIMPLE_CONDS: MaSimpleCond[] = [
   "stack_bull",
@@ -417,6 +423,8 @@ export const ALL_MA_SIMPLE_CONDS: MaSimpleCond[] = [
   "x_100_200",
   "price_x_20",
   "price_x_50",
+  "ema10_x_sma20",
+  "ema10_x_sma20_dn",
 ];
 
 export const DEFAULT_MA_SIMPLE_CONDS: MaSimpleCond[] = [
@@ -432,6 +440,37 @@ export const MA_SIMPLE_COND_LABEL: Record<MaSimpleCond, string> = {
   x_100_200: "SMA100↑200",
   price_x_20: "Fiyat↑SMA20",
   price_x_50: "Fiyat↑SMA50",
+  ema10_x_sma20: "EMA10↑SMA20",
+  ema10_x_sma20_dn: "EMA10↓SMA20",
+};
+
+/** Kijun + BB (BB on Kijun series). All edge events. */
+export type KijunBbCond =
+  | "px_lower_up"
+  | "px_lower_dn"
+  | "px_upper_up"
+  | "kijun_mid_up"
+  | "kijun_mid_dn";
+
+export const ALL_KIJUN_BB_CONDS: KijunBbCond[] = [
+  "px_lower_up",
+  "px_lower_dn",
+  "px_upper_up",
+  "kijun_mid_up",
+  "kijun_mid_dn",
+];
+
+export const DEFAULT_KIJUN_BB_CONDS: KijunBbCond[] = [
+  "px_lower_up",
+  "kijun_mid_up",
+];
+
+export const KIJUN_BB_COND_LABEL: Record<KijunBbCond, string> = {
+  px_lower_up: "Fiyat alt↑",
+  px_lower_dn: "Fiyat alt↓",
+  px_upper_up: "Fiyat üst↑",
+  kijun_mid_up: "Kijun orta↑",
+  kijun_mid_dn: "Kijun orta↓",
 };
 
 export type ListScanKind =
@@ -449,6 +488,7 @@ export type ListScanKind =
   | "bbDivLg"
   | "obFall"
   | "maSimple"
+  | "kijunBb"
   | "pine";
 
 export type PineCond =
@@ -722,6 +762,14 @@ export type ListScanConfig = {
     p50?: number;
     p100?: number;
     p200?: number;
+  };
+  /** Kijun + BB (BB on Kijun) — scan TF only (off by default). */
+  kijunBb?: {
+    enabled: boolean;
+    conds: KijunBbCond[];
+    basePeriods?: number;
+    bbLength?: number;
+    bbStdDev?: number;
   };
   pine?: {
     enabled: boolean;
@@ -2042,6 +2090,10 @@ function scanMaSimple(
         return s.price_x_20;
       case "price_x_50":
         return s.price_x_50;
+      case "ema10_x_sma20":
+        return s.ema10_x_sma20;
+      case "ema10_x_sma20_dn":
+        return s.ema10_x_sma20_dn;
     }
   };
   const best = new Map<string, ListScanHit>();
@@ -2053,7 +2105,7 @@ function scanMaSimple(
       if (i < 0) break;
       if (series[i] !== 1) continue;
       const bias: ListScanHit["bias"] =
-        cond === "stack_bear" ? "bear" : "bull";
+        cond === "stack_bear" || cond === "ema10_x_sma20_dn" ? "bear" : "bull";
       const label = MA_SIMPLE_COND_LABEL[cond] ?? cond;
       const note = `MA Basit ${label} (−${ago})`;
       const prev = best.get(cond);
@@ -2064,6 +2116,44 @@ function scanMaSimple(
     }
   }
   return [...best.values()];
+}
+
+function scanKijunBb(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["kijunBb"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_KIJUN_BB_CONDS;
+  if (candles.length < KIJUN_BB_MIN_BARS) return [];
+  const s = kijunBb(candles, {
+    basePeriods: cfg.basePeriods,
+    bbLength: cfg.bbLength,
+    bbStdDev: cfg.bbStdDev,
+  });
+  const out: ListScanHit[] = [];
+  const last = candles.length - 1;
+  for (const cond of conds) {
+    const series = s[cond];
+    if (!series) continue;
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = last - ago;
+      if (i < 0) break;
+      if (series[i] !== 1) continue;
+      const bias: ListScanHit["bias"] =
+        cond === "px_lower_dn" || cond === "kijun_mid_dn" ? "bear" : "bull";
+      const label = KIJUN_BB_COND_LABEL[cond] ?? cond;
+      out.push({
+        kind: "kijunBb",
+        cond,
+        bias,
+        barsAgo: ago,
+        note: `Kijun+BB ${label} (−${ago})`,
+      });
+      break;
+    }
+  }
+  return out;
 }
 
 export function scanSymbol(
@@ -2086,6 +2176,7 @@ export function scanSymbol(
   if (cfg.bbDivLg?.enabled) enabledKinds.push("bbDivLg");
   if (cfg.obFall?.enabled) enabledKinds.push("obFall");
   if (cfg.maSimple?.enabled) enabledKinds.push("maSimple");
+  if (cfg.kijunBb?.enabled) enabledKinds.push("kijunBb");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2104,6 +2195,7 @@ export function scanSymbol(
     bbDivLg: cfg.bbDivLg ? scanBbDivLg(candles, cfg.bbDivLg, maxBarsAgo) : [],
     obFall: cfg.obFall ? scanObFall(candles, cfg.obFall, maxBarsAgo) : [],
     maSimple: cfg.maSimple ? scanMaSimple(candles, cfg.maSimple, maxBarsAgo) : [],
+    kijunBb: cfg.kijunBb ? scanKijunBb(candles, cfg.kijunBb, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2395,6 +2487,16 @@ export function indicatorParamsFromConfig(
       p100: m.p100 ?? 100,
       p200: m.p200 ?? 200,
       showMarkers: 1,
+      showEma10: m.conds.some((c) => c.startsWith("ema10_")) ? 1 : 0,
+    };
+  }
+  if (kind === "kijunBb" && cfg.kijunBb) {
+    const k = cfg.kijunBb;
+    return {
+      basePeriods: k.basePeriods ?? 26,
+      bbLength: k.bbLength ?? 24,
+      bbStdDev: k.bbStdDev ?? 2,
+      showMarkers: 1,
     };
   }
   return {};
@@ -2416,6 +2518,7 @@ export const KIND_TO_INDICATOR: Record<
   | "bbDivLg"
   | "orderBlocks"
   | "maSimple"
+  | "kijunBb"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2431,6 +2534,7 @@ export const KIND_TO_INDICATOR: Record<
   bbDivLg: "bbDivLg",
   obFall: "orderBlocks",
   maSimple: "maSimple",
+  kijunBb: "kijunBb",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2453,4 +2557,8 @@ export {
   MA_SIMPLE_MIN_BARS,
   MA_SIMPLE_FETCH_LIMIT,
 } from "@/lib/indicators/maSimple";
+export {
+  KIJUN_BB_MIN_BARS,
+  KIJUN_BB_FETCH_LIMIT,
+} from "@/lib/indicators/kijunBb";
 // DIV_SCAN_FETCH_LIMIT / DIV_SCAN_MIN_BARS exported above with DivScan types

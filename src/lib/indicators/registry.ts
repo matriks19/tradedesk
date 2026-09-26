@@ -197,6 +197,7 @@ import { doktorHull as computeDoktorHull } from "./doktorHull";
 import { multiDipBb as computeMultiDipBb } from "./multiDipBb";
 import { bbDivLg as computeBbDivLg } from "./bbDivLg";
 import { maSimple as computeMaSimple } from "./maSimple";
+import { kijunBb as computeKijunBb } from "./kijunBb";
 
 export type PlotMarker = {
   time: number;
@@ -482,7 +483,8 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "goldKeko", label: "Gold2 (KEKO)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "oscMain", description: "GOLD/KEKO — kutuplu enerji kırılım osilatörü. Liste Gold2: Raw/Core/Disp × RMA AL/SAT, kırılım, şarj, kutup (kenar-only).", inputs: [num("hamMomLen", "HAM Mom", 21), num("volBaseLen", "Vol Base", 34), num("hamPower", "HAM Power", 1.2, 0.1, 5, 0.1), num("aoFast", "AO Fast", 5), num("aoSlow", "AO Slow", 34), num("hamWeight", "HAM W", 0.6, 0, 1, 0.05), num("aoWeight", "AO W", 0.4, 0, 1, 0.05), num("bbLen", "BB Len", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("kcLen", "KC Len", 20), num("kcMult", "KC Mult", 1.5, 0.5, 5, 0.1), num("peLen", "PE Len", 100), num("compressionThresh", "Sıkışma Z", 0.5, 0, 3, 0.05), num("cmfLen", "CMF Len", 21), num("polarWeightCMF", "Polar CMF", 0.6, 0, 1, 0.05), num("polarWeightHam", "Polar HAM", 0.4, 0, 1, 0.05), num("preSmoothLen", "Pre Smooth", 3), num("jurikLen", "Jurik Len", 8), num("rmaLen", "RMA Len", 13), num("postSmoothLen", "Post Smooth", 2), num("zLen", "Z Len", 89), num("displaySignalLen", "Disp EMA", 5), num("histScale", "Hist Scale", 18, 1, 100, 0.5), num("minChargeForSignal", "Min Şarj", 30, 0, 100, 1)] },
   { id: "doktorHull", label: "Doktor Hull", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "h21", description: "Hull ribbon 8/13/21/50/100/200 (Hma/Ehma/Thma). Grafik AL: 13×50↑, SAT: 21×50↓. Tarama: 100↑200 AL, 21↓100 SAT + kesişimler. Liste TF≈4h, ≥400 mum.", inputs: [sel("mode", "Hull Type", "Hma", [{ value: "Hma", label: "Hma" }, { value: "Ehma", label: "Ehma" }, { value: "Thma", label: "Thma" }]), num("showRibbon", "Ribbon", 1, 0, 1, 1), num("showMarkers", "AL/SAT", 1, 0, 1, 1), num("thickness", "Kalınlık", 2, 1, 5, 1)] },
   { id: "bbDivLg", label: "BB+RSI Div + LG", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "BB alt dokunuş + RSI OS + bullish RSI div VEYA unconfirmed Liquidity Grab. Opsiyonel EMA50+ADX trend. BUY = sinyal + mum onayı. Liste tarama TF mumları.", inputs: [num("bbLen", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("rsiLen", "RSI Periyot", 14), num("rsiOS", "RSI OS", 30), num("divLbL", "Div Pivot Sol", 5), num("divLbR", "Div Pivot Sağ", 5), num("divRangeLower", "Div Min Bar", 5), num("lgWickMult", "LG Fitil", 2, 1, 5, 0.1), num("lgVolMult", "LG Hacim", 1.3, 1, 3, 0.1), num("useTrend", "Trend Filtre", 1, 0, 1, 1), num("emaLen", "EMA", 50), num("useADX", "ADX Filtre", 1, 0, 1, 1), num("adxLen", "ADX Periyot", 14), num("adxMin", "ADX Min", 20), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1)] },
-  { id: "maSimple", label: "MA Basit (20-50-100-200)", category: "ma", pane: "main", acceptsSeries: false, primarySeriesKey: "sma20", description: "SMA 20/50/100/200 şerit. Liste: boğa/ayı yığını, SMA×SMA↑, fiyat×SMA↑. Hafif kart.", inputs: [num("p20", "SMA20", 20), num("p50", "SMA50", 50), num("p100", "SMA100", 100), num("p200", "SMA200", 200), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1)] },
+  { id: "maSimple", label: "MA Basit (20-50-100-200)", category: "ma", pane: "main", acceptsSeries: false, primarySeriesKey: "sma20", description: "SMA 20/50/100/200 şerit. Liste: boğa/ayı yığını, SMA×SMA↑, fiyat×SMA↑, EMA10×SMA20 (hızlı). Hafif kart.", inputs: [num("p20", "SMA20", 20), num("p50", "SMA50", 50), num("p100", "SMA100", 100), num("p200", "SMA200", 200), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1), num("showEma10", "EMA10 çiz", 0, 0, 1, 1)] },
+  { id: "kijunBb", label: "Kijun + BB", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "kijun", description: "Kijun (Donchian orta, 26) + Kijun üzerinde Bollinger (24, 2σ). Liste: fiyat×alt/üst band (erken), Kijun×orta (trend onayı). Hafif kart.", inputs: [num("basePeriods", "Kijun periyot", 26), num("bbLength", "BB Periyot", 24), num("bbStdDev", "BB StdDev", 2, 0.5, 5, 0.1), num("showMarkers", "Kesişim işaretleri", 1, 0, 1, 1)] },
   { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık + majör düşen direnç kırılımı. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("majBreakLookback", "Majör kırılım pivot", 20, 5, 50, 1), num("breakComboBars", "Dip→kırılım pencere", 8, 1, 30, 1), num("showMarkers", "Sinyal işaretleri", 1, 0, 1, 1), num("showSr", "S/R çizgileri", 1, 0, 1, 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), num("showMarkers", "AL/SAT işaretleri", 1, 0, 1, 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
 ];
@@ -2905,12 +2907,18 @@ export function computeBuiltin(
         p100: n(p, "p100", 100),
         p200: n(p, "p200", 200),
       });
+      const showEma10 = n(p, "showEma10", 0) !== 0;
       const plots: PlotSeries[] = [
         line(inst, "sma20", "main", "#42a5f5", candles, s.sma20, "SMA20"),
         line(inst, "sma50", "main", "#ab47bc", candles, s.sma50, "SMA50"),
         line(inst, "sma100", "main", "#ffa726", candles, s.sma100, "SMA100"),
         line(inst, "sma200", "main", "#ef5350", candles, s.sma200, "SMA200"),
       ];
+      if (showEma10) {
+        plots.push(
+          line(inst, "ema10", "main", "#ffee58", candles, s.ema10, "EMA10")
+        );
+      }
       if (showMarkers) {
         const markers: PlotMarker[] = [];
         for (let i = 0; i < candles.length; i++) {
@@ -2947,6 +2955,22 @@ export function computeBuiltin(
               shape: "circle",
               text: "Px↑",
             });
+          } else if (showEma10 && s.ema10_x_sma20[i] === 1) {
+            markers.push({
+              time: t,
+              position: "belowBar",
+              color: "#ffee58",
+              shape: "arrowUp",
+              text: "E10↑20",
+            });
+          } else if (showEma10 && s.ema10_x_sma20_dn[i] === 1) {
+            markers.push({
+              time: t,
+              position: "aboveBar",
+              color: "#ff7043",
+              shape: "arrowDown",
+              text: "E10↓20",
+            });
           }
         }
         markers.sort((a, b) => a.time - b.time);
@@ -2957,6 +2981,49 @@ export function computeBuiltin(
         sma50: s.sma50,
         sma100: s.sma100,
         sma200: s.sma200,
+        ...(showEma10 ? { ema10: s.ema10 } : {}),
+      });
+      break;
+    }
+
+    case "kijunBb": {
+      const showMarkers = n(p, "showMarkers", 1) !== 0;
+      const k = computeKijunBb(candles, {
+        basePeriods: n(p, "basePeriods", 26),
+        bbLength: n(p, "bbLength", 24),
+        bbStdDev: n(p, "bbStdDev", 2),
+      });
+      const plots: PlotSeries[] = [
+        line(inst, "kijun", "main", "#2962ff", candles, k.kijun, "Kijun"),
+        line(inst, "basis", "main", "#ef5350", candles, k.basis, "BB orta"),
+        line(inst, "upper", "main", "#42a5f5", candles, k.upper, "BB üst"),
+        line(inst, "lower", "main", "#42a5f5", candles, k.lower, "BB alt"),
+      ];
+      if (showMarkers) {
+        const markers: PlotMarker[] = [];
+        for (let i = 0; i < candles.length; i++) {
+          const t = candles[i]!.time;
+          if (k.kijun_mid_up[i] === 1) {
+            markers.push({ time: t, position: "belowBar", color: "#26a69a", shape: "arrowUp", text: "K↑" });
+          } else if (k.kijun_mid_dn[i] === 1) {
+            markers.push({ time: t, position: "aboveBar", color: "#ef5350", shape: "arrowDown", text: "K↓" });
+          }
+          if (k.px_lower_up[i] === 1) {
+            markers.push({ time: t, position: "belowBar", color: "#90caf9", shape: "circle", text: "alt↑" });
+          } else if (k.px_lower_dn[i] === 1) {
+            markers.push({ time: t, position: "aboveBar", color: "#ff7043", shape: "circle", text: "alt↓" });
+          } else if (k.px_upper_up[i] === 1) {
+            markers.push({ time: t, position: "belowBar", color: "#66bb6a", shape: "circle", text: "üst↑" });
+          }
+        }
+        markers.sort((a, b) => a.time - b.time);
+        if (plots[0]) plots[0].markers = markers;
+      }
+      push(plots, {
+        kijun: k.kijun,
+        basis: k.basis,
+        upper: k.upper,
+        lower: k.lower,
       });
       break;
     }
