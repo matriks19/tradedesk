@@ -10,6 +10,7 @@ import type {
   TickerQuote,
 } from "@/lib/types";
 import { buildDeskOpenUrl } from "@/lib/deskLink";
+import { pliDirFetchLimit } from "@/lib/indicators/pliDirLimits";
 import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
@@ -242,13 +243,23 @@ export function AlertWatcher() {
             hull?: { enabled?: boolean; tf?: string };
             pdo?: { enabled?: boolean };
             pliDmi?: { enabled?: boolean };
+            pliDir?: { enabled?: boolean; hullLen?: number; length?: number };
           };
           const hullOn = !!payload.hull?.enabled;
           const tf =
             (hullOn && payload.hull?.tf) || a.timeframe || "15m";
           // PDO: liste taramasıyla aynı pencere (PDO_FETCH_LIMIT = 240)
           // PLI±DMI: pivot durum makinesi geçmişe bağlı → liste taramasıyla aynı pencere (300)
-          const limit = hullOn ? 500 : payload.pliDmi?.enabled ? 300 : payload.pdo?.enabled ? 240 : 220;
+          // PLI±: PLI penceresi + Hull ısınması (liste taramasıyla aynı formül)
+          const limit = hullOn
+            ? 500
+            : payload.pliDmi?.enabled
+              ? 300
+              : payload.pliDir?.enabled
+                ? pliDirFetchLimit(payload.pliDir.hullLen, payload.pliDir.length)
+                : payload.pdo?.enabled
+                  ? 240
+                  : 220;
           const res = await fetch(
             `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=${limit}`
           );

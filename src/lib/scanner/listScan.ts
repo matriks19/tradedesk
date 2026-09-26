@@ -832,13 +832,15 @@ export type ListScanConfig = {
     lower?: number;
     upper?: number;
   };
-  /** PLI Yönlü Oran — yonlu = oran·yön, 0 kesişimleri (+ sıkışma çıkışı). */
+  /** PLI Yönlü Oran — yonlu = oran·yön, 0 kesişimleri (+ sıkışma çıkışı) + Hull/fiyat × bant kesişimleri. */
   pliDir?: {
     enabled: boolean;
     conds: PliDirCond[];
     length?: number;
     x?: number;
     k?: number;
+    hullLen?: number;
+    crossSrc?: "hull" | "price";
   };
   /** PLI± DMI Hibrit — erken T?/D?, ADX T/D, kombine T!!/D!! (onay mumunda). */
   pliDmi?: {
@@ -2301,6 +2303,8 @@ function scanPliDir(
     length: cfg.length,
     x: cfg.x,
     k: cfg.k,
+    hullLen: cfg.hullLen,
+    crossSrc: cfg.crossSrc,
   }).map((h) => ({
     kind: "pliDir" as const,
     cond: h.cond,
@@ -2711,8 +2715,14 @@ export function indicatorParamsFromConfig(
       length: c.length ?? 50,
       x: c.x ?? 5,
       k: c.k ?? 5,
+      hullLen: c.hullLen ?? 55,
+      crossSrc: c.crossSrc ?? "hull",
       showMarkers: 1,
       sigSq: c.conds.some((x) => x.endsWith("_sq")) ? 1 : 0,
+      sigLoUp: 1,
+      sigHiUp: 1,
+      sigMidUp: c.conds.includes("pli_mid_up") ? 1 : 0,
+      sigMidDn: c.conds.includes("pli_mid_dn") ? 1 : 0,
     };
   }
   if (kind === "cmo" && cfg.cmo) {
@@ -2829,6 +2839,8 @@ export {
   DEFAULT_PLI_DIR_CONDS,
   ALL_PLI_DIR_CONDS,
   PLI_DIR_COND_LABEL,
+  PLI_DIR_BAND_CONDS,
+  pliDirFetchLimit,
   type PliDirCond,
 } from "@/lib/indicators/median";
 export {

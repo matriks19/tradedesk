@@ -87,7 +87,7 @@ import {
   type CmoCond,
   DEFAULT_PLI_DIR_CONDS,
   PLI_DIR_MIN_BARS,
-  PLI_DIR_FETCH_LIMIT,
+  pliDirFetchLimit,
   PLI_DIR_DEFAULTS,
   PLI_DIR_COND_LABEL,
   type PliDirCond,
@@ -282,6 +282,10 @@ const PLI_DIR_CHIPS: { id: PliDirCond; title: string }[] = [
   { id: "pli_dn", title: "Yönlü oran 0'ı aşağı keser: kanal genişlemesi aşağı yönlü oldu" },
   { id: "pli_up_sq", title: "Yükseliş kesişimi + son 5 mumda oran kendi son 50 değerinin alt %25'inde (sıkışma çıkışı) — varsayılan kapalı" },
   { id: "pli_dn_sq", title: "Düşüş kesişimi + son 5 mumda sıkışma (oran alt %25) — varsayılan kapalı" },
+  { id: "pli_lo_up", title: "Kesen çizgi (Hull veya fiyat) PLI alt bandını yukarı keser — varsayılan kapalı" },
+  { id: "pli_hi_up", title: "Kesen çizgi PLI üst bandını yukarı keser (kırılım) — varsayılan kapalı" },
+  { id: "pli_mid_up", title: "Kesen çizgi PLI medyanını (%50) yukarı keser — varsayılan kapalı" },
+  { id: "pli_mid_dn", title: "Kesen çizgi PLI medyanını (%50) aşağı keser — varsayılan kapalı" },
 ];
 
 const PLI_DMI_CHIPS: { id: PliDmiCond; title: string }[] = [
@@ -782,6 +786,8 @@ export function ListScanPanel() {
   const [pliLen, setPliLen] = useState<number>(PLI_DIR_DEFAULTS.length);
   const [pliX, setPliX] = useState<number>(PLI_DIR_DEFAULTS.x);
   const [pliK, setPliK] = useState<number>(PLI_DIR_DEFAULTS.k);
+  const [pliHull, setPliHull] = useState<number>(PLI_DIR_DEFAULTS.hullLen);
+  const [pliCrossPrice, setPliCrossPrice] = useState(false);
   const [pliDmiOn, setPliDmiOn] = useState(false);
   const [pliDmiConds, setPliDmiConds] = useState<PliDmiCond[]>([...DEFAULT_PLI_DMI_CONDS]);
   const [pdLen, setPdLen] = useState<number>(PLI_DMI_DEFAULTS.length);
@@ -1111,6 +1117,8 @@ export function ListScanPanel() {
         length: Math.max(2, Math.round(Number(pliLen) || PLI_DIR_DEFAULTS.length)),
         x: Number.isFinite(pliX) && pliX > 0 && pliX < 50 ? pliX : PLI_DIR_DEFAULTS.x,
         k: Math.max(0, Math.round(Number.isFinite(pliK) ? pliK : PLI_DIR_DEFAULTS.k)),
+        hullLen: Math.max(2, Math.min(500, Math.round(Number(pliHull) || PLI_DIR_DEFAULTS.hullLen))),
+        crossSrc: pliCrossPrice ? "price" : "hull",
       },
       pliDmi: {
         enabled: pliDmiOn,
@@ -1232,6 +1240,8 @@ export function ListScanPanel() {
     pliLen,
     pliX,
     pliK,
+    pliHull,
+    pliCrossPrice,
     pliDmiOn,
     pliDmiConds,
     pdLen,
@@ -1363,7 +1373,7 @@ export function ListScanPanel() {
                                 : useCmo
                                   ? CMO_FETCH_LIMIT
                                   : usePliDir
-                                    ? PLI_DIR_FETCH_LIMIT
+                                    ? pliDirFetchLimit(cfg.pliDir?.hullLen, cfg.pliDir?.length)
                                     : usePliDmi
                                       ? PLI_DMI_FETCH_LIMIT
                                       : 220;
@@ -2060,6 +2070,8 @@ export function ListScanPanel() {
               length: c?.length ?? PLI_DIR_DEFAULTS.length,
               x: c?.x ?? PLI_DIR_DEFAULTS.x,
               k: c?.k ?? PLI_DIR_DEFAULTS.k,
+              hullLen: c?.hullLen ?? PLI_DIR_DEFAULTS.hullLen,
+              crossSrc: c?.crossSrc ?? "hull",
             },
           },
           timeframe: tf,
@@ -3120,14 +3132,22 @@ export function ListScanPanel() {
       >
         <p className="text-2xs text-desk-muted">
           yönlü = oran·yön · oran = PLI üst/alt − 1 · yön = üst/üst[k] − 1 −
-          (alt[k]/alt − 1) işareti (0 ise kapanış ≥ medyan) · kesişim son Max
-          bar içinde · tarama TF · ≥{PLI_DIR_MIN_BARS} mum · grafik: kanal +
+          (alt[k]/alt − 1) işareti (0 ise kapanış ≥ medyan) · bant kesişimleri:
+          Hull MA (varsayılan 55) veya fiyat alt / üst bandı ya da medyanı keser
+          · kesişimler son Max bar içinde · tarama TF · ≥{PLI_DIR_MIN_BARS} mum
+          (Hull ısınması için mum sayısı otomatik) · grafik: kanal + Hull +
           yönlü histogram
         </p>
-        <div className="grid grid-cols-3 gap-1">
+        <div className="grid grid-cols-4 gap-1">
           <NumInput label="Uzunluk" value={pliLen} onChange={setPliLen} hint="PLI penceresi (varsayılan 50)" />
           <NumInput label="Percentil X" value={pliX} onChange={setPliX} step={0.5} hint="Üst = 100−X, alt = X (varsayılan 5)" />
           <NumInput label="Yön k" value={pliK} onChange={setPliK} hint="Yön için geriye bakış (varsayılan 5)" />
+          <NumInput label="Hull MA" value={pliHull} onChange={setPliHull} hint="Hull MA uzunluğu (varsayılan 55; TV hesaplaması)" />
+        </div>
+        <div className="flex flex-wrap gap-1 items-center">
+          <span className="text-2xs text-desk-muted">Bantları kesen:</span>
+          <Chip active={!pliCrossPrice} label="Hull" title="Bant kesişimlerinde Hull MA kullanılır (varsayılan)" onClick={() => setPliCrossPrice(false)} />
+          <Chip active={pliCrossPrice} label="Fiyat" title="Bant kesişimlerinde kapanış fiyatı kullanılır" onClick={() => setPliCrossPrice(true)} />
         </div>
         <div className="flex flex-wrap gap-1">
           {PLI_DIR_CHIPS.map((c) => (
