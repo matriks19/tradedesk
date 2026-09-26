@@ -68,6 +68,12 @@ import {
   type CmoCond,
 } from "@/lib/indicators/cmo";
 import {
+  pliDirScan,
+  DEFAULT_PLI_DIR_CONDS,
+  PLI_DIR_BEAR_CONDS,
+  type PliDirCond,
+} from "@/lib/indicators/median";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -518,6 +524,7 @@ export type ListScanKind =
   | "kijunBb"
   | "pdo"
   | "cmo"
+  | "pliDir"
   | "pine";
 
 export type PineCond =
@@ -817,6 +824,14 @@ export type ListScanConfig = {
     length?: number;
     lower?: number;
     upper?: number;
+  };
+  /** PLI Yönlü Oran — yonlu = oran·yön, 0 kesişimleri (+ sıkışma çıkışı). */
+  pliDir?: {
+    enabled: boolean;
+    conds: PliDirCond[];
+    length?: number;
+    x?: number;
+    k?: number;
   };
   pine?: {
     enabled: boolean;
@@ -2255,6 +2270,26 @@ function scanCmo(
   }));
 }
 
+function scanPliDir(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["pliDir"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_PLI_DIR_CONDS;
+  return pliDirScan(candles, conds, maxBarsAgo, {
+    length: cfg.length,
+    x: cfg.x,
+    k: cfg.k,
+  }).map((h) => ({
+    kind: "pliDir" as const,
+    cond: h.cond,
+    bias: PLI_DIR_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -2278,6 +2313,7 @@ export function scanSymbol(
   if (cfg.kijunBb?.enabled) enabledKinds.push("kijunBb");
   if (cfg.pdo?.enabled) enabledKinds.push("pdo");
   if (cfg.cmo?.enabled) enabledKinds.push("cmo");
+  if (cfg.pliDir?.enabled) enabledKinds.push("pliDir");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2299,6 +2335,7 @@ export function scanSymbol(
     kijunBb: cfg.kijunBb ? scanKijunBb(candles, cfg.kijunBb, maxBarsAgo) : [],
     pdo: cfg.pdo ? scanPdo(candles, cfg.pdo, maxBarsAgo) : [],
     cmo: cfg.cmo ? scanCmo(candles, cfg.cmo, maxBarsAgo) : [],
+    pliDir: cfg.pliDir ? scanPliDir(candles, cfg.pliDir, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2607,6 +2644,16 @@ export function indicatorParamsFromConfig(
       showPatterns: 1,
     };
   }
+  if (kind === "pliDir" && cfg.pliDir) {
+    const c = cfg.pliDir;
+    return {
+      length: c.length ?? 50,
+      x: c.x ?? 5,
+      k: c.k ?? 5,
+      showMarkers: 1,
+      sigSq: c.conds.some((x) => x.endsWith("_sq")) ? 1 : 0,
+    };
+  }
   if (kind === "cmo" && cfg.cmo) {
     const c = cfg.cmo;
     return {
@@ -2648,6 +2695,7 @@ export const KIND_TO_INDICATOR: Record<
   | "kijunBb"
   | "pdo"
   | "cmoChande"
+  | "pliDir"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2666,6 +2714,7 @@ export const KIND_TO_INDICATOR: Record<
   kijunBb: "kijunBb",
   pdo: "pdo",
   cmo: "cmoChande",
+  pliDir: "pliDir",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2710,3 +2759,12 @@ export {
   cmoCondLabel,
   type CmoCond,
 } from "@/lib/indicators/cmo";
+export {
+  PLI_DIR_MIN_BARS,
+  PLI_DIR_FETCH_LIMIT,
+  PLI_DIR_DEFAULTS,
+  DEFAULT_PLI_DIR_CONDS,
+  ALL_PLI_DIR_CONDS,
+  PLI_DIR_COND_LABEL,
+  type PliDirCond,
+} from "@/lib/indicators/median";

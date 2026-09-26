@@ -380,3 +380,183 @@ export function pliDeltaHybrid(
     barBias,
   };
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PLI Yönlü Oran (pliDir) — pliChannel oranına yön işareti ekler.
+// pliChannel / pliDeltaHybrid DEĞİŞMEZ.
+//
+// Pine:
+//   upper = ta.percentile_linear_interpolation(src, len, 100 - x)
+//   lower = ta.percentile_linear_interpolation(src, len, x)
+//   med   = ta.percentile_linear_interpolation(src, len, 50)
+//   oran  = upper / lower - 1
+//   upMove = upper / upper[k] - 1
+//   dnMove = lower[k] / lower - 1
+//   d = upMove - dnMove
+//   dir = d > 0 ? 1 : d < 0 ? -1 : (src >= med ? 1 : -1)
+//   yonlu = oran * dir
+// Pine'da `na > 0` ve `na < 0` false → d na iken (ilk k mum) yön medyandan gelir.
+// ─────────────────────────────────────────────────────────────────────────────
+
+export interface PliDirOpts {
+  length?: number;
+  x?: number;
+  k?: number;
+  /** Squeeze: oran ≤ PLI(oran, sqLookback, sqPct) (varsayılan 50 / 25) */
+  sqLookback?: number;
+  sqPct?: number;
+  /** Squeeze son kaç mumda (bu mum dahil) görülmüş olmalı (varsayılan 5) */
+  sqMemory?: number;
+}
+
+export const PLI_DIR_DEFAULTS = {
+  length: 50,
+  x: 5,
+  k: 5,
+  sqLookback: 50,
+  sqPct: 25,
+  sqMemory: 5,
+} as const;
+
+export interface PliDirResult {
+  upper: (number | null)[];
+  lower: (number | null)[];
+  med: (number | null)[];
+  oran: (number | null)[];
+  d: (number | null)[];
+  dir: (number | null)[];
+  yonlu: (number | null)[];
+  /** 1: oran kendi son sqLookback değerinin alt sqPct diliminde */
+  squeeze: (number | null)[];
+  /** 1: son sqMemory mumda (bu mum dahil) squeeze var */
+  squeezeRecent: (0 | 1)[];
+  /** ta.crossover(yonlu, 0) / ta.crossunder(yonlu, 0) */
+  crossUp: (0 | 1)[];
+  crossDn: (0 | 1)[];
+}
+
+const finiteOrNull = (v: number): number | null => (Number.isFinite(v) ? v : null);
+
+export function pliDir(values: number[], opts: PliDirOpts = {}): PliDirResult {
+  const n = values.length;
+  const length = Math.max(1, Math.floor(opts.length ?? PLI_DIR_DEFAULTS.length));
+  const x = Math.max(0, Math.min(50, opts.x ?? PLI_DIR_DEFAULTS.x));
+  const k = Math.max(0, Math.floor(opts.k ?? PLI_DIR_DEFAULTS.k));
+  const sqLookback = Math.max(2, Math.floor(opts.sqLookback ?? PLI_DIR_DEFAULTS.sqLookback));
+  const sqPct = Math.max(0, Math.min(100, opts.sqPct ?? PLI_DIR_DEFAULTS.sqPct));
+  const sqMemory = Math.max(1, Math.floor(opts.sqMemory ?? PLI_DIR_DEFAULTS.sqMemory));
+
+  const upper = percentileLinearInterpolation(values, length, 100 - x);
+  const lower = percentileLinearInterpolation(values, length, x);
+  const med = percentileLinearInterpolation(values, length, 50);
+
+  const oran = fillNull(n);
+  const d = fillNull(n);
+  const dir = fillNull(n);
+  const yonlu = fillNull(n);
+  for (let i = 0; i < n; i++) {
+    const u = upper[i];
+    const l = lower[i];
+    if (u == null || l == null) continue;
+    const o = finiteOrNull(u / l - 1);
+    if (o == null) continue;
+    oran[i] = o;
+    const uk = i - k >= 0 ? upper[i - k] : null;
+    const lk = i - k >= 0 ? lower[i - k] : null;
+    let dv: number | null = null;
+    if (uk != null && lk != null) dv = finiteOrNull(u / uk - 1 - (lk / l - 1));
+    d[i] = dv;
+    const m = med[i];
+    const dr = dv != null && dv > 0 ? 1 : dv != null && dv < 0 ? -1 : m != null && values[i]! >= m ? 1 : -1;
+    dir[i] = dr;
+    yonlu[i] = o * dr;
+  }
+
+  // Squeeze: oran'ın kendi son sqLookback değerinin (tam pencere) sqPct yüzdeliği
+  const squeeze = fillNull(n);
+  for (let i = sqLookback - 1; i < n; i++) {
+    const w: number[] = [];
+    for (let j = i - sqLookback + 1; j <= i; j++) {
+      const v = oran[j];
+      if (v == null) break;
+      w.push(v);
+    }
+    if (w.length < sqLookback) continue;
+    w.sort((a, b) => a - b);
+    const rank = (sqPct / 100) * (sqLookback - 1);
+    const lo = Math.floor(rank);
+    const hi = Math.ceil(rank);
+    const gate = lo === hi ? w[lo]! : w[lo]! * (1 - (rank - lo)) + w[hi]! * (rank - lo);
+    squeeze[i] = (oran[i] as number) <= gate ? 1 : 0;
+  }
+  const squeezeRecent: (0 | 1)[] = new Array(n).fill(0);
+  for (let i = 0; i < n; i++) {
+    for (let j = i; j > i - sqMemory && j >= 0; j--) {
+      if (squeeze[j] === 1) {
+        squeezeRecent[i] = 1;
+        break;
+      }
+    }
+  }
+
+  const crossUp: (0 | 1)[] = new Array(n).fill(0);
+  const crossDn: (0 | 1)[] = new Array(n).fill(0);
+  for (let i = 1; i < n; i++) {
+    const a = yonlu[i - 1];
+    const b = yonlu[i];
+    if (a == null || b == null) continue;
+    if (a <= 0 && b > 0) crossUp[i] = 1;
+    else if (a >= 0 && b < 0) crossDn[i] = 1;
+  }
+
+  return { upper, lower, med, oran, d, dir, yonlu, squeeze, squeezeRecent, crossUp, crossDn };
+}
+
+// ── Liste taraması ──────────────────────────────────────────────────────────
+
+export type PliDirCond = "pli_up" | "pli_dn" | "pli_up_sq" | "pli_dn_sq";
+export const ALL_PLI_DIR_CONDS: PliDirCond[] = ["pli_up", "pli_dn", "pli_up_sq", "pli_dn_sq"];
+export const DEFAULT_PLI_DIR_CONDS: PliDirCond[] = ["pli_up", "pli_dn"];
+export const PLI_DIR_BEAR_CONDS = new Set<PliDirCond>(["pli_dn", "pli_dn_sq"]);
+export const PLI_DIR_COND_LABEL: Record<PliDirCond, string> = {
+  pli_up: "PLI± yükseliş",
+  pli_dn: "PLI± düşüş",
+  pli_up_sq: "PLI± yükseliş (sıkışma)",
+  pli_dn_sq: "PLI± düşüş (sıkışma)",
+};
+/** len 50 + oran lookback 50 − 1 = 99 mum squeeze için; 60 temel kesişim için yeter. */
+export const PLI_DIR_MIN_BARS = 60;
+export const PLI_DIR_FETCH_LIMIT = 220;
+
+export type PliDirHit = { cond: PliDirCond; barsAgo: number; note: string; yonlu: number };
+
+export function pliDirScan(
+  candles: Candle[],
+  conds: PliDirCond[],
+  maxBarsAgo: number,
+  opts: PliDirOpts = {}
+): PliDirHit[] {
+  if (!conds.length) return [];
+  const r = pliDir(candles.map((c) => c.close), opts);
+  const last = candles.length - 1;
+  const out: PliDirHit[] = [];
+  for (const cond of conds) {
+    const up = cond === "pli_up" || cond === "pli_up_sq";
+    const sq = cond.endsWith("_sq");
+    for (let ago = 0; ago <= maxBarsAgo; ago++) {
+      const i = last - ago;
+      if (i < 1) break;
+      if (!(up ? r.crossUp[i] : r.crossDn[i])) continue;
+      if (sq && !r.squeezeRecent[i]) continue;
+      const y = r.yonlu[i] as number;
+      out.push({
+        cond,
+        barsAgo: ago,
+        yonlu: y,
+        note: `${PLI_DIR_COND_LABEL[cond]} oran ${(y * 100).toFixed(2)}% (−${ago})`,
+      });
+      break;
+    }
+  }
+  return out;
+}

@@ -282,7 +282,8 @@ export type BuiltinIndicatorId =
   | "maSimple"
   | "kijunBb"
   | "pdo"
-  | "cmoChande";
+  | "cmoChande"
+  | "pliDir";
 
 export interface IndicatorInputDef {
   key: string;
