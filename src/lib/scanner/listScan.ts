@@ -74,6 +74,12 @@ import {
   type PliDirCond,
 } from "@/lib/indicators/median";
 import {
+  pliDmiScan,
+  DEFAULT_PLI_DMI_CONDS,
+  PLI_DMI_BEAR_CONDS,
+  type PliDmiCond,
+} from "@/lib/indicators/pliDmi";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -525,6 +531,7 @@ export type ListScanKind =
   | "pdo"
   | "cmo"
   | "pliDir"
+  | "pliDmi"
   | "pine";
 
 export type PineCond =
@@ -832,6 +839,19 @@ export type ListScanConfig = {
     length?: number;
     x?: number;
     k?: number;
+  };
+  /** PLI± DMI Hibrit — erken T?/D?, ADX T/D, kombine T!!/D!! (onay mumunda). */
+  pliDmi?: {
+    enabled: boolean;
+    conds: PliDmiCond[];
+    length?: number;
+    x?: number;
+    k?: number;
+    earlySw?: number;
+    combWin?: number;
+    adxMin?: number;
+    dmSrc?: "price" | "band";
+    useWk?: boolean;
   };
   pine?: {
     enabled: boolean;
@@ -2290,6 +2310,31 @@ function scanPliDir(
   }));
 }
 
+function scanPliDmi(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["pliDmi"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_PLI_DMI_CONDS;
+  return pliDmiScan(candles, conds, maxBarsAgo, {
+    length: cfg.length,
+    x: cfg.x,
+    k: cfg.k,
+    earlySw: cfg.earlySw,
+    combWin: cfg.combWin,
+    adxMin: cfg.adxMin,
+    dmSrc: cfg.dmSrc,
+    useWk: cfg.useWk,
+  }).map((h) => ({
+    kind: "pliDmi" as const,
+    cond: h.cond,
+    bias: PLI_DMI_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -2314,6 +2359,7 @@ export function scanSymbol(
   if (cfg.pdo?.enabled) enabledKinds.push("pdo");
   if (cfg.cmo?.enabled) enabledKinds.push("cmo");
   if (cfg.pliDir?.enabled) enabledKinds.push("pliDir");
+  if (cfg.pliDmi?.enabled) enabledKinds.push("pliDmi");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2336,6 +2382,7 @@ export function scanSymbol(
     pdo: cfg.pdo ? scanPdo(candles, cfg.pdo, maxBarsAgo) : [],
     cmo: cfg.cmo ? scanCmo(candles, cfg.cmo, maxBarsAgo) : [],
     pliDir: cfg.pliDir ? scanPliDir(candles, cfg.pliDir, maxBarsAgo) : [],
+    pliDmi: cfg.pliDmi ? scanPliDmi(candles, cfg.pliDmi, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2644,6 +2691,20 @@ export function indicatorParamsFromConfig(
       showPatterns: 1,
     };
   }
+  if (kind === "pliDmi" && cfg.pliDmi) {
+    const c = cfg.pliDmi;
+    return {
+      length: c.length ?? 50,
+      x: c.x ?? 5,
+      k: c.k ?? 5,
+      earlySw: c.earlySw ?? 1.5,
+      combWin: c.combWin ?? 5,
+      adxMin: c.adxMin ?? 20,
+      dmSrc: c.dmSrc ?? "price",
+      useWk: c.useWk === false ? 0 : 1,
+      showMarkers: 1,
+    };
+  }
   if (kind === "pliDir" && cfg.pliDir) {
     const c = cfg.pliDir;
     return {
@@ -2696,6 +2757,7 @@ export const KIND_TO_INDICATOR: Record<
   | "pdo"
   | "cmoChande"
   | "pliDir"
+  | "pliDmiHybrid"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2715,6 +2777,7 @@ export const KIND_TO_INDICATOR: Record<
   pdo: "pdo",
   cmo: "cmoChande",
   pliDir: "pliDir",
+  pliDmi: "pliDmiHybrid",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2768,3 +2831,12 @@ export {
   PLI_DIR_COND_LABEL,
   type PliDirCond,
 } from "@/lib/indicators/median";
+export {
+  PLI_DMI_MIN_BARS,
+  PLI_DMI_FETCH_LIMIT,
+  PLI_DMI_DEFAULTS,
+  DEFAULT_PLI_DMI_CONDS,
+  ALL_PLI_DMI_CONDS,
+  PLI_DMI_COND_LABEL,
+  type PliDmiCond,
+} from "@/lib/indicators/pliDmi";
