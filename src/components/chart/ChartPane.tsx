@@ -1047,6 +1047,7 @@ export function ChartPane({ pane, compact }: Props) {
         const s = main.addLineSeries({
           color: p.color,
           lineWidth: p.lineWidth ?? 2,
+          ...(p.lineStyle ? { lineStyle: p.lineStyle } : {}),
           title: p.title,
           priceLineVisible: false,
           lastValueVisible: false,
@@ -1122,6 +1123,7 @@ export function ChartPane({ pane, compact }: Props) {
           const s = chart.addLineSeries({
             color: p.color,
             lineWidth: p.lineWidth ?? 2,
+            ...(p.lineStyle ? { lineStyle: p.lineStyle } : {}),
             title: p.title,
             priceLineVisible: false,
             lastValueVisible: false,

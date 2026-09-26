@@ -24,6 +24,18 @@ export type OscDivergenceResult = {
   pivotLow: (number | null)[];
   /** 1 at confirmed oscillator pivot high bars */
   pivotHigh: (number | null)[];
+  /** Pivot pairs behind each marker (for drawing divergence lines). */
+  links: OscDivLink[];
+};
+
+export type OscDivLink = {
+  kind: "bull" | "bear" | "hiddenBull" | "hiddenBear";
+  /** Confirm bar (marker bar = pivot + lbR) */
+  at: number;
+  /** Previous pivot bar */
+  from: number;
+  /** Current pivot bar */
+  to: number;
 };
 
 /** List-scan research pack: pivot spacing 5–60 (not lookback). User lookback = maxBars. */
@@ -94,6 +106,7 @@ export function computeOscDivergence(
   type Pivot = { confirm: number; pivot: number; osc: number; price: number };
   const lows: Pivot[] = [];
   const highs: Pivot[] = [];
+  const links: OscDivLink[] = [];
 
   for (let i = 0; i < n; i++) {
     const pi = i - lbR;
@@ -113,9 +126,11 @@ export function computeOscDivergence(
           const priceHL = price > prev.price;
           if (oscHL && priceLL) {
             bull[i] = ov;
+            links.push({ kind: "bull", at: i, from: prev.pivot, to: pi });
           }
           if (oscLL && priceHL) {
             hiddenBull[i] = ov;
+            links.push({ kind: "hiddenBull", at: i, from: prev.pivot, to: pi });
           }
         }
       }
@@ -136,9 +151,11 @@ export function computeOscDivergence(
           const priceLH = price < prev.price;
           if (oscLH && priceHH) {
             bear[i] = ov;
+            links.push({ kind: "bear", at: i, from: prev.pivot, to: pi });
           }
           if (oscHH && priceLH) {
             hiddenBear[i] = ov;
+            links.push({ kind: "hiddenBear", at: i, from: prev.pivot, to: pi });
           }
         }
       }
@@ -146,7 +163,7 @@ export function computeOscDivergence(
     }
   }
 
-  return { bull, bear, hiddenBull, hiddenBear, pivotLow, pivotHigh };
+  return { bull, bear, hiddenBull, hiddenBear, pivotLow, pivotHigh, links };
 }
 
 /** Count non-null samples in a series. */

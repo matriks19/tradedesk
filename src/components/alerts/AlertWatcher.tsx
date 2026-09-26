@@ -11,6 +11,7 @@ import type {
 } from "@/lib/types";
 import { buildDeskOpenUrl } from "@/lib/deskLink";
 import { pliDirFetchLimit } from "@/lib/indicators/pliDirLimits";
+import { pliDtDivFetchLimit } from "@/lib/indicators/pliDtDivLimits";
 import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
@@ -243,6 +244,7 @@ export function AlertWatcher() {
             hull?: { enabled?: boolean; tf?: string };
             pdo?: { enabled?: boolean };
             pliDmi?: { enabled?: boolean };
+            pliDtDiv?: { enabled?: boolean; length?: number; lbL?: number; lbR?: number; rangeUpper?: number };
             pliDir?: { enabled?: boolean; hullLen?: number; length?: number };
           };
           const hullOn = !!payload.hull?.enabled;
@@ -250,16 +252,19 @@ export function AlertWatcher() {
             (hullOn && payload.hull?.tf) || a.timeframe || "15m";
           // PDO: liste taramasıyla aynı pencere (PDO_FETCH_LIMIT = 240)
           // PLI±DMI: pivot durum makinesi geçmişe bağlı → liste taramasıyla aynı pencere (300)
+          // PLI-DT Uyumsuz: PLI penceresi + pivot + range + 200 (liste taramasıyla aynı formül)
           // PLI±: PLI penceresi + Hull ısınması (liste taramasıyla aynı formül)
           const limit = hullOn
             ? 500
             : payload.pliDmi?.enabled
               ? 300
-              : payload.pliDir?.enabled
-                ? pliDirFetchLimit(payload.pliDir.hullLen, payload.pliDir.length)
-                : payload.pdo?.enabled
-                  ? 240
-                  : 220;
+              : payload.pliDtDiv?.enabled
+                ? pliDtDivFetchLimit(payload.pliDtDiv.length, payload.pliDtDiv.lbL, payload.pliDtDiv.lbR, payload.pliDtDiv.rangeUpper)
+                : payload.pliDir?.enabled
+                  ? pliDirFetchLimit(payload.pliDir.hullLen, payload.pliDir.length)
+                  : payload.pdo?.enabled
+                    ? 240
+                    : 220;
           const res = await fetch(
             `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=${limit}`
           );

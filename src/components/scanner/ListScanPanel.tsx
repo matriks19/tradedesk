@@ -97,6 +97,12 @@ import {
   PLI_DMI_DEFAULTS,
   PLI_DMI_COND_LABEL,
   type PliDmiCond,
+  DEFAULT_PLI_DT_DIV_CONDS,
+  PLI_DT_DIV_DEFAULTS,
+  PLI_DT_DIV_COND_LABEL,
+  pliDtDivFetchLimit,
+  pliDtDivMinBars,
+  type PliDtDivCond,
   type ListScanHit,
   type ListScanKind,
   type PineCond,
@@ -295,6 +301,15 @@ const PLI_DMI_CHIPS: { id: PliDmiCond; title: string }[] = [
   { id: "core_bot", title: "ADX D: ADX zirvesi + DI− baskın + konum alt uç bölgede → dip onayı" },
   { id: "early_top", title: "Erken T?: PLI± yön 1→−1 döndü, izlenen tepeden salınım ≥ % eşik (yeni tepe gelirse iptal)" },
   { id: "early_bot", title: "Erken D?: PLI± yön −1→1 döndü, izlenen dipten salınım ≥ % eşik (yeni dip gelirse iptal)" },
+];
+
+const PLI_DT_DIV_CHIPS: { id: PliDtDivCond; title: string }[] = [
+  { id: "pdt_bull", title: "Klasik AL: fiyat daha düşük dip (LL, low) + pos daha yüksek dip (HL) — pos pivot onayında" },
+  { id: "pdt_bear", title: "Klasik SAT: fiyat daha yüksek tepe (HH, high) + pos daha düşük tepe (LH)" },
+  { id: "pdt_hbull", title: "Gizli AL: fiyat daha yüksek dip (HL) + pos daha düşük dip (LL) — varsayılan kapalı" },
+  { id: "pdt_hbear", title: "Gizli SAT: fiyat daha düşük tepe (LH) + pos daha yüksek tepe (HH) — varsayılan kapalı" },
+  { id: "pdt_d_div", title: "Onaylı D uyumsuz: D onaylandığında yeni dip fiyatı önceki onaylı D'den düşük, ama D mumundaki pos önceki D mumundakinden yüksek — varsayılan kapalı" },
+  { id: "pdt_t_div", title: "Onaylı T uyumsuz: T onaylandığında yeni tepe önceki onaylı T'den yüksek, ama T mumundaki pos daha düşük — varsayılan kapalı" },
 ];
 
 const KIJUN_BB_CHIPS: { id: KijunBbCond; label: string }[] = [
@@ -796,6 +811,17 @@ export function ListScanPanel() {
   const [pdSw, setPdSw] = useState<number>(PLI_DMI_DEFAULTS.earlySw);
   const [pdWin, setPdWin] = useState<number>(PLI_DMI_DEFAULTS.combWin);
   const [pdAdxMin, setPdAdxMin] = useState<number>(PLI_DMI_DEFAULTS.adxMin);
+  const [pliDtOn, setPliDtOn] = useState(false);
+  const [pliDtConds, setPliDtConds] = useState<PliDtDivCond[]>([...DEFAULT_PLI_DT_DIV_CONDS]);
+  const [pdtLen, setPdtLen] = useState<number>(PLI_DT_DIV_DEFAULTS.length);
+  const [pdtX, setPdtX] = useState<number>(PLI_DT_DIV_DEFAULTS.x);
+  const [pdtTop, setPdtTop] = useState<number>(PLI_DT_DIV_DEFAULTS.topTh);
+  const [pdtBot, setPdtBot] = useState<number>(PLI_DT_DIV_DEFAULTS.botTh);
+  const [pdtSw, setPdtSw] = useState<number>(PLI_DT_DIV_DEFAULTS.minSwing);
+  const [pdtLbL, setPdtLbL] = useState<number>(PLI_DT_DIV_DEFAULTS.lbL);
+  const [pdtLbR, setPdtLbR] = useState<number>(PLI_DT_DIV_DEFAULTS.lbR);
+  const [pdtRl, setPdtRl] = useState<number>(PLI_DT_DIV_DEFAULTS.rangeLower);
+  const [pdtRu, setPdtRu] = useState<number>(PLI_DT_DIV_DEFAULTS.rangeUpper);
   const [pdBand, setPdBand] = useState(false);
   const [pdWk, setPdWk] = useState(true);
 
@@ -972,6 +998,11 @@ export function ListScanPanel() {
     setMatchMode("any");
     setPliDmiConds([...DEFAULT_PLI_DMI_CONDS]);
   }, []);
+  const enablePliDt = useCallback(() => {
+    setPliDtOn(true);
+    setMatchMode("any");
+    setPliDtConds([...DEFAULT_PLI_DT_DIV_CONDS]);
+  }, []);
   const enableKijunBb = useCallback(() => {
     setKijunBbOn(true);
     setMatchMode("any");
@@ -1132,6 +1163,19 @@ export function ListScanPanel() {
         dmSrc: pdBand ? "band" : "price",
         useWk: pdWk,
       },
+      pliDtDiv: {
+        enabled: pliDtOn,
+        conds: pliDtConds,
+        length: Math.max(2, Math.min(500, Math.round(Number(pdtLen) || PLI_DT_DIV_DEFAULTS.length))),
+        x: Number.isFinite(pdtX) && pdtX >= 0 && pdtX <= 50 ? pdtX : PLI_DT_DIV_DEFAULTS.x,
+        topTh: Number.isFinite(pdtTop) ? pdtTop : PLI_DT_DIV_DEFAULTS.topTh,
+        botTh: Number.isFinite(pdtBot) ? pdtBot : PLI_DT_DIV_DEFAULTS.botTh,
+        minSwing: Number.isFinite(pdtSw) && pdtSw >= 0 ? pdtSw : PLI_DT_DIV_DEFAULTS.minSwing,
+        lbL: Math.max(1, Math.min(50, Math.round(Number(pdtLbL) || PLI_DT_DIV_DEFAULTS.lbL))),
+        lbR: Math.max(1, Math.min(50, Math.round(Number(pdtLbR) || PLI_DT_DIV_DEFAULTS.lbR))),
+        rangeLower: Math.max(0, Math.min(200, Math.round(Number.isFinite(pdtRl) ? pdtRl : PLI_DT_DIV_DEFAULTS.rangeLower))),
+        rangeUpper: Math.max(1, Math.min(500, Math.round(Number(pdtRu) || PLI_DT_DIV_DEFAULTS.rangeUpper))),
+      },
       kijunBb: {
         enabled: kijunBbOn,
         conds: kijunBbConds,
@@ -1252,6 +1296,17 @@ export function ListScanPanel() {
     pdAdxMin,
     pdBand,
     pdWk,
+    pliDtOn,
+    pliDtConds,
+    pdtLen,
+    pdtX,
+    pdtTop,
+    pdtBot,
+    pdtSw,
+    pdtLbL,
+    pdtLbR,
+    pdtRl,
+    pdtRu,
     colorH8,
     colorH13,
     colorH21,
@@ -1276,7 +1331,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1344,6 +1399,7 @@ export function ListScanPanel() {
             const useCmo = !!cfg.cmo?.enabled;
             const usePliDir = !!cfg.pliDir?.enabled;
             const usePliDmi = !!cfg.pliDmi?.enabled;
+            const usePliDt = !!cfg.pliDtDiv?.enabled;
             const scanTf = useHull && cfg.hull?.tf
               ? String(cfg.hull.tf)
               : useMultiDip && cfg.multiDip?.tf
@@ -1376,7 +1432,9 @@ export function ListScanPanel() {
                                     ? pliDirFetchLimit(cfg.pliDir?.hullLen, cfg.pliDir?.length)
                                     : usePliDmi
                                       ? PLI_DMI_FETCH_LIMIT
-                                      : 220;
+                                      : usePliDt
+                                        ? pliDtDivFetchLimit(cfg.pliDtDiv?.length, cfg.pliDtDiv?.lbL, cfg.pliDtDiv?.lbR, cfg.pliDtDiv?.rangeUpper)
+                                        : 220;
             const minBars = useHull
               ? DOKTOR_HULL_MIN_BARS
               : useGold2
@@ -1405,7 +1463,9 @@ export function ListScanPanel() {
                                       ? PLI_DIR_MIN_BARS
                                       : usePliDmi
                                         ? PLI_DMI_MIN_BARS
-                                        : 50;
+                                        : usePliDt
+                                          ? pliDtDivMinBars(cfg.pliDtDiv?.length, cfg.pliDtDiv?.lbL, cfg.pliDtDiv?.lbR)
+                                          : 50;
             const kr = await fetch(
               `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${encodeURIComponent(scanTf)}&limit=${klineLimit}`,
               { signal: fetchSignal }
@@ -1514,6 +1574,10 @@ export function ListScanPanel() {
         const n = out.filter((h) => h.kind === "pliDmi").length;
         byKind.push(`pliDmi ${n}`);
       }
+      if (cfgDone.pliDtDiv?.enabled) {
+        const n = out.filter((h) => h.kind === "pliDtDiv").length;
+        byKind.push(`pliDtDiv ${n}`);
+      }
       if (cfgDone.ham?.enabled) {
         const n = out.filter((h) => h.kind === "ham").length;
         byKind.push(`ham ${n}`);
@@ -1539,6 +1603,7 @@ export function ListScanPanel() {
         cfgDone.cmo?.enabled,
         cfgDone.pliDir?.enabled,
         cfgDone.pliDmi?.enabled,
+        cfgDone.pliDtDiv?.enabled,
         cfgDone.pine?.enabled,
       ].filter(Boolean).length;
       const hepsiWarn =
@@ -1591,6 +1656,7 @@ export function ListScanPanel() {
       if (cfg.cmo?.enabled) kinds.push("cmo");
       if (cfg.pliDir?.enabled) kinds.push("pliDir");
       if (cfg.pliDmi?.enabled) kinds.push("pliDmi");
+      if (cfg.pliDtDiv?.enabled) kinds.push("pliDtDiv");
       for (const kind of kinds) {
         let type: BuiltinIndicatorId = KIND_TO_INDICATOR[kind];
         if (kind === "divScan" && cfg.divScan) {
@@ -1632,10 +1698,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -1709,7 +1775,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2017,6 +2083,41 @@ export function ListScanPanel() {
         });
         continue;
       }
+      if (h.kind === "pliDtDiv") {
+        const c = cfg.pliDtDiv;
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "PLI-DT Uyumsuz",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            pliDtDiv: {
+              enabled: true,
+              conds: [h.cond as PliDtDivCond],
+              length: c?.length ?? PLI_DT_DIV_DEFAULTS.length,
+              x: c?.x ?? PLI_DT_DIV_DEFAULTS.x,
+              topTh: c?.topTh ?? PLI_DT_DIV_DEFAULTS.topTh,
+              botTh: c?.botTh ?? PLI_DT_DIV_DEFAULTS.botTh,
+              minSwing: c?.minSwing ?? PLI_DT_DIV_DEFAULTS.minSwing,
+              lbL: c?.lbL ?? PLI_DT_DIV_DEFAULTS.lbL,
+              lbR: c?.lbR ?? PLI_DT_DIV_DEFAULTS.lbR,
+              rangeLower: c?.rangeLower ?? PLI_DT_DIV_DEFAULTS.rangeLower,
+              rangeUpper: c?.rangeUpper ?? PLI_DT_DIV_DEFAULTS.rangeUpper,
+            },
+          },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
       if (h.kind === "pliDmi") {
         const c = cfg.pliDmi;
         items.push({
@@ -2246,10 +2347,11 @@ export function ListScanPanel() {
     if (cmoOn) names.push("CMO");
     if (pliDirOn) names.push("PLI±");
     if (pliDmiOn) names.push("PLI-DMI");
+    if (pliDtOn) names.push("PLI-DT Uyumsuz");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -2370,7 +2472,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!hamOn) {
             bumpMatchModeOnSecondKind(false, [
-              diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+              diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
             setHamOn(true);
           } else {
             setHamOn(false);
@@ -2388,7 +2490,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!hamOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setHamOn(true);
                   setHamConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2425,7 +2527,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!diagOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+              hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
             setDiagOn(true);
           } else {
             setDiagOn(false);
@@ -2443,7 +2545,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!diagOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setDiagOn(true);
                   setDiagConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2471,7 +2573,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!macdOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+              hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
             setMacdOn(true);
           } else {
             setMacdOn(false);
@@ -2489,7 +2591,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!macdOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setMacdOn(true);
                   setMacdConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2517,7 +2619,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!stochOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+              hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
             setStochOn(true);
           } else {
             setStochOn(false);
@@ -2535,7 +2637,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!stochOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setStochOn(true);
                   setStochConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2563,7 +2665,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!diOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+              hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
             setDiOn(true);
           } else {
             setDiOn(false);
@@ -2581,7 +2683,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!diOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setDiOn(true);
                   setDiConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2603,7 +2705,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!hullOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+              hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
             setHullOn(true);
           } else {
             setHullOn(false);
@@ -2624,7 +2726,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!hullOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setHullOn(true);
                   setHullConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2680,7 +2782,7 @@ export function ListScanPanel() {
         onToggle={() => {
           if (!hamAoOn) {
             bumpMatchModeOnSecondKind(false, [
-              hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+              hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
             setHamAoOn(true);
           } else {
             setHamAoOn(false);
@@ -2702,7 +2804,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!hamAoOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setHamAoOn(true);
                   setHamAoConds((a) => ensureCond(a, c.id));
                 } else {
@@ -2734,7 +2836,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!goldOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setGoldOn(true);
                   setGold2On(false);
                   setMatchMode("any");
@@ -2768,7 +2870,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!gold2On) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setGold2On(true);
                   setGoldOn(false);
                   setMatchMode("any");
@@ -2804,7 +2906,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!divScanOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setDivScanOn(true);
                   setMatchMode("any");
                   setDivOscs([c.id]);
@@ -2826,7 +2928,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!divScanOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setDivScanOn(true);
                   setMatchMode("any");
                   setDivOscs([...DEFAULT_DIV_OSC]);
@@ -2861,7 +2963,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!multiDipOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setMultiDipOn(true);
                   setMatchMode("any");
                   setMultiDipConds((a) => ensureCond(a, c.id));
@@ -2908,7 +3010,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!bbDivLgOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setBbDivLgOn(true);
                   setMatchMode("any");
                   setBbDivLgConds((a) => ensureCond(a, c.id));
@@ -2959,7 +3061,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!obFallOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setObFallOn(true);
                   setMatchMode("any");
                   setObFallConds((a) => ensureCond(a, c.id));
@@ -2994,7 +3096,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!maSimpleOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setMaSimpleOn(true);
                   setMatchMode("any");
                   setMaSimpleConds((a) => ensureCond(a, c.id));
@@ -3030,7 +3132,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!kijunBbOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setKijunBbOn(true);
                   setMatchMode("any");
                   setKijunBbConds((a) => ensureCond(a, c.id));
@@ -3070,7 +3172,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!pdoOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setPdoOn(true);
                   setMatchMode("any");
                   setPdoConds((a) => ensureCond(a, c.id));
@@ -3110,7 +3212,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!cmoOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, pliDirOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, pliDirOn, pliDmiOn, pliDtOn]);
                   setCmoOn(true);
                   setMatchMode("any");
                   setCmoConds((a) => ensureCond(a, c.id));
@@ -3159,7 +3261,7 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!pliDirOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDmiOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDmiOn, pliDtOn]);
                   setPliDirOn(true);
                   setMatchMode("any");
                   setPliDirConds((a) => ensureCond(a, c.id));
@@ -3207,12 +3309,61 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!pliDmiOn) {
                   bumpMatchModeOnSecondKind(false, [
-                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn]);
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDtOn]);
                   setPliDmiOn(true);
                   setMatchMode("any");
                   setPliDmiConds((a) => ensureCond(a, c.id));
                 } else {
                   setPliDmiConds((a) => toggleCondKeepOne(a, c.id));
+                }
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="PLI-DT Uyumsuzluk"
+        enabled={pliDtOn}
+        onToggle={() => (pliDtOn ? setPliDtOn(false) : enablePliDt())}
+        open={openCard === "pliDtDiv"}
+        onOpen={() => setOpenCard((c) => (c === "pliDtDiv" ? null : "pliDtDiv"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          PLI Trend Dip/Tepe pos (0–1) osilatörü · klasik/gizli: pos pivotları
+          (fiyat dipte low, tepede high) · onaylı D/T: ardışık onaylı D (T) fiyat
+          ve pos karşılaştırması · sinyal onay mumunda, son Max mum içinde · ≥
+          {pliDtDivMinBars(pdtLen, pdtLbL, pdtLbR)} mum · çekim{" "}
+          {pliDtDivFetchLimit(pdtLen, pdtLbL, pdtLbR, pdtRu)} · grafik: bantlar + T/D +
+          zigzag, alt panel pos + uyumsuzluk çizgileri
+        </p>
+        <div className="grid grid-cols-3 gap-1">
+          <NumInput label="PLI uzunluk" value={pdtLen} onChange={setPdtLen} hint="Percentil penceresi (50)" />
+          <NumInput label="Percentil X" value={pdtX} onChange={setPdtX} step={0.5} hint="Üst = 100−X, alt = X (5)" />
+          <NumInput label="Min salınım %" value={pdtSw} onChange={setPdtSw} step={0.1} hint="T/D onayı için izlenen uçtan min salınım (3)" />
+          <NumInput label="Tepe eşiği" value={pdtTop} onChange={setPdtTop} step={0.05} hint="pos ≤ eşik → T onayı (0.30)" />
+          <NumInput label="Dip eşiği" value={pdtBot} onChange={setPdtBot} step={0.05} hint="pos ≥ eşik → D onayı (0.70)" />
+          <NumInput label="Pivot sol" value={pdtLbL} onChange={setPdtLbL} hint="pos pivot sol mum (5)" />
+          <NumInput label="Pivot sağ" value={pdtLbR} onChange={setPdtLbR} hint="pos pivot sağ mum — sinyal bu kadar gecikir (3)" />
+          <NumInput label="Range alt" value={pdtRl} onChange={setPdtRl} hint="İki pivot arası min mum (5)" />
+          <NumInput label="Range üst" value={pdtRu} onChange={setPdtRu} hint="İki pivot arası max mum (60)" />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {PLI_DT_DIV_CHIPS.map((c) => (
+            <Chip
+              key={c.id}
+              title={c.title}
+              active={pliDtConds.includes(c.id)}
+              label={PLI_DT_DIV_COND_LABEL[c.id]}
+              onClick={() => {
+                if (!pliDtOn) {
+                  bumpMatchModeOnSecondKind(false, [
+                    hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn]);
+                  setPliDtOn(true);
+                  setMatchMode("any");
+                  setPliDtConds((a) => ensureCond(a, c.id));
+                } else {
+                  setPliDtConds((a) => toggleCondKeepOne(a, c.id));
                 }
               }}
             />
