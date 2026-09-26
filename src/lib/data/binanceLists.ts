@@ -3,6 +3,11 @@
  * Live exchangeInfo is preferred; FALLBACK_USDT_PERPS is the offline snapshot.
  */
 import { FALLBACK_USDT_PERPS } from "@/lib/data/binancePerpSnapshot";
+import {
+  TRADFI_USDT_PERPS,
+  TRADFI_COMMODITY_BASES,
+  TRADFI_ETF_BASES,
+} from "@/lib/data/binanceTradfiSnapshot";
 import type { Watchlist } from "@/lib/types";
 
 /** AI / agent names first — AIO, AIOT, then other AI tickers. */
@@ -100,6 +105,35 @@ export function binancePerpWatchlistMeta(): Array<{
   return [
     { id: "binance-ai-usdt", name: "BN AI · USDT.P", symbols: all.filter(isAiPerp) },
     { id: "binance-perp-usdt", name: "BN Perp · USDT.P", symbols: all },
+  ];
+}
+
+/**
+ * Binance TRADIFI_PERPETUAL (hisse/ETF/emtia/FX) listeleri — yalnızca Liste
+ * tarama evren seçicisinde; izleme listelerine otomatik eklenmez.
+ */
+export function binanceTradfiWatchlistMeta(): Array<{
+  id: string;
+  name: string;
+  symbols: string[];
+}> {
+  const tf = [...TRADFI_USDT_PERPS].sort((a, b) => a.localeCompare(b));
+  const comm = tf.filter((s) => TRADFI_COMMODITY_BASES.has(perpBase(s)));
+  const etf = tf.filter((s) => TRADFI_ETF_BASES.has(perpBase(s)));
+  const stocks = tf.filter(
+    (s) => !TRADFI_COMMODITY_BASES.has(perpBase(s)) && !TRADFI_ETF_BASES.has(perpBase(s))
+  );
+  const crypto = sortPerpsAiFirst(fallbackUsdtPerps());
+  return [
+    { id: "binance-tradfi-usdt", name: `BN TradFi · Tümü (${tf.length})`, symbols: tf },
+    { id: "binance-tradfi-stocks", name: `BN TradFi · Hisse/Pre-IPO (${stocks.length})`, symbols: stocks },
+    { id: "binance-tradfi-etf", name: `BN TradFi · ETF/Endeks (${etf.length})`, symbols: etf },
+    { id: "binance-tradfi-comm", name: `BN TradFi · Emtia/FX (${comm.length})`, symbols: comm },
+    {
+      id: "binance-perp-all-usdt",
+      name: `BN Perp + TradFi (${crypto.length + tf.length})`,
+      symbols: [...crypto, ...tf],
+    },
   ];
 }
 
