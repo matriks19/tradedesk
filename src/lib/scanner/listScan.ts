@@ -408,10 +408,15 @@ export type MaSimpleCond =
   | "stack_bull"
   | "stack_bear"
   | "x_20_50"
+  | "x_20_100"
+  | "x_20_200"
   | "x_50_100"
+  | "x_50_200"
   | "x_100_200"
   | "price_x_20"
   | "price_x_50"
+  | "price_x_100"
+  | "price_x_200"
   | "ema10_x_sma20"
   | "ema10_x_sma20_dn";
 
@@ -419,10 +424,15 @@ export const ALL_MA_SIMPLE_CONDS: MaSimpleCond[] = [
   "stack_bull",
   "stack_bear",
   "x_20_50",
+  "x_20_100",
+  "x_20_200",
   "x_50_100",
+  "x_50_200",
   "x_100_200",
   "price_x_20",
   "price_x_50",
+  "price_x_100",
+  "price_x_200",
   "ema10_x_sma20",
   "ema10_x_sma20_dn",
 ];
@@ -436,10 +446,15 @@ export const MA_SIMPLE_COND_LABEL: Record<MaSimpleCond, string> = {
   stack_bull: "Boğa yığını",
   stack_bear: "Ayı yığını",
   x_20_50: "SMA20↑50",
+  x_20_100: "SMA20↑100",
+  x_20_200: "SMA20↑200",
   x_50_100: "SMA50↑100",
+  x_50_200: "SMA50↑200",
   x_100_200: "SMA100↑200",
   price_x_20: "Fiyat↑SMA20",
   price_x_50: "Fiyat↑SMA50",
+  price_x_100: "Fiyat↑SMA100",
+  price_x_200: "Fiyat↑SMA200",
   ema10_x_sma20: "EMA10↑SMA20",
   ema10_x_sma20_dn: "EMA10↓SMA20",
 };
@@ -2082,14 +2097,24 @@ function scanMaSimple(
         return s.stack_bear;
       case "x_20_50":
         return s.x_20_50;
+      case "x_20_100":
+        return s.x_20_100;
+      case "x_20_200":
+        return s.x_20_200;
       case "x_50_100":
         return s.x_50_100;
+      case "x_50_200":
+        return s.x_50_200;
       case "x_100_200":
         return s.x_100_200;
       case "price_x_20":
         return s.price_x_20;
       case "price_x_50":
         return s.price_x_50;
+      case "price_x_100":
+        return s.price_x_100;
+      case "price_x_200":
+        return s.price_x_200;
       case "ema10_x_sma20":
         return s.ema10_x_sma20;
       case "ema10_x_sma20_dn":

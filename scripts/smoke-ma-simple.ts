@@ -7,8 +7,11 @@ import { maSimple } from "../src/lib/indicators/maSimple";
 import {
   scanSymbol,
   alertScanHits,
+  indicatorParamsFromConfig,
   type ListScanConfig,
 } from "../src/lib/scanner/listScan";
+import { computeBuiltin } from "../src/lib/indicators/registry";
+import type { IndicatorInstance } from "../src/lib/types";
 
 function assert(cond: boolean, msg: string) {
   if (!cond) throw new Error(msg);
@@ -54,6 +57,12 @@ function main() {
     if (s.x_20_50[i] === 1) x2050++;
     if (s.price_x_20[i] === 1) px20++;
   }
+  // New chips present as series (lengths)
+  assert(s.x_20_100.length === cs.length, "x_20_100");
+  assert(s.x_20_200.length === cs.length, "x_20_200");
+  assert(s.x_50_200.length === cs.length, "x_50_200");
+  assert(s.price_x_100.length === cs.length, "price_x_100");
+  assert(s.price_x_200.length === cs.length, "price_x_200");
   assert(stackN > 0, `expected stack_bull hits, got ${stackN}`);
   assert(s.sma20[cs.length - 1] != null, "sma20 ready");
   assert(s.sma200[cs.length - 1] != null, "sma200 ready");
@@ -72,7 +81,14 @@ function main() {
     matchMode: "any",
     maSimple: {
       enabled: true,
-      conds: ["stack_bull", "x_20_50", "price_x_20"],
+      conds: [
+        "stack_bull",
+        "x_20_50",
+        "x_50_200",
+        "price_x_20",
+        "price_x_100",
+        "price_x_200",
+      ],
     },
   };
   const hits = scanSymbol(cs, cfg, 5);
@@ -138,6 +154,76 @@ function main() {
   const hx = scanSymbol(short, cfgX, 30);
   assert(hx.some((h) => h.cond === "x_20_50"), "scan x_20_50");
 
+  // ---- New cross chips: real events → scan + alarm + chart marker ----
+  const wave: Candle[] = [];
+  for (let i = 0; i < 1600; i++) {
+    const base =
+      200 + 40 * Math.sin(i / 70) + 15 * Math.sin(i / 19) + 6 * Math.sin(i / 5);
+    wave.push({
+      time: 1_700_000_000 + i * 3600,
+      open: base,
+      high: base + 1,
+      low: base - 1,
+      close: base + 0.3 * Math.sin(i),
+      volume: 1000,
+    });
+  }
+  const sw = maSimple(wave);
+  const newConds = [
+    "x_20_100",
+    "x_20_200",
+    "x_50_200",
+    "price_x_100",
+    "price_x_200",
+  ] as const;
+  const markerText: Record<(typeof newConds)[number], RegExp> = {
+    x_20_100: /20↑100/,
+    x_20_200: /20↑200/,
+    x_50_200: /50↑200/,
+    price_x_100: /Px↑.*100/,
+    price_x_200: /Px↑.*200/,
+  };
+  const newCounts: Record<string, number> = {};
+  const inst = {
+    id: "m",
+    type: "maSimple",
+    params: indicatorParamsFromConfig("maSimple", {
+      maSimple: { enabled: true, conds: [...newConds] },
+    }),
+  } as unknown as IndicatorInstance;
+  const plots = computeBuiltin(inst, wave);
+  const markers = plots[0]?.markers ?? [];
+  for (const c of newConds) {
+    let lastIdx = -1;
+    let cnt = 0;
+    for (let i = 0; i < wave.length; i++) {
+      if (sw[c][i] === 1) {
+        cnt++;
+        lastIdx = i;
+      }
+    }
+    newCounts[c] = cnt;
+    assert(cnt > 0 && lastIdx >= 210, `expected ${c} events after warmup`);
+    const cut = wave.slice(0, lastIdx + 1);
+    const cfgC: ListScanConfig = { maSimple: { enabled: true, conds: [c] } };
+    const h = scanSymbol(cut, cfgC, 2);
+    assert(
+      h.some((x) => x.kind === "maSimple" && x.cond === c && x.barsAgo === 0),
+      `scan ${c}`
+    );
+    assert(
+      alertScanHits(cut, cfgC, 1).some((x) => x.cond === c),
+      `alarm ${c} (edge → alarmable)`
+    );
+    const t = wave[lastIdx]!.time;
+    assert(
+      markers.some((m) => m.time === t && markerText[c].test(m.text ?? "")),
+      `chart marker ${c}`
+    );
+  }
+  // PR #37 EMA10 chips still present alongside
+  assert(sw.ema10_x_sma20.some((v) => v === 1), "ema10_x_sma20 still works");
+
   console.log("OK smoke-ma-simple", {
     stackN,
     x2050,
@@ -145,6 +231,7 @@ function main() {
     hits: hits.map((h) => `${h.cond}@${h.barsAgo}`),
     alerts: alerts.map((h) => h.cond),
     xHits: hx.map((h) => `${h.cond}@${h.barsAgo}`),
+    newCounts,
   });
 }
 
