@@ -8,6 +8,7 @@ import {
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "fs";
 import { join } from "path";
 import { TRADFI_USDT_PERPS } from "@/lib/data/binanceTradfiSnapshot";
+const TRADFI_SET = new Set(TRADFI_USDT_PERPS);
 import { FALLBACK_USDT_PERPS } from "@/lib/data/binancePerpSnapshot";
 import {
   PERP_FETCH_HEADERS,
@@ -53,17 +54,27 @@ export function toPerpDisplaySymbol(symbol: string): string {
   return `${rest}.P`;
 }
 
+/** SymbolInfo.name for TRADIFI_PERPETUAL contracts (hisse/ETF/emtia/FX). */
+export const TRADFI_PERP_NAME = "TRADFI PERP";
+
+/** Snapshot fallback: 528 PERPETUAL + 199 TRADIFI_PERPETUAL (727). */
 function snapshotPerpSymbols(): SymbolInfo[] {
-  return FALLBACK_USDT_PERPS.map((s) => {
+  const row = (s: string, name: string): SymbolInfo => {
     const rest = toBinanceRestSymbol(s);
     return {
       symbol: toPerpDisplaySymbol(s),
       exchange: "binance" as const,
       base: rest.replace(/USDT$/i, ""),
       quote: "USDT",
-      name: "PERP",
+      name,
     };
-  });
+  };
+  const crypto = FALLBACK_USDT_PERPS.map((s) => row(s, "PERP"));
+  const seen = new Set(crypto.map((c) => c.symbol));
+  const tradfi = TRADFI_USDT_PERPS.filter((s) => !seen.has(toPerpDisplaySymbol(s))).map((s) =>
+    row(s, TRADFI_PERP_NAME)
+  );
+  return [...crypto, ...tradfi];
 }
 
 function readFileCache(path: string): SymbolInfo[] | null {
@@ -198,7 +209,7 @@ export class BinanceProvider {
     }
   }
 
-  /** USDT-M perpetual symbols as XXXUSDT.P */
+  /** USDT-M perpetual symbols as XXXUSDT.P (PERPETUAL + TRADIFI_PERPETUAL). */
   static async getUsdtPerpSymbols(): Promise<SymbolInfo[]> {
     if (memPerpSymbols && Date.now() - memPerpSymbols.ts < MEM_TTL) {
       return memPerpSymbols.symbols;
@@ -220,7 +231,7 @@ export class BinanceProvider {
         .filter(
           (s) =>
             s.status === "TRADING" &&
-            s.contractType === "PERPETUAL" &&
+            (s.contractType === "PERPETUAL" || s.contractType === "TRADIFI_PERPETUAL") &&
             (s.quoteAsset === "USDT" || String(s.symbol).endsWith("USDT"))
         )
         .map((s) => ({
@@ -228,7 +239,7 @@ export class BinanceProvider {
           exchange: "binance" as const,
           base: String(s.baseAsset ?? ""),
           quote: String(s.quoteAsset ?? "USDT"),
-          name: "PERP",
+          name: s.contractType === "TRADIFI_PERPETUAL" ? TRADFI_PERP_NAME : "PERP",
         }))
         .sort((a, b) => a.symbol.localeCompare(b.symbol));
       memPerpSymbols = { ts: Date.now(), symbols };
@@ -247,15 +258,33 @@ export class BinanceProvider {
       this.getUsdtSymbols(),
       this.getUsdtPerpSymbols(),
     ]);
+    // Eski dosya önbelleği (yalnız kripto) olsa bile TradFi snapshot'ı ekle
     const seen = new Set(perp.map((p) => p.symbol));
     const tradfi = TRADFI_USDT_PERPS.filter((s) => !seen.has(s)).map((s) => ({
       symbol: s,
       exchange: "binance" as const,
       base: toBinanceRestSymbol(s).replace(/USDT$/i, ""),
       quote: "USDT",
-      name: "TRADFI PERP",
+      name: TRADFI_PERP_NAME,
     }));
     return [...spot, ...perp, ...tradfi];
+  }
+
+  /** Perp evreni türe göre: all (727) / crypto (PERPETUAL) / tradfi (TRADIFI). */
+  static async getPerpUniverse(kind: "all" | "crypto" | "tradfi" = "all"): Promise<SymbolInfo[]> {
+    const perp = await this.getUsdtPerpSymbols();
+    const seen = new Set(perp.map((p) => p.symbol));
+    const extra = TRADFI_USDT_PERPS.filter((s) => !seen.has(s)).map((s) => ({
+      symbol: s,
+      exchange: "binance" as const,
+      base: toBinanceRestSymbol(s).replace(/USDT$/i, ""),
+      quote: "USDT",
+      name: TRADFI_PERP_NAME,
+    }));
+    const all = [...perp, ...extra];
+    if (kind === "all") return all;
+    const isTf = (s: SymbolInfo) => s.name === TRADFI_PERP_NAME || TRADFI_SET.has(s.symbol);
+    return all.filter((s) => (kind === "tradfi" ? isTf(s) : !isTf(s)));
   }
 
   static async getKlines(

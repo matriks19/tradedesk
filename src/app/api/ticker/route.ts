@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { BinanceProvider, isBinancePerp } from "@/lib/data/binance";
+import { BinanceProvider, isBinancePerp, toBinanceRestSymbol } from "@/lib/data/binance";
 import { BistProvider, bistScanUniverse } from "@/lib/data/bist";
 import type { Exchange } from "@/lib/types";
 
@@ -49,10 +49,18 @@ export async function GET(req: NextRequest) {
       const resolvedMarket = allPerp ? "perp" : anyPerp ? "mixed" : "spot";
       return NextResponse.json({ quotes, delayed: false, market: resolvedMarket });
     }
-    const quotes = await BinanceProvider.getTicker24h(undefined, {
+    let quotes = await BinanceProvider.getTicker24h(undefined, {
       market: market === "perp" ? "perp" : "spot",
     });
-    return NextResponse.json({ quotes, delayed: false, market });
+    // Perp tam liste: kind=crypto|tradfi|all (varsayılan all = 528 kripto + 199 TradFi)
+    const kind = sp.get("kind");
+    if (market === "perp" && (kind === "crypto" || kind === "tradfi")) {
+      const allowed = new Set(
+        (await BinanceProvider.getPerpUniverse(kind)).map((s) => toBinanceRestSymbol(s.symbol))
+      );
+      quotes = quotes.filter((q) => allowed.has(toBinanceRestSymbol(q.symbol)));
+    }
+    return NextResponse.json({ quotes, delayed: false, market, kind: kind ?? "all" });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : String(e) },

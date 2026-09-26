@@ -553,6 +553,8 @@ export function ChartPane({ pane, compact }: Props) {
             ? {
                 time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
                 value: d.value,
+                // per-point renk (HAM rejim, MACD hist, PDO trend rengi)
+                ...("color" in d && d.color ? { color: d.color } : {}),
               }
             : {
                 time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
@@ -1044,7 +1046,7 @@ export function ChartPane({ pane, compact }: Props) {
       } else {
         const s = main.addLineSeries({
           color: p.color,
-          lineWidth: 2,
+          lineWidth: p.lineWidth ?? 2,
           title: p.title,
           priceLineVisible: false,
           lastValueVisible: false,

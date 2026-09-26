@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeskStore } from "@/store/desk";
 import type { Candle, Exchange, Timeframe, AlertScanKey, Watchlist, TickerQuote, BuiltinIndicatorId } from "@/lib/types";
-import { binancePerpWatchlistMeta, binanceTradfiWatchlistMeta } from "@/lib/data/binanceLists";
+import {
+  binancePerpWatchlistMeta,
+  binanceTradfiWatchlistMeta,
+  sortPerpsAiFirst,
+  PERP_ALL_ID,
+  PERP_ALL_NAME,
+  PERP_CRYPTO_NAME,
+} from "@/lib/data/binanceLists";
 import { sectorWatchlistMeta } from "@/lib/data/bistSectors";
 import {
   mapPool,
@@ -383,7 +390,10 @@ function isSectorId(id: string): boolean {
   return id.startsWith("bist-") && id !== "bist-all";
 }
 
-function cryptoOptions(watchlists: Watchlist[]): UniOpt[] {
+/** Canlı exchangeInfo perp evreni (/api/symbols?market=perp) */
+type LivePerps = { crypto: string[]; tradfi: string[] };
+
+function cryptoOptions(watchlists: Watchlist[], live: LivePerps | null): UniOpt[] {
   const byId = new Map<string, UniOpt>();
   for (const m of [...binancePerpWatchlistMeta(), ...binanceTradfiWatchlistMeta()]) {
     byId.set(m.id, {
@@ -399,7 +409,29 @@ function cryptoOptions(watchlists: Watchlist[]): UniOpt[] {
       byId.set(w.id, { id: w.id, name: w.name, symbols: w.symbols });
     }
   }
-  return [...byId.values()].sort((a, b) => a.name.localeCompare(b.name, "tr"));
+  const asOpts = (syms: string[]) => syms.map((symbol) => ({ symbol, exchange: "binance" as const }));
+  if (live && live.crypto.length >= 400) {
+    byId.set("binance-perp-usdt", { id: "binance-perp-usdt", name: PERP_CRYPTO_NAME, symbols: asOpts(sortPerpsAiFirst(live.crypto)) });
+  }
+  if (live && live.tradfi.length >= 50) {
+    const prev = byId.get("binance-tradfi-usdt");
+    byId.set("binance-tradfi-usdt", { id: "binance-tradfi-usdt", name: prev?.name ?? "BN TradFi · Tümü", symbols: asOpts([...live.tradfi].sort()) });
+  }
+  // Kripto-yalnız liste adı sabit; varsayılan Tümü = kripto ∪ TradFi (canlı/izleme listesi güncel)
+  const cryptoOnly = byId.get("binance-perp-usdt");
+  if (cryptoOnly) byId.set("binance-perp-usdt", { ...cryptoOnly, name: PERP_CRYPTO_NAME });
+  const tfAll = byId.get("binance-tradfi-usdt");
+  const seen = new Set<string>();
+  const union: UniOpt["symbols"] = [];
+  for (const s of [...(cryptoOnly?.symbols ?? []), ...(tfAll?.symbols ?? [])]) {
+    if (seen.has(s.symbol)) continue;
+    seen.add(s.symbol);
+    union.push(s);
+  }
+  byId.set(PERP_ALL_ID, { id: PERP_ALL_ID, name: PERP_ALL_NAME, symbols: union });
+  return [...byId.values()].sort((a, b) =>
+    a.id === PERP_ALL_ID ? -1 : b.id === PERP_ALL_ID ? 1 : a.name.localeCompare(b.name, "tr")
+  );
 }
 
 function bistOptions(watchlists: Watchlist[]): UniOpt[] {
@@ -623,9 +655,32 @@ export function ListScanPanel() {
     watchlists.find((w) => w.id === activeWatchlistId) ?? watchlists[0];
 
   const [uniSrc, setUniSrc] = useState<UniSrc>("crypto");
-  const [uniId, setUniId] = useState("binance-perp-usdt");
+  const [uniId, setUniId] = useState(PERP_ALL_ID);
+  const [livePerps, setLivePerps] = useState<LivePerps | null>(null);
+  // Canlı perp evreni (PERPETUAL + TRADIFI_PERPETUAL); sunucu snapshot'a düşer.
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/symbols?exchange=binance&market=perp&limit=5000")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { symbols?: { symbol: string; name?: string }[] } | null) => {
+        if (cancelled || !j?.symbols?.length) return;
+        const crypto: string[] = [];
+        const tradfi: string[] = [];
+        for (const s of j.symbols) {
+          if (!/\.P$/i.test(s.symbol)) continue;
+          (s.name === "TRADFI PERP" ? tradfi : crypto).push(s.symbol);
+        }
+        if (crypto.length >= 400) setLivePerps({ crypto, tradfi });
+      })
+      .catch(() => {
+        /* snapshot */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
-  const cryptoOpts = useMemo(() => cryptoOptions(watchlists), [watchlists]);
+  const cryptoOpts = useMemo(() => cryptoOptions(watchlists, livePerps), [watchlists, livePerps]);
   const bistOpts = useMemo(() => bistOptions(watchlists), [watchlists]);
   const sectorOpts = useMemo(() => sectorOptions(), []);
   const uniOpts = useMemo(() => {
@@ -1955,7 +2010,7 @@ export function ListScanPanel() {
             className={clsx("btn text-2xs px-1.5", uniSrc === id && "btn-accent")}
             onClick={() => {
               setUniSrc(id);
-              if (id === "crypto") setUniId("binance-perp-usdt");
+              if (id === "crypto") setUniId(PERP_ALL_ID);
               else if (id === "bist") setUniId("bist-all");
               else if (id === "sector") setUniId("bist-xbank");
             }}
