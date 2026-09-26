@@ -516,24 +516,44 @@ function SectionCard({
   onOpen: () => void;
   children: React.ReactNode;
 }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const mounted = useRef(false);
+  // Bring a freshly opened (full-row) card into view inside the scroll area
+  // (skip initial mount so the panel doesn't jump on load)
+  useEffect(() => {
+    if (!mounted.current) {
+      mounted.current = true;
+      return;
+    }
+    if (open) ref.current?.scrollIntoView({ block: "nearest" });
+  }, [open]);
   return (
-    <div className="border border-desk-border/40 rounded">
-      <div className="flex items-center gap-2 px-2 py-1 bg-desk-elevated/50">
+    <div
+      ref={ref}
+      className={clsx(
+        "border border-desk-border/40 rounded min-w-0",
+        // Open card spans the full row so its inputs keep usable width
+        open && "col-span-full",
+        enabled && "border-desk-accent/50"
+      )}
+    >
+      <div className="flex items-center gap-1.5 px-1.5 py-1 bg-desk-elevated/50 min-w-0">
         <input
           type="checkbox"
           checked={enabled}
           onChange={onToggle}
-          className="accent-desk-accent"
+          className="accent-desk-accent shrink-0"
         />
         <button
           type="button"
-          className="flex-1 text-left text-xs font-medium"
+          className="flex-1 min-w-0 text-left text-xs font-medium truncate"
+          title={title}
           onClick={onOpen}
         >
           {title} {open ? "▾" : "▸"}
         </button>
       </div>
-      {open && <div className="p-2 space-y-2">{children}</div>}
+      {open && <div className="p-2 space-y-2 min-w-0">{children}</div>}
     </div>
   );
 }
@@ -1830,8 +1850,8 @@ export function ListScanPanel() {
   }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, extraIds.length, pineIds.length]);
 
   return (
-    <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs">
-      <div className="flex flex-col gap-2 shrink-0">
+    <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
+      <div className="flex flex-col gap-2 shrink-0 min-w-0 max-h-[70%] overflow-y-auto overflow-x-hidden">
         <div className="font-medium">Liste Tarama</div>
       <p className="text-2xs text-desk-muted">
         Evren: kripto listesi, BIST listesi veya sektör. Şartlar aynı.
@@ -1934,7 +1954,14 @@ export function ListScanPanel() {
       </div>
 
       {indicatorsOpen && (
-        <div className="space-y-2">
+        <div
+          className="grid grid-flow-row-dense gap-1.5 min-w-0"
+          style={{
+            // 2 columns at normal sidebar width; falls back to 1 below ~250px
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(max(120px, calc(50% - 3px)), 1fr))",
+          }}
+        >
       <SectionCard
         title="HAM"
         enabled={hamOn}
@@ -2614,7 +2641,7 @@ export function ListScanPanel() {
         </div>
       </SectionCard>
 
-      <div className="border border-desk-border/40 rounded">
+      <div className="border border-desk-border/40 rounded col-span-full min-w-0">
         <button
           type="button"
           className="w-full text-left px-2 py-1 text-xs bg-desk-elevated/50"
@@ -2729,7 +2756,10 @@ export function ListScanPanel() {
       </div>
         </div>
       )}
+      </div>
 
+      {/* Actions + status stay visible even when the settings above scroll */}
+      <div className="flex flex-col gap-2 shrink-0 min-w-0">
       <div className="flex flex-wrap gap-1">
         <button
           type="button"
