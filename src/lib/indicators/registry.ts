@@ -210,6 +210,7 @@ import {
   toNullable as pdoToNullable,
   type PdoPatternEvent,
 } from "./pdo";
+import { computeCmo, cmoCrossAt } from "./cmo";
 import { obFall } from "./obFall";
 
 export type PlotMarker = {
@@ -525,6 +526,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "bbDivLg", label: "BB+RSI Div + LG", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "BB alt dokunuş + RSI OS + bullish RSI div VEYA unconfirmed Liquidity Grab. Opsiyonel EMA50+ADX trend. BUY = sinyal + mum onayı. Liste tarama TF mumları.", inputs: [num("bbLen", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("rsiLen", "RSI Periyot", 14), num("rsiOS", "RSI OS", 30), num("divLbL", "Div Pivot Sol", 5), num("divLbR", "Div Pivot Sağ", 5), num("divRangeLower", "Div Min Bar", 5), num("lgWickMult", "LG Fitil", 2, 1, 5, 0.1), num("lgVolMult", "LG Hacim", 1.3, 1, 3, 0.1), flag("useTrend", "Trend Filtre", 1), num("emaLen", "EMA", 50), flag("useADX", "ADX Filtre", 1), num("adxLen", "ADX Periyot", 14), num("adxMin", "ADX Min", 20), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigBuy", "BUY (BB+Div+LG)", 1), sigFlag("sigLg", "LG (likidite avı)", 1), sigFlag("sigDiv", "DIV (BB altı uyumsuzluk)", 1), lineFlag("lineLower", "BB alt", 1), lineFlag("lineMid", "BB orta", 0), lineFlag("lineUpper", "BB üst", 0), lineFlag("lineEma", "EMA", 1)] },
   { id: "maSimple", label: "MA Basit (20-50-100-200)", category: "ma", pane: "main", acceptsSeries: false, primarySeriesKey: "sma20", description: "SMA 20/50/100/200 şerit. Liste: boğa/ayı yığını, SMA×SMA↑, fiyat×SMA↑, EMA10×SMA20 (hızlı). Hafif kart.", inputs: [num("p20", "SMA20", 20), num("p50", "SMA50", 50), num("p100", "SMA100", 100), num("p200", "SMA200", 200), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigSmaX", "SMA×SMA (20↑50, 50↑200…)", 1), sigFlag("sigPxX", "Fiyat×SMA (Px↑)", 1), sigFlag("sigEma10", "EMA10×SMA20", 1), lineFlag("line20", "SMA20", 1), lineFlag("line50", "SMA50", 1), lineFlag("line100", "SMA100", 1), lineFlag("line200", "SMA200", 1), lineFlag("showEma10", "EMA10 çiz", 0)] },
   { id: "pdo", label: "PDO (Stoch hibrit)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "pdo", description: "PDO — Pump/Dump Osilatörü (kripto-tarayici). Mavi PDO = Stoch %K + yapı sapması, turuncu sinyal = %D + aynı sapma, EMA2. Yeşil P = PUMP skoru, kırmızı D = DUMP skoru (EMA2) + 50 tabanlı yeşil/kırmızı çubuklar; P×D kesişimi = trend↑/↓. AL: ≤30 bölgeden yukarı kesişim, SAT: ≥70'ten aşağı. T10: kesişim + ayrı mumda alt BB teması. UA/US uyumsuzluk + 2D/3D/2T/3T yapı çizgileri. Mod 'ema' = eski PDO.", inputs: [num("stochWeight", "Stoch ağırlığı %", 70, 50, 100, 1), num("smooth", "Yumuşatma (EMA)", 2, 1, 30, 1), sel("crossMode", "Kesişim modu", "kd", [{ value: "kd", label: "Yeni (K/D)" }, { value: "ema", label: "Eski (EMA)" }]), num("stochK", "Stoch %K", 14, 2, 100, 1), num("stochSk", "Stoch %K yumuşatma", 3, 1, 20, 1), num("stochD", "Stoch %D", 3, 1, 20, 1), num("low", "Dip bölge", 30, 5, 50, 1), num("high", "Tepe bölge", 70, 50, 95, 1), num("zoneLook", "Bölge geriye bakış (bar)", 5, 1, 30, 1), num("patternBars", "Yapı penceresi (bar)", 20, 5, 100, 1), num("pivot", "Pivot genişliği", 2, 1, 10, 1), num("tol", "Dip/tepe toleransı %", 2, 0.1, 10, 0.1), num("rise", "Min yükseliş %", 2, 0, 20, 0.1), num("divMin", "Uyumsuzluk min PDO farkı", 2, 0, 20, 0.5), num("touch", "Temas bandı %", 0.5, 0.05, 5, 0.05), num("t10SignalBars", "T10 kesişim penceresi", 8, 1, 50, 1), num("t10BandWindow", "T10 bant penceresi", 20, 1, 100, 1), num("t10BandTol", "T10 bant toleransı %", 2, 0.1, 10, 0.1), num("bollLen", "Bollinger periyot", 20, 2, 200, 1), num("bollMult", "Bollinger çarpan", 2, 0.5, 5, 0.1), flag("live", "Canlı UA/US (teyitsiz pivot)", 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("showTrend", "Trend T↑/T↓ (yeşil P × kırmızı D)", 1), sigFlag("sigAlSat", "AL/SAT (yeni kesişim, 30/70 bölge)", 1), sigFlag("showOld", "Eski kesişim E↑/E↓", 0), sigFlag("sigT10", "T10 (kesişim + alt BB)", 1), sigFlag("sigUaUs", "UA/US uyumsuzluk", 1), sigFlag("sigPatterns", "2D/3D/2T/3T yapılar", 1), lineFlag("showPD", "Yeşil P / kırmızı D çizgileri", 1), lineFlag("showPdBars", "P/D çubukları (50 tabanlı)", 1), lineFlag("lineSignal", "Turuncu sinyal çizgisi", 1), lineFlag("lineLevels", "30/50/70 seviyeleri", 1), lineFlag("trendColor", "PDO çizgisini trende göre boya", 0), lineFlag("showPatterns", "Yapı pivot çizgileri", 1)] },
+  { id: "cmoChande", label: "CMO Seviyeler (Chande)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "cmo", description: "Chande Momentum Oscillator (TradingView ta.cmo, varsayılan 9): 100·(ΣYükseliş − ΣDüşüş)/(ΣYükseliş + ΣDüşüş), N mum kapanış değişimi; yatay pencerede (payda 0) 0. Seviyeler −50 / 0 / 75. İşaretler: alt seviyeyi yukarı kesiş (−50↑), üst seviyeyi aşağı kesiş (75↓), isteğe bağlı 0 kesişimi. Liste kartı: CMO (Chande). (Genel CMO(14) göstergesi ayrı.)", inputs: [num("length", "Uzunluk", 9, 1, 200, 1), num("lower", "Alt seviye", -50, -100, 100, 1), num("upper", "Üst seviye", 75, -100, 100, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigUpLo", "Alt seviye yukarı kesiş (−50↑)", 1), sigFlag("sigDnHi", "Üst seviye aşağı kesiş (75↓)", 1), sigFlag("sigZero", "0 kesişimi (0↑ / 0↓)", 0), lineFlag("lineLevels", "Seviye çizgileri (alt / 0 / üst)", 1)] },
   { id: "kijunBb", label: "Kijun + BB", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "kijun", description: "Kijun (Donchian orta, 26) + Kijun üzerinde Bollinger (24, 2σ). Liste: fiyat×alt/üst band (erken), Kijun×orta (trend onayı). Hafif kart.", inputs: [num("basePeriods", "Kijun periyot", 26), num("bbLength", "BB Periyot", 24), num("bbStdDev", "BB StdDev", 2, 0.5, 5, 0.1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigKijunMid", "Kijun×orta (K↑/K↓)", 1), sigFlag("sigPxLower", "Fiyat×alt band (alt↑/alt↓)", 1), sigFlag("sigPxUpper", "Fiyat×üst band (üst↑)", 1), lineFlag("lineKijun", "Kijun", 1), lineFlag("lineBasis", "BB orta", 1), lineFlag("lineUpper", "BB üst", 1), lineFlag("lineLower", "BB alt", 1)] },
   { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık + majör düşen direnç kırılımı. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("majBreakLookback", "Majör kırılım pivot", 20, 5, 50, 1), num("breakComboBars", "Dip→kırılım pencere", 8, 1, 30, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigDipBreak", "Dip+Kırılım", 1), sigFlag("sigMajBreak", "Majör kırılım", 1), sigFlag("sigBbSr", "BB+S/R", 1), sigFlag("sigDipSr", "Dip+S/R", 1), sigFlag("sigTriple", "ÜÇLÜ dip", 1), sigFlag("sigDouble", "İKİLİ dip", 1), lineFlag("showSr", "S/R çizgileri", 1), lineFlag("lineLower", "BB alt", 1), lineFlag("lineZone", "Yakalama bölgesi", 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigAl", "AL", 1), sigFlag("sigSat", "SAT", 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
@@ -3290,6 +3292,46 @@ export function computeBuiltin(
         pump: pdoToNullable(ser.pump),
         dump: pdoToNullable(ser.dump),
       });
+      break;
+    }
+
+    case "cmoChande": {
+      const showMarkers = on("showMarkers");
+      const len = Math.max(1, Math.round(n(p, "length", 9)));
+      const lo = n(p, "lower", -50);
+      const hi = n(p, "upper", 75);
+      const v = computeCmo(candles.map((c) => c.close), len);
+      const N = candles.length;
+      const lvl = (x: number) => new Array<number | null>(N).fill(x);
+      const main = line(inst, "cmo", "sub", "#2962ff", candles, v, `CMO(${len})`);
+      const plots: PlotSeries[] = [main];
+      const lvLo = line(inst, "lvlLo", "sub", "#26a69a99", candles, lvl(lo), String(lo));
+      const lv0 = line(inst, "lvl0", "sub", "#787b8666", candles, lvl(0), "0");
+      const lvHi = line(inst, "lvlHi", "sub", "#ef535099", candles, lvl(hi), String(hi));
+      for (const l of [lvLo, lv0, lvHi]) {
+        l.toggle = "lineLevels";
+        l.lineWidth = 1;
+        plots.push(l);
+      }
+      const sUp = showMarkers && on("sigUpLo");
+      const sDn = showMarkers && on("sigDnHi");
+      const sZ = showMarkers && on("sigZero");
+      if (sUp || sDn || sZ) {
+        const markers: PlotMarker[] = [];
+        for (let i = 1; i < N; i++) {
+          const t = candles[i]!.time;
+          if (sUp && cmoCrossAt(v, i, lo, "up"))
+            markers.push({ time: t, position: "belowBar", color: "#26a69a", shape: "arrowUp", text: `${lo}↑` });
+          if (sDn && cmoCrossAt(v, i, hi, "down"))
+            markers.push({ time: t, position: "aboveBar", color: "#ef5350", shape: "arrowDown", text: `${hi}↓` });
+          if (sZ && cmoCrossAt(v, i, 0, "up"))
+            markers.push({ time: t, position: "belowBar", color: "#66bb6a", shape: "circle", text: "0↑" });
+          if (sZ && cmoCrossAt(v, i, 0, "down"))
+            markers.push({ time: t, position: "aboveBar", color: "#ff7043", shape: "circle", text: "0↓" });
+        }
+        main.markers = markers;
+      }
+      push(plots, { cmo: v });
       break;
     }
 
