@@ -588,9 +588,22 @@ export function ChartPane({ pane, compact }: Props) {
   }, [candles, pane.indicators, scripts]);
 
   const mainPlots = useMemo(
-    () => plots.filter((p) => p.pane === "main"),
+    () => plots.filter((p) => p.pane === "main" && !p.barColor),
     [plots]
   );
+
+  // Per-candle colors (plots flagged barColor; last one wins). Off unless an indicator asks.
+  const barColorMap = useMemo(() => {
+    const bc = plots.filter((p) => p.barColor);
+    if (!bc.length) return null;
+    const m = new Map<number, string>();
+    for (const p of bc) {
+      for (const pt of p.data as { time: number; color?: string }[]) {
+        if (pt.color) m.set(pt.time, pt.color);
+      }
+    }
+    return m.size ? m : null;
+  }, [plots]);
 
   const subGroups: SubPaneGroup[] = useMemo(() => {
     const map = new Map<string, SubPaneGroup>();
@@ -951,13 +964,17 @@ export function ChartPane({ pane, compact }: Props) {
   useEffect(() => {
     if (!candleRef.current || !volRef.current || !candles.length) return;
     candleRef.current.setData(
-      candles.map((c) => ({
-        time: c.time as unknown as import("lightweight-charts").UTCTimestamp,
-        open: c.open,
-        high: c.high,
-        low: c.low,
-        close: c.close,
-      }))
+      candles.map((c) => {
+        const bc = barColorMap?.get(c.time);
+        return {
+          time: c.time as unknown as import("lightweight-charts").UTCTimestamp,
+          open: c.open,
+          high: c.high,
+          low: c.low,
+          close: c.close,
+          ...(bc ? { color: bc, borderColor: bc, wickColor: bc } : {}),
+        };
+      })
     );
     volRef.current.setData(
       candles.map((c) => ({
@@ -1012,7 +1029,7 @@ export function ChartPane({ pane, compact }: Props) {
       if (raf2) cancelAnimationFrame(raf2);
       if (timeoutId) clearTimeout(timeoutId);
     };
-  }, [candles, syncLogicalRanges, applyInitialView, overlayPattern, pane.symbol, pane.timeframe]);
+  }, [candles, barColorMap, syncLogicalRanges, applyInitialView, overlayPattern, pane.symbol, pane.timeframe]);
 
   // Main overlays
   useEffect(() => {

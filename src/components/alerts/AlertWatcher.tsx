@@ -12,6 +12,7 @@ import type {
 import { buildDeskOpenUrl } from "@/lib/deskLink";
 import { pliDirFetchLimit } from "@/lib/indicators/pliDirLimits";
 import { pliDtDivFetchLimit } from "@/lib/indicators/pliDtDivLimits";
+import { ppoDsiZFetchLimit } from "@/lib/indicators/ppoDsiZLimits";
 import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
@@ -245,6 +246,7 @@ export function AlertWatcher() {
             pdo?: { enabled?: boolean };
             pliDmi?: { enabled?: boolean };
             pliDtDiv?: { enabled?: boolean; length?: number; lbL?: number; lbR?: number; rangeUpper?: number };
+            ppoDsiZ?: { enabled?: boolean; slow?: number; zlen?: number; smooth?: number; squeezeLen?: number };
             pliDir?: { enabled?: boolean; hullLen?: number; length?: number };
           };
           const hullOn = !!payload.hull?.enabled;
@@ -252,6 +254,7 @@ export function AlertWatcher() {
             (hullOn && payload.hull?.tf) || a.timeframe || "15m";
           // PDO: liste taramasıyla aynı pencere (PDO_FETCH_LIMIT = 240)
           // PLI±DMI: pivot durum makinesi geçmişe bağlı → liste taramasıyla aynı pencere (300)
+          // PPO-DSI-Z: yavaş EMA + 2·zlen + smooth + sıkışma + 100 (liste taramasıyla aynı formül)
           // PLI-DT Uyumsuz: PLI penceresi + pivot + range + 200 (liste taramasıyla aynı formül)
           // PLI±: PLI penceresi + Hull ısınması (liste taramasıyla aynı formül)
           const limit = hullOn
@@ -260,6 +263,8 @@ export function AlertWatcher() {
               ? 300
               : payload.pliDtDiv?.enabled
                 ? pliDtDivFetchLimit(payload.pliDtDiv.length, payload.pliDtDiv.lbL, payload.pliDtDiv.lbR, payload.pliDtDiv.rangeUpper)
+              : payload.ppoDsiZ?.enabled
+                ? ppoDsiZFetchLimit(payload.ppoDsiZ.slow, payload.ppoDsiZ.zlen, payload.ppoDsiZ.smooth, payload.ppoDsiZ.squeezeLen)
                 : payload.pliDir?.enabled
                   ? pliDirFetchLimit(payload.pliDir.hullLen, payload.pliDir.length)
                   : payload.pdo?.enabled
