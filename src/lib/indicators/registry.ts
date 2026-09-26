@@ -214,6 +214,7 @@ import {
 import { computeCmo, cmoCrossAt } from "./cmo";
 import { computePliDmi, type PliDmiLabel } from "./pliDmi";
 import { computePliDtDiv, type PliDtDivCond } from "./pliDtDiv";
+import { computePpoDsiZ, type PpoDsiZCond } from "./ppoDsiZ";
 import { obFall } from "./obFall";
 
 export type PlotMarker = {
@@ -246,6 +247,11 @@ export interface PlotSeries {
   lineWidth?: 1 | 2 | 3 | 4;
   /** LWC çizgi stili: 0 düz, 1 noktalı, 2 kesikli, 3 geniş kesikli (varsayılan 0) */
   lineStyle?: 0 | 1 | 2 | 3 | 4;
+  /**
+   * Mum renklendirme: çizilmez; data[i].color ana paneldeki mumlara uygulanır (son gelen kazanır).
+   * Varsayılan kapalı tutun (diğer renklendirmelerle çakışmasın).
+   */
+  barColor?: boolean;
   /**
    * Görünürlük anahtarı (meta input key, type "bool"). Param 0 ise çizgi
    * çizilmez; üzerindeki işaretler aynı paneldeki ilk görünür çizgiye taşınır.
@@ -535,6 +541,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "pliDir", label: "PLI Yönlü Oran", category: "bands", pane: "main", acceptsSeries: false, primarySeriesKey: "yonlu", description: "PLI kanal oranına yön: oran = üst/alt − 1 (percentile_linear_interpolation, len 50, x 5); upMove = üst/üst[k] − 1, dnMove = alt[k]/alt − 1, d = upMove − dnMove; yön = d>0 ? +1 : d<0 ? −1 : (src ≥ medyan ? +1 : −1); yönlü = oran·yön. Ana panel: üst (kırmızı), alt (turkuaz), medyan (gri). Alt panel: yönlü histogram (≥0 yeşil, <0 kırmızı) + 0 çizgisi; işaretler: yönlü 0'ı yukarı/aşağı keser, S = oran son 5 mumda kendi son 50 değerinin alt %25'indeyken (sıkışma çıkışı). Hull MA (TV: wma(2·wma(n/2) − wma(n), ⌊√n⌋), varsayılan 55, eğime göre renkli) + bant kesişimleri: kesen çizgi (Hull veya fiyat) alt bandı / üst bandı / medyanı yukarı (A↑ / Ü↑ / O↑) veya medyanı aşağı (O↓) keser. PLI Kanal (oran) göstergesi değişmedi.", inputs: [num("length", "Uzunluk", 50, 2, 500, 1), num("x", "Percentil X", 5, 0.5, 49.5, 0.5), num("k", "Yön geriye bakış k", 5, 0, 100, 1), src(), num("sqLookback", "Sıkışma lookback", 50, 5, 500, 1), num("sqPct", "Sıkışma %", 25, 1, 50, 1), num("sqMemory", "Sıkışma bellek (mum)", 5, 1, 50, 1), num("hullLen", "Hull MA uzunluğu", 55, 2, 500, 1), sel("crossSrc", "Bant kesen çizgi", "hull", [{ value: "hull", label: "Hull" }, { value: "price", label: "Fiyat (kaynak)" }]), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigUp", "Yönlü 0↑ (PLI± yükseliş)", 1), sigFlag("sigDn", "Yönlü 0↓ (PLI± düşüş)", 1), sigFlag("sigSq", "Sıkışma çıkışı vurgusu (S)", 0), sigFlag("sigLoUp", "Alt band↑ (A↑)", 1), sigFlag("sigHiUp", "Üst band↑ (Ü↑)", 1), sigFlag("sigMidUp", "Orta band↑ (O↑)", 0), sigFlag("sigMidDn", "Orta band↓ (O↓)", 0), lineFlag("lineUpper", "Üst kanal (kırmızı)", 1), lineFlag("lineLower", "Alt kanal (turkuaz)", 1), lineFlag("lineMedian", "Medyan (gri)", 1), lineFlag("lineZero", "0 çizgisi", 1), lineFlag("lineHull", "Hull MA", 1), lineFlag("hullSlopeColor", "Hull eğim rengi (yeşil↑ / kırmızı↓)", 1)] },
   { id: "pliDmiHybrid", label: "PLI± DMI Hibrit Dip/Tepe", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "adx", description: "PLI kanal + PLI± yön erken uyarısı + PLI-DMI ADX zirve onayı. T?/D? = erken (yön 1→−1 / −1→1 + izlenen uçtan ≥ salınım %, yeni uçta iptal), T/D = ADX zirvesi (≥ ADX min) + baskın DI + konum uç bölgede, T!!/D!! = ikisi ≤ kombine pencere mum arayla (en güçlü), t/d = yedek DI kesişimi / konum eşiği (gri). Etiketler pivot mumunda, sinyal/alarm onay mumunda. Alt panel: DI+, DI−, ADX, yonlu ×ölçek sütunları, ADX min. Pine: pli_dmi_hybrid.pine.", inputs: [num("length", "PLI uzunluk", 50, 2, 500, 1), num("x", "Percentil X", 5, 0.5, 40, 0.5), num("zone", "Uç bölge (konum)", 0.75, 0.5, 1, 0.05), src(), sel("dmSrc", "DM kaynağı", "price", [{ value: "price", label: "Fiyat" }, { value: "band", label: "PLI bant" }]), num("diLen", "DI uzunluk", 14, 2, 200, 1), num("adxLen", "ADX yumuşatma", 14, 2, 200, 1), num("adxMin", "ADX min", 20, 0, 100, 1), num("look", "Uç bölge bakışı (mum)", 3, 1, 50, 1), num("k", "Yön geriye bakış k", 5, 1, 100, 1), num("earlySw", "Erken uyarı min salınım %", 1.5, 0, 50, 0.1), num("combWin", "Kombine pencere (mum)", 5, 0, 50, 1), flag("useWk", "Yedek: DI kesişim onayı (t/d)", 1), flag("usePos", "Yedek: konum eşiği onayı", 0), num("posLo", "Konum alt eşik", 0.3, 0, 1, 0.05), num("posHi", "Konum üst eşik", 0.7, 0, 1, 0.05), num("yScale", "yonlu ölçeği (×)", 100, 0.01, 10000, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigComb", "Kombine T!!/D!!", 1), sigFlag("sigCore", "ADX T/D", 1), sigFlag("sigEarly", "Erken T?/D?", 1), sigFlag("sigWeak", "Yedek t/d", 1), sigFlag("sigAdxPeak", "ADX zirve noktaları", 1), lineFlag("lineUpper", "PLI üst (kırmızı)", 1), lineFlag("lineLower", "PLI alt (turkuaz)", 1), lineFlag("lineMedian", "PLI medyan", 0), lineFlag("lineZigzag", "Zigzag (onaylı pivotlar)", 1), lineFlag("lineDiP", "DI+", 1), lineFlag("lineDiM", "DI−", 1), lineFlag("lineAdx", "ADX", 1), lineFlag("lineYonlu", "yonlu sütunları", 1), lineFlag("lineAdxMin", "ADX min çizgisi", 1)] },
   { id: "pliDtDiv", label: "PLI-DT Uyumsuzluk", category: "momentum", pane: "main", acceptsSeries: false, primarySeriesKey: "pos", description: "PLI Trend Dip/Tepe (Pine) + pos (0–1) uyumsuzluğu. Ana panel: PLI üst/alt bant, T/D etiketleri (pivot mumunda), gri zigzag. Alt panel: pos (trend rengi: turkuaz yükseliş / kırmızı düşüş / gri), topTh/botTh kesikli, 0.5 noktalı. Uyumsuzluk çizgileri pos ve fiyatta (yeşil AL, kırmızı SAT, gizli = kesikli). Klasik/gizli: pos pivotları (sol/sağ + range), fiyat dipte low / tepede high. Onaylı D/T uyumsuz: yeni D daha düşük ama pos daha yüksek (T simetrik). Sinyal onay mumunda. Tarama: Liste PLI-DT Uyumsuzluk kartı.", inputs: [num("length", "PLI uzunluk", 50, 2, 500, 1), num("x", "Percentil X", 5, 0, 50, 0.5), num("topTh", "Tepe eşiği (pos ≤)", 0.3, 0, 1, 0.05), num("botTh", "Dip eşiği (pos ≥)", 0.7, 0, 1, 0.05), num("minSwing", "Min salınım %", 3, 0, 100, 0.1), src(), num("lbL", "Pivot Sol", 5, 1, 50, 1), num("lbR", "Pivot Sağ", 3, 1, 50, 1), num("rangeLower", "Range Alt (pivot arası min)", 5, 0, 200, 1), num("rangeUpper", "Range Üst (pivot arası max)", 60, 1, 500, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), flag("showDivLines", "Uyumsuzluk çizgileri", 1), sigFlag("sigTD", "T/D etiketleri", 1), sigFlag("sigBull", "Klasik AL", 1), sigFlag("sigBear", "Klasik SAT", 1), sigFlag("sigHBull", "Gizli AL", 0), sigFlag("sigHBear", "Gizli SAT", 0), sigFlag("sigDDiv", "Onaylı D uyumsuz", 0), sigFlag("sigTDiv", "Onaylı T uyumsuz", 0), lineFlag("lineUpper", "PLI üst", 1), lineFlag("lineLower", "PLI alt", 1), lineFlag("lineZigzag", "Zigzag (gri)", 1), lineFlag("linePos", "pos (0–1)", 1), lineFlag("lineTh", "topTh / botTh (kesikli)", 1), lineFlag("lineMid", "0.5 (noktalı)", 1)] },
+  { id: "ppoDsiZ", label: "PPO-DSI-Z", category: "momentum", pane: "main", acceptsSeries: false, primarySeriesKey: "combinedZ", description: "CipherDecoded PPO-DSI-Z (Pine v6). combined = (PPO + DSI)/2, sinyal = SMA, hist = combined − sinyal; üçü de zlen z-skoru (popülasyon stdev). Durum: z > +eşik → 1 (turkuaz), z < −eşik → −1 (kırmızı). Ana panel: medyan (percentile_nearest_rank 50) ± medyan stdev bantları durum renginde (LWC'de iki çizgi arası dolgu yok), isteğe bağlı mum renklendirme (varsayılan kapalı). Alt panel: combined_z (durum rengi), signal_z (turuncu), ±eşik kesikli, 0 noktalı, hist_z sütunları. Kırılıma yakın: genişlik (üst−alt)/medyan ≤ son N mumun en düşüğü × (1 + tol%) durumuna giriş. Tarama: Liste PPO-DSI-Z kartı.", inputs: [num("fast", "Hızlı EMA", 12, 1, 500, 1), num("slow", "Yavaş EMA", 26, 1, 500, 1), num("dsiLen", "DSI uzunluk", 13, 1, 500, 1), num("smooth", "Sinyal SMA", 9, 1, 200, 1), num("thLong", "Uzun eşik (z)", 0.8, -5, 5, 0.05), num("thShort", "Kısa eşik (z)", -0.8, -5, 5, 0.05), num("zlen", "Z-skor / medyan uzunluk", 50, 2, 400, 1), num("squeezeLen", "Sıkışma penceresi", 50, 2, 400, 1), num("sqTol", "Sıkışma toleransı %", 5, 0, 100, 0.5), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), flag("candleColor", "Mum renklendirme (duruma göre)", 0), sigFlag("sigZ", "Z ±eşik kesişimleri", 1), sigFlag("sigSig", "Z × sinyal", 1), sigFlag("sigHist", "Hist +/− dönüşü", 0), sigFlag("sigBand", "Alt/üst bant kesişimi", 1), sigFlag("sigSqueeze", "Kırılıma yakın (sıkışma)", 0), lineFlag("lineCombZ", "combined_z", 1), lineFlag("lineSigZ", "signal_z (turuncu)", 1), lineFlag("lineHistZ", "hist_z sütunları", 1), lineFlag("lineTh", "±eşik (kesikli)", 1), lineFlag("lineZero", "0 çizgisi (noktalı)", 1), lineFlag("lineMedian", "Medyan", 1), lineFlag("lineBands", "Üst/alt bant", 1)] },
   { id: "kijunBb", label: "Kijun + BB", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "kijun", description: "Kijun (Donchian orta, 26) + Kijun üzerinde Bollinger (24, 2σ). Liste: fiyat×alt/üst band (erken), Kijun×orta (trend onayı). Hafif kart.", inputs: [num("basePeriods", "Kijun periyot", 26), num("bbLength", "BB Periyot", 24), num("bbStdDev", "BB StdDev", 2, 0.5, 5, 0.1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigKijunMid", "Kijun×orta (K↑/K↓)", 1), sigFlag("sigPxLower", "Fiyat×alt band (alt↑/alt↓)", 1), sigFlag("sigPxUpper", "Fiyat×üst band (üst↑)", 1), lineFlag("lineKijun", "Kijun", 1), lineFlag("lineBasis", "BB orta", 1), lineFlag("lineUpper", "BB üst", 1), lineFlag("lineLower", "BB alt", 1)] },
   { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık + majör düşen direnç kırılımı. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("majBreakLookback", "Majör kırılım pivot", 20, 5, 50, 1), num("breakComboBars", "Dip→kırılım pencere", 8, 1, 30, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigDipBreak", "Dip+Kırılım", 1), sigFlag("sigMajBreak", "Majör kırılım", 1), sigFlag("sigBbSr", "BB+S/R", 1), sigFlag("sigDipSr", "Dip+S/R", 1), sigFlag("sigTriple", "ÜÇLÜ dip", 1), sigFlag("sigDouble", "İKİLİ dip", 1), lineFlag("showSr", "S/R çizgileri", 1), lineFlag("lineLower", "BB alt", 1), lineFlag("lineZone", "Yakalama bölgesi", 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigAl", "AL", 1), sigFlag("sigSat", "SAT", 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
@@ -3406,6 +3413,117 @@ export function computeBuiltin(
       break;
     }
 
+    case "ppoDsiZ": {
+      const showMarkers = on("showMarkers");
+      const r = computePpoDsiZ(candles, {
+        fast: n(p, "fast", 12),
+        slow: n(p, "slow", 26),
+        dsiLen: n(p, "dsiLen", 13),
+        smooth: n(p, "smooth", 9),
+        thLong: n(p, "thLong", 0.8),
+        thShort: n(p, "thShort", -0.8),
+        zlen: n(p, "zlen", 50),
+        squeezeLen: n(p, "squeezeLen", 50),
+        sqTol: n(p, "sqTol", 5),
+      });
+      const N = candles.length;
+      const AQUA = "#00bcd4", RED = "#ef5350", GRAY = "#9e9e9e";
+      const stCol = (i: number, a = "") => (r.state[i] === 1 ? AQUA : r.state[i] === -1 ? RED : GRAY) + a;
+      const colorBy = (pl: PlotSeries, a = "") => {
+        pl.data = pl.data.map((pt, i) =>
+          "value" in pt && pt.value != null ? { time: pt.time, value: pt.value, color: stCol(i, a) } : pt
+        );
+      };
+      const med = line(inst, "median", "main", GRAY, candles, r.median, "Medyan");
+      const up = line(inst, "upper", "main", GRAY, candles, r.upper, "Üst bant");
+      const lo = line(inst, "lower", "main", GRAY, candles, r.lower, "Alt bant");
+      colorBy(med);
+      colorBy(up, "99");
+      colorBy(lo, "99");
+      med.toggle = "lineMedian";
+      up.toggle = "lineBands";
+      lo.toggle = "lineBands";
+      up.lineWidth = 1;
+      lo.lineWidth = 1;
+      const bars = line(inst, "barColor", "main", GRAY, candles, candles.map((c) => c.close), "");
+      colorBy(bars);
+      bars.barColor = true;
+      bars.toggle = "candleColor";
+      const cz = line(inst, "combinedZ", "sub", GRAY, candles, r.combinedZ, "combined_z");
+      colorBy(cz);
+      cz.toggle = "lineCombZ";
+      const sz = line(inst, "signalZ", "sub", "#ff9800", candles, r.signalZ, "signal_z");
+      sz.toggle = "lineSigZ";
+      sz.lineWidth = 1;
+      const hz = hist(inst, "histZ", "sub", AQUA, candles, r.histZ, "hist_z");
+      hz.data = hz.data.map((pt) =>
+        "value" in pt && pt.value != null ? { time: pt.time, value: pt.value, color: pt.value > 0 ? "#00bcd466" : "#ef535066" } : pt
+      );
+      hz.toggle = "lineHistZ";
+      const lvl = (v: number) => new Array<number | null>(N).fill(v);
+      const thL = line(inst, "thLong", "sub", "#00bcd499", candles, lvl(n(p, "thLong", 0.8)), "+eşik");
+      const thS = line(inst, "thShort", "sub", "#ef535099", candles, lvl(n(p, "thShort", -0.8)), "−eşik");
+      const zero = line(inst, "zero", "sub", "#787b8699", candles, lvl(0), "0");
+      for (const t of [thL, thS]) {
+        t.toggle = "lineTh";
+        t.lineWidth = 1;
+        t.lineStyle = 2;
+      }
+      zero.toggle = "lineZero";
+      zero.lineWidth = 1;
+      zero.lineStyle = 1;
+      if (showMarkers) {
+        type Mk = { cond: PpoDsiZCond; key: string; text: string; bear: boolean | null; host: "sub" | "lo" | "up" | "med" };
+        const MK: Mk[] = [
+          { cond: "pdz_long_up", key: "sigZ", text: "Z+↑", bear: false, host: "sub" },
+          { cond: "pdz_short_up", key: "sigZ", text: "Z−↑", bear: false, host: "sub" },
+          { cond: "pdz_long_dn", key: "sigZ", text: "Z+↓", bear: true, host: "sub" },
+          { cond: "pdz_short_dn", key: "sigZ", text: "Z−↓", bear: true, host: "sub" },
+          { cond: "pdz_sig_up", key: "sigSig", text: "S↑", bear: false, host: "sub" },
+          { cond: "pdz_sig_dn", key: "sigSig", text: "S↓", bear: true, host: "sub" },
+          { cond: "pdz_hist_pos", key: "sigHist", text: "H+", bear: false, host: "sub" },
+          { cond: "pdz_hist_neg", key: "sigHist", text: "H−", bear: true, host: "sub" },
+          { cond: "pdz_lo_up", key: "sigBand", text: "A↑", bear: false, host: "lo" },
+          { cond: "pdz_lo_dn", key: "sigBand", text: "A↓", bear: true, host: "lo" },
+          { cond: "pdz_hi_up", key: "sigBand", text: "Ü↑", bear: false, host: "up" },
+          { cond: "pdz_hi_dn", key: "sigBand", text: "Ü↓", bear: true, host: "up" },
+          { cond: "pdz_squeeze", key: "sigSqueeze", text: "K", bear: null, host: "med" },
+        ];
+        const want = new Map<string, boolean>();
+        for (const k of ["sigZ", "sigSig", "sigHist", "sigBand", "sigSqueeze"]) want.set(k, on(k));
+        const buckets: Record<Mk["host"], PlotMarker[]> = { sub: [], lo: [], up: [], med: [] };
+        for (const m of MK) {
+          if (!want.get(m.key)) continue;
+          const arr = r.sig[m.cond];
+          for (let i = 0; i < N; i++) {
+            if (!arr[i]) continue;
+            buckets[m.host].push({
+              time: candles[i]!.time,
+              position: m.bear ? "aboveBar" : "belowBar",
+              color: m.bear == null ? "#ff9800" : m.bear ? RED : AQUA,
+              shape: m.bear == null ? "circle" : m.bear ? "arrowDown" : "arrowUp",
+              text: m.text,
+            });
+          }
+        }
+        for (const b of Object.values(buckets)) b.sort((a, c) => a.time - c.time);
+        cz.markers = buckets.sub;
+        lo.markers = buckets.lo;
+        up.markers = buckets.up;
+        med.markers = buckets.med;
+      }
+      push([med, up, lo, bars, cz, sz, hz, thL, thS, zero], {
+        combinedZ: r.combinedZ,
+        signalZ: r.signalZ,
+        histZ: r.histZ,
+        median: r.median,
+        upper: r.upper,
+        lower: r.lower,
+        state: r.state,
+      });
+      break;
+    }
+
     case "pliDtDiv": {
       const showMarkers = on("showMarkers");
       const r = computePliDtDiv(
@@ -4623,8 +4741,8 @@ function applyPlotToggles(out: PlotSeries[], on: (k: string) => boolean): PlotSe
   const kept = out.filter((pl) => !hidden.includes(pl));
   for (const h of hidden) {
     if (!h.markers?.length) continue;
-    const host = kept.find((pl) => pl.pane === h.pane && pl.type === "line" && pl.color !== "rgba(0,0,0,0)")
-      ?? kept.find((pl) => pl.pane === h.pane);
+    const host = kept.find((pl) => pl.pane === h.pane && pl.type === "line" && !pl.barColor && pl.color !== "rgba(0,0,0,0)")
+      ?? kept.find((pl) => pl.pane === h.pane && !pl.barColor);
     if (host) {
       host.markers = [...(host.markers ?? []), ...h.markers].sort((a, b) => a.time - b.time);
     } else {

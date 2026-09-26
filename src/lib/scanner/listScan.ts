@@ -86,6 +86,13 @@ import {
   type PliDtDivCond,
 } from "@/lib/indicators/pliDtDiv";
 import {
+  ppoDsiZScan,
+  DEFAULT_PPO_DSI_Z_CONDS,
+  PPO_DSI_Z_BEAR_CONDS,
+  PPO_DSI_Z_NEUTRAL_CONDS,
+  type PpoDsiZCond,
+} from "@/lib/indicators/ppoDsiZ";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -539,6 +546,7 @@ export type ListScanKind =
   | "pliDir"
   | "pliDmi"
   | "pliDtDiv"
+  | "ppoDsiZ"
   | "pine";
 
 export type PineCond =
@@ -875,6 +883,20 @@ export type ListScanConfig = {
     lbR?: number;
     rangeLower?: number;
     rangeUpper?: number;
+  };
+  /** PPO-DSI-Z (CipherDecoded) — z-skor eşik/sinyal/hist kesişimleri, medyan bant kesişimleri, sıkışma. */
+  ppoDsiZ?: {
+    enabled: boolean;
+    conds: PpoDsiZCond[];
+    fast?: number;
+    slow?: number;
+    dsiLen?: number;
+    smooth?: number;
+    thLong?: number;
+    thShort?: number;
+    zlen?: number;
+    squeezeLen?: number;
+    sqTol?: number;
   };
   pine?: {
     enabled: boolean;
@@ -2386,6 +2408,36 @@ function scanPliDtDiv(
   }));
 }
 
+function scanPpoDsiZ(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["ppoDsiZ"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_PPO_DSI_Z_CONDS;
+  return ppoDsiZScan(candles, conds, maxBarsAgo, {
+    fast: cfg.fast,
+    slow: cfg.slow,
+    dsiLen: cfg.dsiLen,
+    smooth: cfg.smooth,
+    thLong: cfg.thLong,
+    thShort: cfg.thShort,
+    zlen: cfg.zlen,
+    squeezeLen: cfg.squeezeLen,
+    sqTol: cfg.sqTol,
+  }).map((h) => ({
+    kind: "ppoDsiZ" as const,
+    cond: h.cond,
+    bias: PPO_DSI_Z_NEUTRAL_CONDS.has(h.cond)
+      ? ("neutral" as const)
+      : PPO_DSI_Z_BEAR_CONDS.has(h.cond)
+        ? ("bear" as const)
+        : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -2412,6 +2464,7 @@ export function scanSymbol(
   if (cfg.pliDir?.enabled) enabledKinds.push("pliDir");
   if (cfg.pliDmi?.enabled) enabledKinds.push("pliDmi");
   if (cfg.pliDtDiv?.enabled) enabledKinds.push("pliDtDiv");
+  if (cfg.ppoDsiZ?.enabled) enabledKinds.push("ppoDsiZ");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2436,6 +2489,7 @@ export function scanSymbol(
     pliDir: cfg.pliDir ? scanPliDir(candles, cfg.pliDir, maxBarsAgo) : [],
     pliDmi: cfg.pliDmi ? scanPliDmi(candles, cfg.pliDmi, maxBarsAgo) : [],
     pliDtDiv: cfg.pliDtDiv ? scanPliDtDiv(candles, cfg.pliDtDiv, maxBarsAgo) : [],
+    ppoDsiZ: cfg.ppoDsiZ ? scanPpoDsiZ(candles, cfg.ppoDsiZ, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2744,6 +2798,28 @@ export function indicatorParamsFromConfig(
       showPatterns: 1,
     };
   }
+  if (kind === "ppoDsiZ" && cfg.ppoDsiZ) {
+    const c = cfg.ppoDsiZ;
+    const cs = c.conds.length ? c.conds : DEFAULT_PPO_DSI_Z_CONDS;
+    const any = (...xs: PpoDsiZCond[]) => (xs.some((x) => cs.includes(x)) ? 1 : 0);
+    return {
+      fast: c.fast ?? 12,
+      slow: c.slow ?? 26,
+      dsiLen: c.dsiLen ?? 13,
+      smooth: c.smooth ?? 9,
+      thLong: c.thLong ?? 0.8,
+      thShort: c.thShort ?? -0.8,
+      zlen: c.zlen ?? 50,
+      squeezeLen: c.squeezeLen ?? 50,
+      sqTol: c.sqTol ?? 5,
+      showMarkers: 1,
+      sigZ: any("pdz_long_up", "pdz_short_up", "pdz_long_dn", "pdz_short_dn"),
+      sigSig: any("pdz_sig_up", "pdz_sig_dn"),
+      sigHist: any("pdz_hist_pos", "pdz_hist_neg"),
+      sigBand: any("pdz_lo_up", "pdz_lo_dn", "pdz_hi_up", "pdz_hi_dn"),
+      sigSqueeze: any("pdz_squeeze"),
+    };
+  }
   if (kind === "pliDtDiv" && cfg.pliDtDiv) {
     const c = cfg.pliDtDiv;
     const has = (x: PliDtDivCond) => (c.conds.length ? c.conds : DEFAULT_PLI_DT_DIV_CONDS).includes(x);
@@ -2840,6 +2916,7 @@ export const KIND_TO_INDICATOR: Record<
   | "pliDir"
   | "pliDmiHybrid"
   | "pliDtDiv"
+  | "ppoDsiZ"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2861,6 +2938,7 @@ export const KIND_TO_INDICATOR: Record<
   pliDir: "pliDir",
   pliDmi: "pliDmiHybrid",
   pliDtDiv: "pliDtDiv",
+  ppoDsiZ: "ppoDsiZ",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2936,3 +3014,14 @@ export {
   pliDtDivMinBars,
   type PliDtDivCond,
 } from "@/lib/indicators/pliDtDiv";
+export {
+  PPO_DSI_Z_MIN_BARS,
+  PPO_DSI_Z_FETCH_LIMIT,
+  PPO_DSI_Z_DEFAULTS,
+  DEFAULT_PPO_DSI_Z_CONDS,
+  ALL_PPO_DSI_Z_CONDS,
+  PPO_DSI_Z_COND_LABEL,
+  ppoDsiZFetchLimit,
+  ppoDsiZMinBars,
+  type PpoDsiZCond,
+} from "@/lib/indicators/ppoDsiZ";
