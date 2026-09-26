@@ -62,6 +62,12 @@ import {
   type PdoCond,
 } from "@/lib/indicators/pdo";
 import {
+  cmoScan,
+  DEFAULT_CMO_CONDS,
+  CMO_BEAR_CONDS,
+  type CmoCond,
+} from "@/lib/indicators/cmo";
+import {
   computeOscDivergence,
   pickOscSeries,
   LIST_SCAN_DIV_OPTS,
@@ -511,6 +517,7 @@ export type ListScanKind =
   | "maSimple"
   | "kijunBb"
   | "pdo"
+  | "cmo"
   | "pine";
 
 export type PineCond =
@@ -802,6 +809,14 @@ export type ListScanConfig = {
     crossMode?: "kd" | "ema";
     low?: number;
     high?: number;
+  };
+  /** CMO (Chande Momentum Oscillator, TV ta.cmo) — seviye kesişimleri. */
+  cmo?: {
+    enabled: boolean;
+    conds: CmoCond[];
+    length?: number;
+    lower?: number;
+    upper?: number;
   };
   pine?: {
     enabled: boolean;
@@ -2220,6 +2235,26 @@ function scanPdo(
   }));
 }
 
+function scanCmo(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["cmo"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_CMO_CONDS;
+  return cmoScan(candles, conds, maxBarsAgo, {
+    length: cfg.length,
+    lower: cfg.lower,
+    upper: cfg.upper,
+  }).map((h) => ({
+    kind: "cmo" as const,
+    cond: h.cond,
+    bias: CMO_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -2242,6 +2277,7 @@ export function scanSymbol(
   if (cfg.maSimple?.enabled) enabledKinds.push("maSimple");
   if (cfg.kijunBb?.enabled) enabledKinds.push("kijunBb");
   if (cfg.pdo?.enabled) enabledKinds.push("pdo");
+  if (cfg.cmo?.enabled) enabledKinds.push("cmo");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2262,6 +2298,7 @@ export function scanSymbol(
     maSimple: cfg.maSimple ? scanMaSimple(candles, cfg.maSimple, maxBarsAgo) : [],
     kijunBb: cfg.kijunBb ? scanKijunBb(candles, cfg.kijunBb, maxBarsAgo) : [],
     pdo: cfg.pdo ? scanPdo(candles, cfg.pdo, maxBarsAgo) : [],
+    cmo: cfg.cmo ? scanCmo(candles, cfg.cmo, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2570,6 +2607,16 @@ export function indicatorParamsFromConfig(
       showPatterns: 1,
     };
   }
+  if (kind === "cmo" && cfg.cmo) {
+    const c = cfg.cmo;
+    return {
+      length: c.length ?? 9,
+      lower: c.lower ?? -50,
+      upper: c.upper ?? 75,
+      showMarkers: 1,
+      sigZero: c.conds.some((x) => x.startsWith("cmo_zero_")) ? 1 : 0,
+    };
+  }
   if (kind === "kijunBb" && cfg.kijunBb) {
     const k = cfg.kijunBb;
     return {
@@ -2600,6 +2647,7 @@ export const KIND_TO_INDICATOR: Record<
   | "maSimple"
   | "kijunBb"
   | "pdo"
+  | "cmoChande"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2617,6 +2665,7 @@ export const KIND_TO_INDICATOR: Record<
   maSimple: "maSimple",
   kijunBb: "kijunBb",
   pdo: "pdo",
+  cmo: "cmoChande",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -2652,3 +2701,12 @@ export {
   PDO_COND_LABEL,
   type PdoCond,
 } from "@/lib/indicators/pdo";
+export {
+  CMO_MIN_BARS,
+  CMO_FETCH_LIMIT,
+  CMO_DEFAULTS,
+  DEFAULT_CMO_CONDS,
+  ALL_CMO_CONDS,
+  cmoCondLabel,
+  type CmoCond,
+} from "@/lib/indicators/cmo";
