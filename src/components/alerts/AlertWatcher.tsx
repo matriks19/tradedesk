@@ -241,12 +241,14 @@ export function AlertWatcher() {
           const payload = (a.scanPayload ?? {}) as {
             hull?: { enabled?: boolean; tf?: string };
             pdo?: { enabled?: boolean };
+            pliDmi?: { enabled?: boolean };
           };
           const hullOn = !!payload.hull?.enabled;
           const tf =
             (hullOn && payload.hull?.tf) || a.timeframe || "15m";
           // PDO: liste taramasıyla aynı pencere (PDO_FETCH_LIMIT = 240)
-          const limit = hullOn ? 500 : payload.pdo?.enabled ? 240 : 220;
+          // PLI±DMI: pivot durum makinesi geçmişe bağlı → liste taramasıyla aynı pencere (300)
+          const limit = hullOn ? 500 : payload.pliDmi?.enabled ? 300 : payload.pdo?.enabled ? 240 : 220;
           const res = await fetch(
             `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=${limit}`
           );

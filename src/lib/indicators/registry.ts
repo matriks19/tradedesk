@@ -212,6 +212,7 @@ import {
   type PdoPatternEvent,
 } from "./pdo";
 import { computeCmo, cmoCrossAt } from "./cmo";
+import { computePliDmi, type PliDmiLabel } from "./pliDmi";
 import { obFall } from "./obFall";
 
 export type PlotMarker = {
@@ -529,6 +530,7 @@ export const BUILTIN_LIST: IndicatorMeta[] = [
   { id: "pdo", label: "PDO (Stoch hibrit)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "pdo", description: "PDO — Pump/Dump Osilatörü (kripto-tarayici). Mavi PDO = Stoch %K + yapı sapması, turuncu sinyal = %D + aynı sapma, EMA2. Yeşil P = PUMP skoru, kırmızı D = DUMP skoru (EMA2) + 50 tabanlı yeşil/kırmızı çubuklar; P×D kesişimi = trend↑/↓. AL: ≤30 bölgeden yukarı kesişim, SAT: ≥70'ten aşağı. T10: kesişim + ayrı mumda alt BB teması. UA/US uyumsuzluk + 2D/3D/2T/3T yapı çizgileri. Mod 'ema' = eski PDO.", inputs: [num("stochWeight", "Stoch ağırlığı %", 70, 50, 100, 1), num("smooth", "Yumuşatma (EMA)", 2, 1, 30, 1), sel("crossMode", "Kesişim modu", "kd", [{ value: "kd", label: "Yeni (K/D)" }, { value: "ema", label: "Eski (EMA)" }]), num("stochK", "Stoch %K", 14, 2, 100, 1), num("stochSk", "Stoch %K yumuşatma", 3, 1, 20, 1), num("stochD", "Stoch %D", 3, 1, 20, 1), num("low", "Dip bölge", 30, 5, 50, 1), num("high", "Tepe bölge", 70, 50, 95, 1), num("zoneLook", "Bölge geriye bakış (bar)", 5, 1, 30, 1), num("patternBars", "Yapı penceresi (bar)", 20, 5, 100, 1), num("pivot", "Pivot genişliği", 2, 1, 10, 1), num("tol", "Dip/tepe toleransı %", 2, 0.1, 10, 0.1), num("rise", "Min yükseliş %", 2, 0, 20, 0.1), num("divMin", "Uyumsuzluk min PDO farkı", 2, 0, 20, 0.5), num("touch", "Temas bandı %", 0.5, 0.05, 5, 0.05), num("t10SignalBars", "T10 kesişim penceresi", 8, 1, 50, 1), num("t10BandWindow", "T10 bant penceresi", 20, 1, 100, 1), num("t10BandTol", "T10 bant toleransı %", 2, 0.1, 10, 0.1), num("bollLen", "Bollinger periyot", 20, 2, 200, 1), num("bollMult", "Bollinger çarpan", 2, 0.5, 5, 0.1), flag("live", "Canlı UA/US (teyitsiz pivot)", 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("showTrend", "Trend T↑/T↓ (yeşil P × kırmızı D)", 1), sigFlag("sigAlSat", "AL/SAT (yeni kesişim, 30/70 bölge)", 1), sigFlag("showOld", "Eski kesişim E↑/E↓", 0), sigFlag("sigT10", "T10 (kesişim + alt BB)", 1), sigFlag("sigUaUs", "UA/US uyumsuzluk", 1), sigFlag("sigPatterns", "2D/3D/2T/3T yapılar", 1), lineFlag("showPD", "Yeşil P / kırmızı D çizgileri", 1), lineFlag("showPdBars", "P/D çubukları (50 tabanlı)", 1), lineFlag("lineSignal", "Turuncu sinyal çizgisi", 1), lineFlag("lineLevels", "30/50/70 seviyeleri", 1), lineFlag("trendColor", "PDO çizgisini trende göre boya", 0), lineFlag("showPatterns", "Yapı pivot çizgileri", 1)] },
   { id: "cmoChande", label: "CMO Seviyeler (Chande)", category: "momentum", pane: "sub", acceptsSeries: false, primarySeriesKey: "cmo", description: "Chande Momentum Oscillator (TradingView ta.cmo, varsayılan 9): 100·(ΣYükseliş − ΣDüşüş)/(ΣYükseliş + ΣDüşüş), N mum kapanış değişimi; yatay pencerede (payda 0) 0. Seviyeler −50 / 0 / 75. İşaretler: alt seviyeyi yukarı kesiş (−50↑), üst seviyeyi aşağı kesiş (75↓), isteğe bağlı 0 kesişimi. Liste kartı: CMO (Chande). (Genel CMO(14) göstergesi ayrı.)", inputs: [num("length", "Uzunluk", 9, 1, 200, 1), num("lower", "Alt seviye", -50, -100, 100, 1), num("upper", "Üst seviye", 75, -100, 100, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigUpLo", "Alt seviye yukarı kesiş (−50↑)", 1), sigFlag("sigDnHi", "Üst seviye aşağı kesiş (75↓)", 1), sigFlag("sigZero", "0 kesişimi (0↑ / 0↓)", 0), lineFlag("lineLevels", "Seviye çizgileri (alt / 0 / üst)", 1)] },
   { id: "pliDir", label: "PLI Yönlü Oran", category: "bands", pane: "main", acceptsSeries: false, primarySeriesKey: "yonlu", description: "PLI kanal oranına yön: oran = üst/alt − 1 (percentile_linear_interpolation, len 50, x 5); upMove = üst/üst[k] − 1, dnMove = alt[k]/alt − 1, d = upMove − dnMove; yön = d>0 ? +1 : d<0 ? −1 : (src ≥ medyan ? +1 : −1); yönlü = oran·yön. Ana panel: üst (kırmızı), alt (turkuaz), medyan (gri). Alt panel: yönlü histogram (≥0 yeşil, <0 kırmızı) + 0 çizgisi; işaretler: yönlü 0'ı yukarı/aşağı keser, S = oran son 5 mumda kendi son 50 değerinin alt %25'indeyken (sıkışma çıkışı). PLI Kanal (oran) göstergesi değişmedi.", inputs: [num("length", "Uzunluk", 50, 2, 500, 1), num("x", "Percentil X", 5, 0.5, 49.5, 0.5), num("k", "Yön geriye bakış k", 5, 0, 100, 1), src(), num("sqLookback", "Sıkışma lookback", 50, 5, 500, 1), num("sqPct", "Sıkışma %", 25, 1, 50, 1), num("sqMemory", "Sıkışma bellek (mum)", 5, 1, 50, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigUp", "Yönlü 0↑ (PLI± yükseliş)", 1), sigFlag("sigDn", "Yönlü 0↓ (PLI± düşüş)", 1), sigFlag("sigSq", "Sıkışma çıkışı vurgusu (S)", 0), lineFlag("lineUpper", "Üst kanal (kırmızı)", 1), lineFlag("lineLower", "Alt kanal (turkuaz)", 1), lineFlag("lineMedian", "Medyan (gri)", 1), lineFlag("lineZero", "0 çizgisi", 1)] },
+  { id: "pliDmiHybrid", label: "PLI± DMI Hibrit Dip/Tepe", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "adx", description: "PLI kanal + PLI± yön erken uyarısı + PLI-DMI ADX zirve onayı. T?/D? = erken (yön 1→−1 / −1→1 + izlenen uçtan ≥ salınım %, yeni uçta iptal), T/D = ADX zirvesi (≥ ADX min) + baskın DI + konum uç bölgede, T!!/D!! = ikisi ≤ kombine pencere mum arayla (en güçlü), t/d = yedek DI kesişimi / konum eşiği (gri). Etiketler pivot mumunda, sinyal/alarm onay mumunda. Alt panel: DI+, DI−, ADX, yonlu ×ölçek sütunları, ADX min. Pine: pli_dmi_hybrid.pine.", inputs: [num("length", "PLI uzunluk", 50, 2, 500, 1), num("x", "Percentil X", 5, 0.5, 40, 0.5), num("zone", "Uç bölge (konum)", 0.75, 0.5, 1, 0.05), src(), sel("dmSrc", "DM kaynağı", "price", [{ value: "price", label: "Fiyat" }, { value: "band", label: "PLI bant" }]), num("diLen", "DI uzunluk", 14, 2, 200, 1), num("adxLen", "ADX yumuşatma", 14, 2, 200, 1), num("adxMin", "ADX min", 20, 0, 100, 1), num("look", "Uç bölge bakışı (mum)", 3, 1, 50, 1), num("k", "Yön geriye bakış k", 5, 1, 100, 1), num("earlySw", "Erken uyarı min salınım %", 1.5, 0, 50, 0.1), num("combWin", "Kombine pencere (mum)", 5, 0, 50, 1), flag("useWk", "Yedek: DI kesişim onayı (t/d)", 1), flag("usePos", "Yedek: konum eşiği onayı", 0), num("posLo", "Konum alt eşik", 0.3, 0, 1, 0.05), num("posHi", "Konum üst eşik", 0.7, 0, 1, 0.05), num("yScale", "yonlu ölçeği (×)", 100, 0.01, 10000, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigComb", "Kombine T!!/D!!", 1), sigFlag("sigCore", "ADX T/D", 1), sigFlag("sigEarly", "Erken T?/D?", 1), sigFlag("sigWeak", "Yedek t/d", 1), sigFlag("sigAdxPeak", "ADX zirve noktaları", 1), lineFlag("lineUpper", "PLI üst (kırmızı)", 1), lineFlag("lineLower", "PLI alt (turkuaz)", 1), lineFlag("lineMedian", "PLI medyan", 0), lineFlag("lineZigzag", "Zigzag (onaylı pivotlar)", 1), lineFlag("lineDiP", "DI+", 1), lineFlag("lineDiM", "DI−", 1), lineFlag("lineAdx", "ADX", 1), lineFlag("lineYonlu", "yonlu sütunları", 1), lineFlag("lineAdxMin", "ADX min çizgisi", 1)] },
   { id: "kijunBb", label: "Kijun + BB", category: "trend", pane: "main", acceptsSeries: false, primarySeriesKey: "kijun", description: "Kijun (Donchian orta, 26) + Kijun üzerinde Bollinger (24, 2σ). Liste: fiyat×alt/üst band (erken), Kijun×orta (trend onayı). Hafif kart.", inputs: [num("basePeriods", "Kijun periyot", 26), num("bbLength", "BB Periyot", 24), num("bbStdDev", "BB StdDev", 2, 0.5, 5, 0.1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigKijunMid", "Kijun×orta (K↑/K↓)", 1), sigFlag("sigPxLower", "Fiyat×alt band (alt↑/alt↓)", 1), sigFlag("sigPxUpper", "Fiyat×üst band (üst↑)", 1), lineFlag("lineKijun", "Kijun", 1), lineFlag("lineBasis", "BB orta", 1), lineFlag("lineUpper", "BB üst", 1), lineFlag("lineLower", "BB alt", 1)] },
   { id: "multiDipBb", label: "Çoklu Dip + BB", category: "levels", pane: "main", acceptsSeries: false, primarySeriesKey: "lowerBB", description: "İkili/üçlü dip + Bollinger alt band + S/R yakınlık + majör düşen direnç kırılımı. Pivot lbL/lbR onayında sinyal. Diyagonal (pikusov) + yatay pivot destek çizgileri chart'ta. Üçlü > ikili. Liste TF≈1h.", inputs: [num("lbL", "Pivot Sol", 3), num("lbR", "Pivot Sağ", 3), num("bbLength", "BB Periyot", 20), num("bbMult", "BB Mult", 2, 0.5, 5, 0.1), num("bbProximity", "BB Yakınlık %", 0.5, 0, 5, 0.1), num("dipSensitivity", "Dip ATR", 1.5, 0.5, 5, 0.1), num("minDipDistance", "Min Mum", 5), num("maxDipDistance", "Max Mum", 30), num("rsiOversold", "RSI Üst", 40), num("srTolAtr", "S/R ATR tol", 0.75, 0.2, 3, 0.05), num("srTolPct", "S/R % tol", 0.35, 0.05, 2, 0.05), num("majBreakLookback", "Majör kırılım pivot", 20, 5, 50, 1), num("breakComboBars", "Dip→kırılım pencere", 8, 1, 30, 1), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigDipBreak", "Dip+Kırılım", 1), sigFlag("sigMajBreak", "Majör kırılım", 1), sigFlag("sigBbSr", "BB+S/R", 1), sigFlag("sigDipSr", "Dip+S/R", 1), sigFlag("sigTriple", "ÜÇLÜ dip", 1), sigFlag("sigDouble", "İKİLİ dip", 1), lineFlag("showSr", "S/R çizgileri", 1), lineFlag("lineLower", "BB alt", 1), lineFlag("lineZone", "Yakalama bölgesi", 1)] },
   { id: "macdEliziHybrid", label: "MACD×Elizi (60/40)", category: "lab", pane: "sub", acceptsSeries: false, primarySeriesKey: "hybrid", description: "MACD %60 + Elizi ±E %40 weighted composite. MACD leads timing (Elizi alone lags). AL/SAT = hybrid×signal cross. Osilatör→M×E tarama ile aynı.", inputs: [num("fast", "MACD Fast", 12), num("slow", "MACD Slow", 26), num("signalPeriod", "MACD Signal", 9), num("wMacd", "MACD Ağırlık", 0.6, 0, 1, 0.05), num("wElizi", "Elizi Ağırlık", 0.4, 0, 1, 0.05), num("normLen", "Norm Len", 50), num("hybridSignal", "Hybrid Signal", 5), flag("showMarkers", "Tüm işaretler (ana anahtar)", 1), sigFlag("sigAl", "AL", 1), sigFlag("sigSat", "SAT", 1), num("erLen", "ER Length", 10), num("atrLen", "ATR Length", 14), num("adxPeriod", "ADX Period", 14)] },
@@ -3293,6 +3295,109 @@ export function computeBuiltin(
         signal: pdoToNullable(ser.signal),
         pump: pdoToNullable(ser.pump),
         dump: pdoToNullable(ser.dump),
+      });
+      break;
+    }
+
+    case "pliDmiHybrid": {
+      const showMarkers = on("showMarkers");
+      const r = computePliDmi(
+        candles,
+        {
+          length: n(p, "length", 50),
+          x: n(p, "x", 5),
+          zone: n(p, "zone", 0.75),
+          dmSrc: p.dmSrc === "band" ? "band" : "price",
+          diLen: n(p, "diLen", 14),
+          adxLen: n(p, "adxLen", 14),
+          adxMin: n(p, "adxMin", 20),
+          look: n(p, "look", 3),
+          k: n(p, "k", 5),
+          earlySw: n(p, "earlySw", 1.5),
+          combWin: n(p, "combWin", 5),
+          useWk: on("useWk"),
+          usePos: on("usePos"),
+          posLo: n(p, "posLo", 0.3),
+          posHi: n(p, "posHi", 0.7),
+        },
+        values
+      );
+      const N = candles.length;
+      const yScale = n(p, "yScale", 100);
+      const up = line(inst, "upper", "main", "#ef5350", candles, r.upper, "PLI Üst");
+      const lo = line(inst, "lower", "main", "#26a69a", candles, r.lower, "PLI Alt");
+      const md = line(inst, "med", "main", "#9e9e9e", candles, r.med, "PLI Medyan");
+      up.toggle = "lineUpper";
+      lo.toggle = "lineLower";
+      md.toggle = "lineMedian";
+      md.lineWidth = 1;
+      // zigzag through confirmed pivots (linear between pivot bars)
+      const conf = r.pivots.filter((pv) => !pv.label.endsWith("?"));
+      const zz: (number | null)[] = new Array(N).fill(null);
+      for (let q = 1; q < conf.length; q++) {
+        const a = conf[q - 1]!, b = conf[q]!;
+        const span = Math.max(1, b.bar - a.bar);
+        for (let j = a.bar; j <= b.bar; j++) zz[j] = a.price + ((b.price - a.price) * (j - a.bar)) / span;
+      }
+      const zig = line(inst, "zigzag", "main", "#9e9e9ecc", candles, zz, "Zigzag");
+      zig.toggle = "lineZigzag";
+      const yv = r.yonlu.map((v) => (v == null ? null : v * yScale));
+      const yh = hist(inst, "yonlu", "sub", "#26a69a", candles, yv, `PLI± yonlu ×${yScale}`);
+      yh.data = yh.data.map((pt) => {
+        if (!("value" in pt) || pt.value == null) return pt;
+        return { time: pt.time, value: pt.value, color: pt.value >= 0 ? "#26a69a66" : "#ef535066" };
+      });
+      yh.toggle = "lineYonlu";
+      const dp = line(inst, "diP", "sub", "#26a69a", candles, r.diP, "DI+");
+      const dm = line(inst, "diM", "sub", "#ef5350", candles, r.diM, "DI−");
+      const ax = line(inst, "adx", "sub", "#ff9800", candles, r.adx, "ADX");
+      const amin = line(inst, "adxMin", "sub", "#787b8688", candles, new Array<number | null>(N).fill(n(p, "adxMin", 20)), "ADX min");
+      dp.toggle = "lineDiP";
+      dm.toggle = "lineDiM";
+      ax.toggle = "lineAdx";
+      amin.toggle = "lineAdxMin";
+      dp.lineWidth = 1;
+      dm.lineWidth = 1;
+      amin.lineWidth = 1;
+      if (showMarkers) {
+        const COL: Record<PliDmiLabel, string> = {
+          "T!!": "#b71c1c", T: "#ef5350", t: "#9e9e9e", "T?": "#ff9800",
+          "D!!": "#00c853", D: "#26a69a", d: "#9e9e9e", "D?": "#00bcd4",
+        };
+        const want = (l: PliDmiLabel) =>
+          l.endsWith("!!") ? on("sigComb") : l.endsWith("?") ? on("sigEarly") : l === "T" || l === "D" ? on("sigCore") : on("sigWeak");
+        const topM: PlotMarker[] = [];
+        const botM: PlotMarker[] = [];
+        for (const pv of r.pivots) {
+          if (!want(pv.label)) continue;
+          const m: PlotMarker = {
+            time: candles[pv.bar]!.time,
+            position: pv.top ? "aboveBar" : "belowBar",
+            color: COL[pv.label],
+            shape: pv.label.endsWith("?") ? "circle" : pv.top ? "arrowDown" : "arrowUp",
+            text: pv.label,
+          };
+          (pv.top ? topM : botM).push(m);
+        }
+        topM.sort((a, b) => a.time - b.time);
+        botM.sort((a, b) => a.time - b.time);
+        up.markers = topM;
+        lo.markers = botM;
+        if (on("sigAdxPeak")) {
+          const pk: PlotMarker[] = [];
+          for (let i = 0; i < N; i++)
+            if (r.adxTurnDn[i]) pk.push({ time: candles[i]!.time, position: "aboveBar", color: "#ff9800", shape: "circle", text: "" });
+          ax.markers = pk;
+        }
+      }
+      push([up, lo, md, zig, yh, dp, dm, ax, amin], {
+        upper: r.upper,
+        lower: r.lower,
+        med: r.med,
+        yonlu: r.yonlu,
+        diP: r.diP,
+        diM: r.diM,
+        adx: r.adx,
       });
       break;
     }
