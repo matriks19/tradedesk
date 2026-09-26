@@ -4,8 +4,8 @@
  *
  * Chips (lean):
  * - stack_bull / stack_bear — full MA stack
- * - x_20_50 / x_50_100 / x_100_200 — SMA×SMA cross up
- * - price_x_20 / price_x_50 — close×SMA cross up
+ * - x_20_50 / x_20_100 / x_20_200 / x_50_100 / x_50_200 / x_100_200 — SMA×SMA cross up
+ * - price_x_20 / price_x_50 / price_x_100 / price_x_200 — close×SMA cross up
  * - ema10_x_sma20 / ema10_x_sma20_dn — fast EMA10×SMA20 cross (up / down)
  */
 import type { Candle } from "@/lib/types";
@@ -29,10 +29,15 @@ export type MaSimpleResult = {
   stack_bull: (number | null)[];
   stack_bear: (number | null)[];
   x_20_50: (number | null)[];
+  x_20_100: (number | null)[];
+  x_20_200: (number | null)[];
   x_50_100: (number | null)[];
+  x_50_200: (number | null)[];
   x_100_200: (number | null)[];
   price_x_20: (number | null)[];
   price_x_50: (number | null)[];
+  price_x_100: (number | null)[];
+  price_x_200: (number | null)[];
   ema10_x_sma20: (number | null)[];
   ema10_x_sma20_dn: (number | null)[];
 };
@@ -92,10 +97,15 @@ export function maSimple(
   const stack_bull = empty();
   const stack_bear = empty();
   const x_20_50 = empty();
+  const x_20_100 = empty();
+  const x_20_200 = empty();
   const x_50_100 = empty();
+  const x_50_200 = empty();
   const x_100_200 = empty();
   const price_x_20 = empty();
   const price_x_50 = empty();
+  const price_x_100 = empty();
+  const price_x_200 = empty();
   const ema10_x_sma20 = empty();
   const ema10_x_sma20_dn = empty();
 
@@ -130,10 +140,15 @@ export function maSimple(
       stack_bear[i] = 1;
     }
     if (crossedAboveAt(sma20, sma50, i)) x_20_50[i] = 1;
+    if (crossedAboveAt(sma20, sma100, i)) x_20_100[i] = 1;
+    if (crossedAboveAt(sma20, sma200, i)) x_20_200[i] = 1;
     if (crossedAboveAt(sma50, sma100, i)) x_50_100[i] = 1;
+    if (crossedAboveAt(sma50, sma200, i)) x_50_200[i] = 1;
     if (crossedAboveAt(sma100, sma200, i)) x_100_200[i] = 1;
     if (crossedAboveAt(closeSeries, sma20, i)) price_x_20[i] = 1;
     if (crossedAboveAt(closeSeries, sma50, i)) price_x_50[i] = 1;
+    if (crossedAboveAt(closeSeries, sma100, i)) price_x_100[i] = 1;
+    if (crossedAboveAt(closeSeries, sma200, i)) price_x_200[i] = 1;
     if (crossedAboveAt(ema10, sma20, i)) ema10_x_sma20[i] = 1;
     if (crossedBelowAt(ema10, sma20, i)) ema10_x_sma20_dn[i] = 1;
   }
@@ -147,10 +162,15 @@ export function maSimple(
     stack_bull,
     stack_bear,
     x_20_50,
+    x_20_100,
+    x_20_200,
     x_50_100,
+    x_50_200,
     x_100_200,
     price_x_20,
     price_x_50,
+    price_x_100,
+    price_x_200,
     ema10_x_sma20,
     ema10_x_sma20_dn,
   };

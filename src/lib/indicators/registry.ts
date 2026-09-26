@@ -627,6 +627,22 @@ function hist(
   };
 }
 
+/** MA Basit chart marker tables (series key → short label). */
+const MA_SIMPLE_SMA_X = [
+  ["x_20_50", "20↑50"],
+  ["x_20_100", "20↑100"],
+  ["x_20_200", "20↑200"],
+  ["x_50_100", "50↑100"],
+  ["x_50_200", "50↑200"],
+  ["x_100_200", "100↑200"],
+] as const;
+const MA_SIMPLE_PX_X = [
+  ["price_x_20", "20"],
+  ["price_x_50", "50"],
+  ["price_x_100", "100"],
+  ["price_x_200", "200"],
+] as const;
+
 export function computeBuiltin(
   inst: IndicatorInstance,
   candles: Candle[],
@@ -2923,39 +2939,33 @@ export function computeBuiltin(
         const markers: PlotMarker[] = [];
         for (let i = 0; i < candles.length; i++) {
           const t = candles[i]!.time;
-          if (s.x_20_50[i] === 1) {
+          // SMA×SMA crosses → one arrow per bar (e.g. "20↑50 50↑200")
+          const smaX = MA_SIMPLE_SMA_X.filter(([k]) => s[k][i] === 1).map(
+            ([, txt]) => txt
+          );
+          if (smaX.length) {
             markers.push({
               time: t,
               position: "belowBar",
-              color: "#66bb6a",
+              color: smaX.some((x) => x.endsWith("200")) ? "#26a69a" : "#66bb6a",
               shape: "arrowUp",
-              text: "20↑50",
+              text: smaX.join(" "),
             });
-          } else if (s.x_50_100[i] === 1) {
-            markers.push({
-              time: t,
-              position: "belowBar",
-              color: "#26a69a",
-              shape: "arrowUp",
-              text: "50↑100",
-            });
-          } else if (s.x_100_200[i] === 1) {
-            markers.push({
-              time: t,
-              position: "belowBar",
-              color: "#81c784",
-              shape: "arrowUp",
-              text: "100↑200",
-            });
-          } else if (s.price_x_20[i] === 1 || s.price_x_50[i] === 1) {
+          }
+          // close×SMA crosses → one circle per bar (e.g. "Px↑20/100")
+          const pxX = MA_SIMPLE_PX_X.filter(([k]) => s[k][i] === 1).map(
+            ([, txt]) => txt
+          );
+          if (pxX.length) {
             markers.push({
               time: t,
               position: "belowBar",
               color: "#90caf9",
               shape: "circle",
-              text: "Px↑",
+              text: `Px↑${pxX.join("/")}`,
             });
-          } else if (showEma10 && s.ema10_x_sma20[i] === 1) {
+          }
+          if (showEma10 && s.ema10_x_sma20[i] === 1) {
             markers.push({
               time: t,
               position: "belowBar",
