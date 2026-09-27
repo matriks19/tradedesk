@@ -35,3 +35,14 @@ export function trendFilterFetchLimit(period: number): number {
   if (p > TREND_MAX_FETCH) return 0;
   return Math.min(TREND_MAX_FETCH, p + Math.max(100, Math.round(p * 0.25)));
 }
+
+/** 4s EMA200 yedeği: ayrı çekilen 4s mumları (300) üzerinde gerçek EMA200. */
+export const HTF_TF = "4h";
+export const HTF_SEC = 4 * 3600;
+export const HTF_PERIOD = 200;
+export const HTF_FETCH = 300;
+
+/** 4s EMA200 yedeği gerekir mi? (4s altı TF ve eldeki mum sayısı ölçekli periyottan az) */
+export function needsHtfTrend(tfMin: number, period: number, bars: number): boolean {
+  return tfMin < 240 && bars < period;
+}
