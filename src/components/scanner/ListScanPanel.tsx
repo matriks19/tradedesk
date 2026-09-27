@@ -6,7 +6,10 @@ import {
   trendFilterApplies,
   trendEmaPeriod,
   trendFilterFetchLimit,
-  TREND_MAX_FETCH,
+  tfMinutes,
+  needsHtfTrend,
+  HTF_TF,
+  HTF_FETCH,
 } from "@/lib/scanner/trendFilter";
 import type { Candle, Exchange, Timeframe, AlertScanKey, Watchlist, TickerQuote, BuiltinIndicatorId } from "@/lib/types";
 import {
@@ -1478,6 +1481,23 @@ export function ListScanPanel() {
       const out: ResultRow[] = [];
       let done = 0;
       let lastProgressAt = 0;
+      // Trend filtresi 4s yedeği: sembol başına tek 4s çekimi (bu tarama boyunca önbellek)
+      const htfCache = new Map<string, Promise<Candle[]>>();
+      const getHtf = (symbol: string, exchange: string): Promise<Candle[]> => {
+        const k = `${exchange}:${symbol}`;
+        let pr = htfCache.get(k);
+        if (!pr) {
+          pr = fetch(
+            `/api/klines?symbol=${encodeURIComponent(symbol)}&exchange=${exchange}&timeframe=${HTF_TF}&limit=${HTF_FETCH}`,
+            { signal: ac.signal }
+          )
+            .then((r) => r.json())
+            .then((j) => (j.candles ?? []) as Candle[])
+            .catch(() => [] as Candle[]);
+          htfCache.set(k, pr);
+        }
+        return pr;
+      };
       const isBist = universe.symbols[0]?.exchange === "bist";
       const concurrency = isBist ? 3 : total > 200 ? 6 : 8;
       const klineMs = isBist ? 6000 : 10000;
@@ -1590,8 +1610,14 @@ export function ListScanPanel() {
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
             if (candles.length < minBars) return null;
+            const scanTfMin = tfMinutes(scanTf);
+            // Ölçekli periyot mevcut mumu aşıyorsa (15dk/30dk, yeni listelenenler) gerçek 4s EMA200
+            const htf =
+              trendApplies && needsHtfTrend(scanTfMin, trendPeriod, candles.length)
+                ? await getHtf(q.symbol, q.exchange)
+                : undefined;
             const symCfg: ListScanConfig = trendApplies
-              ? { ...cfg, trendFilter: { enabled: true, bear: trendBear, period: trendPeriod } }
+              ? { ...cfg, trendFilter: { enabled: true, bear: trendBear, period: trendPeriod, tfMin: scanTfMin, htf } }
               : cfg;
             let found = scanSymbol(candles, symCfg, maxBars);
             if (found.length && cfg.extraFilters?.length) {
@@ -2612,14 +2638,14 @@ export function ListScanPanel() {
       {(() => {
         const p = trendEmaPeriod(tf);
         const na = trendFilterFetchLimit(p) === 0;
-        const tip = `Etkin periyot: ${tf} → EMA${p}${p === 200 ? "" : ` (= 4s EMA200 · 240/${tf})`}${na ? ` · bu TF'de uygulanamaz (Binance ${TREND_MAX_FETCH} mum sınırı) → sinyaller filtrelenmez` : ""}. Mum < periyot ise filtre uygulanmaz. Yalnız Binance kripto (BIST ve TradFi hariç).`;
+        const tip = `Etkin periyot: ${tf} → EMA${p}${p === 200 ? "" : ` (= 4s EMA200 · 240/${tf})`}.${na ? ` Bu TF'de EMA${p} için yeterli mum yok → ayrı 4s mumlarıyla (300) gerçek 4s EMA200 kullanılır.` : ""} 4s altı TF'de mum < periyot ise (yeni listelenenler dahil) 4s EMA200'e geçilir: sinyal mumunun kapanışında ya da öncesinde kapanmış son 4s mumu (ileriye bakış yok). 4s mum < 200 ise filtre uygulanmaz. Yalnız Binance kripto (BIST ve TradFi hariç).`;
         return (
           <div className="flex flex-col gap-0.5 border border-desk-border/40 rounded px-2 py-1" data-testid="trend-filter">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
               <label className="text-2xs flex items-center gap-1 cursor-pointer" title={tip}>
                 <input type="checkbox" checked={trendOn} onChange={(e) => setTrendOn(e.target.checked)} />
                 <span className="font-medium">Trend filtresi (4s EMA200)</span>
-                <span className="text-desk-muted">· EMA{p}{na ? " (uygulanamaz)" : ""}</span>
+                <span className="text-desk-muted">· {na ? "4s EMA200 (ayrı 4s mum)" : `EMA${p}`}</span>
               </label>
               <label
                 className={`text-2xs flex items-center gap-1 ${trendOn ? "cursor-pointer" : "opacity-50"}`}

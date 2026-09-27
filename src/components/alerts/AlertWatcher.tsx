@@ -13,7 +13,13 @@ import { buildDeskOpenUrl } from "@/lib/deskLink";
 import { pliDirFetchLimit } from "@/lib/indicators/pliDirLimits";
 import { pliDtDivFetchLimit } from "@/lib/indicators/pliDtDivLimits";
 import { ppoDsiZFetchLimit } from "@/lib/indicators/ppoDsiZLimits";
-import { trendFilterFetchLimit } from "@/lib/scanner/trendFilterLimits";
+import {
+  trendFilterFetchLimit,
+  tfMinutes,
+  needsHtfTrend,
+  HTF_TF,
+  HTF_FETCH,
+} from "@/lib/scanner/trendFilterLimits";
 import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
@@ -284,7 +290,25 @@ export function AlertWatcher() {
           if (candles.length) {
             // Lazy: do not pull scanAlert → listScan into first-paint bundle
             const { checkScanAlert } = await import("@/lib/alerts/scanAlert");
-            const hit = await checkScanAlert(candles, a.scanKey!, a.scanPayload);
+            // Trend filtresi 4s yedeği (liste taramasıyla aynı kural): ölçekli periyot > mum → 4s EMA200
+            let scanPayload = a.scanPayload;
+            const tfl = payload.trendFilter;
+            const tfMin = tfMinutes(tf);
+            if (tfl?.enabled && needsHtfTrend(tfMin, tfl.period ?? 200, candles.length)) {
+              try {
+                const hr = await fetch(
+                  `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${HTF_TF}&limit=${HTF_FETCH}`
+                );
+                const hj = await hr.json();
+                const htf = (hj.candles ?? []) as Candle[];
+                scanPayload = { ...payload, trendFilter: { ...tfl, tfMin, htf } };
+              } catch {
+                /* 4s alınamazsa filtre uygulanmaz (sinyal kalır) */
+              }
+            } else if (tfl?.enabled) {
+              scanPayload = { ...payload, trendFilter: { ...tfl, tfMin } };
+            }
+            const hit = await checkScanAlert(candles, a.scanKey!, scanPayload);
             const last = candles[candles.length - 1]!.close;
             const sig = hit.sig || hit.note || "";
             if (a.scanPrimed !== true) {

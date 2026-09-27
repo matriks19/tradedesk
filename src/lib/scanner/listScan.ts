@@ -99,7 +99,7 @@ import {
   type OscDivergenceOpts,
 } from "@/lib/indicators/oscDivergence";
 import type { ScannerFilter } from "@/lib/scanner/engine";
-import { trendEmaSeries, passesTrend, type TrendFilterCfg } from "@/lib/scanner/trendFilter";
+import { trendRefFor, passesTrendRef, type TrendFilterCfg } from "@/lib/scanner/trendFilter";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { convertAny } from "@/lib/scripts/pine/translate";
 
@@ -2499,14 +2499,15 @@ export function scanSymbol(
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
-  // Trend filtresi: EMA sembol başına bir kez; "Hepsi" kontrolünden önce uygulanır
+  // Trend filtresi: EMA sembol başına bir kez (TF'de ölçekli periyot ya da 4s EMA200 yedeği);
+  // "Hepsi" kontrolünden önce uygulanır
   const tfl = cfg.trendFilter;
   if (tfl?.enabled && tfl.period > 0) {
-    const es = trendEmaSeries(candles, tfl.period);
-    if (es) {
+    const ref = trendRefFor(candles, tfl);
+    if (ref) {
       const bear = !!tfl.bear;
       for (const k of enabledKinds) {
-        byKind[k] = byKind[k].filter((h) => passesTrend(candles, es, h.bias, h.barsAgo, bear));
+        byKind[k] = byKind[k].filter((h) => passesTrendRef(candles, ref, h.bias, h.barsAgo, bear));
       }
     }
   }

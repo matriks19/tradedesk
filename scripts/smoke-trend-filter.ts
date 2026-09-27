@@ -8,7 +8,7 @@
  */
 import { readFileSync } from "node:fs";
 import type { Candle } from "../src/lib/types";
-import { tfMinutes, trendEmaPeriod, trendFilterFetchLimit, trendFilterApplies, passesTrend } from "../src/lib/scanner/trendFilter";
+import { tfMinutes, trendEmaPeriod, trendFilterFetchLimit, trendFilterApplies, passesTrend, lastClosedHtfIndex, needsHtfTrend, HTF_SEC } from "../src/lib/scanner/trendFilter";
 import { scanSymbol, alertScanHits, ALL_PPO_DSI_Z_CONDS, ALL_PLI_DT_DIV_CONDS, type ListScanConfig, type ListScanHit } from "../src/lib/scanner/listScan";
 import { checkScanAlert } from "../src/lib/alerts/scanAlert";
 
@@ -147,6 +147,73 @@ const base: ListScanConfig = {
     assert(passesTrend(cs, es, "bull", 0, true), "null point → keep");
   }
 
+  // ── 4s EMA200 fallback (15m: EMA3200 > fetched bars) + no-lookahead ─────────
+  {
+    const H = HTF_SEC, M15 = 900;
+    assert(needsHtfTrend(15, 3200, 1000) && needsHtfTrend(60, 800, 700) && !needsHtfTrend(60, 800, 1000) && !needsHtfTrend(240, 200, 50), "needsHtfTrend");
+    // boundary: 4h bar [T, T+4h) is closed for a signal bar closing exactly at T+4h, not before
+    const T0 = 1_699_999_200 - (1_699_999_200 % H);
+    const mk = (t: number, c: number): Candle => ({ time: t, open: c, high: c, low: c, close: c, volume: 1 });
+    const h3 = [mk(T0, 1), mk(T0 + H, 2), mk(T0 + 2 * H, 3)];
+    assert(lastClosedHtfIndex(h3, T0 + H) === 0 && lastClosedHtfIndex(h3, T0 + H - 1) === -1 && lastClosedHtfIndex(h3, T0 + 2 * H + 899) === 1 && lastClosedHtfIndex(h3, T0 + 3 * H) === 2, "lastClosedHtfIndex boundaries");
+
+    let s2 = 777;
+    const rnd = () => ((s2 = (s2 * 1664525 + 1013904223) >>> 0) / 4294967296);
+    let checkedSig = 0, removed = 0, kept = 0;
+    for (const seed of [3, 4]) {
+      const htf: Candle[] = [];
+      let p4 = 100;
+      for (let k = 0; k < 300; k++) {
+        const o = p4;
+        p4 = Math.max(1, p4 * (1 + (k < 150 ? 0.003 : -0.003) * (seed === 3 ? 1 : -1) + (rnd() - 0.5) * 0.03));
+        htf.push({ time: T0 + k * H, open: o, high: Math.max(o, p4), low: Math.min(o, p4), close: p4, volume: 1 });
+      }
+      const m15 = gen(seed, 600).map((c, i) => ({ ...c, time: T0 + 262 * H + i * M15 }));
+      // last 15m bar lies inside the (forming) last 4h bar
+      assert(m15[m15.length - 1]!.time < htf[299]!.time + H, "setup");
+      const e4 = refEma(htf.map((c) => c.close), 200);
+      const refAt = (sigClose: number) => {
+        let j = -1;
+        for (let k = 0; k < htf.length; k++) if (htf[k]!.time + H <= sigClose) j = k;
+        return j >= 0 ? e4[j]! : NaN;
+      };
+      for (let end = 260; end <= m15.length; end += 3) {
+        const cut = m15.slice(0, end);
+        const raw = scanSymbol(cut, base, 0);
+        if (!raw.length) continue;
+        const tfc = { enabled: true, bear: true, period: 3200, tfMin: 15, htf };
+        const got = scanSymbol(cut, { ...base, trendFilter: tfc } as ListScanConfig, 0).map(key).sort();
+        const exp = raw.filter((h) => {
+          if (h.bias === "neutral") return true;
+          const i = cut.length - 1 - h.barsAgo;
+          const e = refAt(cut[i]!.time + M15);
+          if (Number.isNaN(e)) return true;
+          return h.bias === "bull" ? cut[i]!.close > e : cut[i]!.close < e;
+        });
+        assert(JSON.stringify(got) === JSON.stringify(exp.map(key).sort()), `4h fallback seed ${seed} end ${end}`);
+        checkedSig += raw.length;
+        removed += raw.length - exp.length;
+        kept += exp.length;
+        // no lookahead: rewrite every 4h bar not yet closed at the scan's last bar close → same result
+        const lastClose = cut[cut.length - 1]!.time + M15;
+        const future = htf.map((c) => (c.time + H > lastClose ? { ...c, close: c.close * (rnd() < 0.5 ? 0.2 : 5) } : c));
+        const got2 = scanSymbol(cut, { ...base, trendFilter: { ...tfc, htf: future } } as ListScanConfig, 0).map(key).sort();
+        assert(JSON.stringify(got2) === JSON.stringify(got), `no lookahead seed ${seed} end ${end}`);
+        // alarm path parity with runtime-injected htf
+        const cfgA = { ...base, trendFilter: tfc } as ListScanConfig;
+        const ca = await checkScanAlert(cut, "list_scan", cfgA as unknown as Record<string, unknown>);
+        assert(ca.ok === alertScanHits(cut, cfgA, 1).length > 0, `alarm parity 4h seed ${seed} end ${end}`);
+      }
+      // too few 4h bars → no filtering; no htf → no filtering
+      const cut = m15.slice(0, 500);
+      const raw = scanSymbol(cut, base, 300).map(key).sort();
+      assert(JSON.stringify(scanSymbol(cut, { ...base, trendFilter: { enabled: true, bear: true, period: 3200, tfMin: 15, htf: htf.slice(0, 150) } } as ListScanConfig, 300).map(key).sort()) === JSON.stringify(raw), "htf < 200 → unfiltered");
+      assert(JSON.stringify(scanSymbol(cut, { ...base, trendFilter: { enabled: true, bear: true, period: 3200, tfMin: 15 } } as ListScanConfig, 300).map(key).sort()) === JSON.stringify(raw), "no htf → unfiltered");
+    }
+    assert(checkedSig > 0 && removed > 0 && kept > 0, `4h coverage ${checkedSig}/${removed}/${kept}`);
+    console.log(`4h EMA200 fallback + no-lookahead OK (signals ${checkedSig}, removed ${removed}, kept ${kept})`);
+  }
+
   // wiring: default off + persisted, panel + alarms use the same helpers, BIST excluded in UI note
   {
     const lp = readFileSync("src/components/scanner/ListScanPanel.tsx", "utf8");
@@ -157,6 +224,8 @@ const base: ListScanConfig = {
     assert(lp.includes("trendFilterApplies(q.symbol, q.exchange") && lp.includes("trendFilterFetchLimit(trendPeriod)"), "scan wiring");
     assert(lp.includes("withTrend(it.scanPayload") && lp.includes("withTrend(cfg as unknown"), "alarm payload wiring");
     assert(aw.includes("trendFilterFetchLimit(payload.trendFilter.period") && !/from "@\/lib\/scanner\/trendFilter"/.test(aw), "AlertWatcher light helper");
+    assert(aw.includes("needsHtfTrend(tfMin") && aw.includes("timeframe=${HTF_TF}&limit=${HTF_FETCH}"), "AlertWatcher 4h fallback");
+    assert(lp.includes("needsHtfTrend(scanTfMin, trendPeriod, candles.length)") && lp.includes("htfCache"), "panel 4h fallback + per-scan cache");
     console.log("wiring OK");
   }
   console.log("smoke-trend-filter: ALL OK");
