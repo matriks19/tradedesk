@@ -13,6 +13,7 @@ import { buildDeskOpenUrl } from "@/lib/deskLink";
 import { pliDirFetchLimit } from "@/lib/indicators/pliDirLimits";
 import { pliDtDivFetchLimit } from "@/lib/indicators/pliDtDivLimits";
 import { ppoDsiZFetchLimit } from "@/lib/indicators/ppoDsiZLimits";
+import { trendFilterFetchLimit } from "@/lib/scanner/trendFilterLimits";
 import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
 
 function conditionMet(
@@ -247,6 +248,7 @@ export function AlertWatcher() {
             pliDmi?: { enabled?: boolean };
             pliDtDiv?: { enabled?: boolean; length?: number; lbL?: number; lbR?: number; rangeUpper?: number };
             ppoDsiZ?: { enabled?: boolean; slow?: number; zlen?: number; smooth?: number; squeezeLen?: number };
+            trendFilter?: { enabled?: boolean; period?: number };
             pliDir?: { enabled?: boolean; hullLen?: number; length?: number };
           };
           const hullOn = !!payload.hull?.enabled;
@@ -257,7 +259,7 @@ export function AlertWatcher() {
           // PPO-DSI-Z: yavaş EMA + 2·zlen + smooth + sıkışma + 100 (liste taramasıyla aynı formül)
           // PLI-DT Uyumsuz: PLI penceresi + pivot + range + 200 (liste taramasıyla aynı formül)
           // PLI±: PLI penceresi + Hull ısınması (liste taramasıyla aynı formül)
-          const limit = hullOn
+          const baseLimit = hullOn
             ? 500
             : payload.pliDmi?.enabled
               ? 300
@@ -270,6 +272,10 @@ export function AlertWatcher() {
                   : payload.pdo?.enabled
                     ? 240
                     : 220;
+          // Trend filtresi (4s EMA200 eşdeğeri): liste taramasıyla aynı → max(taban, periyot + ısınma)
+          const limit = payload.trendFilter?.enabled
+            ? Math.max(baseLimit, trendFilterFetchLimit(payload.trendFilter.period ?? 200))
+            : baseLimit;
           const res = await fetch(
             `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=${limit}`
           );
