@@ -99,6 +99,7 @@ import {
   type OscDivergenceOpts,
 } from "@/lib/indicators/oscDivergence";
 import type { ScannerFilter } from "@/lib/scanner/engine";
+import { trendEmaSeries, passesTrend, type TrendFilterCfg } from "@/lib/scanner/trendFilter";
 import { runCustomScript } from "@/lib/scripts/sandbox";
 import { convertAny } from "@/lib/scripts/pine/translate";
 
@@ -902,6 +903,11 @@ export type ListScanConfig = {
     enabled: boolean;
     scripts: PineScriptScan[];
   };
+  /**
+   * Trend filtresi (4s EMA200 eşdeğeri, yalnız kripto — panel BIST/TradFi için eklemez).
+   * AL sinyali: kapanış > EMA; `bear` açıksa SAT sinyali: kapanış < EMA. Mum < periyot → filtre yok.
+   */
+  trendFilter?: TrendFilterCfg;
   /** Extra AND filters (engine ScannerFilter) applied after main hit. */
   extraFilters?: ScannerFilter[];
 };
@@ -2492,6 +2498,18 @@ export function scanSymbol(
     ppoDsiZ: cfg.ppoDsiZ ? scanPpoDsiZ(candles, cfg.ppoDsiZ, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
+
+  // Trend filtresi: EMA sembol başına bir kez; "Hepsi" kontrolünden önce uygulanır
+  const tfl = cfg.trendFilter;
+  if (tfl?.enabled && tfl.period > 0) {
+    const es = trendEmaSeries(candles, tfl.period);
+    if (es) {
+      const bear = !!tfl.bear;
+      for (const k of enabledKinds) {
+        byKind[k] = byKind[k].filter((h) => passesTrend(candles, es, h.bias, h.barsAgo, bear));
+      }
+    }
+  }
 
   const matchMode = cfg.matchMode ?? "any";
   if (matchMode === "all") {

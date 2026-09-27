@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeskStore } from "@/store/desk";
+import {
+  trendFilterApplies,
+  trendEmaPeriod,
+  trendFilterFetchLimit,
+  TREND_MAX_FETCH,
+} from "@/lib/scanner/trendFilter";
 import type { Candle, Exchange, Timeframe, AlertScanKey, Watchlist, TickerQuote, BuiltinIndicatorId } from "@/lib/types";
 import {
   binancePerpWatchlistMeta,
@@ -475,6 +481,9 @@ function isSectorId(id: string): boolean {
 /** Canlı exchangeInfo perp evreni (/api/symbols?market=perp) */
 type LivePerps = { crypto: string[]; tradfi: string[] };
 
+const TREND_LS_ON = "td.listScan.trendFilter";
+const TREND_LS_BEAR = "td.listScan.trendFilterBear";
+
 function cryptoOptions(watchlists: Watchlist[], live: LivePerps | null): UniOpt[] {
   const byId = new Map<string, UniOpt>();
   for (const m of [...binancePerpWatchlistMeta(), ...binanceTradfiWatchlistMeta()]) {
@@ -739,6 +748,8 @@ export function ListScanPanel() {
   const [uniSrc, setUniSrc] = useState<UniSrc>("crypto");
   const [uniId, setUniId] = useState(PERP_ALL_ID);
   const [livePerps, setLivePerps] = useState<LivePerps | null>(null);
+  const livePerpsRef = useRef<LivePerps | null>(null);
+  livePerpsRef.current = livePerps;
   // Canlı perp evreni (PERPETUAL + TRADIFI_PERPETUAL); sunucu snapshot'a düşer.
   useEffect(() => {
     let cancelled = false;
@@ -791,6 +802,41 @@ export function ListScanPanel() {
     () => (pane?.timeframe as Timeframe) || "15m"
   );
   const [maxBars, setMaxBars] = useState(2);
+  // Trend filtresi (4s EMA200 eşdeğeri; yalnız kripto) — localStorage'da kalıcı, varsayılan kapalı
+  const [trendOn, setTrendOnState] = useState(false);
+  const [trendBear, setTrendBearState] = useState(false);
+  useEffect(() => {
+    try {
+      setTrendOnState(localStorage.getItem(TREND_LS_ON) === "1");
+      setTrendBearState(localStorage.getItem(TREND_LS_BEAR) === "1");
+    } catch {
+      /* SSR / private mode */
+    }
+  }, []);
+  const setTrendOn = useCallback((v: boolean) => {
+    setTrendOnState(v);
+    try {
+      localStorage.setItem(TREND_LS_ON, v ? "1" : "0");
+    } catch {
+      /* */
+    }
+  }, []);
+  const setTrendBear = useCallback((v: boolean) => {
+    setTrendBearState(v);
+    try {
+      localStorage.setItem(TREND_LS_BEAR, v ? "1" : "0");
+    } catch {
+      /* */
+    }
+  }, []);
+  /** list_scan alarm payload'ına trend filtresini ekle (yalnız kripto sembol, alarm TF'sine göre periyot). */
+  const withTrend = useCallback(
+    (payload: Record<string, unknown>, symbol: string, exchange: string, timeframe: string): Record<string, unknown> => {
+      if (!trendOn || !trendFilterApplies(symbol, exchange, livePerpsRef.current?.tradfi)) return payload;
+      return { ...payload, trendFilter: { enabled: true, bear: trendBear, period: trendEmaPeriod(timeframe) } };
+    },
+    [trendOn, trendBear]
+  );
   const [matchMode, setMatchMode] = useState<"any" | "all">("any");
 
   const [hamOn, setHamOn] = useState(true);
@@ -1533,14 +1579,21 @@ export function ListScanPanel() {
                                           : usePpoDz
                                             ? ppoDsiZMinBars(cfg.ppoDsiZ?.slow, cfg.ppoDsiZ?.zlen, cfg.ppoDsiZ?.smooth)
                                             : 50;
+            // Trend filtresi: yalnız kripto; periyot tarama TF'sine göre (4s EMA200 eşdeğeri)
+            const trendApplies = trendOn && trendFilterApplies(q.symbol, q.exchange, livePerpsRef.current?.tradfi);
+            const trendPeriod = trendEmaPeriod(scanTf);
+            const fetchLimit = trendApplies ? Math.max(klineLimit, trendFilterFetchLimit(trendPeriod)) : klineLimit;
             const kr = await fetch(
-              `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${encodeURIComponent(scanTf)}&limit=${klineLimit}`,
+              `/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${encodeURIComponent(scanTf)}&limit=${fetchLimit}`,
               { signal: fetchSignal }
             );
             const kj = await kr.json();
             const candles: Candle[] = kj.candles ?? [];
             if (candles.length < minBars) return null;
-            let found = scanSymbol(candles, cfg, maxBars);
+            const symCfg: ListScanConfig = trendApplies
+              ? { ...cfg, trendFilter: { enabled: true, bear: trendBear, period: trendPeriod } }
+              : cfg;
+            let found = scanSymbol(candles, symCfg, maxBars);
             if (found.length && cfg.extraFilters?.length) {
               const m = matchFilters(q, candles, cfg.extraFilters);
               if (!m.ok) found = [];
@@ -1685,7 +1738,7 @@ export function ListScanPanel() {
       setStatus(
         ac.signal.aborted
           ? `Durdu · ${out.length} hit${kindBit} · ${done}/${total}${hepsiWarn}`
-          : `${out.length} hit${kindBit} · ${universe.name} · ${total} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}${hepsiWarn}`
+          : `${out.length} hit${kindBit} · ${universe.name} · ${total} · ${tf} · ≤${maxBars} bar · ${matchMode === "all" ? "Hepsi" : "Herhangi"}${trendOn ? ` · Trend EMA${trendEmaPeriod(tf)}${trendBear ? " AL+SAT" : " AL"}` : ""}${hepsiWarn}`
       );
     } catch (e) {
       if (e instanceof DOMException && e.name === "AbortError") {
@@ -1696,7 +1749,7 @@ export function ListScanPanel() {
     } finally {
       setRunning(false);
     }
-  }, [universe, buildConfig, tf, maxBars, matchMode]);
+  }, [universe, buildConfig, tf, maxBars, matchMode, trendOn, trendBear]);
 
   const upsertIndicators = useCallback(
     (cfg: ListScanConfig) => {
@@ -1866,7 +1919,7 @@ export function ListScanPanel() {
       price: 0,
       kind: "scan" as const,
       scanKey: "list_scan" as const,
-      scanPayload: cfg as unknown as Record<string, unknown>,
+      scanPayload: withTrend(cfg as unknown as Record<string, unknown>, s.symbol, s.exchange, alertTf),
       group: "Liste",
       note: `${universe.name} · liste koşulu`,
       timeframe: alertTf,
@@ -1881,7 +1934,7 @@ export function ListScanPanel() {
     setStatus(
       `${n} izleme · mevcut sinyal çalmaz · ${universe.name} · bot ${botReady ? "açık" : "kapalı"}`
     );
-  }, [universe, buildConfig, addAlertsBulk, tf]);
+  }, [universe, buildConfig, addAlertsBulk, tf, withTrend]);
 
   const bulkAlerts = useCallback(async () => {
     if (!hits.length) {
@@ -2430,9 +2483,15 @@ export function ListScanPanel() {
       }
     }
 
-    const n = addAlertsBulk(items);
+    // Trend filtresi açık: list_scan alarmları aynı tarama yolunu kullanır → payload'a ekle (yalnız kripto)
+    const finalItems = items.map((it) =>
+      it.scanKey === "list_scan" && it.scanPayload
+        ? { ...it, scanPayload: withTrend(it.scanPayload, it.symbol, it.exchange, String(it.timeframe ?? tf)) }
+        : it
+    );
+    const n = addAlertsBulk(finalItems);
     setStatus(`${n} alarm eklendi`);
-  }, [hits, buildConfig, addAlertsBulk, tf, hullTf, multiDipTf, bbDivLgUseTrend, bbDivLgUseAdx]);
+  }, [hits, buildConfig, addAlertsBulk, tf, hullTf, multiDipTf, bbDivLgUseTrend, bbDivLgUseAdx, withTrend]);
 
   const enabledIndicatorSummary = useMemo(() => {
     const names: string[] = [];
@@ -2549,6 +2608,33 @@ export function ListScanPanel() {
           </select>
         </label>
       </div>
+
+      {(() => {
+        const p = trendEmaPeriod(tf);
+        const na = trendFilterFetchLimit(p) === 0;
+        const tip = `Etkin periyot: ${tf} → EMA${p}${p === 200 ? "" : ` (= 4s EMA200 · 240/${tf})`}${na ? ` · bu TF'de uygulanamaz (Binance ${TREND_MAX_FETCH} mum sınırı) → sinyaller filtrelenmez` : ""}. Mum < periyot ise filtre uygulanmaz. Yalnız Binance kripto (BIST ve TradFi hariç).`;
+        return (
+          <div className="flex flex-col gap-0.5 border border-desk-border/40 rounded px-2 py-1" data-testid="trend-filter">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5">
+              <label className="text-2xs flex items-center gap-1 cursor-pointer" title={tip}>
+                <input type="checkbox" checked={trendOn} onChange={(e) => setTrendOn(e.target.checked)} />
+                <span className="font-medium">Trend filtresi (4s EMA200)</span>
+                <span className="text-desk-muted">· EMA{p}{na ? " (uygulanamaz)" : ""}</span>
+              </label>
+              <label
+                className={`text-2xs flex items-center gap-1 ${trendOn ? "cursor-pointer" : "opacity-50"}`}
+                title="Kapanış < trend EMA değilse SAT/short sinyallerini de ele (lab testi yalnız AL tarafında yapıldı)"
+              >
+                <input type="checkbox" checked={trendBear} disabled={!trendOn} onChange={(e) => setTrendBear(e.target.checked)} />
+                SAT sinyallerini de filtrele (test edilmedi)
+              </label>
+            </div>
+            <span className="text-2xs text-desk-muted">
+              Kripto AL sinyalleri: kapanış &gt; trend EMA ise kalır; düşüş/yatayda kaybı azaltır (4s lab testi). SAT tarafı test edilmedi. BIST&apos;e (ve TradFi&apos;ye) uygulanmaz.
+            </span>
+          </div>
+        );
+      })()}
 
       <div className="flex items-center gap-2 border border-desk-border/40 rounded px-2 py-1 bg-desk-elevated/30">
         <button
