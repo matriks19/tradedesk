@@ -15639,23 +15639,33 @@ t22S = not na(rlmSup) and rlmBrkDn`;
   // ---------- Futures önce, sonra spot (Binance Vision) ----------
   const _origKlines=window.qxFetchBinanceKlines;
   window.qxFetchBinanceKlines=async function(symbol, interval, limit){
-    { // v22: TÜM coinler için önce Binance Futures (USDT-M), sonra Spot; yalnız kapanmış mumlar, ≥1000 mum
-      try{
-        const lim=Math.min(1500, Math.max(1000, parseInt(limit,10)||500)); // backtest için ≥1000 mum (T1–T9 ısınması ~315)
-        const res=await fetch(`https://fapi.binance.com/fapi/v1/klines?symbol=${encodeURIComponent(symbol)}&interval=${encodeURIComponent(interval||'1h')}&limit=${lim}`);
-        if(!res.ok) throw new Error('Futures HTTP '+res.status);
-        const data=await res.json();
-        if(!Array.isArray(data)||!data.length) throw new Error('Futures boş');
-        const now=Date.now();
-        const rows=data.filter(k=>+k[6]<now).map(k=>({ // yalnız kapanmış mumlar (İzleme ile aynı kural)
-          datetime:new Date(k[0]).toISOString().slice(0,19).replace('T',' '),
-          open:+k[1],high:+k[2],low:+k[3],close:+k[4],volume:+k[5],time:k[0]}));
-        if(rows.length>10){ rows._src='futures'; window.QX_LAST_KLINE_SRC='Binance Futures'; return rows; }
-      }catch(e){ console.warn('[v22] futures klines alınamadı, spot yedeğe geçiliyor:', e.message); }
-    }
-    const rows=await _origKlines(symbol, interval, 1000);
+    // fapi.binance.com tarayıcıdan 451 + CORS'suz; istek takılıp hata veriyor.
+    // Aynı sitedeki /api/klines sunucudan çeker (vision/spot). Olmazsa doğrudan vision.
+    const iv=interval||'1h';
+    const lim=Math.min(1000, Math.max(200, parseInt(limit,10)||500));
     const now=Date.now();
-    if(rows && rows.length && rows[rows.length-1].time && rows[rows.length-1].time + ivMs(interval) > now) rows.pop();
+    const toRows=(bars, src)=>{
+      const rows=bars.filter(b=>b.time+ivMs(iv)<=now);
+      if(rows.length<50) throw new Error(src+' çok kısa');
+      rows._src=src; window.QX_LAST_KLINE_SRC=src; return rows;
+    };
+    try{
+      const ctrl=new AbortController(); const tm=setTimeout(()=>ctrl.abort(),12000);
+      const res=await fetch('/api/klines?symbol='+encodeURIComponent(symbol)+'&timeframe='+encodeURIComponent(iv)+'&limit='+lim+'&exchange=binance',{signal:ctrl.signal});
+      clearTimeout(tm);
+      if(!res.ok) throw new Error('API HTTP '+res.status);
+      const data=await res.json();
+      const cs=data&&data.candles;
+      if(!Array.isArray(cs)||!cs.length) throw new Error(data&&data.error||'API boş');
+      const bars=cs.map(c=>{
+        const ms=c.time<1e12? c.time*1000 : c.time;
+        return {datetime:new Date(ms).toISOString().slice(0,19).replace('T',' '), open:+c.open, high:+c.high, low:+c.low, close:+c.close, volume:+c.volume||0, time:ms};
+      });
+      const src=(data.feed&&data.feed!=='binance')?('Binance '+data.feed):'Binance (site)';
+      return toRows(bars, src);
+    }catch(e){ console.warn('[v22] site klines alınamadı, vision yedeği:', e.message); }
+    const rows=await _origKlines(symbol, iv, lim);
+    if(rows && rows.length && rows[rows.length-1].time && rows[rows.length-1].time + ivMs(iv) > now) rows.pop();
     if(rows){ rows._src='spot'; window.QX_LAST_KLINE_SRC='Binance Spot'; }
     return rows;
   };
