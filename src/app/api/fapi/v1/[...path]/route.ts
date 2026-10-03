@@ -29,6 +29,14 @@ export async function GET(
     (q.toString() ? "?" + q.toString() : "");
   try {
     const res = await fetch(url, { cache: "no-store" });
+    if (sub === "exchangeInfo" && res.ok) {
+      const data = await res.json();
+      const symbols = Array.isArray(data.symbols) ? data.symbols : [];
+      data.symbols = symbols.filter(
+        (s) => s && s.status === "TRADING" && s.quoteAsset === "USDT"
+      );
+      return NextResponse.json(data, { headers: { "cache-control": "no-store" } });
+    }
     const body = await res.text();
     return new NextResponse(body, {
       status: res.status,
