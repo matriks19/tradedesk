@@ -33,7 +33,8 @@ export async function GET(
       const data = await res.json();
       const symbols = Array.isArray(data.symbols) ? data.symbols : [];
       data.symbols = symbols.filter(
-        (s) => s && s.status === "TRADING" && s.quoteAsset === "USDT"
+        (s: { status?: string; quoteAsset?: string } | null) =>
+          !!s && s.status === "TRADING" && s.quoteAsset === "USDT"
       );
       return NextResponse.json(data, { headers: { "cache-control": "no-store" } });
     }
