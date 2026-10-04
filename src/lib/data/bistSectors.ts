@@ -26,7 +26,7 @@ const SECTOR_DEFS: BistSector[] = [
     code: "XBANK",
     name: "Banka",
     symbols: [
-      "AKBNK", "ALBRK", "GARAN", "HALKB", "ICBCT", "ISATR", "ISBTR", "ISCTR", "QNBFB", "SKBNK",
+      "AKBNK", "ALBRK", "GARAN", "HALKB", "ICBCT", "ISATR", "ISBTR", "ISCTR", "SKBNK",
       "TSKB", "VAKBN", "YKBNK",
     ],
   },

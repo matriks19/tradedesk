@@ -23,8 +23,6 @@ export const BIST_TICKERS: { symbol: string; name: string }[] = [
   { symbol: "TCELL", name: "Turkcell" },
   { symbol: "TTKOM", name: "Türk Telekom" },
   { symbol: "PGSUS", name: "Pegasus" },
-  { symbol: "KOZAL", name: "Koza Altın" },
-  { symbol: "KOZAA", name: "Koza Anadolu" },
   { symbol: "PETKM", name: "Petkim" },
   { symbol: "SASA", name: "Sasa Polyester" },
   { symbol: "HEKTS", name: "Hektaş" },
