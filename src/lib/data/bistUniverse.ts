@@ -504,7 +504,9 @@ export const BIST_EXTRA: { symbol: string; name: string }[] = [
   { symbol: "TMSN", name: "Tümosan" },
   { symbol: "TNZTP", name: "Tünas Toptan" },
   { symbol: "TOASO", name: "Tofaş" },
+  { symbol: "TRALT", name: "Türk Altın İşletmeleri" },
   { symbol: "TRCAS", name: "Turcas Petrol" },
+  { symbol: "TRENJ", name: "TR Doğal Enerji" },
   { symbol: "TRGYO", name: "Torunlar GYO" },
   { symbol: "TRILC", name: "Turk İlaç" },
   { symbol: "TRMET", name: "Türkiye Metal" },
@@ -561,4 +563,4 @@ export const BIST_EXTRA: { symbol: string; name: string }[] = [
   { symbol: "ZRGYO", name: "Ziraat GYO" },
 ];
 
-export const BIST_UNIVERSE_COUNT = 559;
+export const BIST_UNIVERSE_COUNT = 561;
