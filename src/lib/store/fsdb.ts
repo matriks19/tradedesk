@@ -68,7 +68,6 @@ const DEFAULT_DB: AppDb = {
         { symbol: "PGSUS", exchange: "bist" },
         { symbol: "HEKTS", exchange: "bist" },
         { symbol: "SASA", exchange: "bist" },
-        { symbol: "KOZAL", exchange: "bist" },
         { symbol: "PETKM", exchange: "bist" },
         { symbol: "ISCTR", exchange: "bist" },
         { symbol: "HALKB", exchange: "bist" },
