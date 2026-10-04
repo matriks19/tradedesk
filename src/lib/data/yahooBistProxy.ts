@@ -84,6 +84,7 @@ type YahooQuote = {
 
 type YahooMeta = {
   regularMarketPrice?: number;
+  regularMarketChangePercent?: number;
   chartPreviousClose?: number;
   previousClose?: number;
   regularMarketVolume?: number;
@@ -253,6 +254,20 @@ export type ChartRow = {
   klines?: KlineRow[];
 };
 
+
+/** Session % for the BIST "24s" column. Yahoo regularMarketChangePercent, else price vs previousClose. Never chartPreviousClose (that is the start of the chart range). */
+function sessionChangePercent(meta: YahooMeta): number {
+  const yahoo = meta.regularMarketChangePercent;
+  if (typeof yahoo === "number" && Number.isFinite(yahoo)) return yahoo;
+  const prevClose = Number(meta.previousClose);
+  const px = Number(meta.regularMarketPrice);
+  if (Number.isFinite(px) && Number.isFinite(prevClose) && prevClose !== 0) {
+    const pct = ((px - prevClose) / prevClose) * 100;
+    return Number.isFinite(pct) ? pct : 0;
+  }
+  return 0;
+}
+
 function toKlines(candles: Candle[], limit: number, meta: YahooMeta): Pick<ChartRow, "price" | "chg" | "qv" | "bars" | "klines"> {
   const sliced = candles.length > limit ? candles.slice(candles.length - limit) : candles;
   const klines: KlineRow[] = sliced.map((c) => [
@@ -264,11 +279,8 @@ function toKlines(candles: Candle[], limit: number, meta: YahooMeta): Pick<Chart
     c.volume,
   ]);
   const last = sliced[sliced.length - 1];
-  const prev = sliced.length >= 2 ? sliced[sliced.length - 2] : undefined;
   const price = Number(meta.regularMarketPrice || 0) || (last ? last.close : 0);
-  const prevClose =
-    Number(meta.chartPreviousClose ?? meta.previousClose ?? 0) || (prev ? prev.close : 0);
-  const chg = prevClose ? ((price - prevClose) / prevClose) * 100 : 0;
+  const chg = sessionChangePercent(meta);
   const vol = Number(meta.regularMarketVolume || 0) || (last ? last.volume : 0);
   const qv = vol * (price || (last ? last.close : 0));
   return { price, chg, qv, bars: klines.length, klines };
