@@ -12052,6 +12052,18 @@ function qxIsBistSymbol(symbol) {
   if ((U.meta || []).indexOf(s) >= 0) return false;
   return true;
 }
+// BIST mum bitişi (ms). TRT = UTC+3 sabit. 1g: o gün 18:10 TRT. Gün içi: başlangıç+periyot,
+// seans sonuna (18:00) değen/aşan mum 18:10'da kapanır. 3g/1h(hafta): başlangıç+periyot.
+function qxBistBarEnd(t, iv) {
+  const H = 36e5, off = 3 * H, D = 864e5;
+  const ms = QX_IV_MS[iv] || D;
+  const dayStart = Math.floor((t + off) / D) * D - off;
+  const sessEnd = dayStart + 18 * H + 10 * 6e4;
+  if (iv === '1d') return sessEnd;
+  if (iv === '3d' || iv === '1w') return t + ms;
+  const end = t + ms;
+  return end >= dayStart + 18 * H ? sessEnd : end;
+}
 // BIST: same-origin sunucu proxy'si (/api/yahoo/chart — Vercel'de çalışır, sıra + önbellek sunucuda)
 async function qxFetchBistChart(symbol, interval, limit) {
   const sym = String(symbol || '').toUpperCase().replace(/\.IS$/, '');
@@ -12075,9 +12087,8 @@ async function qxFetchBistChart(symbol, interval, limit) {
       open: +k[1], high: +k[2], low: +k[3], close: +k[4], volume: +k[5] || 0,
       time: +k[0]
     })).filter(r => Number.isFinite(r.close) && Number.isFinite(r.open));
-    // kapanmamış son mumu at (Binance yolu gibi yalnız kapanmış mumlar)
-    const ms = QX_IV_MS[iv] || 864e5;
-    if (rows.length && rows[rows.length - 1].time + ms > Date.now()) rows.pop();
+    // kapanmamış son mumu at — BIST seansı: gün 18:10 TRT'de kapanır (kapanış seansı dahil)
+    if (rows.length && qxBistBarEnd(rows[rows.length - 1].time, iv) > Date.now()) rows.pop();
     if (!rows.length) { lastErr = 'Yahoo OHLCV boş'; continue; }
     return rows;
   }
