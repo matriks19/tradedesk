@@ -21,6 +21,7 @@ import {
   HTF_FETCH,
 } from "@/lib/scanner/trendFilterLimits";
 import { isNtfyWebhookUrl, loadSavedNtfy, publishNtfy } from "@/lib/alerts/ntfy";
+import { eliziLdr4FetchLimit } from "@/lib/indicators/eliziLdr4Limits";
 
 function conditionMet(
   cond: AlertCondition,
@@ -256,6 +257,7 @@ export function AlertWatcher() {
             ppoDsiZ?: { enabled?: boolean; slow?: number; zlen?: number; smooth?: number; squeezeLen?: number };
             trendFilter?: { enabled?: boolean; period?: number };
             pliDir?: { enabled?: boolean; hullLen?: number; length?: number };
+            eliziLdr4?: { enabled?: boolean; params?: Record<string, unknown> };
           };
           const hullOn = !!payload.hull?.enabled;
           const tf =
@@ -279,9 +281,13 @@ export function AlertWatcher() {
                     ? 240
                     : 220;
           // Trend filtresi (4s EMA200 eşdeğeri): liste taramasıyla aynı → max(taban, periyot + ısınma)
-          const limit = payload.trendFilter?.enabled
-            ? Math.max(baseLimit, trendFilterFetchLimit(payload.trendFilter.period ?? 200))
+          // ELIZI-LDR4: liste taramasıyla aynı pencere (≥500, ısınma + 120)
+          const baseLimitE = payload.eliziLdr4?.enabled
+            ? Math.max(baseLimit, eliziLdr4FetchLimit(payload.eliziLdr4.params))
             : baseLimit;
+          const limit = payload.trendFilter?.enabled
+            ? Math.max(baseLimitE, trendFilterFetchLimit(payload.trendFilter.period ?? 200))
+            : baseLimitE;
           const res = await fetch(
             `/api/klines?symbol=${encodeURIComponent(a.symbol)}&exchange=${a.exchange}&timeframe=${encodeURIComponent(tf)}&limit=${limit}`
           );

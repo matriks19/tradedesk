@@ -283,6 +283,7 @@ export type BuiltinIndicatorId =
   | "kijunBb"
   | "pdo"
   | "cmoChande"
+  | "eliziLdr4"
   | "pliDir"
   | "pliDmiHybrid"
   | "pliDtDiv"

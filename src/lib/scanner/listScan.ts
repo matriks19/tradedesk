@@ -86,6 +86,13 @@ import {
   type PliDtDivCond,
 } from "@/lib/indicators/pliDtDiv";
 import {
+  eliziLdr4Scan,
+  DEFAULT_ELIZI_LDR4_CONDS,
+  ELIZI_LDR4_BEAR_CONDS,
+  type EliziLdr4Cond,
+  type EliziLdr4Params,
+} from "@/lib/indicators/eliziLdr4";
+import {
   ppoDsiZScan,
   DEFAULT_PPO_DSI_Z_CONDS,
   PPO_DSI_Z_BEAR_CONDS,
@@ -548,6 +555,7 @@ export type ListScanKind =
   | "pliDmi"
   | "pliDtDiv"
   | "ppoDsiZ"
+  | "eliziLdr4"
   | "pine";
 
 export type PineCond =
@@ -898,6 +906,14 @@ export type ListScanConfig = {
     zlen?: number;
     squeezeLen?: number;
     sqTol?: number;
+  };
+  /** ELIZI-LDR4 Ladder (Elizi Ladder v4, kullanıcının Pine v6 stratejisi) — Ana/Erken AL/SAT, yalnız kapanmış mum. */
+  eliziLdr4?: {
+    enabled: boolean;
+    conds: EliziLdr4Cond[];
+    params?: EliziLdr4Params;
+    /** syminfo.mintick (BIST 0.01, kripto 1e-8 varsayılan) */
+    mintick?: number;
   };
   pine?: {
     enabled: boolean;
@@ -2444,6 +2460,22 @@ function scanPpoDsiZ(
   }));
 }
 
+function scanEliziLdr4(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["eliziLdr4"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_ELIZI_LDR4_CONDS;
+  return eliziLdr4Scan(candles, conds, maxBarsAgo, cfg.params ?? {}, { mintick: cfg.mintick }).map((h) => ({
+    kind: "eliziLdr4" as const,
+    cond: h.cond,
+    bias: ELIZI_LDR4_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 export function scanSymbol(
   candles: Candle[],
   cfg: ListScanConfig,
@@ -2471,6 +2503,7 @@ export function scanSymbol(
   if (cfg.pliDmi?.enabled) enabledKinds.push("pliDmi");
   if (cfg.pliDtDiv?.enabled) enabledKinds.push("pliDtDiv");
   if (cfg.ppoDsiZ?.enabled) enabledKinds.push("ppoDsiZ");
+  if (cfg.eliziLdr4?.enabled) enabledKinds.push("eliziLdr4");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2496,6 +2529,7 @@ export function scanSymbol(
     pliDmi: cfg.pliDmi ? scanPliDmi(candles, cfg.pliDmi, maxBarsAgo) : [],
     pliDtDiv: cfg.pliDtDiv ? scanPliDtDiv(candles, cfg.pliDtDiv, maxBarsAgo) : [],
     ppoDsiZ: cfg.ppoDsiZ ? scanPpoDsiZ(candles, cfg.ppoDsiZ, maxBarsAgo) : [],
+    eliziLdr4: cfg.eliziLdr4 ? scanEliziLdr4(candles, cfg.eliziLdr4, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2817,6 +2851,23 @@ export function indicatorParamsFromConfig(
       showPatterns: 1,
     };
   }
+  if (kind === "eliziLdr4" && cfg.eliziLdr4) {
+    const c = cfg.eliziLdr4;
+    const cs = c.conds.length ? c.conds : DEFAULT_ELIZI_LDR4_CONDS;
+    const out: Record<string, number | string> = {
+      showMarkers: 1,
+      sigAnaAl: cs.includes("eld_ana_al") ? 1 : 0,
+      sigAnaSat: cs.includes("eld_ana_sat") ? 1 : 0,
+      sigErkenAl: cs.includes("eld_erken_al") ? 1 : 0,
+      sigErkenSat: cs.includes("eld_erken_sat") ? 1 : 0,
+    };
+    for (const [k, v] of Object.entries(c.params ?? {})) {
+      if (v === undefined || v === null) continue;
+      out[k] = typeof v === "boolean" ? (v ? 1 : 0) : (v as number | string);
+    }
+    if (c.mintick) out.mintick = c.mintick;
+    return out;
+  }
   if (kind === "ppoDsiZ" && cfg.ppoDsiZ) {
     const c = cfg.ppoDsiZ;
     const cs = c.conds.length ? c.conds : DEFAULT_PPO_DSI_Z_CONDS;
@@ -2936,6 +2987,7 @@ export const KIND_TO_INDICATOR: Record<
   | "pliDmiHybrid"
   | "pliDtDiv"
   | "ppoDsiZ"
+  | "eliziLdr4"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -2958,6 +3010,7 @@ export const KIND_TO_INDICATOR: Record<
   pliDmi: "pliDmiHybrid",
   pliDtDiv: "pliDtDiv",
   ppoDsiZ: "ppoDsiZ",
+  eliziLdr4: "eliziLdr4",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -3044,3 +3097,16 @@ export {
   ppoDsiZMinBars,
   type PpoDsiZCond,
 } from "@/lib/indicators/ppoDsiZ";
+export {
+  ELIZI_LDR4_MIN_BARS,
+  ELIZI_LDR4_FETCH_LIMIT,
+  ELIZI_LDR4_DEFAULTS,
+  DEFAULT_ELIZI_LDR4_CONDS,
+  ALL_ELIZI_LDR4_CONDS,
+  ELIZI_LDR4_COND_LABEL,
+  ELD4_ST_MODES,
+  eliziLdr4FetchLimit,
+  eliziLdr4MinBars,
+  type EliziLdr4Cond,
+  type EliziLdr4Params,
+} from "@/lib/indicators/eliziLdr4";
