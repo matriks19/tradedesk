@@ -284,6 +284,7 @@ export type BuiltinIndicatorId =
   | "pdo"
   | "cmoChande"
   | "eliziLdr4"
+  | "ema30Band"
   | "pliDir"
   | "pliDmiHybrid"
   | "pliDtDiv"

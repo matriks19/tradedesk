@@ -86,6 +86,13 @@ import {
   type PliDtDivCond,
 } from "@/lib/indicators/pliDtDiv";
 import {
+  ema30BandScan,
+  DEFAULT_EMA30_BAND_CONDS,
+  EMA30_BAND_BEAR_CONDS,
+  type Ema30BandCond,
+  type Ema30BandParams,
+} from "@/lib/indicators/ema30Band";
+import {
   eliziLdr4Scan,
   DEFAULT_ELIZI_LDR4_CONDS,
   ELIZI_LDR4_BEAR_CONDS,
@@ -556,6 +563,7 @@ export type ListScanKind =
   | "pliDtDiv"
   | "ppoDsiZ"
   | "eliziLdr4"
+  | "ema30Band"
   | "pine";
 
 export type PineCond =
@@ -914,6 +922,12 @@ export type ListScanConfig = {
     params?: EliziLdr4Params;
     /** syminfo.mintick (BIST 0.01, kripto 1e-8 varsayılan) */
     mintick?: number;
+  };
+  /** EMA30 Band Kırılım (kullanıcının Pine v6 göstergesi) — LONG/SHORT (+ kırılım/ters alt çipler, durum çipleri), kapanmış mum. */
+  ema30Band?: {
+    enabled: boolean;
+    conds: Ema30BandCond[];
+    params?: Ema30BandParams;
   };
   pine?: {
     enabled: boolean;
@@ -2460,6 +2474,22 @@ function scanPpoDsiZ(
   }));
 }
 
+function scanEma30Band(
+  candles: Candle[],
+  cfg: NonNullable<ListScanConfig["ema30Band"]>,
+  maxBarsAgo: number
+): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_EMA30_BAND_CONDS;
+  return ema30BandScan(candles, conds, maxBarsAgo, cfg.params ?? {}).map((h) => ({
+    kind: "ema30Band" as const,
+    cond: h.cond,
+    bias: EMA30_BAND_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 function scanEliziLdr4(
   candles: Candle[],
   cfg: NonNullable<ListScanConfig["eliziLdr4"]>,
@@ -2504,6 +2534,7 @@ export function scanSymbol(
   if (cfg.pliDtDiv?.enabled) enabledKinds.push("pliDtDiv");
   if (cfg.ppoDsiZ?.enabled) enabledKinds.push("ppoDsiZ");
   if (cfg.eliziLdr4?.enabled) enabledKinds.push("eliziLdr4");
+  if (cfg.ema30Band?.enabled) enabledKinds.push("ema30Band");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2530,6 +2561,7 @@ export function scanSymbol(
     pliDtDiv: cfg.pliDtDiv ? scanPliDtDiv(candles, cfg.pliDtDiv, maxBarsAgo) : [],
     ppoDsiZ: cfg.ppoDsiZ ? scanPpoDsiZ(candles, cfg.ppoDsiZ, maxBarsAgo) : [],
     eliziLdr4: cfg.eliziLdr4 ? scanEliziLdr4(candles, cfg.eliziLdr4, maxBarsAgo) : [],
+    ema30Band: cfg.ema30Band ? scanEma30Band(candles, cfg.ema30Band, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -2851,6 +2883,19 @@ export function indicatorParamsFromConfig(
       showPatterns: 1,
     };
   }
+  if (kind === "ema30Band" && cfg.ema30Band) {
+    const c = cfg.ema30Band;
+    const cs = c.conds.length ? c.conds : DEFAULT_EMA30_BAND_CONDS;
+    const out: Record<string, number | string> = {
+      sigLong: cs.some((x) => x === "e30_long" || x === "e30_brk_long" || x === "e30_rev_long") ? 1 : 0,
+      sigShort: cs.some((x) => x === "e30_short" || x === "e30_brk_short" || x === "e30_rev_short") ? 1 : 0,
+    };
+    for (const [k, v] of Object.entries(c.params ?? {})) {
+      if (v === undefined || v === null) continue;
+      out[k] = typeof v === "boolean" ? (v ? 1 : 0) : (v as number | string);
+    }
+    return out;
+  }
   if (kind === "eliziLdr4" && cfg.eliziLdr4) {
     const c = cfg.eliziLdr4;
     const cs = c.conds.length ? c.conds : DEFAULT_ELIZI_LDR4_CONDS;
@@ -2988,6 +3033,7 @@ export const KIND_TO_INDICATOR: Record<
   | "pliDtDiv"
   | "ppoDsiZ"
   | "eliziLdr4"
+  | "ema30Band"
 > = {
   ham: "hamJurikTpo",
   diag: "diagonalSr",
@@ -3011,6 +3057,7 @@ export const KIND_TO_INDICATOR: Record<
   pliDtDiv: "pliDtDiv",
   ppoDsiZ: "ppoDsiZ",
   eliziLdr4: "eliziLdr4",
+  ema30Band: "ema30Band",
 };
 
 export { DOKTOR_HULL_MIN_BARS, DOKTOR_HULL_FETCH_LIMIT } from "@/lib/indicators/doktorHull";
@@ -3110,3 +3157,13 @@ export {
   type EliziLdr4Cond,
   type EliziLdr4Params,
 } from "@/lib/indicators/eliziLdr4";
+export {
+  DEFAULT_EMA30_BAND_CONDS,
+  ALL_EMA30_BAND_CONDS,
+  EMA30_BAND_COND_LABEL,
+  EMA30_BAND_FETCH_LIMIT,
+  E30_DEFAULTS,
+  ema30BandMinBars,
+  type Ema30BandCond,
+  type Ema30BandParams,
+} from "@/lib/indicators/ema30Band";
