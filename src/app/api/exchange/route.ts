@@ -14,7 +14,7 @@ type P = Record<string, string | number | boolean>;
 type Body = {
   exchange?: string; market?: "spot" | "futures"; testnet?: boolean;
   apiKey?: string; apiSecret?: string; passphrase?: string;
-  action?: "balance" | "order" | "leverage" | "marginType" | "price";
+  action?: "balance" | "order" | "leverage" | "marginType" | "price" | "position";
   params?: P;
 };
 
@@ -41,6 +41,24 @@ async function binance(b: Body, key: string, sec: string) {
     case "price": {
       const r = await fetch(`${base}${fut ? "/fapi/v1/ticker/price" : "/api/v3/ticker/price"}?symbol=${encodeURIComponent(String(p.symbol || ""))}`, { cache: "no-store" });
       return { ok: r.ok, data: await asJson(r) };
+    }
+    case "position": {
+      // Canlı emir öncesi: sembolde mevcut pozisyon var mı? (futures positionRisk / spot baz varlık bakiyesi)
+      const sym = String(p.symbol || "");
+      const q0 = qs(fut ? { symbol: sym, recvWindow: 5000, timestamp: Date.now() } : { omitZeroBalances: "true", recvWindow: 5000, timestamp: Date.now() });
+      const r0 = await fetch(`${base}${fut ? "/fapi/v2/positionRisk" : "/api/v3/account"}?${q0}&signature=${hmacHex(sec, q0)}`, { headers: { "X-MBX-APIKEY": key }, cache: "no-store" });
+      const d0 = await asJson(r0);
+      if (!r0.ok) return { ok: false, error: d0?.msg || `binance ${r0.status}` };
+      if (fut) {
+        const pos = (Array.isArray(d0) ? d0 : []).filter((x: { positionAmt?: string }) => Math.abs(Number(x.positionAmt || 0)) > 0);
+        return { ok: true, data: { open: pos.length > 0, detail: pos.map((x: { positionAmt?: string; positionSide?: string }) => `${x.positionSide || ""} ${x.positionAmt}`).join(", ") } };
+      }
+      const baseAsset = sym.replace(/(USDT|USDC|FDUSD|BUSD|TRY)$/, "");
+      const b0 = (d0?.balances || []).find((x: { asset: string }) => x.asset === baseAsset);
+      const amt = b0 ? Number(b0.free || 0) + Number(b0.locked || 0) : 0;
+      const pr = await fetch(`${base}/api/v3/ticker/price?symbol=${encodeURIComponent(sym)}`, { cache: "no-store" }).then((x) => x.json()).catch(() => ({}));
+      const val = amt * Number(pr?.price || 0);
+      return { ok: true, data: { open: val >= 5, detail: `${baseAsset} ${amt} (~${val.toFixed(2)} USDT)` } };
     }
     case "leverage": if (!fut) throw new Error("spot'ta kaldıraç yok"); method = "POST"; path = "/fapi/v1/leverage"; params = { symbol: p.symbol, leverage: p.leverage }; break;
     case "marginType": if (!fut) throw new Error("spot'ta marjin modu yok"); method = "POST"; path = "/fapi/v1/marginType"; params = { symbol: p.symbol, marginType: p.marginType }; break;

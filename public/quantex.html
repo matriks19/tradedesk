@@ -18705,7 +18705,8 @@ function render(){
   h.innerHTML=`
  <div class="bx"><div class="row"><h3>🤖 Robot Bağla</h3><span class="tag ${cfg.live?'live':'paper'}">${cfg.live?'CANLI':'PAPER (simülasyon)'}</span><span>${st.running?'<span class="ok">● çalışıyor</span>':'<span class="warn">■ durdu</span>'}</span>
  <button class="o" id="qxbStart">${st.running?'Duraklat':'Başlat'}</button><button class="r" id="qxbKill">⛔ Tümünü durdur</button></div>
- <small>Sinyal kaynağı: 📡 İzleme (coin) taraması. İzleme açık ve taranıyor olmalı; bot her 15 sn İzleme sonuçlarını okur. Çiplerdeki / grafikteki <b>🤖</b> butonu taramayı buraya ekler.</small></div>
+ <div class="row" style="margin:6px 0"><label style="flex:0 0 auto">Tarama aralığı</label><select id="qxbEvery" style="max-width:120px">${SCAN_OPTS.map(m=>`<option value="${m}" ${+cfg.scanMin===m?'selected':''}>${m<60?m+' dk':(m/60)+' saat'}</option>`).join('')}</select><span>Sonraki tarama: <b id="qxbNext">${hhmm(nextRun)}</b></span><button class="g" id="qxbNow">↻ Şimdi tara</button></div>
+ <small>Sinyal kaynağı: 📡 İzleme (coin) taraması. İzleme sekmesi açılmış olmalı; bot seçilen aralıkta (varsayılan 15 dk, mum kapanışına hizalı) İzleme taramasını tetikler ve sinyalleri okur. TP/SL fiyat kontrolü dakikada bir. Çiplerdeki / grafikteki <b>🤖</b> butonu taramayı buraya ekler.</small></div>
  <div class="bx"><h3>Sinyal kaynakları</h3><div id="qxbSrc"></div>
  <div class="row" style="margin-top:6px"><select id="qxbAddId">${scanIds.map(i=>`<option value="${i}">${esc(LB(i))}</option>`).join('')}</select><button class="g" id="qxbAdd">+ Tarama ekle (İzleme ayarlarıyla)</button></div></div>
  <div class="bx"><h3>🔀 Kombin Sinyal oluşturucu</h3><small>Sınırsız koşul: tarama çipleri + RSI/CMO/MFI/Stoch/CCI/ADX aralıkları + PDO AL/SAT + EMA. HEPSİ veya EN AZ N; aynı mumda ya da son K mum içinde.</small><div id="qxbCombo"></div></div>
@@ -18748,6 +18749,8 @@ function bind(){
   $('qxbAdd').onclick=()=>{const id=$('qxbAddId').value.toLowerCase();addSource({scanId:id,label:LB(id)});};
   $('qxbStart').onclick=()=>{st.running=!st.running;log(st.running?'Bot başlatıldı ('+(cfg.live?'CANLI':'PAPER')+')':'Bot duraklatıldı');render();};
   $('qxbKill').onclick=killAll;
+  $('qxbEvery').onchange=e=>{cfg.scanMin=+e.target.value;save();schedule();log('Tarama aralığı: '+cfg.scanMin+' dk');};
+  $('qxbNow').onclick=()=>{note('Tarama başladı…','info');scanCycle().then(()=>{note('Tarama bitti','ok');render();});};
   h.querySelectorAll('[data-ca]').forEach(i=>i.onchange=()=>{cfg[i.dataset.ca]=i.checked;save();if(i.checked)rbeep(1);try{Notification&&Notification.permission==='default'&&Notification.requestPermission();}catch(e){}});
   $('qxbLive').onchange=e=>setLive(e.target.checked);
   if($('qxbUnlock'))$('qxbUnlock').onclick=async()=>{try{await unlock($('qxbPw').value);render();}catch(e){note('Parola yanlış','err');}};
@@ -18809,6 +18812,7 @@ async function openPos(sym,side,price,src){
   const p={sym,side,entry:price,last:price,src,live:cfg.live,lev,notional,qty:notional/price,t:Date.now()};
   if(cfg.live){
     try{
+      const ex=await api(cfg.exchange,'position',{symbol:sym}); if(ex&&ex.open){ log('atlandı: açık pozisyon var (borsada) — '+sym+' '+(ex.detail||'')); return; }
       const L=await lotSize(sym); p.qty=roundQty(notional/price,L.step); if(!(p.qty>0)||p.qty<L.min) throw new Error('miktar çok küçük');
       if(cfg.market==='futures'){await api(cfg.exchange,'marginType',{symbol:sym,marginType:cfg.marginType}).catch(()=>{});await api(cfg.exchange,'leverage',{symbol:sym,leverage:lev});}
       const d=await api(cfg.exchange,'order',{symbol:sym,side:side==='LONG'?'BUY':'SELL',type:'MARKET',quantity:p.qty,newClientOrderId:'qx'+Date.now().toString(36)});
@@ -18831,26 +18835,28 @@ async function prices(){
   try{const r=await fetch(cfg.market==='futures'?'/api/fapi/v1/ticker/price':'https://api.binance.com/api/v3/ticker/price');const j=await r.json();const m={};(j||[]).forEach(x=>m[x.symbol]=+x.price);return m;}catch(e){return {};}
 }
 let busy=false;
-async function tick(){
+async function tick(sig){
   if(!st.running||busy) return; busy=true;
   try{
     const px=await prices();
     for(let i=st.open.length-1;i>=0;i--){const p=st.open[i];if(px[p.sym])p.last=px[p.sym];const r=pr(p);
       if(r>=cfg.tp/100) await closePos(i,'TP'); else if(r<=-cfg.sl/100) await closePos(i,'SL');}
-    const w=izWin();
-    if(!w){ if(!tick.warned){log('⚠ İzleme açık değil — sinyal okunamıyor (📡 İzleme sekmesini açıp tara)');tick.warned=1;} }
+    const w=sig?izWin():null;
+    if(!sig){} else if(!w){ if(!tick.warned){log('⚠ İzleme açık değil — sinyal okunamıyor (📡 İzleme sekmesini açıp tara)');tick.warned=1;} }
     else{ tick.warned=0;
       const D=w.DATA||{};
+      const turn=new Set();
       for(const s of cfg.sources.filter(x=>x.on!==false)){
         for(const sym of Object.keys(D)){
           if(st.open.length>=cfg.maxSlots) break;
-          if(st.open.some(p=>p.sym===sym)) continue;
           const d=D[sym]; let pass=false,age=null,dir='';
           if(s.comboId){const cb=cfg.combos.find(x=>x.id===s.comboId); const r=cb&&evalCombo(w,d,cb); if(r){pass=true;age=r.age;dir=cb.side==='SHORT'?'SAT':'AL';}}
           else try{pass=w.scanPass(d,s.scanId);age=w.scanAge(d,s.scanId);dir=String(w.scanDirLabel(d,s.scanId)||'');}catch(e){}
           if(!pass) continue; if(age!=null&&age>cfg.maxAge) continue;
           const side=/SAT|SHORT|US\b|↓/i.test(dir)?'SHORT':/AL|LONG|UA\b|↑/i.test(dir)?'LONG':null;
           if(!side) continue; if(cfg.market==='spot'&&side==='SHORT') continue;
+          if(turn.has(sym)) continue; turn.add(sym); // aynı turda aynı sembole yalnız ilk sinyal
+          if(st.open.some(p=>p.sym===sym)){ log('atlandı: açık pozisyon var — '+sym+' ['+s.label+' '+dir+']'); continue; }
           const price=px[sym]||d.price; if(!(price>0)) continue;
           const key=sym+'|'+s.scanId+'|'+(d.scan&&d.scan.lastT||'')+'|'+age; tick.seen=tick.seen||{}; if(tick.seen[key]&&Date.now()-tick.seen[key]<3600e3) continue; tick.seen[key]=Date.now();
           await openPos(sym,side,price,s.label+(dir?' '+dir:''));
@@ -18860,7 +18866,26 @@ async function tick(){
     save(); if(!$('qxBot').hidden) render();
   }finally{busy=false;}
 }
-setInterval(tick,15000);
+// Zamanlama: sinyal taraması varsayılan 15 dk (mum kapanışına hizalı +5 sn); TP/SL fiyat kontrolü her 1 dk.
+const SCAN_OPTS=[1,5,15,30,60,240];
+if(!SCAN_OPTS.includes(+cfg.scanMin)){ cfg.scanMin=15; save(); } // eski 15 sn döngü → 15 dk
+let nextRun=0, schedT=null, cycling=false;
+function nextAt(){ const ms=cfg.scanMin*60000, off=-new Date().getTimezoneOffset()*60000, now=Date.now(); return Math.floor((now+off)/ms+1)*ms-off+5000; }
+function hhmm(t){ return t?new Date(t).toLocaleTimeString('tr-TR',{hour:'2-digit',minute:'2-digit'}):'-'; }
+async function runFrameScan(w){ if(!w||typeof w.scanAll!=='function') return; if(w.busy) return;
+  try{ await Promise.race([w.scanAll(), new Promise(r=>setTimeout(r,6*60000))]); }catch(e){} }
+async function scanCycle(){
+  if(cycling) return; cycling=true;
+  try{
+    const coin=frameWin('coin'), bist=frameWin('bist'), needCoin=st.running||cfg.combos.some(c=>c.alarm), needBist=cfg.combos.some(c=>c.alarm);
+    if(needCoin) await runFrameScan(coin); if(needBist) await runFrameScan(bist);
+    await tick(true); try{ comboAlarms(); }catch(e){ console.warn(e); }
+    log('⏱ Tarama turu tamam ('+cfg.scanMin+' dk)');
+  }finally{ cycling=false; }
+}
+function schedule(){ clearTimeout(schedT); nextRun=nextAt(); schedT=setTimeout(()=>{ scanCycle().finally(()=>{ schedule(); if(!$('qxBot').hidden) render(); }); }, Math.max(1000,nextRun-Date.now())); const e=$('qxbNext'); if(e) e.textContent=hhmm(nextRun); }
+schedule();
+setInterval(()=>tick(false),60000);
 
 
 // ---- ROBOT İŞLEM ALARMLARI (toast + ses + bildirim + TradeDesk kanalları: Telegram / WhatsApp / ntfy) ----
@@ -18941,7 +18966,7 @@ function comboAlarms(){
   }
   comboAlarms.ready=true; try{localStorage.setItem('qxbot_cfired_v1',JSON.stringify(comboFired));}catch(e){}
 }
-setInterval(()=>{try{comboAlarms();}catch(e){console.warn(e);}},20000);
+
 function condRow(ci,i,cd){
   const opt=Object.keys(CTYPES).map(t=>`<option value="${t}" ${cd.t===t?'selected':''}>${CTYPES[t].lb}</option>`).join('');
   const inp=(f,v,w)=>`<input style="max-width:${w||70}px" data-cc="${ci}.${i}.${f}" value="${esc(v??'')}">`;
