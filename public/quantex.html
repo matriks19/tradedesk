@@ -19002,13 +19002,21 @@ function renderCombos(){
   el.querySelectorAll('[data-cadd]').forEach(b=>b.onclick=()=>{cfg.combos[b.dataset.cadd].conds.push({t:'rsi',p:14,min:20,max:30});save2();renderCombos();});
   el.querySelectorAll('[data-cdelc]').forEach(b=>b.onclick=()=>{if(!confirm('Kombin silinsin mi?'))return;const cb=cfg.combos.splice(+b.dataset.cdelc,1)[0];cfg.sources=cfg.sources.filter(s=>s.comboId!==cb.id);save2();render();});
   el.querySelectorAll('[data-cscan]').forEach(b=>b.onclick=()=>{const [ci,m]=b.dataset.cscan.split('|');const cb=cfg.combos[ci];const r=scanCombo(cb,m);
-    if(!r){note((m==='bist'?'📈 İzleme BIST':'📡 İzleme')+' sekmesini açıp önce tara','err');return;} comboRes[cb.id+'|'+m]=r; note(cb.name+': '+r.length+' sonuç','ok'); renderCombos();});
+    if(!r){note((m==='bist'?'📈 İzleme BIST':'📡 İzleme')+' sekmesini açıp önce tara','err');return;} comboRes[cb.id+'|'+m]=r; note(cb.name+': '+r.length+' sonuç','ok');
+    if(m==='bist'&&r.length&&cb.side!=='SHORT'){ // PAPER: kombin BIST kâğıt bota otomatik kaynak + bot başlar
+      if(!B.sources.some(x=>x.comboId===cb.id)) addSourceB({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});
+      if(!B.running){B.running=true;logB('BIST kâğıt bot otomatik başlatıldı (kombin: '+cb.name+')'+(bistSessionOpen()?'':' — seans kapalı, 10:00 bekleniyor'));saveB();note('🇹🇷 BIST kâğıt bot başladı (PAPER)','ok');}
+    }
+    render();});
   el.querySelectorAll('[data-cbotb]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbotb];if(cb.side==='SHORT'){note('BIST kâğıt bot yalnız LONG','err');return;}addSourceB({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});});
   el.querySelectorAll('[data-cbot]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbot];addSource({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});render();});
-  el.querySelectorAll('[data-copen]').forEach(a=>a.onclick=e=>{e.preventDefault();const [m,sym]=a.dataset.copen.split('|');try{if(window.QX_LINK&&QX_LINK.openInMonitor)QX_LINK.openInMonitor(sym);}catch(err){}});
+  el.querySelectorAll('[data-copen]').forEach(a=>a.onclick=e=>{e.preventDefault();const [m,sym]=a.dataset.copen.split('|');openChartIn(m,sym);});
   $('qxbNewCombo').onclick=()=>{cfg.combos.push(newCombo());save2();renderCombos();try{Notification&&Notification.permission==='default'&&Notification.requestPermission();}catch(e){}};
 }
 
+function openChartIn(m,sym){ // sonuç tıklaması: ilgili İzleme sekmesi + o sembolün grafik penceresi
+  const bist=m==='bist'; window.switchMainTab(bist?'bist':'izleme',$(bist?'qxNavBist':'qxNavIzleme'));
+  let n=0; const go=()=>{const w=frameWin(bist?'bist':'coin'); if(w&&typeof w.openModal==='function'&&w.DATA&&w.DATA[sym]){try{w.openModal(sym);}catch(e){} return;} if(++n<40) setTimeout(go,250); else note(sym+' grafiği açılamadı (önce '+(bist?'İzleme BIST':'İzleme')+' taransın)','err');}; go(); }
 // ---- 🇹🇷 BIST KÂĞIT BOT (yalnız PAPER, yalnız LONG, kaldıraçsız, TL) ----
 const LS_B='qxbot_bist_v1';
 let B=Object.assign({running:false,equity:1000000,posPct:5,tp:10,sl:5,maxSlots:10,maxAge:1,sources:[],open:[],log:[],pnl:0},load(LS_B)||{});
@@ -19066,7 +19074,7 @@ async function tickB(sig){
 function renderB(){
   const el=$('qxbBist'); if(!el) return;
   const upnl=B.open.reduce((a,p)=>a+(p.last-p.entry)*p.lot,0);
-  el.innerHTML=`<div class="row"><h3>🇹🇷 BIST kâğıt bot</h3><span class="tag paper">KÂĞIT · canlı emir yok</span><span>${B.running?'<span class="ok">● çalışıyor</span>':'<span class="warn">■ durdu</span>'}</span><span>${bistSessionOpen()?'<span class="ok">seans açık</span>':'<span class="warn">seans kapalı</span>'}</span>
+  el.innerHTML=`<div class="row"><h3>🇹🇷 BIST kâğıt bot</h3><span class="tag paper">KÂĞIT · canlı emir yok</span><span>${B.running?'<span class="ok">● çalışıyor</span>':'<span class="warn">■ durdu</span>'}</span><span>${bistSessionOpen()?'<span class="ok">seans açık</span>':'<span class="warn">seans kapalı, 10:00 bekleniyor</span>'}</span>
    <button class="o" id="qxbBStart">${B.running?'Duraklat':'Başlat'}</button><button class="r" id="qxbBKill">⛔ Durdur + kapat</button><button class="g" id="qxbBReset">Sıfırla</button></div>
    <div class="row"><div><label>Bakiye (TL)</label><input type="number" data-b="equity" value="${B.equity}"></div><div><label>Pozisyon = bakiyenin %</label><input type="number" step="0.5" data-b="posPct" value="${B.posPct}"></div>
    <div><label>TP %</label><input type="number" step="0.5" data-b="tp" value="${B.tp}"></div><div><label>SL %</label><input type="number" step="0.5" data-b="sl" value="${B.sl}"></div>
