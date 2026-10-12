@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-const ALLOW = new Set(["klines", "ticker/24hr", "exchangeInfo", "ping", "time"]);
+const ALLOW = new Set(["klines", "ticker/24hr", "ticker/price", "exchangeInfo", "ping", "time"]);
 
 /** Browser cannot reach fapi.binance.com (451, no CORS). Screener calls /api/fapi/v1/* and we fetch the public vision mirror. */
 export async function GET(
