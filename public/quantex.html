@@ -18707,6 +18707,7 @@ function render(){
  <small>Sinyal kaynağı: 📡 İzleme (coin) taraması. İzleme açık ve taranıyor olmalı; bot her 15 sn İzleme sonuçlarını okur. Çiplerdeki / grafikteki <b>🤖</b> butonu taramayı buraya ekler.</small></div>
  <div class="bx"><h3>Sinyal kaynakları</h3><div id="qxbSrc"></div>
  <div class="row" style="margin-top:6px"><select id="qxbAddId">${scanIds.map(i=>`<option>${i.toUpperCase()}</option>`).join('')}</select><button class="g" id="qxbAdd">+ Tarama ekle (İzleme ayarlarıyla)</button></div></div>
+ <div class="bx"><h3>🔀 Kombin Sinyal oluşturucu</h3><small>Sınırsız koşul: tarama çipleri + RSI/CMO/MFI/Stoch/CCI/ADX aralıkları + PDO AL/SAT + EMA. HEPSİ veya EN AZ N; aynı mumda ya da son K mum içinde.</small><div id="qxbCombo"></div></div>
  <div class="bx"><h3>Bot ayarları</h3><div class="row">
   <div><label>Borsa</label><select data-c="exchange">${EXCHANGES.map(e=>`<option value="${e.id}" ${cfg.exchange===e.id?'selected':''}>${e.name}${e.order?'':' (canlı emir yakında)'}</option>`).join('')}</select></div>
   <div><label>Piyasa</label><select data-c="market"><option value="futures" ${cfg.market==='futures'?'selected':''}>Futures USDT-M</option><option value="spot" ${cfg.market==='spot'?'selected':''}>Spot (yalnız AL)</option></select></div>
@@ -18720,6 +18721,7 @@ function render(){
   <div><label>Sinyal yaşı ≤ (mum)</label><input type="number" min="0" max="5" data-c="maxAge" value="${cfg.maxAge}"></div>
   <div><label>Paper bakiye (USDT)</label><input type="number" data-c="equity" value="${cfg.equity}"></div>
  </div>
+ <div class="row" style="margin-top:8px"><label><input type="checkbox" data-ca="tradeAlarm" ${cfg.tradeAlarm?'checked':''}> 🔔 Robot işlem alarmı</label><label><input type="checkbox" data-ca="tradeAlarmSound" ${cfg.tradeAlarmSound?'checked':''}> Ses</label><label><input type="checkbox" data-ca="tradeAlarmRemote" ${cfg.tradeAlarmRemote?'checked':''}> Telegram/WhatsApp/ntfy (TradeDesk alarm ayarlarından)</label></div>
  <div class="row" style="margin-top:8px"><label style="flex:2"><input type="checkbox" id="qxbLive" ${cfg.live?'checked':''}> <b class="bad">CANLI emir</b> (gerçek para — bağlantı testi + onay gerekir; şu an yalnız Binance)</label></div></div>
  <div class="bx"><div class="row"><h3>Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})</h3><span>Gerçekleşen PnL: <b class="${st.pnl>=0?'ok':'bad'}">${st.pnl.toFixed(2)} USDT</b></span></div>
  <table><tr><th>Sembol</th><th>Yön</th><th>Kaynak</th><th>Giriş</th><th>Son</th><th>PnL %</th><th>Mod</th><th></th></tr>${st.open.map((p,i)=>{const r=pr(p);return `<tr><td>${esc(p.sym)}</td><td>${p.side}</td><td>${esc(p.src)}</td><td>${fmt(p.entry)}</td><td>${fmt(p.last)}</td><td class="${r>=0?'ok':'bad'}">${(r*100).toFixed(2)}</td><td>${p.live?'CANLI':'paper'}</td><td><button class="g" data-close="${i}">Kapat</button></td></tr>`;}).join('')}</table></div>
@@ -18727,7 +18729,7 @@ function render(){
  ${locked?`<div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Anahtar parolası"><button id="qxbUnlock">Kilidi aç</button></div>`:`<div class="grid" style="margin-top:8px">${EXCHANGES.map(exCard).join('')}</div>
  <div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Şifreleme parolası (opsiyonel)"><button id="qxbSaveKeys">Anahtarları kaydet</button><button class="r" id="qxbWipe">Anahtarları sil</button></div>`}</div>
  <div class="bx"><h3>İşlem günlüğü</h3><div style="max-height:220px;overflow:auto;font-family:monospace;font-size:11px">${st.log.slice().reverse().map(esc).join('<br>')}</div></div>`;
-  renderSrc(); bind();
+  renderSrc(); bind(); renderCombos();
 }
 const fmt=v=>v==null?'-':(+v).toPrecision(6);
 function pr(p){return p.last&&p.entry?(p.side==='LONG'?(p.last/p.entry-1):(1-p.last/p.entry)):0;}
@@ -18745,6 +18747,7 @@ function bind(){
   $('qxbAdd').onclick=()=>{const id=$('qxbAddId').value.toLowerCase();addSource({scanId:id,label:id.toUpperCase()});};
   $('qxbStart').onclick=()=>{st.running=!st.running;log(st.running?'Bot başlatıldı ('+(cfg.live?'CANLI':'PAPER')+')':'Bot duraklatıldı');render();};
   $('qxbKill').onclick=killAll;
+  h.querySelectorAll('[data-ca]').forEach(i=>i.onchange=()=>{cfg[i.dataset.ca]=i.checked;save();if(i.checked)rbeep(1);try{Notification&&Notification.permission==='default'&&Notification.requestPermission();}catch(e){}});
   $('qxbLive').onchange=e=>setLive(e.target.checked);
   if($('qxbUnlock'))$('qxbUnlock').onclick=async()=>{try{await unlock($('qxbPw').value);render();}catch(e){note('Parola yanlış','err');}};
   if($('qxbSaveKeys'))$('qxbSaveKeys').onclick=async()=>{await storeKeys($('qxbPw').value);note('Anahtarlar bu tarayıcıya kaydedildi'+($('qxbPw').value?' (şifreli)':''),'ok');};
@@ -18783,7 +18786,7 @@ async function killAll(){
 function addSource(s){
   const w=izWin(); const S=w&&w.S||{};
   const src=Object.assign({on:true,interval:S.interval||'',list:S.listName||S.list||'İzleme coin',added:Date.now()},s);
-  if(cfg.sources.some(x=>x.scanId===src.scanId&&x.interval===src.interval)){note(src.label+' zaten bağlı','info');}
+  if(cfg.sources.some(x=>x.scanId===src.scanId&&x.interval===src.interval&&x.comboId===src.comboId)){note(src.label+' zaten bağlı','info');}
   else{cfg.sources.push(src);log('Kaynak eklendi: '+src.label+' · '+src.interval);note('🤖 '+src.label+' robota bağlandı (PAPER)','ok');}
   save(); if(!$('qxBot').hidden) render();
 }
@@ -18811,7 +18814,7 @@ async function openPos(sym,side,price,src){
       if(d&&+d.avgPrice>0)p.entry=+d.avgPrice; if(d&&+d.executedQty>0)p.qty=+d.executedQty; p.orderId=d&&d.orderId;
     }catch(e){log('✗ CANLI açılış '+sym+': '+e.message);return;}
   }
-  st.open.push(p); log((p.live?'CANLI ':'PAPER ')+'AÇ '+side+' '+sym+' @'+fmt(p.entry)+' ['+src+'] marjin '+margin.toFixed(2)+' x'+lev);
+  st.open.push(p); robotAlarm('🤖 Robot '+(side==='LONG'?'AL':'SAT')+' verdi: '+sym+' '+lev+'x @'+fmt(p.entry)+' ('+src+')'+(p.live?' · CANLI':' · PAPER')); log((p.live?'CANLI ':'PAPER ')+'AÇ '+side+' '+sym+' @'+fmt(p.entry)+' ['+src+'] marjin '+margin.toFixed(2)+' x'+lev);
 }
 async function closePos(i,why){
   const p=st.open[i]; if(!p) return;
@@ -18821,7 +18824,7 @@ async function closePos(i,why){
       await api(cfg.exchange,'order',params);}catch(e){log('✗ CANLI kapanış '+p.sym+': '+e.message);return;}
   }
   const r=pr(p), pnl=r*p.notional; st.pnl+=pnl; if(!p.live) cfg.equity=+(cfg.equity+pnl).toFixed(4);
-  st.open.splice(i,1); log((p.live?'CANLI ':'PAPER ')+'KAPAT '+p.sym+' '+why+' '+(r*100).toFixed(2)+'% → '+pnl.toFixed(2)+' USDT'); save();
+  st.open.splice(i,1); robotAlarm('🤖 Robot '+(why==='TP'?'TP':why==='SL'?'SL':'SAT/'+why)+' kapattı: '+p.sym+' '+(r>=0?'+':'')+(r*100).toFixed(2)+'% ('+(pnl>=0?'+':'')+pnl.toFixed(2)+' USDT)'+(p.live?' · CANLI':' · PAPER')); log((p.live?'CANLI ':'PAPER ')+'KAPAT '+p.sym+' '+why+' '+(r*100).toFixed(2)+'% → '+pnl.toFixed(2)+' USDT'); save();
 }
 async function prices(){
   try{const r=await fetch(cfg.market==='futures'?'/api/fapi/v1/ticker/price':'https://api.binance.com/api/v3/ticker/price');const j=await r.json();const m={};(j||[]).forEach(x=>m[x.symbol]=+x.price);return m;}catch(e){return {};}
@@ -18842,7 +18845,8 @@ async function tick(){
           if(st.open.length>=cfg.maxSlots) break;
           if(st.open.some(p=>p.sym===sym)) continue;
           const d=D[sym]; let pass=false,age=null,dir='';
-          try{pass=w.scanPass(d,s.scanId);age=w.scanAge(d,s.scanId);dir=String(w.scanDirLabel(d,s.scanId)||'');}catch(e){}
+          if(s.comboId){const cb=cfg.combos.find(x=>x.id===s.comboId); const r=cb&&evalCombo(w,d,cb); if(r){pass=true;age=r.age;dir=cb.side==='SHORT'?'SAT':'AL';}}
+          else try{pass=w.scanPass(d,s.scanId);age=w.scanAge(d,s.scanId);dir=String(w.scanDirLabel(d,s.scanId)||'');}catch(e){}
           if(!pass) continue; if(age!=null&&age>cfg.maxAge) continue;
           const side=/SAT|SHORT|US\b|↓/i.test(dir)?'SHORT':/AL|LONG|UA\b|↑/i.test(dir)?'LONG':null;
           if(!side) continue; if(cfg.market==='spot'&&side==='SHORT') continue;
@@ -18856,6 +18860,126 @@ async function tick(){
   }finally{busy=false;}
 }
 setInterval(tick,15000);
+
+
+// ---- ROBOT İŞLEM ALARMLARI (toast + ses + bildirim + TradeDesk kanalları: Telegram / WhatsApp / ntfy) ----
+if(cfg.tradeAlarm===undefined){cfg.tradeAlarm=true;cfg.tradeAlarmSound=true;cfg.tradeAlarmRemote=true;}
+let actx=null;
+function rbeep(n){try{const AC=window.AudioContext||window.webkitAudioContext;if(!AC)return;actx=actx||new AC();if(actx.state==='suspended')actx.resume();const t=actx.currentTime;
+  for(let i=0;i<n;i++){const o=actx.createOscillator(),g=actx.createGain();o.frequency.setValueAtTime(i%2?660:990,t+i*.2);g.gain.setValueAtTime(.0001,t+i*.2);g.gain.exponentialRampToValueAtTime(.25,t+i*.2+.02);g.gain.exponentialRampToValueAtTime(.0001,t+i*.2+.18);o.connect(g);g.connect(actx.destination);o.start(t+i*.2);o.stop(t+i*.2+.19);}}catch(e){}}
+function tdChannels(){const out=[];
+  try{const tg=JSON.parse(localStorage.getItem('tradedesk-tg-v1')||'null');if(tg&&tg.url&&tg.chatId)out.push({url:tg.url,telegramChatId:tg.chatId});}catch(e){}
+  try{const nt=JSON.parse(localStorage.getItem('tradedesk-ntfy-v1')||'null');if(nt&&nt.url)out.push({url:nt.url});}catch(e){}
+  try{const st0=JSON.parse(localStorage.getItem('tradedesk-v1')||'null');const b=st0&&st0.state&&st0.state.botSettings;
+    if(b&&b.enabled&&b.webhookUrl&&!out.some(o=>o.url===b.webhookUrl))out.push({url:b.webhookUrl,telegramChatId:b.telegramChatId||undefined});}catch(e){}
+  return out;}
+function robotAlarm(msg){
+  if(!cfg.tradeAlarm) return;
+  note(msg,'ok'); if(cfg.tradeAlarmSound) rbeep(2);
+  try{if(window.Notification&&Notification.permission==='granted'&&document.hidden)new Notification('QUANTEX Robot',{body:msg});}catch(e){}
+  if(cfg.tradeAlarmRemote) tdChannels().forEach(c=>fetch('/api/webhook',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({url:c.url,telegramChatId:c.telegramChatId,payload:{text:msg,event:'robot'}})}).catch(()=>{}));
+}
+// ---- KOMBİN SİNYAL OLUŞTURUCU ----
+// Koşullar İzleme çerçevesinin KAPANMIŞ mum verisi (d.kScan) ve kendi gösterge fonksiyonlarıyla (rsiArr, mfiArr, stochArr, cciArr, moveOscSeries=PDO) hesaplanır.
+cfg.combos=cfg.combos||[];
+const CTYPES={
+  chip:{lb:'Tarama çipi (T1–T29)'}, rsi:{lb:'RSI aralık',p:14,min:20,max:30}, cmo:{lb:'CMO aralık',p:14,min:-100,max:-40},
+  mfi:{lb:'MFI aralık',p:14,min:0,max:20}, stoch:{lb:'Stoch %K aralık',p:14,min:0,max:20}, cci:{lb:'CCI aralık',p:20,min:-300,max:-100},
+  adx:{lb:'ADX aralık',p:14,min:25,max:100}, pdo:{lb:'PDO AL/SAT kesişi',dir:'AL'}, pdov:{lb:'PDO değer aralık',min:0,max:30},
+  ema:{lb:'Fiyat EMA üstü/altı',p:200,dir:'ust'}
+};
+function newCombo(){return {id:'c'+Date.now().toString(36),name:'Kombin '+(cfg.combos.length+1),side:'LONG',logic:'all',n:2,mode:'window',K:2,alarm:false,conds:[{t:'rsi',p:14,min:20,max:30},{t:'pdo',dir:'AL'}]};}
+function cmoArr(c,p){const o=new Array(c.length).fill(NaN);for(let i=p;i<c.length;i++){let u=0,d=0;for(let j=i-p+1;j<=i;j++){const x=c[j]-c[j-1];if(x>0)u+=x;else d-=x;}o[i]=u+d?100*(u-d)/(u+d):0;}return o;}
+function adxArr(h,l,c,p){const L=c.length,o=new Array(L).fill(NaN);let tr=0,pd=0,md=0,adx=NaN,dxs=[];
+  for(let i=1;i<L;i++){const up=h[i]-h[i-1],dn=l[i-1]-l[i],t=Math.max(h[i]-l[i],Math.abs(h[i]-c[i-1]),Math.abs(l[i]-c[i-1]));
+    const P=up>dn&&up>0?up:0,M=dn>up&&dn>0?dn:0;
+    if(i<=p){tr+=t;pd+=P;md+=M;if(i<p)continue;}else{tr=tr-tr/p+t;pd=pd-pd/p+P;md=md-md/p+M;}
+    const pi=tr?100*pd/tr:0,mi=tr?100*md/tr:0,dx=pi+mi?100*Math.abs(pi-mi)/(pi+mi):0;
+    if(isNaN(adx)){dxs.push(dx);if(dxs.length===p){adx=dxs.reduce((a,b)=>a+b,0)/p;o[i]=adx;}}else{adx=(adx*(p-1)+dx)/p;o[i]=adx;}}
+  return o;}
+const emaA=(x,n)=>{const o=new Array(x.length).fill(NaN),a=2/(n+1);let e=NaN;for(let i=0;i<x.length;i++){if(!isFinite(x[i]))continue;e=isNaN(e)?x[i]:e+a*(x[i]-e);if(i>=n-1)o[i]=e;}return o;};
+// Koşulun j. mumdaki doğruluk fonksiyonunu döndürür (j: kapanmış mum dizini)
+function condFn(w,d,k,cd){
+  const n=k.c.length, inR=(v)=>isFinite(v)&&v>=+cd.min&&v<=+cd.max, P=Math.max(2,+cd.p||14);
+  switch(cd.t){
+    case 'chip':{let pass=false,age=null,dir='';try{pass=w.scanPass(d,cd.scan);age=w.scanAge(d,cd.scan);dir=String(w.scanDirLabel(d,cd.scan)||'');}catch(e){}
+      if(pass&&cd.dir&&cd.dir!=='any'){const isSat=/SAT|SHORT|US\b|↓/i.test(dir),isAl=!isSat&&/AL|LONG|UA\b|↑/i.test(dir);if(cd.dir==='AL'?!isAl:!isSat)pass=false;}
+      return j=>pass&&(age==null?j===n-1:(n-1-j)===+age);}
+    case 'rsi':{const a=w.rsiArr(k.c,P);return j=>inR(a[j]);}
+    case 'cmo':{const a=cmoArr(k.c,P);return j=>inR(a[j]);}
+    case 'mfi':{const a=w.mfiArr(k.h,k.l,k.c,k.v,P);return j=>inR(a[j]);}
+    case 'stoch':{const a=w.stochArr(k.h,k.l,k.c,P,3,3).K;return j=>inR(a[j]);}
+    case 'cci':{const a=w.cciArr(k.h,k.l,k.c,P);return j=>inR(a[j]);}
+    case 'adx':{const a=adxArr(k.h,k.l,k.c,P);return j=>inR(a[j]);}
+    case 'ema':{const a=emaA(k.c,P);return j=>isFinite(a[j])&&(cd.dir==='ust'?k.c[j]>a[j]:k.c[j]<a[j]);}
+    case 'pdo':case 'pdov':{let s;try{s=w.moveOscSeries(k,w.oscOpts(),n);}catch(e){return ()=>false;}
+      const r=s&&s.raw,g=s&&s.signal; if(!r||!g) return ()=>false; const o=n-r.length; // hizalama
+      if(cd.t==='pdov') return j=>inR(r[j-o]);
+      return j=>{const a=j-o;if(a<1)return false;return cd.dir==='SAT'?(r[a]<g[a]&&r[a-1]>=g[a-1]):(r[a]>g[a]&&r[a-1]<=g[a-1]);};}
+  }
+  return ()=>false;
+}
+function evalCombo(w,d,cb){
+  const k=d&&(d.kScan||d.k); if(!k||!k.c||k.c.length<30||!cb.conds.length) return null;
+  const n=k.c.length,K=Math.max(1,+cb.K||1),need=cb.logic==='all'?cb.conds.length:Math.min(cb.conds.length,Math.max(1,+cb.n||1));
+  let fns; try{fns=cb.conds.map(cd=>condFn(w,d,k,cd));}catch(e){return null;}
+  const js=[];for(let j=n-1;j>=Math.max(1,n-K);j--)js.push(j);
+  if(cb.mode==='same'){for(const j of js){const hits=fns.filter(f=>f(j)).length;if(hits>=need)return {hits,age:n-1-j,t:k.t[j]};}return null;}
+  const hits=fns.filter(f=>js.some(j=>f(j))).length; return hits>=need?{hits,age:0,t:k.t[n-1]}:null;
+}
+function frameWin(m){const f=$(m==='bist'?'qxBistFrame':'qxIzlemeFrame');try{return f&&f.contentWindow&&f.contentWindow.DATA?f.contentWindow:null;}catch(e){return null;}}
+function scanCombo(cb,m){const w=frameWin(m);if(!w)return null;const D=w.DATA||{},out=[];
+  for(const sym of Object.keys(D)){const r=evalCombo(w,D[sym],cb);if(r)out.push({sym,price:D[sym].price,hits:r.hits,age:r.age,t:r.t});}return out;}
+let comboRes={}, comboFired=load('qxbot_cfired_v1')||{};
+function comboAlarms(){
+  for(const cb of cfg.combos.filter(c=>c.alarm)) for(const m of ['coin','bist']){
+    const res=scanCombo(cb,m); if(!res) continue; comboRes[cb.id+'|'+m]=res;
+    for(const r of res){const key=cb.id+'|'+m+'|'+r.sym; if(comboFired[key]===r.t) continue; const first=comboFired[key]===undefined&&!comboAlarms.ready; comboFired[key]=r.t; if(first) continue;
+      const msg='🔔 Kombin "'+cb.name+'" · '+r.sym+' ('+(m==='bist'?'BIST':'coin')+') · '+cb.side; note(msg,'ok'); log(msg);
+      try{if(window.Notification&&Notification.permission==='granted')new Notification('QUANTEX Kombin',{body:msg});}catch(e){}}
+  }
+  comboAlarms.ready=true; try{localStorage.setItem('qxbot_cfired_v1',JSON.stringify(comboFired));}catch(e){}
+}
+setInterval(()=>{try{comboAlarms();}catch(e){console.warn(e);}},20000);
+function condRow(ci,i,cd){
+  const opt=Object.keys(CTYPES).map(t=>`<option value="${t}" ${cd.t===t?'selected':''}>${CTYPES[t].lb}</option>`).join('');
+  const inp=(f,v,w)=>`<input style="max-width:${w||70}px" data-cc="${ci}.${i}.${f}" value="${esc(v??'')}">`;
+  let x='';
+  if(cd.t==='chip') x=`<select data-cc="${ci}.${i}.scan">${Array.from({length:29},(_,q)=>'t'+(q+1)).map(s=>`<option value="${s}" ${cd.scan===s?'selected':''}>${s.toUpperCase()}</option>`).join('')}</select><select data-cc="${ci}.${i}.dir">${['any','AL','SAT'].map(s=>`<option ${cd.dir===s?'selected':''} value="${s}">${s==='any'?'yön fark etmez':s}</option>`).join('')}</select>`;
+  else if(cd.t==='pdo') x=`<select data-cc="${ci}.${i}.dir"><option ${cd.dir==='AL'?'selected':''}>AL</option><option ${cd.dir==='SAT'?'selected':''}>SAT</option></select>`;
+  else if(cd.t==='ema') x=`periyot ${inp('p',cd.p)}<select data-cc="${ci}.${i}.dir"><option value="ust" ${cd.dir==='ust'?'selected':''}>fiyat üstünde</option><option value="alt" ${cd.dir==='alt'?'selected':''}>fiyat altında</option></select>`;
+  else x=(cd.t==='pdov'?'':`periyot ${inp('p',cd.p)} `)+`min ${inp('min',cd.min)} max ${inp('max',cd.max)}`;
+  return `<div class="row" style="margin-top:4px"><select data-cc="${ci}.${i}.t" style="max-width:190px">${opt}</select>${x}<button class="g" style="flex:0" data-cdel="${ci}.${i}">✕</button></div>`;
+}
+function renderCombos(){
+  const el=$('qxbCombo'); if(!el) return;
+  el.innerHTML=cfg.combos.map((cb,ci)=>{
+    const rc=comboRes[cb.id+'|coin'], rb=comboRes[cb.id+'|bist'];
+    const tbl=(r,m)=>r?`<div><b>${m==='bist'?'BIST':'Coin'} sonuç: ${r.length}</b> ${r.slice(0,60).map(x=>`<a href="#" data-copen="${m}|${esc(x.sym)}" class="tag">${esc(x.sym)} ${x.hits}/${cb.conds.length}${x.age?' · '+x.age+' mum önce':''}</a>`).join(' ')}</div>`:'';
+    return `<div class="bx" style="background:#0d1422"><div class="row"><input data-cb="${ci}.name" value="${esc(cb.name)}" style="max-width:200px">
+     <select data-cb="${ci}.side"><option ${cb.side==='LONG'?'selected':''}>LONG</option><option ${cb.side==='SHORT'?'selected':''}>SHORT</option></select>
+     <select data-cb="${ci}.logic"><option value="all" ${cb.logic==='all'?'selected':''}>HEPSİ (VE)</option><option value="n" ${cb.logic==='n'?'selected':''}>EN AZ N</option></select>
+     ${cb.logic==='n'?`N <input data-cb="${ci}.n" value="${cb.n}" style="max-width:50px">`:''}
+     <select data-cb="${ci}.mode"><option value="window" ${cb.mode==='window'?'selected':''}>son K mum içinde</option><option value="same" ${cb.mode==='same'?'selected':''}>aynı mumda</option></select>
+     K <input data-cb="${ci}.K" value="${cb.K}" style="max-width:50px">
+     <label><input type="checkbox" data-cb="${ci}.alarm" ${cb.alarm?'checked':''}> Alarm</label></div>
+     ${cb.conds.map((cd,i)=>condRow(ci,i,cd)).join('')}
+     <div class="row" style="margin-top:6px"><button class="g" data-cadd="${ci}">+ Koşul</button><button data-cscan="${ci}|coin">📡 Coin tara</button><button data-cscan="${ci}|bist">📈 BIST tara</button><button class="o" data-cbot="${ci}">🤖 Bota kaynak yap</button><button class="r" data-cdelc="${ci}">Kombini sil</button></div>
+     ${tbl(rc,'coin')}${tbl(rb,'bist')}</div>`;}).join('')+`<button id="qxbNewCombo">+ Yeni kombin</button> <small>Tarama, ilgili İzleme sekmesinde yüklenmiş listenin KAPANMIŞ mumları ve İzleme'nin zaman dilimi üzerinde çalışır. Çip koşulları İzleme'deki çip ayarlarını kullanır. BIST'te yalnız tarama + alarm (bot emri yok).</small>`;
+  const save2=()=>{save();};
+  el.querySelectorAll('[data-cb]').forEach(i=>i.onchange=()=>{const [ci,f]=i.dataset.cb.split('.');let v=i.type==='checkbox'?i.checked:i.value;if(f==='K'||f==='n')v=Math.max(1,+v|0);cfg.combos[ci][f]=v;save2();renderCombos();});
+  el.querySelectorAll('[data-cc]').forEach(i=>i.onchange=()=>{const [ci,ii,f]=i.dataset.cc.split('.');const cd=cfg.combos[ci].conds[ii];
+    if(f==='t'){const d=CTYPES[i.value];cfg.combos[ci].conds[ii]=Object.assign({t:i.value},d.p!=null?{p:d.p}:{},d.min!=null?{min:d.min,max:d.max}:{},d.dir?{dir:d.dir}:{},i.value==='chip'?{scan:'t1',dir:'any'}:{});}
+    else cd[f]=(f==='p'||f==='min'||f==='max')?+i.value:i.value; save2(); renderCombos();});
+  el.querySelectorAll('[data-cdel]').forEach(b=>b.onclick=()=>{const [ci,ii]=b.dataset.cdel.split('.');cfg.combos[ci].conds.splice(ii,1);save2();renderCombos();});
+  el.querySelectorAll('[data-cadd]').forEach(b=>b.onclick=()=>{cfg.combos[b.dataset.cadd].conds.push({t:'rsi',p:14,min:20,max:30});save2();renderCombos();});
+  el.querySelectorAll('[data-cdelc]').forEach(b=>b.onclick=()=>{if(!confirm('Kombin silinsin mi?'))return;const cb=cfg.combos.splice(+b.dataset.cdelc,1)[0];cfg.sources=cfg.sources.filter(s=>s.comboId!==cb.id);save2();render();});
+  el.querySelectorAll('[data-cscan]').forEach(b=>b.onclick=()=>{const [ci,m]=b.dataset.cscan.split('|');const cb=cfg.combos[ci];const r=scanCombo(cb,m);
+    if(!r){note((m==='bist'?'📈 İzleme BIST':'📡 İzleme')+' sekmesini açıp önce tara','err');return;} comboRes[cb.id+'|'+m]=r; note(cb.name+': '+r.length+' sonuç','ok'); renderCombos();});
+  el.querySelectorAll('[data-cbot]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbot];addSource({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});render();});
+  el.querySelectorAll('[data-copen]').forEach(a=>a.onclick=e=>{e.preventDefault();const [m,sym]=a.dataset.copen.split('|');try{if(window.QX_LINK&&QX_LINK.openInMonitor)QX_LINK.openInMonitor(sym);}catch(err){}});
+  $('qxbNewCombo').onclick=()=>{cfg.combos.push(newCombo());save2();renderCombos();try{Notification&&Notification.permission==='default'&&Notification.requestPermission();}catch(e){}};
+}
 
 // ---- sekme ----
 function showBot(el){
