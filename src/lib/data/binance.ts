@@ -119,12 +119,21 @@ async function fetchNativeKlines(
     ? `${fapiUrl("/v1/klines")}?symbol=${encodeURIComponent(restSym)}&interval=${interval}&limit=${limit}`
     : `${REST}/api/v3/klines?symbol=${encodeURIComponent(restSym)}&interval=${interval}&limit=${limit}`;
   try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: perp ? PERP_FETCH_HEADERS : undefined,
-    });
-    if (!res.ok) throw new Error(`Binance klines ${res.status}`);
-    const rows = (await res.json()) as unknown[][];
+    let rows: unknown[][];
+    if (!perp && typeof window === "undefined") {
+      // sunucu: ağırlık/ban koruması + 60 sn cache
+      const { guardedGet } = await import("@/lib/server/binanceGuard");
+      const e = await guardedGet(url);
+      if (e.status !== 200) throw new Error(`Binance klines ${e.status}`);
+      rows = JSON.parse(e.body) as unknown[][];
+    } else {
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: perp ? PERP_FETCH_HEADERS : undefined,
+      });
+      if (!res.ok) throw new Error(`Binance klines ${res.status}`);
+      rows = (await res.json()) as unknown[][];
+    }
     if (perp) setLastPerpFeed("binance");
     return rows.map((r) => ({
       time: Math.floor(Number(r[0]) / 1000),

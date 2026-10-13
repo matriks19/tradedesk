@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { guardedGet, guardStatus } from "@/lib/server/binanceGuard";
 
 export const dynamic = "force-dynamic";
 
@@ -28,24 +29,28 @@ export async function GET(
     sub +
     (q.toString() ? "?" + q.toString() : "");
   try {
-    const res = await fetch(url, { cache: "no-store" });
-    if (sub === "exchangeInfo" && res.ok) {
-      const data = await res.json();
+    const e = await guardedGet(url);
+    const st = guardStatus();
+    const hdr: Record<string, string> = {
+      "content-type": e.ct || "application/json",
+      "cache-control": "no-store",
+      "x-qx-used-weight-1m": String(st.usedWeight1m),
+      "x-qx-cache": e.cached ? (e.stale ? "stale" : "hit") : "miss",
+    };
+    if (e.status === 429) {
+      hdr["retry-after"] = String(Math.max(1, Math.ceil((st.banUntil - Date.now()) / 1000)));
+      if (st.banUntil) hdr["x-qx-ban-until"] = String(st.banUntil);
+    }
+    if (sub === "exchangeInfo" && e.status === 200) {
+      const data = JSON.parse(e.body);
       const symbols = Array.isArray(data.symbols) ? data.symbols : [];
       data.symbols = symbols.filter(
         (s: { status?: string; quoteAsset?: string } | null) =>
           !!s && s.status === "TRADING" && s.quoteAsset === "USDT"
       );
-      return NextResponse.json(data, { headers: { "cache-control": "no-store" } });
+      return NextResponse.json(data, { headers: hdr });
     }
-    const body = await res.text();
-    return new NextResponse(body, {
-      status: res.status,
-      headers: {
-        "content-type": res.headers.get("content-type") || "application/json",
-        "cache-control": "no-store",
-      },
-    });
+    return new NextResponse(e.body, { status: e.status, headers: hdr });
   } catch (e) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : "proxy" },
