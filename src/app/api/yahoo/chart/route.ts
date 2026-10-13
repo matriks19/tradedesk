@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
     );
   }
   const limitRaw = Number(sp.get("limit") || 320);
-  const limit = Math.min(500, Math.max(30, Number.isFinite(limitRaw) ? limitRaw : 320));
+  const limit = Math.min(1000, Math.max(30, Number.isFinite(limitRaw) ? limitRaw : 320));
   const raw = (sp.get("symbols") || "").slice(0, 800);
   const symbols: string[] = [];
   const seen = new Set<string>();

@@ -20,9 +20,12 @@ export async function GET(
     const v = src.get(k);
     if (v) q.set(k, v.slice(0, 32));
   }
+  // Spot proxy tek istekte en fazla 1000 mum; 1001–1500 istenirse (T29/T30) eski mumlar ikinci istekle (endTime) eklenir
+  let wantKl = 0;
   if (sub === "klines") {
-    const n = Math.min(1000, Math.max(1, Number(q.get("limit") || 499)));
-    q.set("limit", String(Number.isFinite(n) ? n : 499));
+    const n0 = Math.min(1500, Math.max(1, Number(q.get("limit") || 499)));
+    wantKl = Number.isFinite(n0) ? n0 : 499;
+    q.set("limit", String(Math.min(1000, wantKl)));
   }
   const url =
     "https://data-api.binance.vision/api/v3/" +
@@ -49,6 +52,23 @@ export async function GET(
           !!s && s.status === "TRADING" && s.quoteAsset === "USDT"
       );
       return NextResponse.json(data, { headers: hdr });
+    }
+    if (sub === "klines" && wantKl > 1000 && e.status === 200) {
+      try {
+        const rows = JSON.parse(e.body) as unknown[][];
+        if (Array.isArray(rows) && rows.length >= 1000) {
+          const q2 = new URLSearchParams(q);
+          q2.set("limit", String(wantKl - rows.length));
+          q2.set("endTime", String(Number(rows[0]![0]) - 1));
+          const e2 = await guardedGet("https://data-api.binance.vision/api/v3/klines?" + q2.toString());
+          if (e2.status === 200) {
+            const older = JSON.parse(e2.body) as unknown[][];
+            if (Array.isArray(older)) return NextResponse.json([...older, ...rows], { headers: hdr });
+          }
+        }
+      } catch {
+        /* ilk 1000 ile devam */
+      }
     }
     return new NextResponse(e.body, { status: e.status, headers: hdr });
   } catch (e) {

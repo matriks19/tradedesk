@@ -7,9 +7,9 @@
 import type { Candle } from "@/lib/types";
 import { lastClosedIndex } from "./eliziLdr4";
 
-export const FRACTAL8_FETCH_LIMIT = 1000;
+export const FRACTAL8_FETCH_LIMIT = 1000; // Liste Tarama (spot proxy tek istek 1000)
 export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: number; /** "auto" veya 1, 0.5, 0.25, 0.125, 0.0625 */ scale?: number | "auto" };
-export const FR8_SCALES = [1, 0.5, 0.25, 0.125, 0.0625];
+export const FR8_SCALES = [1, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 12, 1 / 16];
 export const fr8ScaleLabel = (sc: number) => (sc >= 1 ? "1" : `1/${Math.round(1 / sc)}`);
 export const FR8_DEFAULTS = { n1: 10, n2: 21, ob: 75, mult: 1 };
 export type Fractal8Cond = "fr8_up12" | "fr8_dn12" | "fr8_up15" | "fr8_up25" | "fr8_dn25";

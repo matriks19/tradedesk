@@ -3970,7 +3970,7 @@ export function ListScanPanel() {
           (ısınmamışsa sinyal yok) · çekim {FRACTAL8_FETCH_LIMIT} · QUANTEX T30 ile aynı matematik
         </p>
         <div className="flex flex-wrap gap-1">
-          {[["auto", "Otomatik"], ["1", "1"], ["0.5", "1/2"], ["0.25", "1/4"], ["0.125", "1/8"], ["0.0625", "1/16"]].map(([v, l]) => (
+          {[["auto", "Otomatik"], ["1", "1"], ["0.5", "1/2"], [String(1 / 3), "1/3"], ["0.25", "1/4"], ["0.2", "1/5"], [String(1 / 6), "1/6"], ["0.125", "1/8"], ["0.1", "1/10"], [String(1 / 12), "1/12"], ["0.0625", "1/16"]].map(([v, l]) => (
             <Chip key={v} title={`Ölçek ${l}`} active={fr8Scale === v} label={`Ölçek ${l}`} onClick={() => setFr8Scale(v!)} />
           ))}
         </div>
