@@ -86,6 +86,13 @@ import {
   type PliDtDivCond,
 } from "@/lib/indicators/pliDtDiv";
 import {
+  jfkpsScan,
+  DEFAULT_JFKPS_CONDS,
+  JFKPS_BEAR_CONDS,
+  type JfkpsCond,
+  type JfkpsParams,
+} from "@/lib/indicators/jfkps";
+import {
   fractal8Scan,
   DEFAULT_FRACTAL8_CONDS,
   FRACTAL8_BEAR_CONDS,
@@ -572,6 +579,7 @@ export type ListScanKind =
   | "eliziLdr4"
   | "ema30Band"
   | "fractal8"
+  | "jfkps"
   | "pine";
 
 export type PineCond =
@@ -938,6 +946,12 @@ export type ListScanConfig = {
     params?: Ema30BandParams;
   };
   /** T30 FRACTAL 8 Ribbons (kullanıcının Pine v4 göstergesi) — seviye kesişimleri, kapanmış mum. */
+  /** T31 JFKPS (Loxx) — L/S kesişimleri + trend durumu, kapanmış mum. */
+  jfkps?: {
+    enabled: boolean;
+    conds: JfkpsCond[];
+    params?: JfkpsParams;
+  };
   fractal8?: {
     enabled: boolean;
     conds: Fractal8Cond[];
@@ -2504,6 +2518,18 @@ function scanEma30Band(
   }));
 }
 
+function scanJfkps(candles: Candle[], cfg: NonNullable<ListScanConfig["jfkps"]>, maxBarsAgo: number): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_JFKPS_CONDS;
+  return jfkpsScan(candles, conds, maxBarsAgo, cfg.params ?? {}).map((h) => ({
+    kind: "jfkps" as const,
+    cond: h.cond,
+    bias: JFKPS_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 function scanFractal8(
   candles: Candle[],
   cfg: NonNullable<ListScanConfig["fractal8"]>,
@@ -2566,6 +2592,7 @@ export function scanSymbol(
   if (cfg.eliziLdr4?.enabled) enabledKinds.push("eliziLdr4");
   if (cfg.ema30Band?.enabled) enabledKinds.push("ema30Band");
   if (cfg.fractal8?.enabled) enabledKinds.push("fractal8");
+  if (cfg.jfkps?.enabled) enabledKinds.push("jfkps");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2594,6 +2621,7 @@ export function scanSymbol(
     eliziLdr4: cfg.eliziLdr4 ? scanEliziLdr4(candles, cfg.eliziLdr4, maxBarsAgo) : [],
     ema30Band: cfg.ema30Band ? scanEma30Band(candles, cfg.ema30Band, maxBarsAgo) : [],
     fractal8: cfg.fractal8 ? scanFractal8(candles, cfg.fractal8, maxBarsAgo) : [],
+    jfkps: cfg.jfkps ? scanJfkps(candles, cfg.jfkps, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -3042,7 +3070,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  Exclude<ListScanKind, "pine" | "fractal8">,
+  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps">,
   | "hamJurikTpo"
   | "diagonalSr"
   | "macd"
@@ -3209,3 +3237,12 @@ export {
   type Fractal8Cond,
   type Fractal8Params,
 } from "@/lib/indicators/fractal8";
+export {
+  DEFAULT_JFKPS_CONDS,
+  ALL_JFKPS_CONDS,
+  JFKPS_COND_LABEL,
+  JFKPS_DEFAULTS,
+  jfkpsMinBars,
+  type JfkpsCond,
+  type JfkpsParams,
+} from "@/lib/indicators/jfkps";
