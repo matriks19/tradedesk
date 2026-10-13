@@ -8,7 +8,9 @@ import type { Candle } from "@/lib/types";
 import { lastClosedIndex } from "./eliziLdr4";
 
 export const FRACTAL8_FETCH_LIMIT = 1000;
-export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: number };
+export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: number; /** "auto" veya 1, 0.5, 0.25, 0.125, 0.0625 */ scale?: number | "auto" };
+export const FR8_SCALES = [1, 0.5, 0.25, 0.125, 0.0625];
+export const fr8ScaleLabel = (sc: number) => (sc >= 1 ? "1" : `1/${Math.round(1 / sc)}`);
 export const FR8_DEFAULTS = { n1: 10, n2: 21, ob: 75, mult: 1 };
 export type Fractal8Cond = "fr8_up12" | "fr8_dn12" | "fr8_up15" | "fr8_up25" | "fr8_dn25";
 export const ALL_FRACTAL8_CONDS: Fractal8Cond[] = ["fr8_up12", "fr8_dn12", "fr8_up15", "fr8_up25", "fr8_dn25"];
@@ -34,9 +36,20 @@ function opts(p?: Fractal8Params | null) {
     mult: Math.max(1, Math.round(g(p?.mult, 1))),
   };
 }
+const per = (o: ReturnType<typeof opts>, sc: number, base: number, m: number) => Math.max(2, Math.round(base * m * o.mult * sc));
+const needAt = (o: ReturnType<typeof opts>, sc: number, m: number) => 2 * per(o, sc, o.n1, m) + per(o, sc, o.n2, m) + 1;
+/** Otomatik: Level 5 dahil tüm seviyelerin ısınıp ≥50 mum geçerli kaldığı en büyük ölçek (QUANTEX ile aynı). */
+export function fractal8PickScale(p: Fractal8Params | null | undefined, n: number): { sc: number; auto: boolean } {
+  const o = opts(p), v = Number(p?.scale);
+  if (p?.scale !== undefined && p.scale !== "auto" && Number.isFinite(v) && v > 0) return { sc: v, auto: false };
+  for (const sc of FR8_SCALES) if (needAt(o, sc, 128) + 50 <= n) return { sc, auto: true };
+  return { sc: FR8_SCALES[FR8_SCALES.length - 1]!, auto: true };
+}
+/** Level 1/2 için gereken mum (Otomatik'te en küçük ölçek varsayılır). */
 export function fractal8MinBars(p?: Fractal8Params | null): number {
-  const o = opts(p);
-  return (2 * o.n1 + o.n2) * 16 * o.mult + 1;
+  const o = opts(p), v = Number(p?.scale);
+  const sc = p?.scale !== undefined && p.scale !== "auto" && Number.isFinite(v) && v > 0 ? v : FR8_SCALES[FR8_SCALES.length - 1]!;
+  return needAt(o, sc, 16);
 }
 /** Pine ema: ilk len geçerli değerin SMA'sı ile tohumlanır. */
 function ema(x: number[], len: number): number[] {
@@ -53,14 +66,15 @@ function ema(x: number[], len: number): number[] {
   }
   return o;
 }
-export type Fractal8Result = { n: number; need: number; lv: number[][]; v12: boolean[]; v15: boolean[]; ev: Record<"up12" | "dn12" | "up15" | "up25" | "dn25", boolean[]> };
+export type Fractal8Result = { n: number; need: number; sc: number; scLbl: string; lv: number[][]; v12: boolean[]; v15: boolean[]; ev: Record<"up12" | "dn12" | "up15" | "up25" | "dn25", boolean[]> };
 
 export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): Fractal8Result {
   const o = opts(p), n = candles.length, M = [1, 2, 4, 8, 16, 32, 64, 128];
+  const PS = fractal8PickScale(p, n), sc = PS.sc;
   const ap = candles.map((c) => (c.high + c.low + c.close) / 3);
   const W: Record<number, number[]> = {};
   for (const m of M) {
-    const L1 = o.n1 * m * o.mult, L2 = o.n2 * m * o.mult;
+    const L1 = per(o, sc, o.n1, m), L2 = per(o, sc, o.n2, m);
     const esa = ema(ap, L1);
     const dd = ema(ap.map((v, i) => (Number.isFinite(esa[i]!) ? Math.abs(v - esa[i]!) : NaN)), L1);
     const ci = ap.map((v, i) => (Number.isFinite(esa[i]!) && Number.isFinite(dd[i]!) && dd[i] !== 0 ? (100 * (v - esa[i]!)) / dd[i]! : NaN));
@@ -89,7 +103,7 @@ export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): F
     ev.up25[i] = a5 && B[i]! > C[i]! && B[q]! <= C[q]!;
     ev.dn25[i] = a5 && B[i]! < C[i]! && B[q]! >= C[q]!;
   }
-  return { n, need: fractal8MinBars(p), lv, v12, v15, ev };
+  return { n, need: needAt(o, sc, 16), sc, scLbl: fr8ScaleLabel(sc) + (PS.auto ? " (oto)" : ""), lv, v12, v15, ev };
 }
 
 const EV_KEY: Record<Fractal8Cond, keyof Fractal8Result["ev"]> = { fr8_up12: "up12", fr8_dn12: "dn12", fr8_up15: "up15", fr8_up25: "up25", fr8_dn25: "dn25" };
@@ -106,7 +120,7 @@ export function fractal8Scan(candles: Candle[], conds: Fractal8Cond[], maxBarsAg
     const ev = R.ev[EV_KEY[cond]];
     for (let i = lc; i >= 0 && last - i <= maxBarsAgo; i--) {
       if (!ev[i]) continue;
-      out.push({ cond, barsAgo: last - i, note: `FR8 ${FRACTAL8_COND_LABEL[cond]} · K ${R.lv[0]![i]!.toFixed(1)} / Y ${R.lv[1]![i]!.toFixed(1)}${R.v15[i] ? ` / S ${R.lv[4]![i]!.toFixed(1)}` : ""} (−${last - i})` });
+      out.push({ cond, barsAgo: last - i, note: `FR8 ölçek ${R.scLbl} · ${FRACTAL8_COND_LABEL[cond]} · K ${R.lv[0]![i]!.toFixed(1)} / Y ${R.lv[1]![i]!.toFixed(1)}${R.v15[i] ? ` / S ${R.lv[4]![i]!.toFixed(1)}` : ""} (−${last - i})` });
       break;
     }
   }

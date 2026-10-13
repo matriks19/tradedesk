@@ -936,6 +936,7 @@ export function ListScanPanel() {
   const [e3On, setE3On] = useState(false);
   const [fr8On, setFr8On] = useState(false);
   const [fr8Conds, setFr8Conds] = useState<Fractal8Cond[]>([...DEFAULT_FRACTAL8_CONDS]);
+  const [fr8Scale, setFr8Scale] = useState<string>("auto");
   const [fr8Mult, setFr8Mult] = useState<number>(FR8_DEFAULTS.mult);
   const [fr8N1, setFr8N1] = useState<number>(FR8_DEFAULTS.n1);
   const [fr8N2, setFr8N2] = useState<number>(FR8_DEFAULTS.n2);
@@ -1343,6 +1344,7 @@ export function ListScanPanel() {
           n1: Math.max(1, Math.min(200, Math.round(Number(fr8N1) || FR8_DEFAULTS.n1))),
           n2: Math.max(1, Math.min(200, Math.round(Number(fr8N2) || FR8_DEFAULTS.n2))),
           mult: Math.max(1, Math.min(8, Math.round(Number(fr8Mult) || FR8_DEFAULTS.mult))),
+          scale: fr8Scale === "auto" ? "auto" : Number(fr8Scale),
         },
       },
       ema30Band: {
@@ -1524,6 +1526,7 @@ export function ListScanPanel() {
     fr8N1,
     fr8N2,
     fr8Mult,
+    fr8Scale,
     e3LenBand,
     e3Len200,
     e3RevBars,
@@ -3963,9 +3966,14 @@ export function ListScanPanel() {
       >
         <p className="text-2xs text-desk-muted">
           Kullanıcının Pine v4 göstergesi: hlc3 WaveTrend (ci/tci), çarpanlar 1..128 × mult · Kırmızı = Level 1, Yeşil = Level 2,
-          Siyah = Level 5 · yalnız kapanmış mum · Level 1/2 ≥{fractal8MinBars({ n1: fr8N1, n2: fr8N2, mult: fr8Mult })} mum, Siyah ≈8× daha
-          uzun ısınma (ısınmamışsa sinyal yok) · çekim {FRACTAL8_FETCH_LIMIT} · QUANTEX T30 ile aynı matematik
+          Siyah = Level 5 · yalnız kapanmış mum · Level 1/2 ≥{fractal8MinBars({ n1: fr8N1, n2: fr8N2, mult: fr8Mult, scale: fr8Scale === "auto" ? "auto" : Number(fr8Scale) })} mum · Ölçek: periyot = max(2, round(n·k·mult·ölçek)); Otomatik = Siyah dahil ısınabilen en büyük ölçek
+          (ısınmamışsa sinyal yok) · çekim {FRACTAL8_FETCH_LIMIT} · QUANTEX T30 ile aynı matematik
         </p>
+        <div className="flex flex-wrap gap-1">
+          {[["auto", "Otomatik"], ["1", "1"], ["0.5", "1/2"], ["0.25", "1/4"], ["0.125", "1/8"], ["0.0625", "1/16"]].map(([v, l]) => (
+            <Chip key={v} title={`Ölçek ${l}`} active={fr8Scale === v} label={`Ölçek ${l}`} onClick={() => setFr8Scale(v!)} />
+          ))}
+        </div>
         <div className="grid grid-cols-3 gap-1">
           <NumInput label="Çarpan" value={fr8Mult} onChange={setFr8Mult} hint="Base Timescale Multiplier (1)" />
           <NumInput label="n1" value={fr8N1} onChange={setFr8N1} hint="Channel Length (10)" />
