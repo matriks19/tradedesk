@@ -130,6 +130,19 @@ import {
   EMA30_BAND_FETCH_LIMIT,
   E30_DEFAULTS,
   ema30BandMinBars,
+  DEFAULT_FRACTAL8_CONDS,
+  DEFAULT_JFKPS_CONDS,
+  ALL_JFKPS_CONDS,
+  JFKPS_COND_LABEL,
+  JFKPS_DEFAULTS,
+  jfkpsMinBars,
+  type JfkpsCond,
+  ALL_FRACTAL8_CONDS,
+  FRACTAL8_COND_LABEL,
+  FRACTAL8_FETCH_LIMIT,
+  FR8_DEFAULTS,
+  fractal8MinBars,
+  type Fractal8Cond,
   type Ema30BandCond,
   type ListScanHit,
   type ListScanKind,
@@ -927,6 +940,24 @@ export function ListScanPanel() {
   const [pdzSqLen, setPdzSqLen] = useState<number>(PPO_DSI_Z_DEFAULTS.squeezeLen);
   const [pdzSqTol, setPdzSqTol] = useState<number>(PPO_DSI_Z_DEFAULTS.sqTol);
   const [e3On, setE3On] = useState(false);
+  const [fr8On, setFr8On] = useState(false);
+  const [jfOn, setJfOn] = useState(false);
+  const [jfConds, setJfConds] = useState<JfkpsCond[]>([...DEFAULT_JFKPS_CONDS]);
+  const [jfLen, setJfLen] = useState<number>(JFKPS_DEFAULTS.len);
+  const [jfX, setJfX] = useState<number>(JFKPS_DEFAULTS.x);
+  const [jfSm, setJfSm] = useState<number>(JFKPS_DEFAULTS.sm);
+  const [jfJl, setJfJl] = useState<number>(JFKPS_DEFAULTS.jl);
+  const [jfPh, setJfPh] = useState<number>(JFKPS_DEFAULTS.phase);
+  const [fr8Conds, setFr8Conds] = useState<Fractal8Cond[]>([...DEFAULT_FRACTAL8_CONDS]);
+  const [fr8Scale, setFr8Scale] = useState<string>("auto");
+  const [fr8Jma, setFr8Jma] = useState<boolean>(true);
+  const [fr8JmaRed, setFr8JmaRed] = useState<boolean>(false);
+  const [fr8JmaKlasik, setFr8JmaKlasik] = useState<boolean>(false);
+  const [fr8JmaLen, setFr8JmaLen] = useState<number>(5);
+  const [fr8JmaPh, setFr8JmaPh] = useState<number>(0);
+  const [fr8Mult, setFr8Mult] = useState<number>(FR8_DEFAULTS.mult);
+  const [fr8N1, setFr8N1] = useState<number>(FR8_DEFAULTS.n1);
+  const [fr8N2, setFr8N2] = useState<number>(FR8_DEFAULTS.n2);
   const [e3Conds, setE3Conds] = useState<Ema30BandCond[]>([...DEFAULT_EMA30_BAND_CONDS]);
   const [e3LenBand, setE3LenBand] = useState<number>(E30_DEFAULTS.lenBand);
   const [e3Len200, setE3Len200] = useState<number>(E30_DEFAULTS.len200);
@@ -1324,6 +1355,32 @@ export function ListScanPanel() {
         squeezeLen: Math.max(2, Math.min(400, Math.round(Number(pdzSqLen) || PPO_DSI_Z_DEFAULTS.squeezeLen))),
         sqTol: Number.isFinite(pdzSqTol) && pdzSqTol >= 0 ? pdzSqTol : PPO_DSI_Z_DEFAULTS.sqTol,
       },
+      jfkps: {
+        enabled: jfOn,
+        conds: jfConds,
+        params: {
+          len: Math.max(1, Math.min(200, Math.round(Number(jfLen) || 23))),
+          x: Math.max(1, Math.min(50, Math.round(Number(jfX) || 13))),
+          sm: Math.max(1, Math.min(50, Math.round(Number(jfSm) || 8))),
+          jl: Math.max(2, Math.min(200, Math.round(Number(jfJl) || 25))),
+          phase: Math.max(-100, Math.min(100, Math.round(Number(jfPh) || 0))),
+        },
+      },
+      fractal8: {
+        enabled: fr8On,
+        conds: fr8Conds,
+        params: {
+          n1: Math.max(1, Math.min(200, Math.round(Number(fr8N1) || FR8_DEFAULTS.n1))),
+          n2: Math.max(1, Math.min(200, Math.round(Number(fr8N2) || FR8_DEFAULTS.n2))),
+          mult: Math.max(1, Math.min(8, Math.round(Number(fr8Mult) || FR8_DEFAULTS.mult))),
+          scale: fr8Scale === "auto" ? "auto" : Number(fr8Scale),
+          jmaOn: fr8Jma,
+          jmaScope: fr8JmaRed ? "red" : "all",
+          jmaType: fr8JmaKlasik ? "klasik" : "loxx",
+          jmaLen: Math.max(1, Math.min(100, Math.round(Number(fr8JmaLen) || 5))),
+          jmaPhase: Math.max(-100, Math.min(100, Math.round(Number(fr8JmaPh) || 0))),
+        },
+      },
       ema30Band: {
         enabled: e3On,
         conds: e3Conds,
@@ -1498,6 +1555,24 @@ export function ListScanPanel() {
     eldConds,
     e3On,
     e3Conds,
+    fr8On,
+    fr8Conds,
+    jfOn,
+    jfConds,
+    jfLen,
+    jfX,
+    jfSm,
+    jfJl,
+    jfPh,
+    fr8N1,
+    fr8N2,
+    fr8Mult,
+    fr8Scale,
+    fr8Jma,
+    fr8JmaRed,
+    fr8JmaKlasik,
+    fr8JmaLen,
+    fr8JmaPh,
     e3LenBand,
     e3Len200,
     e3RevBars,
@@ -1547,7 +1622,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1708,10 +1783,13 @@ export function ListScanPanel() {
             // ELIZI-LDR4: kendi ısınması (≈250 kapalı mum) — diğer türlerle birlikte açıksa en büyüğü
             const useE3 = !!cfg.ema30Band?.enabled;
             const minBars1 = useEld ? Math.max(minBars0, eliziLdr4MinBars(cfg.eliziLdr4?.params) + 1) : minBars0;
-            const minBars = useE3 ? Math.max(minBars1, ema30BandMinBars(cfg.ema30Band?.params)) : minBars1;
+            const minBars2 = useE3 ? Math.max(minBars1, ema30BandMinBars(cfg.ema30Band?.params)) : minBars1;
+            const minBars = cfg.jfkps?.enabled ? Math.max(minBars2, jfkpsMinBars(cfg.jfkps?.params)) : minBars2;
             const klineLimitE0 = useEld ? Math.max(klineLimit, eliziLdr4FetchLimit(cfg.eliziLdr4?.params)) : klineLimit;
             // EMA30 Band: durum makinesi geçmişe bağlı → 1000 mum
-            const klineLimitE = useE3 ? Math.max(klineLimitE0, EMA30_BAND_FETCH_LIMIT) : klineLimitE0;
+            const klineLimitE1 = useE3 ? Math.max(klineLimitE0, EMA30_BAND_FETCH_LIMIT) : klineLimitE0;
+            // FRACTAL 8: uzun ısınma → 1000 mum
+            const klineLimitE = cfg.fractal8?.enabled ? Math.max(klineLimitE1, FRACTAL8_FETCH_LIMIT) : klineLimitE1;
             // Trend filtresi: yalnız kripto; periyot tarama TF'sine göre (4s EMA200 eşdeğeri)
             const trendApplies = trendOn && trendFilterApplies(q.symbol, q.exchange, livePerpsRef.current?.tradfi);
             const trendPeriod = trendEmaPeriod(scanTf);
@@ -1845,6 +1923,14 @@ export function ListScanPanel() {
         const n = out.filter((h) => h.kind === "ppoDsiZ").length;
         byKind.push(`ppoDsiZ ${n}`);
       }
+      if (cfgDone.jfkps?.enabled) {
+        const n = out.filter((h) => h.kind === "jfkps").length;
+        byKind.push(`jfkps ${n}`);
+      }
+      if (cfgDone.fractal8?.enabled) {
+        const n = out.filter((h) => h.kind === "fractal8").length;
+        byKind.push(`fr8 ${n}`);
+      }
       if (cfgDone.ema30Band?.enabled) {
         const n = out.filter((h) => h.kind === "ema30Band").length;
         byKind.push(`e30 ${n}`);
@@ -1882,6 +1968,8 @@ export function ListScanPanel() {
         cfgDone.ppoDsiZ?.enabled,
         cfgDone.eliziLdr4?.enabled,
         cfgDone.ema30Band?.enabled,
+        cfgDone.fractal8?.enabled,
+        cfgDone.jfkps?.enabled,
         cfgDone.pine?.enabled,
       ].filter(Boolean).length;
       const hepsiWarn =
@@ -1914,7 +2002,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -1979,10 +2067,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !jfOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -2056,7 +2144,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2355,6 +2443,49 @@ export function ListScanPanel() {
               conds: [h.cond as PdoCond],
               crossMode: "kd",
             },
+          },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "jfkps") {
+        const c = cfg.jfkps;
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "JFKPS",
+          scanKey: "list_scan",
+          scanPayload: { matchMode: "any", jfkps: { enabled: true, conds: [h.cond as JfkpsCond], params: { ...(c?.params ?? {}) } } },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "fractal8") {
+        const c = cfg.fractal8;
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "FRACTAL 8",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            fractal8: { enabled: true, conds: [h.cond as Fractal8Cond], params: { ...(c?.params ?? {}) } },
           },
           timeframe: tf,
           repeat: "once",
@@ -2728,10 +2859,12 @@ export function ListScanPanel() {
     if (ppoDzOn) names.push("PPO-DSI-Z");
     if (eldOn) names.push("ELIZI-LDR4");
     if (e3On) names.push("EMA30 Band");
+    if (fr8On) names.push("FRACTAL 8");
+    if (jfOn) names.push("JFKPS");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -3891,6 +4024,87 @@ export function ListScanPanel() {
                 } else {
                   setEldConds((a) => toggleCondKeepOne(a, c.id));
                 }
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="T31 · JFKPS (Loxx)"
+        enabled={jfOn}
+        onToggle={() => { if (jfOn) setJfOn(false); else { setJfOn(true); setMatchMode("any"); } }}
+        open={openCard === "jfkps"}
+        onOpen={() => setOpenCard((c) => (c === "jfkps" ? null : "jfkps"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Jurik-Filtered Kase Permission Stochastic [Loxx]: TripleDF/TripleDS [Multiplier] rekürans + sma(3) + Loxx jurik_filt · L = pst pss&apos;i yukarı keser,
+          S = aşağı · Trend Yeşil/Kırmızı = son kapanmış mum durumu · ≥{jfkpsMinBars({ len: jfLen, x: jfX, sm: jfSm, jl: jfJl })} mum · QUANTEX T31 ile aynı matematik
+        </p>
+        <div className="grid grid-cols-3 gap-1">
+          <NumInput label="Period" value={jfLen} onChange={setJfLen} hint="Period (23)" />
+          <NumInput label="Multiplier" value={jfX} onChange={setJfX} hint="Synthetic Multiplier (13)" />
+          <NumInput label="Smoothing" value={jfSm} onChange={setJfSm} hint="Stochastic smoothing (8)" />
+          <NumInput label="Jurik period" value={jfJl} onChange={setJfJl} hint="Jurik smoothing period (25)" />
+          <NumInput label="Jurik phase" value={jfPh} onChange={setJfPh} hint="Jurik phase (0)" />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {ALL_JFKPS_CONDS.map((id) => (
+            <Chip
+              key={id}
+              title={JFKPS_COND_LABEL[id]}
+              active={jfConds.includes(id)}
+              label={JFKPS_COND_LABEL[id]}
+              onClick={() => {
+                if (!jfOn) { setJfOn(true); setMatchMode("any"); setJfConds((a) => ensureCond(a, id)); }
+                else setJfConds((a) => toggleCondKeepOne(a, id));
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="T30 · FRACTAL 8 Ribbons"
+        enabled={fr8On}
+        onToggle={() => { if (fr8On) setFr8On(false); else { setFr8On(true); setMatchMode("any"); } }}
+        open={openCard === "fractal8"}
+        onOpen={() => setOpenCard((c) => (c === "fractal8" ? null : "fractal8"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Kullanıcının Pine v4 göstergesi: hlc3 WaveTrend (ci/tci), çarpanlar 1..128 × mult · Kırmızı = Level 1, Yeşil = Level 2,
+          Siyah = Level 5 · yalnız kapanmış mum · Level 1/2 ≥{fractal8MinBars({ n1: fr8N1, n2: fr8N2, mult: fr8Mult, scale: fr8Scale === "auto" ? "auto" : Number(fr8Scale) })} mum · Ölçek: periyot = max(2, round(n·k·mult·ölçek)); Otomatik = Siyah dahil ısınabilen en büyük ölçek
+          (ısınmamışsa sinyal yok) · çekim {FRACTAL8_FETCH_LIMIT} · QUANTEX T30 ile aynı matematik
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {[["auto", "Otomatik"], ["1", "1"], ["0.5", "1/2"], [String(1 / 3), "1/3"], ["0.25", "1/4"], ["0.2", "1/5"], [String(1 / 6), "1/6"], ["0.125", "1/8"], ["0.1", "1/10"], [String(1 / 12), "1/12"], ["0.0625", "1/16"]].map(([v, l]) => (
+            <Chip key={v} title={`Ölçek ${l}`} active={fr8Scale === v} label={`Ölçek ${l}`} onClick={() => setFr8Scale(v!)} />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Chip title="Level çizgilerini Jurik (JMA, power 2) ile yumuşat; kesişimler yumuşatılmış seriden" active={fr8Jma} label="Jurik yumuşatma" onClick={() => setFr8Jma((v) => !v)} />
+          <Chip title="Kapsam: yalnız Kırmızı (Level 1) yumuşatılır" active={fr8JmaRed} label="Sadece Kırmızı" onClick={() => setFr8JmaRed((v) => !v)} />
+          <Chip title="Jurik tipi: kapalı = Loxx (uyarlamalı, varsayılan), açık = Klasik (sabit alfa)" active={fr8JmaKlasik} label="Klasik Jurik" onClick={() => setFr8JmaKlasik((v) => !v)} />
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          <NumInput label="JMA uzunluk" value={fr8JmaLen} onChange={setFr8JmaLen} hint="JMA uzunluk (5)" />
+          <NumInput label="JMA faz" value={fr8JmaPh} onChange={setFr8JmaPh} hint="JMA faz (-100..100, 0)" />
+        </div>
+        <div className="grid grid-cols-3 gap-1">
+          <NumInput label="Çarpan" value={fr8Mult} onChange={setFr8Mult} hint="Base Timescale Multiplier (1)" />
+          <NumInput label="n1" value={fr8N1} onChange={setFr8N1} hint="Channel Length (10)" />
+          <NumInput label="n2" value={fr8N2} onChange={setFr8N2} hint="Stochastic Ratio Filter (21)" />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {ALL_FRACTAL8_CONDS.map((id) => (
+            <Chip
+              key={id}
+              title={FRACTAL8_COND_LABEL[id]}
+              active={fr8Conds.includes(id)}
+              label={FRACTAL8_COND_LABEL[id]}
+              onClick={() => {
+                if (!fr8On) { setFr8On(true); setMatchMode("any"); setFr8Conds((a) => ensureCond(a, id)); }
+                else setFr8Conds((a) => toggleCondKeepOne(a, id));
               }}
             />
           ))}
