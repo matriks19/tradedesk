@@ -33,22 +33,26 @@ export function loxxJurik(src: number[], len: number, phase: number): number[] {
   const pow1 = Math.max(len1 - 2, 0.5), beta = (0.45 * (len - 1)) / (0.45 * (len - 1) + 2);
   const div = 1 / (10 + (10 * Math.min(Math.max(len - 10, 0), 100)) / 100);
   const PR = phase < -100 ? 0.5 : phase > 100 ? 2.5 : 1.5 + phase * 0.01, bet = len2 / (len2 + 1), avL = 2 / (Math.max(4 * len, 30) + 1);
-  let bsmax = src[f]!, bsmin = src[f]!, vsum = 0, avolty = 0, ma1 = 0, det0 = 0, e2 = 0, jrk = src[f]!;
+  // loxxjuriktools/1 jurik_filt birebir: tüm durumlar nz()→0
+  let bsmax = 0, bsmin = 0, vsum = 0, avolty = 0, ma1 = 0, det0 = 0, e2 = 0, jrk = 0;
   const vh: number[] = [];
   for (let i = f; i < n; i++) {
     const x = src[i]!, c = i - f;
-    if (!Number.isFinite(x)) { out[i] = jrk; continue; }
-    const del1 = c ? x - bsmax : 0, del2 = c ? x - bsmin : 0, volty = Math.max(Math.abs(del1), Math.abs(del2));
+    if (!Number.isFinite(x)) { out[i] = NaN; continue; }
+    const del1 = x - bsmax, del2 = x - bsmin, volty = Math.abs(del1) > Math.abs(del2) ? Math.abs(del1) : Math.abs(del2);
     vh.push(volty);
-    if (c) { vsum = vsum + div * (volty - (c >= 10 ? vh[c - 10]! : 0)); avolty = avolty + avL * (vsum - avolty); }
+    vsum = vsum + div * (volty - (c >= 10 ? vh[c - 10]! : 0));
+    avolty = avolty + avL * (vsum - avolty);
     const dV = avolty > 0 ? volty / avolty : 0, dVolty = Math.max(1, Math.min(Math.pow(len1, 1 / pow1), dV));
     const pow2 = Math.pow(dVolty, pow1), Kv = Math.pow(bet, Math.sqrt(pow2));
     bsmax = del1 > 0 ? x : x - Kv * del1;
     bsmin = del2 < 0 ? x : x - Kv * del2;
     const alpha = Math.pow(beta, pow2);
-    if (c) { ma1 = (1 - alpha) * x + alpha * ma1; det0 = (x - ma1) * (1 - beta) + beta * det0; }
+    ma1 = (1 - alpha) * x + alpha * ma1;
+    det0 = (x - ma1) * (1 - beta) + beta * det0;
     const ma2 = ma1 + PR * det0;
-    if (c >= len) { e2 = (ma2 - jrk) * Math.pow(1 - alpha, 2) + alpha * alpha * e2; jrk = e2 + jrk; } else { e2 = 0; jrk = x; }
+    e2 = (ma2 - jrk) * Math.pow(1 - alpha, 2) + alpha * alpha * e2;
+    jrk = e2 + jrk;
     out[i] = jrk;
   }
   return out;
