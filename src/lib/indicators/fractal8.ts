@@ -6,9 +6,10 @@
  */
 import type { Candle } from "@/lib/types";
 import { lastClosedIndex } from "./eliziLdr4";
+import { loxxJurik } from "./jfkps";
 
 export const FRACTAL8_FETCH_LIMIT = 1000; // Liste Tarama (spot proxy tek istek 1000)
-export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: number; /** "auto" veya 1, 0.5, 0.25, 0.125, 0.0625 */ scale?: number | "auto"; jmaOn?: boolean; jmaScope?: "all" | "red"; jmaLen?: number; jmaPhase?: number };
+export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: number; /** "auto" veya 1, 0.5, 0.25, 0.125, 0.0625 */ scale?: number | "auto"; jmaOn?: boolean; jmaScope?: "all" | "red"; jmaLen?: number; jmaPhase?: number; /** "loxx" (varsayılan, Loxx jurik_filt) | "klasik" */ jmaType?: "loxx" | "klasik" };
 export const FR8_SCALES = [1, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 12, 1 / 16];
 export const fr8ScaleLabel = (sc: number) => (sc >= 1 ? "1" : `1/${Math.round(1 / sc)}`);
 export const FR8_DEFAULTS = { n1: 10, n2: 21, ob: 75, mult: 1 };
@@ -35,6 +36,7 @@ function opts(p?: Fractal8Params | null) {
     ob: g(p?.ob, 75),
     mult: Math.max(1, Math.round(g(p?.mult, 1))),
     jOn: p?.jmaOn !== false,
+    jLx: p?.jmaType !== "klasik",
     jAll: p?.jmaScope !== "red",
     jLen: Math.max(1, Math.round(g(p?.jmaLen, 5))),
     jPh: Math.max(-100, Math.min(100, Number.isFinite(Number(p?.jmaPhase)) ? Number(p?.jmaPhase) : 0)),
@@ -121,7 +123,7 @@ export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): F
     v15[i] = v12[i]! && ok([32, 64, 128], j);
   }
   if (o.jOn) {
-    for (let q = 0; q < 5; q++) if (o.jAll || q === 0) lv[q] = jmaArr(lv[q]!, o.jLen, 2, o.jPh);
+    for (let q = 0; q < 5; q++) if (o.jAll || q === 0) lv[q] = o.jLx ? loxxJurik(lv[q]!, o.jLen, o.jPh) : jmaArr(lv[q]!, o.jLen, 2, o.jPh);
     const sh = 3 * o.jLen, a12 = v12.slice(), a15 = v15.slice();
     for (let i = 0; i < n; i++) { v12[i] = i - sh >= 0 && a12[i]! && a12[i - sh]!; v15[i] = i - sh >= 0 && a15[i]! && a15[i - sh]!; }
   }
@@ -135,7 +137,7 @@ export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): F
     ev.up25[i] = a5 && B[i]! > C[i]! && B[q]! <= C[q]!;
     ev.dn25[i] = a5 && B[i]! < C[i]! && B[q]! >= C[q]!;
   }
-  return { n, need: needAt(o, sc, 16), sc, scLbl: fr8ScaleLabel(sc) + (PS.auto ? " (oto)" : "") + (o.jOn ? ` · JMA ${o.jLen}${o.jAll ? "" : " (K)"}` : ""), lv, v12, v15, ev };
+  return { n, need: needAt(o, sc, 16), sc, scLbl: fr8ScaleLabel(sc) + (PS.auto ? " (oto)" : "") + (o.jOn ? ` · ${o.jLx ? "Loxx JMA" : "JMA"} ${o.jLen}${o.jAll ? "" : " (K)"}` : ""), lv, v12, v15, ev };
 }
 
 const EV_KEY: Record<Fractal8Cond, keyof Fractal8Result["ev"]> = { fr8_up12: "up12", fr8_dn12: "dn12", fr8_up15: "up15", fr8_up25: "up25", fr8_dn25: "dn25" };

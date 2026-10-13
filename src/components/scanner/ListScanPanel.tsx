@@ -952,6 +952,7 @@ export function ListScanPanel() {
   const [fr8Scale, setFr8Scale] = useState<string>("auto");
   const [fr8Jma, setFr8Jma] = useState<boolean>(true);
   const [fr8JmaRed, setFr8JmaRed] = useState<boolean>(false);
+  const [fr8JmaKlasik, setFr8JmaKlasik] = useState<boolean>(false);
   const [fr8JmaLen, setFr8JmaLen] = useState<number>(5);
   const [fr8JmaPh, setFr8JmaPh] = useState<number>(0);
   const [fr8Mult, setFr8Mult] = useState<number>(FR8_DEFAULTS.mult);
@@ -1375,6 +1376,7 @@ export function ListScanPanel() {
           scale: fr8Scale === "auto" ? "auto" : Number(fr8Scale),
           jmaOn: fr8Jma,
           jmaScope: fr8JmaRed ? "red" : "all",
+          jmaType: fr8JmaKlasik ? "klasik" : "loxx",
           jmaLen: Math.max(1, Math.min(100, Math.round(Number(fr8JmaLen) || 5))),
           jmaPhase: Math.max(-100, Math.min(100, Math.round(Number(fr8JmaPh) || 0))),
         },
@@ -1568,6 +1570,7 @@ export function ListScanPanel() {
     fr8Scale,
     fr8Jma,
     fr8JmaRed,
+    fr8JmaKlasik,
     fr8JmaLen,
     fr8JmaPh,
     e3LenBand,
@@ -4081,6 +4084,7 @@ export function ListScanPanel() {
         <div className="flex flex-wrap gap-1">
           <Chip title="Level çizgilerini Jurik (JMA, power 2) ile yumuşat; kesişimler yumuşatılmış seriden" active={fr8Jma} label="Jurik yumuşatma" onClick={() => setFr8Jma((v) => !v)} />
           <Chip title="Kapsam: yalnız Kırmızı (Level 1) yumuşatılır" active={fr8JmaRed} label="Sadece Kırmızı" onClick={() => setFr8JmaRed((v) => !v)} />
+          <Chip title="Jurik tipi: kapalı = Loxx (uyarlamalı, varsayılan), açık = Klasik (sabit alfa)" active={fr8JmaKlasik} label="Klasik Jurik" onClick={() => setFr8JmaKlasik((v) => !v)} />
         </div>
         <div className="grid grid-cols-2 gap-1">
           <NumInput label="JMA uzunluk" value={fr8JmaLen} onChange={setFr8JmaLen} hint="JMA uzunluk (5)" />
