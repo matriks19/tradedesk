@@ -1358,10 +1358,10 @@ export function ListScanPanel() {
         enabled: jfOn,
         conds: jfConds,
         params: {
-          len: Math.max(1, Math.min(200, Math.round(Number(jfLen) || 9))),
-          x: Math.max(1, Math.min(50, Math.round(Number(jfX) || 5))),
-          sm: Math.max(1, Math.min(50, Math.round(Number(jfSm) || 3))),
-          jl: Math.max(2, Math.min(200, Math.round(Number(jfJl) || 10))),
+          len: Math.max(1, Math.min(200, Math.round(Number(jfLen) || 23))),
+          x: Math.max(1, Math.min(50, Math.round(Number(jfX) || 13))),
+          sm: Math.max(1, Math.min(50, Math.round(Number(jfSm) || 8))),
+          jl: Math.max(2, Math.min(200, Math.round(Number(jfJl) || 25))),
           phase: Math.max(-100, Math.min(100, Math.round(Number(jfPh) || 0))),
         },
       },
@@ -4039,10 +4039,10 @@ export function ListScanPanel() {
           S = aşağı · Trend Yeşil/Kırmızı = son kapanmış mum durumu · ≥{jfkpsMinBars({ len: jfLen, x: jfX, sm: jfSm, jl: jfJl })} mum · QUANTEX T31 ile aynı matematik
         </p>
         <div className="grid grid-cols-3 gap-1">
-          <NumInput label="Period" value={jfLen} onChange={setJfLen} hint="Period (9)" />
-          <NumInput label="Multiplier" value={jfX} onChange={setJfX} hint="Synthetic Multiplier (5)" />
-          <NumInput label="Smoothing" value={jfSm} onChange={setJfSm} hint="Stochastic smoothing (3)" />
-          <NumInput label="Jurik period" value={jfJl} onChange={setJfJl} hint="Jurik smoothing period (10)" />
+          <NumInput label="Period" value={jfLen} onChange={setJfLen} hint="Period (23)" />
+          <NumInput label="Multiplier" value={jfX} onChange={setJfX} hint="Synthetic Multiplier (13)" />
+          <NumInput label="Smoothing" value={jfSm} onChange={setJfSm} hint="Stochastic smoothing (8)" />
+          <NumInput label="Jurik period" value={jfJl} onChange={setJfJl} hint="Jurik smoothing period (25)" />
           <NumInput label="Jurik phase" value={jfPh} onChange={setJfPh} hint="Jurik phase (0)" />
         </div>
         <div className="flex flex-wrap gap-1">

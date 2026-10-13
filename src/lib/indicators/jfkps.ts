@@ -7,7 +7,7 @@ import type { Candle } from "@/lib/types";
 import { lastClosedIndex } from "./eliziLdr4";
 
 export type JfkpsParams = { len?: number; x?: number; sm?: number; jl?: number; phase?: number };
-export const JFKPS_DEFAULTS = { len: 9, x: 5, sm: 3, jl: 10, phase: 0 };
+export const JFKPS_DEFAULTS = { len: 23, x: 13, sm: 8, jl: 25, phase: 0 };
 export type JfkpsCond = "jf_long" | "jf_short" | "jf_green" | "jf_red";
 export const ALL_JFKPS_CONDS: JfkpsCond[] = ["jf_long", "jf_short", "jf_green", "jf_red"];
 export const DEFAULT_JFKPS_CONDS: JfkpsCond[] = ["jf_long", "jf_short"];
@@ -17,7 +17,7 @@ export const JFKPS_COND_LABEL: Record<JfkpsCond, string> = { jf_long: "L Long", 
 function opts(p?: JfkpsParams | null) {
   const g = (v: unknown, d: number) => { const x = Math.round(Number(v)); return Number.isFinite(x) && x > 0 ? x : d; };
   const ph = Number(p?.phase);
-  return { len: g(p?.len, 9), x: g(p?.x, 5), sm: g(p?.sm, 3), jl: g(p?.jl, 10), ph: Math.max(-100, Math.min(100, Number.isFinite(ph) ? ph : 0)) };
+  return { len: g(p?.len, 23), x: g(p?.x, 13), sm: g(p?.sm, 8), jl: g(p?.jl, 25), ph: Math.max(-100, Math.min(100, Number.isFinite(ph) ? ph : 0)) };
 }
 export function jfkpsMinBars(p?: JfkpsParams | null): number {
   const o = opts(p);
