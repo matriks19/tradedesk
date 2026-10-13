@@ -8,7 +8,7 @@ import type { Candle } from "@/lib/types";
 import { lastClosedIndex } from "./eliziLdr4";
 
 export const FRACTAL8_FETCH_LIMIT = 1000; // Liste Tarama (spot proxy tek istek 1000)
-export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: number; /** "auto" veya 1, 0.5, 0.25, 0.125, 0.0625 */ scale?: number | "auto" };
+export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: number; /** "auto" veya 1, 0.5, 0.25, 0.125, 0.0625 */ scale?: number | "auto"; jmaOn?: boolean; jmaScope?: "all" | "red"; jmaLen?: number; jmaPhase?: number };
 export const FR8_SCALES = [1, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 12, 1 / 16];
 export const fr8ScaleLabel = (sc: number) => (sc >= 1 ? "1" : `1/${Math.round(1 / sc)}`);
 export const FR8_DEFAULTS = { n1: 10, n2: 21, ob: 75, mult: 1 };
@@ -34,10 +34,37 @@ function opts(p?: Fractal8Params | null) {
     n2: Math.round(g(p?.n2, 21)),
     ob: g(p?.ob, 75),
     mult: Math.max(1, Math.round(g(p?.mult, 1))),
+    jOn: p?.jmaOn !== false,
+    jAll: p?.jmaScope !== "red",
+    jLen: Math.max(1, Math.round(g(p?.jmaLen, 5))),
+    jPh: Math.max(-100, Math.min(100, Number.isFinite(Number(p?.jmaPhase)) ? Number(p?.jmaPhase) : 0)),
   };
 }
 const per = (o: ReturnType<typeof opts>, sc: number, base: number, m: number) => Math.max(2, Math.round(base * m * o.mult * sc));
-const needAt = (o: ReturnType<typeof opts>, sc: number, m: number) => 2 * per(o, sc, o.n1, m) + per(o, sc, o.n2, m) + 1;
+const needAt = (o: ReturnType<typeof opts>, sc: number, m: number) => 2 * per(o, sc, o.n1, m) + per(o, sc, o.n2, m) + 1 + (o.jOn ? 3 * o.jLen : 0);
+/** Jurik MA — QUANTEX jmaArr ile birebir (JKR/AHA). */
+function jmaArr(src: number[], n: number, power: number, phase: number): number[] {
+  const L = src.length, out = new Array<number>(L).fill(NaN);
+  let f = -1;
+  for (let i = 0; i < L; i++) if (Number.isFinite(src[i]!)) { f = i; break; }
+  if (f < 0) return out;
+  const beta = (0.45 * (n - 1)) / (0.45 * (n - 1) + 2), alpha = Math.pow(beta, Math.max(0.05, power));
+  let PR = phase / 100 + 1.5;
+  if (phase < -100) PR = 0.5; else if (phase > 100) PR = 2.5;
+  const ia = 1 - alpha;
+  let s1 = src[f]!, det = 0, e = 0, res = src[f]!;
+  out[f] = res;
+  for (let i = f + 1; i < L; i++) {
+    const x = src[i]!;
+    s1 = ia * x + alpha * s1;
+    det = (x - s1) * (1 - beta) + beta * det;
+    const s2 = s1 + PR * det;
+    e = (s2 - res) * ia * ia + alpha * alpha * e;
+    res = res + e;
+    out[i] = res;
+  }
+  return out;
+}
 /** Otomatik: Level 5 dahil tüm seviyelerin ısınıp ≥50 mum geçerli kaldığı en büyük ölçek (QUANTEX ile aynı). */
 export function fractal8PickScale(p: Fractal8Params | null | undefined, n: number): { sc: number; auto: boolean } {
   const o = opts(p), v = Number(p?.scale);
@@ -93,6 +120,11 @@ export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): F
     v12[i] = ok([1, 2, 4, 8, 16], j);
     v15[i] = v12[i]! && ok([32, 64, 128], j);
   }
+  if (o.jOn) {
+    for (let q = 0; q < 5; q++) if (o.jAll || q === 0) lv[q] = jmaArr(lv[q]!, o.jLen, 2, o.jPh);
+    const sh = 3 * o.jLen, a12 = v12.slice(), a15 = v15.slice();
+    for (let i = 0; i < n; i++) { v12[i] = i - sh >= 0 && a12[i]! && a12[i - sh]!; v15[i] = i - sh >= 0 && a15[i]! && a15[i - sh]!; }
+  }
   const ev = { up12: [] as boolean[], dn12: [] as boolean[], up15: [] as boolean[], up25: [] as boolean[], dn25: [] as boolean[] };
   const A = lv[0]!, B = lv[1]!, C = lv[4]!;
   for (let i = 0; i < n; i++) {
@@ -103,7 +135,7 @@ export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): F
     ev.up25[i] = a5 && B[i]! > C[i]! && B[q]! <= C[q]!;
     ev.dn25[i] = a5 && B[i]! < C[i]! && B[q]! >= C[q]!;
   }
-  return { n, need: needAt(o, sc, 16), sc, scLbl: fr8ScaleLabel(sc) + (PS.auto ? " (oto)" : ""), lv, v12, v15, ev };
+  return { n, need: needAt(o, sc, 16), sc, scLbl: fr8ScaleLabel(sc) + (PS.auto ? " (oto)" : "") + (o.jOn ? ` · JMA ${o.jLen}${o.jAll ? "" : " (K)"}` : ""), lv, v12, v15, ev };
 }
 
 const EV_KEY: Record<Fractal8Cond, keyof Fractal8Result["ev"]> = { fr8_up12: "up12", fr8_dn12: "dn12", fr8_up15: "up15", fr8_up25: "up25", fr8_dn25: "dn25" };

@@ -937,6 +937,10 @@ export function ListScanPanel() {
   const [fr8On, setFr8On] = useState(false);
   const [fr8Conds, setFr8Conds] = useState<Fractal8Cond[]>([...DEFAULT_FRACTAL8_CONDS]);
   const [fr8Scale, setFr8Scale] = useState<string>("auto");
+  const [fr8Jma, setFr8Jma] = useState<boolean>(true);
+  const [fr8JmaRed, setFr8JmaRed] = useState<boolean>(false);
+  const [fr8JmaLen, setFr8JmaLen] = useState<number>(5);
+  const [fr8JmaPh, setFr8JmaPh] = useState<number>(0);
   const [fr8Mult, setFr8Mult] = useState<number>(FR8_DEFAULTS.mult);
   const [fr8N1, setFr8N1] = useState<number>(FR8_DEFAULTS.n1);
   const [fr8N2, setFr8N2] = useState<number>(FR8_DEFAULTS.n2);
@@ -1345,6 +1349,10 @@ export function ListScanPanel() {
           n2: Math.max(1, Math.min(200, Math.round(Number(fr8N2) || FR8_DEFAULTS.n2))),
           mult: Math.max(1, Math.min(8, Math.round(Number(fr8Mult) || FR8_DEFAULTS.mult))),
           scale: fr8Scale === "auto" ? "auto" : Number(fr8Scale),
+          jmaOn: fr8Jma,
+          jmaScope: fr8JmaRed ? "red" : "all",
+          jmaLen: Math.max(1, Math.min(100, Math.round(Number(fr8JmaLen) || 5))),
+          jmaPhase: Math.max(-100, Math.min(100, Math.round(Number(fr8JmaPh) || 0))),
         },
       },
       ema30Band: {
@@ -1527,6 +1535,10 @@ export function ListScanPanel() {
     fr8N2,
     fr8Mult,
     fr8Scale,
+    fr8Jma,
+    fr8JmaRed,
+    fr8JmaLen,
+    fr8JmaPh,
     e3LenBand,
     e3Len200,
     e3RevBars,
@@ -3973,6 +3985,14 @@ export function ListScanPanel() {
           {[["auto", "Otomatik"], ["1", "1"], ["0.5", "1/2"], [String(1 / 3), "1/3"], ["0.25", "1/4"], ["0.2", "1/5"], [String(1 / 6), "1/6"], ["0.125", "1/8"], ["0.1", "1/10"], [String(1 / 12), "1/12"], ["0.0625", "1/16"]].map(([v, l]) => (
             <Chip key={v} title={`Ölçek ${l}`} active={fr8Scale === v} label={`Ölçek ${l}`} onClick={() => setFr8Scale(v!)} />
           ))}
+        </div>
+        <div className="flex flex-wrap gap-1">
+          <Chip title="Level çizgilerini Jurik (JMA, power 2) ile yumuşat; kesişimler yumuşatılmış seriden" active={fr8Jma} label="Jurik yumuşatma" onClick={() => setFr8Jma((v) => !v)} />
+          <Chip title="Kapsam: yalnız Kırmızı (Level 1) yumuşatılır" active={fr8JmaRed} label="Sadece Kırmızı" onClick={() => setFr8JmaRed((v) => !v)} />
+        </div>
+        <div className="grid grid-cols-2 gap-1">
+          <NumInput label="JMA uzunluk" value={fr8JmaLen} onChange={setFr8JmaLen} hint="JMA uzunluk (5)" />
+          <NumInput label="JMA faz" value={fr8JmaPh} onChange={setFr8JmaPh} hint="JMA faz (-100..100, 0)" />
         </div>
         <div className="grid grid-cols-3 gap-1">
           <NumInput label="Çarpan" value={fr8Mult} onChange={setFr8Mult} hint="Base Timescale Multiplier (1)" />
