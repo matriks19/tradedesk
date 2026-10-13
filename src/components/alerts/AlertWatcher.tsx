@@ -260,6 +260,7 @@ export function AlertWatcher() {
             pliDir?: { enabled?: boolean; hullLen?: number; length?: number };
             eliziLdr4?: { enabled?: boolean; params?: Record<string, unknown> };
             ema30Band?: { enabled?: boolean };
+            fractal8?: { enabled?: boolean };
           };
           const hullOn = !!payload.hull?.enabled;
           const tf =
@@ -288,7 +289,7 @@ export function AlertWatcher() {
             ? Math.max(baseLimit, eliziLdr4FetchLimit(payload.eliziLdr4.params))
             : baseLimit;
           // EMA30 Band: durum makinesi geçmişe bağlı → liste taramasıyla aynı 1000 mum
-          const baseLimitB = payload.ema30Band?.enabled ? Math.max(baseLimitE, ema30BandFetchLimit()) : baseLimitE;
+          const baseLimitB = payload.ema30Band?.enabled || payload.fractal8?.enabled ? Math.max(baseLimitE, ema30BandFetchLimit()) : baseLimitE; // FRACTAL 8 de 1000 mum
           const limit = payload.trendFilter?.enabled
             ? Math.max(baseLimitB, trendFilterFetchLimit(payload.trendFilter.period ?? 200))
             : baseLimitB;

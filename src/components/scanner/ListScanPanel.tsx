@@ -130,6 +130,13 @@ import {
   EMA30_BAND_FETCH_LIMIT,
   E30_DEFAULTS,
   ema30BandMinBars,
+  DEFAULT_FRACTAL8_CONDS,
+  ALL_FRACTAL8_CONDS,
+  FRACTAL8_COND_LABEL,
+  FRACTAL8_FETCH_LIMIT,
+  FR8_DEFAULTS,
+  fractal8MinBars,
+  type Fractal8Cond,
   type Ema30BandCond,
   type ListScanHit,
   type ListScanKind,
@@ -927,6 +934,11 @@ export function ListScanPanel() {
   const [pdzSqLen, setPdzSqLen] = useState<number>(PPO_DSI_Z_DEFAULTS.squeezeLen);
   const [pdzSqTol, setPdzSqTol] = useState<number>(PPO_DSI_Z_DEFAULTS.sqTol);
   const [e3On, setE3On] = useState(false);
+  const [fr8On, setFr8On] = useState(false);
+  const [fr8Conds, setFr8Conds] = useState<Fractal8Cond[]>([...DEFAULT_FRACTAL8_CONDS]);
+  const [fr8Mult, setFr8Mult] = useState<number>(FR8_DEFAULTS.mult);
+  const [fr8N1, setFr8N1] = useState<number>(FR8_DEFAULTS.n1);
+  const [fr8N2, setFr8N2] = useState<number>(FR8_DEFAULTS.n2);
   const [e3Conds, setE3Conds] = useState<Ema30BandCond[]>([...DEFAULT_EMA30_BAND_CONDS]);
   const [e3LenBand, setE3LenBand] = useState<number>(E30_DEFAULTS.lenBand);
   const [e3Len200, setE3Len200] = useState<number>(E30_DEFAULTS.len200);
@@ -1324,6 +1336,15 @@ export function ListScanPanel() {
         squeezeLen: Math.max(2, Math.min(400, Math.round(Number(pdzSqLen) || PPO_DSI_Z_DEFAULTS.squeezeLen))),
         sqTol: Number.isFinite(pdzSqTol) && pdzSqTol >= 0 ? pdzSqTol : PPO_DSI_Z_DEFAULTS.sqTol,
       },
+      fractal8: {
+        enabled: fr8On,
+        conds: fr8Conds,
+        params: {
+          n1: Math.max(1, Math.min(200, Math.round(Number(fr8N1) || FR8_DEFAULTS.n1))),
+          n2: Math.max(1, Math.min(200, Math.round(Number(fr8N2) || FR8_DEFAULTS.n2))),
+          mult: Math.max(1, Math.min(8, Math.round(Number(fr8Mult) || FR8_DEFAULTS.mult))),
+        },
+      },
       ema30Band: {
         enabled: e3On,
         conds: e3Conds,
@@ -1498,6 +1519,11 @@ export function ListScanPanel() {
     eldConds,
     e3On,
     e3Conds,
+    fr8On,
+    fr8Conds,
+    fr8N1,
+    fr8N2,
+    fr8Mult,
     e3LenBand,
     e3Len200,
     e3RevBars,
@@ -1547,7 +1573,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1711,7 +1737,9 @@ export function ListScanPanel() {
             const minBars = useE3 ? Math.max(minBars1, ema30BandMinBars(cfg.ema30Band?.params)) : minBars1;
             const klineLimitE0 = useEld ? Math.max(klineLimit, eliziLdr4FetchLimit(cfg.eliziLdr4?.params)) : klineLimit;
             // EMA30 Band: durum makinesi geçmişe bağlı → 1000 mum
-            const klineLimitE = useE3 ? Math.max(klineLimitE0, EMA30_BAND_FETCH_LIMIT) : klineLimitE0;
+            const klineLimitE1 = useE3 ? Math.max(klineLimitE0, EMA30_BAND_FETCH_LIMIT) : klineLimitE0;
+            // FRACTAL 8: uzun ısınma → 1000 mum
+            const klineLimitE = cfg.fractal8?.enabled ? Math.max(klineLimitE1, FRACTAL8_FETCH_LIMIT) : klineLimitE1;
             // Trend filtresi: yalnız kripto; periyot tarama TF'sine göre (4s EMA200 eşdeğeri)
             const trendApplies = trendOn && trendFilterApplies(q.symbol, q.exchange, livePerpsRef.current?.tradfi);
             const trendPeriod = trendEmaPeriod(scanTf);
@@ -1845,6 +1873,10 @@ export function ListScanPanel() {
         const n = out.filter((h) => h.kind === "ppoDsiZ").length;
         byKind.push(`ppoDsiZ ${n}`);
       }
+      if (cfgDone.fractal8?.enabled) {
+        const n = out.filter((h) => h.kind === "fractal8").length;
+        byKind.push(`fr8 ${n}`);
+      }
       if (cfgDone.ema30Band?.enabled) {
         const n = out.filter((h) => h.kind === "ema30Band").length;
         byKind.push(`e30 ${n}`);
@@ -1882,6 +1914,7 @@ export function ListScanPanel() {
         cfgDone.ppoDsiZ?.enabled,
         cfgDone.eliziLdr4?.enabled,
         cfgDone.ema30Band?.enabled,
+        cfgDone.fractal8?.enabled,
         cfgDone.pine?.enabled,
       ].filter(Boolean).length;
       const hepsiWarn =
@@ -1914,7 +1947,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -1979,10 +2012,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -2056,7 +2089,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.pdo?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2355,6 +2388,29 @@ export function ListScanPanel() {
               conds: [h.cond as PdoCond],
               crossMode: "kd",
             },
+          },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
+          scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "fractal8") {
+        const c = cfg.fractal8;
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "FRACTAL 8",
+          scanKey: "list_scan",
+          scanPayload: {
+            matchMode: "any",
+            fractal8: { enabled: true, conds: [h.cond as Fractal8Cond], params: { ...(c?.params ?? {}) } },
           },
           timeframe: tf,
           repeat: "once",
@@ -2728,10 +2784,11 @@ export function ListScanPanel() {
     if (ppoDzOn) names.push("PPO-DSI-Z");
     if (eldOn) names.push("ELIZI-LDR4");
     if (e3On) names.push("EMA30 Band");
+    if (fr8On) names.push("FRACTAL 8");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -3891,6 +3948,39 @@ export function ListScanPanel() {
                 } else {
                   setEldConds((a) => toggleCondKeepOne(a, c.id));
                 }
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="T30 · FRACTAL 8 Ribbons"
+        enabled={fr8On}
+        onToggle={() => { if (fr8On) setFr8On(false); else { setFr8On(true); setMatchMode("any"); } }}
+        open={openCard === "fractal8"}
+        onOpen={() => setOpenCard((c) => (c === "fractal8" ? null : "fractal8"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Kullanıcının Pine v4 göstergesi: hlc3 WaveTrend (ci/tci), çarpanlar 1..128 × mult · Kırmızı = Level 1, Yeşil = Level 2,
+          Siyah = Level 5 · yalnız kapanmış mum · Level 1/2 ≥{fractal8MinBars({ n1: fr8N1, n2: fr8N2, mult: fr8Mult })} mum, Siyah ≈8× daha
+          uzun ısınma (ısınmamışsa sinyal yok) · çekim {FRACTAL8_FETCH_LIMIT} · QUANTEX T30 ile aynı matematik
+        </p>
+        <div className="grid grid-cols-3 gap-1">
+          <NumInput label="Çarpan" value={fr8Mult} onChange={setFr8Mult} hint="Base Timescale Multiplier (1)" />
+          <NumInput label="n1" value={fr8N1} onChange={setFr8N1} hint="Channel Length (10)" />
+          <NumInput label="n2" value={fr8N2} onChange={setFr8N2} hint="Stochastic Ratio Filter (21)" />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {ALL_FRACTAL8_CONDS.map((id) => (
+            <Chip
+              key={id}
+              title={FRACTAL8_COND_LABEL[id]}
+              active={fr8Conds.includes(id)}
+              label={FRACTAL8_COND_LABEL[id]}
+              onClick={() => {
+                if (!fr8On) { setFr8On(true); setMatchMode("any"); setFr8Conds((a) => ensureCond(a, id)); }
+                else setFr8Conds((a) => toggleCondKeepOne(a, id));
               }}
             />
           ))}
