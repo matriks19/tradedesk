@@ -13,16 +13,18 @@ export type Fractal8Params = { n1?: number; n2?: number; ob?: number; mult?: num
 export const FR8_SCALES = [1, 1 / 2, 1 / 3, 1 / 4, 1 / 5, 1 / 6, 1 / 8, 1 / 10, 1 / 12, 1 / 16];
 export const fr8ScaleLabel = (sc: number) => (sc >= 1 ? "1" : `1/${Math.round(1 / sc)}`);
 export const FR8_DEFAULTS = { n1: 10, n2: 21, ob: 75, mult: 1 };
-export type Fractal8Cond = "fr8_up12" | "fr8_dn12" | "fr8_up15" | "fr8_up25" | "fr8_dn25";
-export const ALL_FRACTAL8_CONDS: Fractal8Cond[] = ["fr8_up12", "fr8_dn12", "fr8_up15", "fr8_up25", "fr8_dn25"];
-export const DEFAULT_FRACTAL8_CONDS: Fractal8Cond[] = ["fr8_up12", "fr8_dn12"];
-export const FRACTAL8_BEAR_CONDS = new Set<Fractal8Cond>(["fr8_dn12", "fr8_dn25"]);
+export type Fractal8Cond = "fr8_up12" | "fr8_dn12" | "fr8_up15" | "fr8_up25" | "fr8_dn25" | "fr8_up35" | "fr8_dn35";
+export const ALL_FRACTAL8_CONDS: Fractal8Cond[] = ["fr8_up12", "fr8_dn12", "fr8_up15", "fr8_up25", "fr8_dn25", "fr8_up35", "fr8_dn35"];
+export const DEFAULT_FRACTAL8_CONDS: Fractal8Cond[] = ["fr8_up12", "fr8_dn12", "fr8_up35", "fr8_dn35"];
+export const FRACTAL8_BEAR_CONDS = new Set<Fractal8Cond>(["fr8_dn12", "fr8_dn25", "fr8_dn35"]);
 export const FRACTAL8_COND_LABEL: Record<Fractal8Cond, string> = {
   fr8_up12: "Kırmızı↑Yeşil AL",
   fr8_dn12: "Kırmızı↓Yeşil SAT",
   fr8_up15: "Kırmızı↑Siyah AL",
   fr8_up25: "Yeşil↑Siyah AL",
   fr8_dn25: "Yeşil↓Siyah SAT",
+  fr8_up35: "Mavi↑Siyah AL",
+  fr8_dn35: "Mavi↓Siyah SAT",
 };
 
 function opts(p?: Fractal8Params | null) {
@@ -95,7 +97,7 @@ function ema(x: number[], len: number): number[] {
   }
   return o;
 }
-export type Fractal8Result = { n: number; need: number; sc: number; scLbl: string; lv: number[][]; v12: boolean[]; v15: boolean[]; ev: Record<"up12" | "dn12" | "up15" | "up25" | "dn25", boolean[]> };
+export type Fractal8Result = { n: number; need: number; sc: number; scLbl: string; lv: number[][]; v12: boolean[]; v15: boolean[]; ev: Record<"up12" | "dn12" | "up15" | "up25" | "dn25" | "up35" | "dn35", boolean[]> };
 
 export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): Fractal8Result {
   const o = opts(p), n = candles.length, M = [1, 2, 4, 8, 16, 32, 64, 128];
@@ -127,8 +129,8 @@ export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): F
     const sh = 3 * o.jLen, a12 = v12.slice(), a15 = v15.slice();
     for (let i = 0; i < n; i++) { v12[i] = i - sh >= 0 && a12[i]! && a12[i - sh]!; v15[i] = i - sh >= 0 && a15[i]! && a15[i - sh]!; }
   }
-  const ev = { up12: [] as boolean[], dn12: [] as boolean[], up15: [] as boolean[], up25: [] as boolean[], dn25: [] as boolean[] };
-  const A = lv[0]!, B = lv[1]!, C = lv[4]!;
+  const ev = { up12: [] as boolean[], dn12: [] as boolean[], up15: [] as boolean[], up25: [] as boolean[], dn25: [] as boolean[], up35: [] as boolean[], dn35: [] as boolean[] };
+  const A = lv[0]!, B = lv[1]!, B3 = lv[2]!, C = lv[4]!;
   for (let i = 0; i < n; i++) {
     const q = i - 1, a12 = i > 0 && v12[i]! && v12[q]!, a5 = i > 0 && v15[i]! && v15[q]!;
     ev.up12[i] = a12 && A[i]! > B[i]! && A[q]! <= B[q]!;
@@ -136,11 +138,13 @@ export function computeFractal8(candles: Candle[], p?: Fractal8Params | null): F
     ev.up15[i] = a5 && A[i]! > C[i]! && A[q]! <= C[q]!;
     ev.up25[i] = a5 && B[i]! > C[i]! && B[q]! <= C[q]!;
     ev.dn25[i] = a5 && B[i]! < C[i]! && B[q]! >= C[q]!;
+    ev.up35[i] = a5 && B3[i]! > C[i]! && B3[q]! <= C[q]!;
+    ev.dn35[i] = a5 && B3[i]! < C[i]! && B3[q]! >= C[q]!;
   }
   return { n, need: needAt(o, sc, 16), sc, scLbl: fr8ScaleLabel(sc) + (PS.auto ? " (oto)" : "") + (o.jOn ? ` · ${o.jLx ? "Loxx JMA" : "JMA"} ${o.jLen}${o.jAll ? "" : " (K)"}` : ""), lv, v12, v15, ev };
 }
 
-const EV_KEY: Record<Fractal8Cond, keyof Fractal8Result["ev"]> = { fr8_up12: "up12", fr8_dn12: "dn12", fr8_up15: "up15", fr8_up25: "up25", fr8_dn25: "dn25" };
+const EV_KEY: Record<Fractal8Cond, keyof Fractal8Result["ev"]> = { fr8_up12: "up12", fr8_dn12: "dn12", fr8_up15: "up15", fr8_up25: "up25", fr8_dn25: "dn25", fr8_up35: "up35", fr8_dn35: "dn35" };
 export type Fractal8Hit = { cond: Fractal8Cond; barsAgo: number; note: string };
 
 export function fractal8Scan(candles: Candle[], conds: Fractal8Cond[], maxBarsAgo: number, p?: Fractal8Params | null, o: { nowMs?: number } = {}): Fractal8Hit[] {
