@@ -18774,6 +18774,7 @@ function render(){
  <button class="o" id="qxbStart">${st.running?'Duraklat':'Başlat'}</button><button class="r" id="qxbKill">⛔ Tümünü durdur</button></div>
  <div class="row" style="margin:6px 0"><label style="flex:0 0 auto">Tarama aralığı</label><select id="qxbEvery" style="max-width:120px">${SCAN_OPTS.map(m=>`<option value="${m}" ${+cfg.scanMin===m?'selected':''}>${m<60?m+' dk':(m/60)+' saat'}</option>`).join('')}</select><span>Sonraki tarama: <b id="qxbNext">${hhmm(nextRun)}</b></span><button class="g" id="qxbNow">↻ Şimdi tara</button></div>
  <small>Sinyal kaynağı: 📡 İzleme (coin) taraması. İzleme sekmesi açılmış olmalı; bot seçilen aralıkta (varsayılan 15 dk, mum kapanışına hizalı) İzleme taramasını tetikler ve sinyalleri okur. TP/SL fiyat kontrolü dakikada bir. Çiplerdeki / grafikteki <b>🤖</b> butonu taramayı buraya ekler.</small></div>
+ <div class="bx" id="qxbOzet">${ozetBar()}</div>
  <div class="bx"><h3>Sinyal kaynakları</h3><div id="qxbSrc"></div>
  <div class="row" style="margin-top:6px"><select id="qxbAddId">${scanIds.map(i=>`<option value="${i}">${esc(LB(i))}</option>`).join('')}</select><button class="g" id="qxbAdd">+ Tarama ekle (İzleme ayarlarıyla)</button></div></div>
  <div class="bx" id="qxbBist"></div>
@@ -18833,6 +18834,16 @@ const FEE_C=()=>isFinite(+cfg.feePct)&&cfg.feePct!==''&&cfg.feePct!=null?+cfg.fe
 function feeAmt(m,e,x,qty,notional){const f=(m==='bist'?FEE_B():FEE_C())/100;return m==='bist'?(+qty||0)*((+e||0)+(+x||+e||0))*f:(+notional||0)*(1+((+x||+e)/(+e||1)))*f;}
 function money(v,m,sub,title){if(v==null||!isFinite(v))return '-';const c=m==='bist'?'₺':'$';return `<span title="${esc(title||'')}"><b class="${v>=0?'ok':'bad'}">${v>=0?'+':''}${(+v).toFixed(2)} ${c}</b>${sub!=null&&isFinite(sub)?` <small class="${sub>=0?'ok':'bad'}">${sub>=0?'+':''}${(sub*100).toFixed(2)}%</small>`:''}</span>`;}
 const ROE_TIP='ROE % (kaldıraçlı): marjine göre getiri = fiyat değişimi % × kaldıraç. Ör. 5x\'te fiyat +%2 → ROE +%10.';
+function ozetBar(){ // 📊 Tümü kapatılırsa: açık pozisyonların komisyon sonrası net toplamı (⚠ şüpheli fiyatlılar hariç)
+  const one=(m,L,eq,cur)=>{let n=0,net=0,base=0,w=0,l=0,ex=0,best=null,worst=null;
+    (L||[]).forEach(p=>{if(p.pxWarn){ex++;return;}const g=m==='bist'?(p.last-p.entry)*p.lot:pr(p)*(+p.notional||0),f=m==='bist'?feeAmt('bist',p.entry,p.last,p.lot):feeAmt('coin',p.entry,p.last,p.qty,p.notional),v=g-f;
+      n++;net+=v;base+=m==='bist'?p.lot*p.entry:(+p.notional||0)/(p.lev||1);if(v>=0)w++;else l++;if(!best||v>best.v)best={s:p.sym,v};if(!worst||v<worst.v)worst={s:p.sym,v};});
+    const pct=base>0?net/base:null;
+    return `<div style="flex:1;min-width:300px"><b>${m==='bist'?'🇹🇷 BIST':'🪙 Coin'}</b> · Açık ${n+ex}${ex?` <span class="warn" title="Fiyat kaynağı şüpheli; toplama katılmadı">(⚠ ${ex} hariç)</span>`:''}<br>
+     Net K/Z: <span style="font-size:18px">${money(net,m,pct,'Komisyon sonrası; % = pozisyon tutarına (coin: marjin) göre')}</span><br>
+     Tümü kapatılırsa bakiye: <b>${(eq+net).toLocaleString('tr-TR',{maximumFractionDigits:2})} ${cur}</b> <small>(şu an ${(+eq).toLocaleString('tr-TR',{maximumFractionDigits:2})})</small><br>
+     <span class="ok">▲ ${w} kârda</span> · <span class="bad">▼ ${l} zararda</span>${best?` · En iyi: ${symA(m,best.s)} ${money(best.v,m)}`:''}${worst?` · En kötü: ${symA(m,worst.s)} ${money(worst.v,m)}`:''}</div>`;};
+  return `<h3>📊 Tümü kapatılırsa</h3><div class="row" style="align-items:flex-start">${one('coin',st.open,+cfg.equity||0,'$')}${one('bist',B.open,+B.equity||0,'₺')}</div>`;}
 function pr(p){return p.last&&p.entry?(p.side==='LONG'?(p.last/p.entry-1):(1-p.last/p.entry)):0;}
 function renderSrc(){const el=$('qxbSrc');if(!el)return;
   el.innerHTML=cfg.sources.length?'<table><tr><th>Tarama/çip</th><th>Liste</th><th>TF</th><th>Aktif</th><th></th></tr>'+cfg.sources.map((s,i)=>`<tr><td>${esc(s.label)}</td><td>${esc(s.list||'İzleme coin')}</td><td>${esc(s.interval||'-')}</td><td><input type="checkbox" data-src-on="${i}" ${s.on!==false?'checked':''}></td><td><button class="g" data-src-del="${i}">Sil</button></td></tr>`).join('')+'</table>':'<small>Henüz kaynak yok. İzleme\'de bir çipin yanındaki 🤖 butonuna bas ya da aşağıdan ekle.</small>';}
