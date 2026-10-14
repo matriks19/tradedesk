@@ -136,7 +136,13 @@ import {
   JFKPS_COND_LABEL,
   JFKPS_DEFAULTS,
   jfkpsMinBars,
+  DEFAULT_MDO_CONDS,
+  ALL_MDO_CONDS,
+  MDO_COND_LABEL,
+  MDO_DEFAULTS,
+  mdoMinBars,
   type JfkpsCond,
+  type MdoCond,
   ALL_FRACTAL8_CONDS,
   FRACTAL8_COND_LABEL,
   FRACTAL8_FETCH_LIMIT,
@@ -942,6 +948,16 @@ export function ListScanPanel() {
   const [e3On, setE3On] = useState(false);
   const [fr8On, setFr8On] = useState(false);
   const [jfOn, setJfOn] = useState(false);
+  const [mdoOn, setMdoOn] = useState(false);
+  const [mdoConds, setMdoConds] = useState<MdoCond[]>([...DEFAULT_MDO_CONDS]);
+  const [mdoLen, setMdoLen] = useState<number>(MDO_DEFAULTS.len);
+  const [mdoMom, setMdoMom] = useState<number>(MDO_DEFAULTS.mom);
+  const [mdoBb, setMdoBb] = useState<number>(MDO_DEFAULTS.bb);
+  const [mdoMult, setMdoMult] = useState<number>(MDO_DEFAULTS.mult);
+  const [mdoSt, setMdoSt] = useState<number>(MDO_DEFAULTS.st);
+  const [mdoX, setMdoX] = useState<number>(MDO_DEFAULTS.x);
+  const [mdoJl, setMdoJl] = useState<number>(MDO_DEFAULTS.jl);
+  const [mdoPh, setMdoPh] = useState<number>(MDO_DEFAULTS.phase);
   const [jfConds, setJfConds] = useState<JfkpsCond[]>([...DEFAULT_JFKPS_CONDS]);
   const [jfLen, setJfLen] = useState<number>(JFKPS_DEFAULTS.len);
   const [jfX, setJfX] = useState<number>(JFKPS_DEFAULTS.x);
@@ -1355,6 +1371,11 @@ export function ListScanPanel() {
         squeezeLen: Math.max(2, Math.min(400, Math.round(Number(pdzSqLen) || PPO_DSI_Z_DEFAULTS.squeezeLen))),
         sqTol: Number.isFinite(pdzSqTol) && pdzSqTol >= 0 ? pdzSqTol : PPO_DSI_Z_DEFAULTS.sqTol,
       },
+      mdo: {
+        enabled: mdoOn,
+        conds: mdoConds,
+        params: { len: Number(mdoLen) || 100, mom: Number(mdoMom) || 70, bb: Number(mdoBb) || 100, mult: Number(mdoMult) || 1, st: Number(mdoSt) || 27, x: Number(mdoX) || 15, jl: Number(mdoJl) || 9, phase: Number(mdoPh) || 0 },
+      },
       jfkps: {
         enabled: jfOn,
         conds: jfConds,
@@ -1559,6 +1580,16 @@ export function ListScanPanel() {
     fr8Conds,
     jfOn,
     jfConds,
+    mdoOn,
+    mdoConds,
+    mdoLen,
+    mdoMom,
+    mdoBb,
+    mdoMult,
+    mdoSt,
+    mdoX,
+    mdoJl,
+    mdoPh,
     jfLen,
     jfX,
     jfSm,
@@ -1784,7 +1815,8 @@ export function ListScanPanel() {
             const useE3 = !!cfg.ema30Band?.enabled;
             const minBars1 = useEld ? Math.max(minBars0, eliziLdr4MinBars(cfg.eliziLdr4?.params) + 1) : minBars0;
             const minBars2 = useE3 ? Math.max(minBars1, ema30BandMinBars(cfg.ema30Band?.params)) : minBars1;
-            const minBars = cfg.jfkps?.enabled ? Math.max(minBars2, jfkpsMinBars(cfg.jfkps?.params)) : minBars2;
+            const minBars3 = cfg.jfkps?.enabled ? Math.max(minBars2, jfkpsMinBars(cfg.jfkps?.params)) : minBars2;
+            const minBars = cfg.mdo?.enabled ? Math.max(minBars3, mdoMinBars(cfg.mdo?.params)) : minBars3;
             const klineLimitE0 = useEld ? Math.max(klineLimit, eliziLdr4FetchLimit(cfg.eliziLdr4?.params)) : klineLimit;
             // EMA30 Band: durum makinesi geçmişe bağlı → 1000 mum
             const klineLimitE1 = useE3 ? Math.max(klineLimitE0, EMA30_BAND_FETCH_LIMIT) : klineLimitE0;
@@ -1923,6 +1955,10 @@ export function ListScanPanel() {
         const n = out.filter((h) => h.kind === "ppoDsiZ").length;
         byKind.push(`ppoDsiZ ${n}`);
       }
+      if (cfgDone.mdo?.enabled) {
+        const n = out.filter((h) => h.kind === "mdo").length;
+        byKind.push(`mdo ${n}`);
+      }
       if (cfgDone.jfkps?.enabled) {
         const n = out.filter((h) => h.kind === "jfkps").length;
         byKind.push(`jfkps ${n}`);
@@ -1970,6 +2006,7 @@ export function ListScanPanel() {
         cfgDone.ema30Band?.enabled,
         cfgDone.fractal8?.enabled,
         cfgDone.jfkps?.enabled,
+        cfgDone.mdo?.enabled,
         cfgDone.pine?.enabled,
       ].filter(Boolean).length;
       const hepsiWarn =
@@ -2002,7 +2039,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -2067,10 +2104,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !jfOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !pdoOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !jfOn && !mdoOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, mdoOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -2449,6 +2486,25 @@ export function ListScanPanel() {
           expiresAt: Date.now() + 24 * 3600_000,
           intervalMin: 15,
           scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "mdo") {
+        const c = cfg.mdo;
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "MDO",
+          scanKey: "list_scan",
+          scanPayload: { matchMode: "any", mdo: { enabled: true, conds: [h.cond as MdoCond], params: { ...(c?.params ?? {}) } } },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
+          intervalMin: 15,
         });
         continue;
       }
@@ -2861,10 +2917,11 @@ export function ListScanPanel() {
     if (e3On) names.push("EMA30 Band");
     if (fr8On) names.push("FRACTAL 8");
     if (jfOn) names.push("JFKPS");
+    if (mdoOn) names.push("MDO");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, pdoOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, mdoOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -4024,6 +4081,43 @@ export function ListScanPanel() {
                 } else {
                   setEldConds((a) => toggleCondKeepOne(a, c.id));
                 }
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="T32 · MDO"
+        enabled={mdoOn}
+        onToggle={() => { if (mdoOn) setMdoOn(false); else { setMdoOn(true); setMatchMode("any"); } }}
+        open={openCard === "mdo"}
+        onOpen={() => setOpenCard((c) => (c === "mdo" ? null : "mdo"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Multi-Dimension Oscillator [T3-JMA-Jurik]: İvme (power_norm) × Volatilite (bb_norm) kesişimleri, ikisi 0..100 · Jurik Al/Sat = trigger × signal ·
+          ≥{mdoMinBars({ len: mdoLen, mom: mdoMom, bb: mdoBb, st: mdoSt, x: mdoX, jl: mdoJl })} mum · QUANTEX T32 ile aynı matematik
+        </p>
+        <div className="grid grid-cols-3 gap-1">
+          <NumInput label="Ana Periyot" value={mdoLen} onChange={setMdoLen} hint="Ana Periyot (100; Pine'da hesapta kullanılmıyor)" />
+          <NumInput label="Momentum" value={mdoMom} onChange={setMdoMom} hint="Momentum Periyodu (70)" />
+          <NumInput label="BB Periyodu" value={mdoBb} onChange={setMdoBb} hint="BB Periyodu (100)" />
+          <NumInput label="BB Çarpanı" value={mdoMult} onChange={setMdoMult} hint="BB Çarpanı (1)" />
+          <NumInput label="Kase Periodu" value={mdoSt} onChange={setMdoSt} hint="Jurik Kase Periodu (27)" />
+          <NumInput label="Synth Çarpan" value={mdoX} onChange={setMdoX} hint="Jurik Synth. Çarpan (15)" />
+          <NumInput label="Jurik Smooth" value={mdoJl} onChange={setMdoJl} hint="Jurik Smooth (9)" />
+          <NumInput label="Jurik Phase" value={mdoPh} onChange={setMdoPh} hint="Jurik Phase (0)" />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {ALL_MDO_CONDS.map((id) => (
+            <Chip
+              key={id}
+              title={MDO_COND_LABEL[id]}
+              active={mdoConds.includes(id)}
+              label={MDO_COND_LABEL[id]}
+              onClick={() => {
+                if (!mdoOn) { setMdoOn(true); setMatchMode("any"); setMdoConds((a) => ensureCond(a, id)); }
+                else setMdoConds((a) => toggleCondKeepOne(a, id));
               }}
             />
           ))}
