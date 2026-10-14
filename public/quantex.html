@@ -18731,6 +18731,9 @@ const LB=id=>{try{const f=document.getElementById('qxIzlemeFrame');const L=(f&&f
 let keys={}, locked=false, connOk={};
 let cfg=Object.assign({exchange:'binance',market:'futures',leverage:5,marginType:'ISOLATED',riskPct:1,tp:10,sl:5,maxSlots:5,maxAge:1,equity:1000,live:false,sources:[]}, load(LS_CFG)||{});
 let st=Object.assign({running:false,open:[],log:[],pnl:0}, load(LS_ST)||{});
+// Kaynak karışması onarımı: son fiyat girişten >%50 sapmışsa (ör. XMRUSDT giriş vadeli ~549, son spot aynası bayat 118.7 → −%78) son fiyat güvenilmez sayılır;
+// kullanıcı verisi değiştirilmez: yalnız ⚠ işaretlenir; vadeli fiyatı (giriş ya da son fiyata %30 yakın) gelince güncellenir ve işaret kalkar.
+(st.open||[]).forEach(p=>{if(p&&p.entry>0&&p.last>0&&Math.abs(p.last/p.entry-1)>0.5&&!p.pxWarn){p.pxWarn='son fiyat ('+p.last+') girişten >%50 sapmış — farklı kaynak (spot/vadeli) olabilir; vadeli fiyatı gelince düzelir';}});
 function load(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
 function save(){try{localStorage.setItem(LS_CFG,JSON.stringify(cfg));st.log=st.log.slice(-300);localStorage.setItem(LS_ST,JSON.stringify(st));}catch(e){}}
 
@@ -18791,7 +18794,7 @@ function render(){
  <div class="row" style="margin-top:8px"><label><input type="checkbox" data-ca="tradeAlarm" ${cfg.tradeAlarm?'checked':''}> 🔔 Robot işlem alarmı</label><label><input type="checkbox" data-ca="tradeAlarmSound" ${cfg.tradeAlarmSound?'checked':''}> Ses</label><label><input type="checkbox" data-ca="tradeAlarmRemote" ${cfg.tradeAlarmRemote?'checked':''}> Telegram/WhatsApp/ntfy (TradeDesk alarm ayarlarından)</label></div>
  <div class="row" style="margin-top:8px"><label style="flex:2"><input type="checkbox" id="qxbLive" ${cfg.live?'checked':''}> <b class="bad">CANLI emir</b> (gerçek para — bağlantı testi + onay gerekir; şu an yalnız Binance)</label></div></div>
  <div class="bx"><div class="row"><h3>Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})</h3><span>Gerçekleşen PnL: <b class="${st.pnl>=0?'ok':'bad'}">${st.pnl.toFixed(2)} USDT</b></span></div>
- <table><tr>${sortTh('pos','sym','Sembol')}${sortTh('pos','side','Yön')}${sortTh('pos','src','Kaynak')}${sortTh('pos','entry','Giriş')}${sortTh('pos','last','Son')}${sortTh('pos','pnl','PnL %')}${sortTh('pos','size','Büyüklük')}${sortTh('pos','time','Süre')}<th>Mod</th><th></th></tr>${sortRows(st.open,SORT.pos.k,SORT.pos.d,POS_GET).map(({p,i})=>{const r=pr(p);return `<tr><td>${esc(p.sym)}</td><td>${p.side}</td><td>${esc(p.src)}</td><td>${fmt(p.entry)}</td><td>${fmt(p.last)}</td><td class="${r>=0?'ok':'bad'}">${(r*100).toFixed(2)}</td><td>${fmt(+p.notional||0)}</td><td>${ageTxt(p.t)}</td><td>${p.live?'CANLI':'paper'}</td><td><button class="g" data-close="${i}">Kapat</button></td></tr>`;}).join('')}</table></div>
+ <table><tr>${sortTh('pos','sym','Sembol')}${sortTh('pos','side','Yön')}${sortTh('pos','src','Kaynak')}${sortTh('pos','entry','Giriş')}${sortTh('pos','last','Son')}${sortTh('pos','pnl','PnL %')}${sortTh('pos','size','Büyüklük')}${sortTh('pos','time','Süre')}<th>Mod</th><th></th></tr>${sortRows(st.open,SORT.pos.k,SORT.pos.d,POS_GET).map(({p,i})=>{const r=pr(p);return `<tr><td>${esc(p.sym)}</td><td>${p.side}</td><td>${esc(p.src)}</td><td>${fmt(p.entry)}</td><td>${fmt(p.last)}</td><td class="${r>=0?'ok':'bad'}" title="Fiyat değişimi %; ROE = ×${p.lev||1}">${(r*100).toFixed(2)}${p.lev>1?` <small>(ROE ${(r*100*p.lev).toFixed(1)})</small>`:''}${p.pxWarn?` <small class="bad" title="${esc(p.pxWarn)}">⚠</small>`:''}</td><td>${fmt(+p.notional||0)}</td><td>${ageTxt(p.t)}</td><td>${p.live?'CANLI':'paper'}</td><td><button class="g" data-close="${i}">Kapat</button></td></tr>`;}).join('')}</table></div>
  <div class="bx"><h3>Borsa API ayarları</h3><small>Anahtarlar yalnız bu tarayıcıda saklanır (localStorage). Parola verirsen AES-GCM ile şifrelenir. İstek başına sadece bu sitenin <code>/api/exchange</code> rotasına gider, orada imzalanıp borsaya iletilir; sunucuda saklanmaz/loglanmaz. Borsa tarafında <b>çekim (withdraw) iznini kapalı</b> tut, IP kısıtı koy.</small>
  ${locked?`<div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Anahtar parolası"><button id="qxbUnlock">Kilidi aç</button></div>`:`<div class="grid" style="margin-top:8px">${EXCHANGES.map(exCard).join('')}</div>
  <div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Şifreleme parolası (opsiyonel)"><button id="qxbSaveKeys">Anahtarları kaydet</button><button class="r" id="qxbWipe">Anahtarları sil</button></div>`}</div>
@@ -18923,7 +18926,10 @@ async function tick(sig){
   if(!st.running||busy) return; busy=true;
   try{
     const px=(st.open.length||sig)?await prices():{};
-    for(let i=st.open.length-1;i>=0;i--){const p=st.open[i];if(px[p.sym])p.last=px[p.sym];const r=pr(p);
+    for(let i=st.open.length-1;i>=0;i--){const p=st.open[i],np=px[p.sym];
+      if(np>0){const near=x=>x>0&&Math.abs(np/x-1)<=0.3; // tek adımda >%30 sapma (giriş ve son fiyata göre) = farklı kaynak (spot/vadeli) şüphesi → kullanılmaz
+        if(near(p.entry)||near(p.last)){p.last=np;if(p.pxWarn){p.pxWarn='';}} else {if(!p.pxWarn)log('⚠ '+p.sym+' şüpheli fiyat '+fmt(np)+' (giriş '+fmt(p.entry)+') — kaynak uyuşmazlığı, TP/SL için kullanılmadı');p.pxWarn='şüpheli fiyat '+fmt(np)+' atlandı';continue;}}
+      if(p.pxWarn)continue; const r=pr(p);
       if(r>=cfg.tp/100) await closePos(i,'TP'); else if(r<=-cfg.sl/100) await closePos(i,'SL');}
     const w=sig?izWin():null;
     if(!sig){} else if(!w){ if(!tick.warned){log('⚠ İzleme açık değil — sinyal okunamıyor (📡 İzleme sekmesini açıp tara)');tick.warned=1;} }
