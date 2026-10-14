@@ -19034,7 +19034,7 @@ function robotAlarm(msg){
 // Koşullar İzleme çerçevesinin KAPANMIŞ mum verisi (d.kScan) ve kendi gösterge fonksiyonlarıyla (rsiArr, mfiArr, stochArr, cciArr, moveOscSeries=PDO) hesaplanır.
 cfg.combos=cfg.combos||[];
 const CTYPES={
-  chip:{lb:'Tarama çipi (T1–T32)'}, mdo:{lb:'T32 MDO İvme–Volatilite durumu',dir:'ust'}, xcross:{lb:'Çizgi kesişimi (T30/T31/T32)'}, jft:{lb:'T31 JFKPS trend durumu',dir:'yesil'}, ljma:{lb:'Fiyat Loxx Jurik üstü/altı + eğim',p:20,ph:0,dir:'ust',slope:'up'}, fr8:{lb:'T30 FRACTAL seviye aralık',lvl:1,min:-100,max:-75}, rsi:{lb:'RSI aralık',p:14,min:20,max:30}, cmo:{lb:'CMO aralık',p:14,min:-100,max:-40},
+  chip:{lb:'Tarama çipi (T1–T32)'}, mdo:{lb:'T32 MDO İvme/Volatilite kesişimi',dir:'ust'}, xcross:{lb:'Çizgi kesişimi (T30/T31/T32)'}, jft:{lb:'T31 JFKPS trend durumu',dir:'yesil'}, ljma:{lb:'Fiyat Loxx Jurik üstü/altı + eğim',p:20,ph:0,dir:'ust',slope:'up'}, fr8:{lb:'T30 FRACTAL seviye aralık',lvl:1,min:-100,max:-75}, rsi:{lb:'RSI aralık',p:14,min:20,max:30}, cmo:{lb:'CMO aralık',p:14,min:-100,max:-40},
   mfi:{lb:'MFI aralık',p:14,min:0,max:20}, stoch:{lb:'Stoch %K aralık',p:14,min:0,max:20}, cci:{lb:'CCI aralık',p:20,min:-300,max:-100},
   adx:{lb:'ADX aralık',p:14,min:25,max:100}, pdo:{lb:'PDO AL/SAT kesişi',dir:'AL'}, pdov:{lb:'PDO değer aralık',min:0,max:30},
   ema:{lb:'Fiyat EMA üstü/altı',p:200,dir:'ust'}
@@ -19072,7 +19072,7 @@ function condFn(w,d,k,cd){
     case 'fr8':{let F;try{F=w.fr8Calc(k,w.S);}catch(e){return ()=>false;} const q=Math.max(1,Math.min(5,+cd.lvl||1))-1, okA=q===4?F.v15:F.v12; return j=>!!okA[j]&&inR(F.lv[q][j]);}
     case 'ljma':{let J;try{J=w.lxJurik(k.c,P,Math.max(-100,Math.min(100,+cd.ph||0)));}catch(e){return ()=>false;} const warm=Math.max(30,3*P);
       return j=>{if(j<warm||!isFinite(J[j])||!isFinite(J[j-1]))return false;const pos=cd.dir==='alt'?k.c[j]<J[j]:k.c[j]>J[j];const sl=cd.slope==='down'?J[j]<J[j-1]:cd.slope==='any'?true:J[j]>J[j-1];return pos&&sl;};}
-    case 'mdo':{let M;try{M=w.mdoCalc(k,w.S);}catch(e){return ()=>false;} return j=>j>=M.need&&isFinite(M.pn[j])&&isFinite(M.vr[j])&&(cd.dir==='alt'?M.pn[j]<M.vr[j]:M.pn[j]>M.vr[j]);}
+    case 'mdo':{let M;try{M=w.mdoCalc(k,w.S);}catch(e){return ()=>false;} const A=M.pn,B=M.vr; return j=>{if(j<1||j-1<M.need||![A[j],B[j],A[j-1],B[j-1]].every(isFinite))return false; return cd.dir==='alt'?(B[j]>A[j]&&B[j-1]<=A[j-1]):(A[j]>B[j]&&A[j-1]<=B[j-1]);};}
     case 'xcross':{const L=XLINES[cd.src]||XLINES.t30,ak=L.l[cd.a]?cd.a:Object.keys(L.l)[0];let R;try{R=L.calc(w,k);}catch(e){return ()=>false;}
       const A=L.l[ak].get(R),useLv=cd.bt!=='line',bk=L.l[cd.b]?cd.b:Object.keys(L.l)[0],B=useLv?null:L.l[bk].get(R),lv=+cd.lv,up=cd.dir!=='down';
       if(useLv&&!isFinite(lv))return ()=>false;
@@ -19118,7 +19118,7 @@ function condRow(ci,i,cd){
   else if(cd.t==='ljma') x=`uzunluk ${inp('p',cd.p)} faz ${inp('ph',cd.ph??0)}<select data-cc="${ci}.${i}.dir"><option value="ust" ${cd.dir!=='alt'?'selected':''}>fiyat üstünde</option><option value="alt" ${cd.dir==='alt'?'selected':''}>fiyat altında</option></select><select data-cc="${ci}.${i}.slope"><option value="up" ${(cd.slope||'up')==='up'?'selected':''}>Jurik yükseliyor</option><option value="down" ${cd.slope==='down'?'selected':''}>Jurik düşüyor</option><option value="any" ${cd.slope==='any'?'selected':''}>eğim fark etmez</option></select>`;
   else if(cd.t==='xcross'){const L=XLINES[cd.src]||XLINES.t30,ks=Object.keys(L.l),sel=(f,v)=>`<select data-cc="${ci}.${i}.${f}">${ks.map(q=>`<option value="${q}" ${(v||ks[0])===q?'selected':''}>${L.l[q].lb}</option>`).join('')}</select>`;
     x=`<select data-cc="${ci}.${i}.src">${Object.keys(XLINES).map(q=>`<option value="${q}" ${(cd.src||'t30')===q?'selected':''}>${XLINES[q].lb}</option>`).join('')}</select>${sel('a',cd.a)}<select data-cc="${ci}.${i}.dir"><option value="up" ${cd.dir!=='down'?'selected':''}>yukarı keser</option><option value="down" ${cd.dir==='down'?'selected':''}>aşağı keser</option></select><select data-cc="${ci}.${i}.bt"><option value="lvl" ${cd.bt!=='line'?'selected':''}>seviye</option><option value="line" ${cd.bt==='line'?'selected':''}>çizgi</option></select>${cd.bt==='line'?sel('b',cd.b):inp('lv',cd.lv??-70,60)}`;}
-  else if(cd.t==='mdo') x=`<select data-cc="${ci}.${i}.dir"><option value="ust" ${cd.dir!=='alt'?'selected':''}>İvme > Volatilite</option><option value="alt" ${cd.dir==='alt'?'selected':''}>İvme < Volatilite</option></select>`;
+  else if(cd.t==='mdo') x=`<select data-cc="${ci}.${i}.dir"><option value="ust" ${cd.dir!=='alt'?'selected':''}>İvme↑Volatilite (kesişim, AL)</option><option value="alt" ${cd.dir==='alt'?'selected':''}>Volatilite↑İvme (kesişim, SAT)</option></select>`;
   else if(cd.t==='jft') x=`<select data-cc="${ci}.${i}.dir"><option value="yesil" ${cd.dir!=='kirmizi'?'selected':''}>Trend Yeşil</option><option value="kirmizi" ${cd.dir==='kirmizi'?'selected':''}>Trend Kırmızı</option></select>`;
   else if(cd.t==='pdo') x=`<select data-cc="${ci}.${i}.dir"><option ${cd.dir==='AL'?'selected':''}>AL</option><option ${cd.dir==='SAT'?'selected':''}>SAT</option></select>`;
   else if(cd.t==='ema') x=`periyot ${inp('p',cd.p)}<select data-cc="${ci}.${i}.dir"><option value="ust" ${cd.dir==='ust'?'selected':''}>fiyat üstünde</option><option value="alt" ${cd.dir==='alt'?'selected':''}>fiyat altında</option></select>`;
