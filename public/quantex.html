@@ -19130,7 +19130,7 @@ function sortRes(r){const m=SORT.cres||'hits',a=r.slice();
   else if(m==='chgDesc'||m==='chgAsc'){const d=m==='chgDesc'?-1:1;a.sort((x,y)=>d*((+x.chg||0)-(+y.chg||0)));}else a.sort((x,y)=>(y.hits||0)-(x.hits||0)||(x.age||0)-(y.age||0));return a;}
 function comboCount(cb){return ((comboRes[cb.id+'|coin']||[]).length)+((comboRes[cb.id+'|bist']||[]).length);}
 function comboCreated(cb){const n=parseInt(String(cb.id||'').replace(/^c/,''),36);return isFinite(n)?n:0;}
-function renderCombos(){
+function renderCombos(){try{if($("qxbRapor"))setTimeout(renderJ,0);}catch(e){}
   const el=$('qxbCombo'); if(!el) return;
   el.innerHTML=(cfg.combos.length>1||Object.keys(comboRes).length?`<div class="row" style="margin-bottom:6px"><small>Kombinleri sırala:</small><select id="qxbCSort" style="max-width:200px"><option value="">— seç (bir kez uygula) —</option><option value="az">ada göre A→Z</option><option value="za">ada göre Z→A</option><option value="new">oluşturma yeni→eski</option><option value="old">oluşturma eski→yeni</option><option value="res">son sonuç sayısı büyük→küçük</option></select><small>Sonuç etiketleri:</small><select data-qsel="cres" style="max-width:170px">${[['hits','isabet (hits)'],['az','alfabetik'],['new','yeni→eski'],['chgDesc','% değişim büyük→küçük'],['chgAsc','% değişim küçük→büyük']].map(o=>`<option value="${o[0]}" ${(SORT.cres||'hits')===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>`:'')+cfg.combos.map((cb,ci)=>{
     const rc=comboRes[cb.id+'|coin'], rb=comboRes[cb.id+'|bist'];
@@ -19266,7 +19266,7 @@ function jTrig(meta,srcLabel){meta=meta||{};
   if(meta.scanId)return {kind:'scan',key:LB(meta.scanId),rule:(srcLabel||'')+(meta.dir?' · yön '+meta.dir:''),tf:meta.interval||''};
   return {kind:'eski',key:'bilinmiyor (eski)',rule:srcLabel||'',tf:''};}
 function jOpen(m,p,meta){const tr=jTrig(meta,p.src);
-  JR.trades.push({id:'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),pk:jKey(m,p),m,sym:p.sym,side:p.side||'LONG',t0:p.t||Date.now(),e:p.entry,pxSrc:p.pxSrc||(m==='bist'?'yahoo':null),
+  JR.trades.push({id:'j'+Date.now().toString(36)+Math.random().toString(36).slice(2,6),pk:jKey(m,p),m,comboId:meta&&meta.comboId||null,sym:p.sym,side:p.side||'LONG',t0:p.t||Date.now(),e:p.entry,pxSrc:p.pxSrc||(m==='bist'?'yahoo':null),
     kind:tr.kind,key:tr.key,rule:tr.rule,tf:tr.tf,age:meta&&meta.age,src:p.src,lev:p.lev||1,size:p.notional||(p.lot*p.entry)||0,qty:p.qty||p.lot||0,live:!!p.live,
     mae:0,maePx:p.entry,maeT:p.t||Date.now(),mfe:0,mfePx:p.entry,mfeT:p.t||Date.now()});saveJ();}
 function jSide(t,px){return t.side==='SHORT'?(1-px/t.e):(px/t.e-1);}
@@ -19286,13 +19286,21 @@ function jImportLogs(m,arr){ // eski günlük satırlarından kapanmış işleml
   if(!JR.imported.bist){jImportLogs('bist',B.log);(B.open||[]).forEach(p=>jImportOpen('bist',p));JR.imported.bist=Date.now();ch=1;}
   if(ch)saveJ();})();
 function jUnreal(t){if(t.t1)return null;const L=t.m==='bist'?B.open:st.open,p=(L||[]).find(q=>jKey(t.m,q)===t.pk);if(!p||p.pxWarn)return null;const r=p.side==='SHORT'?(1-p.last/p.entry):(p.last/p.entry-1);const g=t.m==='bist'?(p.last-p.entry)*p.lot:r*(p.notional||0),f=feeAmt(t.m,p.entry,p.last,p.lot||p.qty,p.notional);return {r,gross:g,fee:f,amt:g-f};}
+// kombin kimliği: yeni kayıtlarda comboId; eskilerde "KOMBİN: ad" (veya kaynak etiketi) → mevcut kombine eşlenir. Böylece yeniden adlandırma kayıtları bölmez.
+function jCid(t){if(t.comboId)return t.comboId;const k=String(t.key||'').replace(/\s+(AL|SAT)$/,'');const cb=(cfg.combos||[]).find(c=>'KOMBİN: '+c.name===k);return cb?cb.id:null;}
+function jGk(t){const c=jCid(t);return c?'cid:'+c:t.key;}
+function jName(gk,fallback){if(String(gk).startsWith('cid:')){const cb=(cfg.combos||[]).find(c=>c.id===gk.slice(4));return cb?'KOMBİN: '+cb.name:(fallback||'KOMBİN')+' (silindi)';}return gk;}
+function jWired(m,gk){if(String(gk).startsWith('cid:')){const id=gk.slice(4),L=m==='bist'?B.sources:cfg.sources;const s0=(L||[]).find(x=>x.comboId===id);return s0?(s0.on!==false?'✓':'⏸'):'✗';}return '';}
 function jFiltered(){const f=JF,from=f.from?new Date(f.from).getTime():null,to=f.to?new Date(f.to).getTime()+864e5:null;
-  return JR.trades.filter(t=>(!f.m||t.m===f.m)&&(!f.key||t.key===f.key)&&(!f.st||(f.st==='open'?!t.t1&&!t.tStr:(t.t1||t.tStr)))&&(!from||(t.t0||0)>=from)&&(!to||(t.t0||0)<to));}
+  return JR.trades.filter(t=>(!f.m||t.m===f.m)&&(!f.key||jGk(t)===f.key)&&(!f.st||(f.st==='open'?!t.t1&&!t.tStr:(t.t1||t.tStr)))&&(!from||(t.t0||0)>=from)&&(!to||(t.t0||0)<to));}
 const pc=v=>v==null||!isFinite(v)?'-':((v>=0?'+':'')+(v*100).toFixed(2)+'%');
 const dt=t=>t?new Date(t).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'-';
 const durT=ms=>ms==null||!isFinite(ms)?'-':ageTxt(Date.now()-ms);
 const cur=t=>t.m==='bist'?'TL':'USDT';
-function jSummary(list){const g={};list.forEach(t=>{const k=t.m+'|'+t.key;(g[k]=g[k]||{m:t.m,key:t.key,kind:t.kind,n:0,w:0,sp:0,sa:0,gp:0,gl:0,maeS:0,maeN:0,maeW:0,mfeS:0,mfeN:0,durS:0,durN:0,open:0,uAmt:0,uPctS:0,uN:0});const s=g[k];
+function jSummary(list){const g={};const mk=(m,gk,kind,fb)=>({m,gk,key:jName(gk,fb),kind,wired:jWired(m,gk),n:0,w:0,sp:0,sa:0,gp:0,gl:0,maeS:0,maeN:0,maeW:0,mfeS:0,mfeN:0,durS:0,durN:0,open:0,uAmt:0,uPctS:0,uN:0});
+  // tanımlı TÜM kombinler (işlemi olmasa da 0 satır) — coin + BIST
+  (cfg.combos||[]).forEach(cb=>['coin','bist'].forEach(m=>{const gk='cid:'+cb.id;if((JF.m&&JF.m!==m)||(JF.key&&JF.key!==gk))return;if(m==='bist'&&cb.side==='SHORT')return;g[m+'|'+gk]=mk(m,gk,'combo');}));
+  list.forEach(t=>{const gk=jGk(t),k=t.m+'|'+gk;g[k]=g[k]||mk(t.m,gk,t.kind,t.key);const s=g[k];
   if(t.t1||t.tStr){const nv=t.net!=null?t.net:(t.pnl||0);s.n++;if(nv>0)s.w++;s.sp+=t.pnlPct||0;s.sa+=nv;s.sg=(s.sg||0)+(t.pnl||0);if(nv>0)s.gp+=nv;else s.gl-=nv;if(t.dur!=null){s.durS+=t.dur;s.durN++;}}
   else{s.open++;const u=jUnreal(t);if(u){s.uAmt+=u.amt;s.uPctS+=u.r;s.uN++;}}
   if(t.mae!=null){s.maeS+=t.mae;s.maeN++;s.maeW=Math.min(s.maeW,t.mae);}if(t.mfe!=null){s.mfeS+=t.mfe;s.mfeN++;}});
@@ -19305,19 +19313,19 @@ function jTradeRows(list){return [['Piyasa','Sembol','Yön','Kombin/sinyal','Kur
 function jSumRows(S){return [['Piyasa','Kombin/sinyal','İşlem','Kazanma %','Ort K/Z %','Toplam net K/Z','Ort MAE %','En kötü MAE %','Ort MFE %','Ort süre dk','Profit factor','Açık','Açık net K/Z','Açık K/Z %']].concat(S.map(s=>[s.m,s.key,s.n,s.wr!=null?(s.wr*100).toFixed(1):'',s.avg!=null?(s.avg*100).toFixed(3):'',s.sa.toFixed(2),s.maeA!=null?(s.maeA*100).toFixed(3):'',(s.maeW*100).toFixed(3),s.mfeA!=null?(s.mfeA*100).toFixed(3):'',s.durA!=null?Math.round(s.durA/60000):'',s.pf==null?'':s.pf===Infinity?'∞':s.pf.toFixed(2),s.open,s.uAmt.toFixed(2),s.uPct!=null?(s.uPct*100).toFixed(3):'']));}
 function renderJ(){const el=$('qxbRapor');if(!el)return;
   ['j','js','ju'].forEach(k=>{if(!SORT[k]||typeof SORT[k]!=='object')SORT[k]={k:k==='j'?'t0':k==='js'?'amt':'uAmt',d:-1};});
-  const list=jFiltered(),S=jSummary(list),keys=[...new Set(JR.trades.map(t=>t.key))].sort((a,b)=>a.localeCompare(b,'tr'));
+  const list=jFiltered(),S=jSummary(list),keys=[...(cfg.combos||[]).map(c=>['cid:'+c.id,'KOMBİN: '+c.name]),...[...new Set(JR.trades.map(jGk))].filter(k=>!(cfg.combos||[]).some(c=>'cid:'+c.id===k)).map(k=>[k,jName(k)])];
   const cls=v=>v==null?'':v>=0?'ok':'bad';
   const sumRows=sortRows(S.map(s=>Object.assign(s,{amt:s.sa})),SORT.js.k,SORT.js.d,S_GET);
-  const openS=S.filter(s=>s.open||s.n);
+  const openS=S;
   el.innerHTML=`<div class="row"><h3>📒 Robot Rapor</h3><small>Her işlem ayrı kaydedilir (qxbot_journal_v1, son ${J_CAP}). Bot verisi değişmez. Eski işlemler "bilinmiyor (eski)".</small></div>
   <div class="row" style="margin:6px 0"><div><label>Piyasa</label><select data-jf="m"><option value="">Hepsi</option><option value="coin" ${JF.m==='coin'?'selected':''}>Coin</option><option value="bist" ${JF.m==='bist'?'selected':''}>BIST</option></select></div>
    <div><label>Başlangıç</label><input type="date" data-jf="from" value="${JF.from}"></div><div><label>Bitiş</label><input type="date" data-jf="to" value="${JF.to}"></div>
-   <div style="flex:2"><label>Kombin/sinyal</label><select data-jf="key"><option value="">Hepsi</option>${keys.map(k=>`<option ${JF.key===k?'selected':''}>${esc(k)}</option>`).join('')}</select></div>
+   <div style="flex:2"><label>Kombin/sinyal</label><select data-jf="key"><option value="">Hepsi</option>${keys.map(([v,l])=>`<option value="${esc(v)}" ${JF.key===v?'selected':''}>${esc(l)}</option>`).join('')}</select></div>
    <div><label>Durum</label><select data-jf="st"><option value="">Hepsi</option><option value="open" ${JF.st==='open'?'selected':''}>Açık</option><option value="closed" ${JF.st==='closed'?'selected':''}>Kapalı</option></select></div></div>
   <h3 style="margin-top:8px">Kombin bazında açık K/Z</h3>
-  <table><tr>${sortTh('ju','m','Piyasa')}${sortTh('ju','key','Kombin/sinyal')}${sortTh('ju','open','Açık')}${sortTh('ju','uAmt','Açık net K/Z')}${sortTh('ju','uPct','Ort açık K/Z %')}${sortTh('ju','sa','Gerçekleşen net K/Z')}</tr>${sortRows(openS,SORT.ju.k,SORT.ju.d,S_GET).map(({p:s})=>`<tr><td>${s.m==='bist'?'BIST':'Coin'}</td><td>${esc(s.key)}</td><td>${s.open}</td><td>${money(s.uAmt,s.m)}</td><td class="${cls(s.uPct)}">${pc(s.uPct)}</td><td>${money(s.sa,s.m)}</td></tr>`).join('')||'<tr><td colspan="6"><small>Kayıt yok</small></td></tr>'}</table>
+  <table><tr>${sortTh('ju','m','Piyasa')}${sortTh('ju','key','Kombin/sinyal')}<th title="Robota bağlı mı: ✓ bağlı · ⏸ duraklatılmış · ✗ bağlı değil (kombin kartındaki 🤖 / 🇹🇷 BIST bota ile bağla)">Robot</th>${sortTh('ju','open','Açık')}${sortTh('ju','uAmt','Açık net K/Z')}${sortTh('ju','uPct','Ort açık K/Z %')}${sortTh('ju','sa','Gerçekleşen net K/Z')}</tr>${sortRows(openS,SORT.ju.k,SORT.ju.d,S_GET).map(({p:s})=>`<tr><td>${s.m==='bist'?'BIST':'Coin'}</td><td>${esc(s.key)}</td><td class="${s.wired==='✓'?'ok':s.wired?'warn':''}">${s.wired}</td><td>${s.open}</td><td>${money(s.uAmt,s.m)}</td><td class="${cls(s.uPct)}">${pc(s.uPct)}</td><td>${money(s.sa,s.m)}</td></tr>`).join('')||'<tr><td colspan="7"><small>Kayıt yok</small></td></tr>'}</table>
   <div class="row" style="margin-top:8px"><h3>Kombin / sinyal özeti</h3><button class="g" id="qxjCsvS">⬇ Özet CSV</button></div>
-  <table><tr>${sortTh('js','m','Piyasa')}${sortTh('js','key','Kombin/sinyal')}${sortTh('js','n','İşlem')}${sortTh('js','wr','Kazanma')}${sortTh('js','amt','Toplam net K/Z')}${sortTh('js','avg','Ort K/Z %')}${sortTh('js','maeA','Ort MAE')}${sortTh('js','maeW','En kötü MAE')}${sortTh('js','mfeA','Ort MFE')}${sortTh('js','durA','Ort süre')}${sortTh('js','pf','Profit f.')}</tr>${sumRows.map(({p:s})=>`<tr><td>${s.m==='bist'?'BIST':'Coin'}</td><td>${esc(s.key)}</td><td>${s.n}${s.open?` <small>(+${s.open} açık)</small>`:''}</td><td>${s.wr!=null?(s.wr*100).toFixed(0)+'%':'-'}</td><td>${money(s.sa,s.m,null,'Brüt '+(s.sg||0).toFixed(2)+' · komisyon sonrası net')}</td><td class="${cls(s.avg)}">${pc(s.avg)}</td><td class="bad">${pc(s.maeA)}</td><td class="bad">${pc(s.maeW)}</td><td class="ok">${pc(s.mfeA)}</td><td>${s.durA!=null?ageTxt(Date.now()-s.durA):'-'}</td><td>${s.pf==null?'-':s.pf===Infinity?'∞':s.pf.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="11"><small>Kayıt yok</small></td></tr>'}</table>
+  <table><tr>${sortTh('js','m','Piyasa')}${sortTh('js','key','Kombin/sinyal')}<th>Robot</th>${sortTh('js','n','İşlem')}${sortTh('js','wr','Kazanma')}${sortTh('js','amt','Toplam net K/Z')}${sortTh('js','avg','Ort K/Z %')}${sortTh('js','maeA','Ort MAE')}${sortTh('js','maeW','En kötü MAE')}${sortTh('js','mfeA','Ort MFE')}${sortTh('js','durA','Ort süre')}${sortTh('js','pf','Profit f.')}</tr>${sumRows.map(({p:s})=>`<tr><td>${s.m==='bist'?'BIST':'Coin'}</td><td>${esc(s.key)}</td><td class="${s.wired==='✓'?'ok':s.wired?'warn':''}">${s.wired}</td><td>${s.n}${s.open?` <small>(+${s.open} açık)</small>`:''}</td><td>${s.wr!=null?(s.wr*100).toFixed(0)+'%':'-'}</td><td>${money(s.sa,s.m,null,'Brüt '+(s.sg||0).toFixed(2)+' · komisyon sonrası net')}</td><td class="${cls(s.avg)}">${pc(s.avg)}</td><td class="bad">${pc(s.maeA)}</td><td class="bad">${pc(s.maeW)}</td><td class="ok">${pc(s.mfeA)}</td><td>${s.durA!=null?ageTxt(Date.now()-s.durA):'-'}</td><td>${s.pf==null?'-':s.pf===Infinity?'∞':s.pf.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="12"><small>Kayıt yok</small></td></tr>'}</table>
   <div class="row" style="margin-top:8px"><h3>İşlemler (${list.length})</h3><button class="g" id="qxjCsvT">⬇ İşlem CSV</button><button class="g" id="qxjJson">⬇ JSON yedek</button><label class="g" style="flex:0 0 auto;cursor:pointer;background:#334155;padding:7px 10px;border-radius:6px">⬆ JSON içe al<input type="file" id="qxjImp" accept=".json,application/json" hidden></label>
    <select id="qxjRstM" style="max-width:110px;flex:0 0 auto"><option value="both">İkisi</option><option value="coin">Coin</option><option value="bist">BIST</option></select>
    <label style="flex:0 0 auto"><input type="checkbox" id="qxjRstP"> Gerçekleşen PnL'i de sıfırla</label><button class="r" id="qxjRst" style="flex:0 0 auto">🗑 Raporu sıfırla</button></div>
