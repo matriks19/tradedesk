@@ -18791,14 +18791,33 @@ function render(){
  <div class="row" style="margin-top:8px"><label><input type="checkbox" data-ca="tradeAlarm" ${cfg.tradeAlarm?'checked':''}> 🔔 Robot işlem alarmı</label><label><input type="checkbox" data-ca="tradeAlarmSound" ${cfg.tradeAlarmSound?'checked':''}> Ses</label><label><input type="checkbox" data-ca="tradeAlarmRemote" ${cfg.tradeAlarmRemote?'checked':''}> Telegram/WhatsApp/ntfy (TradeDesk alarm ayarlarından)</label></div>
  <div class="row" style="margin-top:8px"><label style="flex:2"><input type="checkbox" id="qxbLive" ${cfg.live?'checked':''}> <b class="bad">CANLI emir</b> (gerçek para — bağlantı testi + onay gerekir; şu an yalnız Binance)</label></div></div>
  <div class="bx"><div class="row"><h3>Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})</h3><span>Gerçekleşen PnL: <b class="${st.pnl>=0?'ok':'bad'}">${st.pnl.toFixed(2)} USDT</b></span></div>
- <table><tr><th>Sembol</th><th>Yön</th><th>Kaynak</th><th>Giriş</th><th>Son</th><th>PnL %</th><th>Mod</th><th></th></tr>${st.open.map((p,i)=>{const r=pr(p);return `<tr><td>${esc(p.sym)}</td><td>${p.side}</td><td>${esc(p.src)}</td><td>${fmt(p.entry)}</td><td>${fmt(p.last)}</td><td class="${r>=0?'ok':'bad'}">${(r*100).toFixed(2)}</td><td>${p.live?'CANLI':'paper'}</td><td><button class="g" data-close="${i}">Kapat</button></td></tr>`;}).join('')}</table></div>
+ <table><tr>${sortTh('pos','sym','Sembol')}${sortTh('pos','side','Yön')}${sortTh('pos','src','Kaynak')}${sortTh('pos','entry','Giriş')}${sortTh('pos','last','Son')}${sortTh('pos','pnl','PnL %')}${sortTh('pos','size','Büyüklük')}${sortTh('pos','time','Süre')}<th>Mod</th><th></th></tr>${sortRows(st.open,SORT.pos.k,SORT.pos.d,POS_GET).map(({p,i})=>{const r=pr(p);return `<tr><td>${esc(p.sym)}</td><td>${p.side}</td><td>${esc(p.src)}</td><td>${fmt(p.entry)}</td><td>${fmt(p.last)}</td><td class="${r>=0?'ok':'bad'}">${(r*100).toFixed(2)}</td><td>${fmt(+p.notional||0)}</td><td>${ageTxt(p.t)}</td><td>${p.live?'CANLI':'paper'}</td><td><button class="g" data-close="${i}">Kapat</button></td></tr>`;}).join('')}</table></div>
  <div class="bx"><h3>Borsa API ayarları</h3><small>Anahtarlar yalnız bu tarayıcıda saklanır (localStorage). Parola verirsen AES-GCM ile şifrelenir. İstek başına sadece bu sitenin <code>/api/exchange</code> rotasına gider, orada imzalanıp borsaya iletilir; sunucuda saklanmaz/loglanmaz. Borsa tarafında <b>çekim (withdraw) iznini kapalı</b> tut, IP kısıtı koy.</small>
  ${locked?`<div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Anahtar parolası"><button id="qxbUnlock">Kilidi aç</button></div>`:`<div class="grid" style="margin-top:8px">${EXCHANGES.map(exCard).join('')}</div>
  <div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Şifreleme parolası (opsiyonel)"><button id="qxbSaveKeys">Anahtarları kaydet</button><button class="r" id="qxbWipe">Anahtarları sil</button></div>`}</div>
- <div class="bx"><h3>İşlem günlüğü</h3><div style="max-height:220px;overflow:auto;font-family:monospace;font-size:11px">${st.log.slice().reverse().map(esc).join('<br>')}</div></div>`;
+ <div class="bx"><div class="row"><h3>İşlem günlüğü</h3>${logSel('log')}</div><div style="max-height:220px;overflow:auto;font-family:monospace;font-size:11px">${sortLog(st.log,SORT.log).map(esc).join('<br>')}</div></div>`;
   renderSrc(); bind(); renderCombos(); renderB();
 }
 const fmt=v=>v==null?'-':(+v).toPrecision(6);
+// ---- Sıralama (yalnız görünüm; bot verisi değişmez) · tercih: qxbot_sort_v1 ----
+const LS_SORT='qxbot_sort_v1';
+let SORT=Object.assign({pos:{k:'pnl',d:-1},bpos:{k:'pnl',d:-1},log:'new',blog:'new',cres:'hits'},load(LS_SORT)||{});
+function ageTxt(t){if(!t)return '-';const m=Math.max(0,Math.round((Date.now()-t)/60000));return m<60?m+' dk':m<1440?Math.floor(m/60)+' sa '+(m%60)+' dk':Math.floor(m/1440)+' g '+Math.floor(m%1440/60)+' sa';}
+function saveSort(){try{localStorage.setItem(LS_SORT,JSON.stringify(SORT));}catch(e){}}
+function sortRows(arr,key,dir,get){const a=arr.map((p,i)=>({p,i}));a.sort((x,y)=>{const u=get(x.p,key),v=get(y.p,key);if(typeof u==='string'||typeof v==='string')return dir*String(u??'').localeCompare(String(v??''),'tr');const U=isFinite(u)?u:-Infinity,V=isFinite(v)?v:-Infinity;return dir*(U-V)||x.i-y.i;});return a;}
+function sortTh(tbl,key,lb){const S0=SORT[tbl]||{};const on=S0.k===key;return `<th data-qsort="${tbl}|${key}" style="cursor:pointer;user-select:none" title="Sırala">${lb}${on?(S0.d<0?' ▼':' ▲'):''}</th>`;}
+function logPnl(x){const m=/(?:PnL|K\/Z)[^-+\d]*([-+]?\d+(?:[.,]\d+)?)/i.exec(x)||/([-+]?\d+(?:[.,]\d+)?)\s*%/.exec(x);return m?+m[1].replace(',','.'):NaN;}
+function sortLog(arr,mode){const a=arr.map((x,i)=>({x,i}));
+  if(mode==='old')return arr.slice();
+  if(mode==='az')a.sort((p,q)=>p.x.replace(/^\S+\s/,'').localeCompare(q.x.replace(/^\S+\s/,''),'tr'));
+  else if(mode==='pnlDesc'||mode==='pnlAsc'){const d=mode==='pnlDesc'?-1:1;a.sort((p,q)=>{const u=logPnl(p.x),v=logPnl(q.x);if(!isFinite(u)&&!isFinite(v))return q.i-p.i;if(!isFinite(u))return 1;if(!isFinite(v))return -1;return d*(u-v);});}
+  else a.sort((p,q)=>q.i-p.i);
+  return a.map(o=>o.x);}
+function logSel(key){const v=SORT[key]||'new';return `<select data-qsel="${key}" style="max-width:170px;font-size:11px">${[['new','yeni→eski'],['old','eski→yeni'],['az','alfabetik'],['pnlDesc','PnL büyük→küçük'],['pnlAsc','PnL küçük→büyük']].map(o=>`<option value="${o[0]}" ${v===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>`;}
+const POS_GET=(p,k)=>k==='sym'?p.sym:k==='pnl'?pr(p):k==='entry'?+p.entry:k==='last'?+p.last:k==='size'?(+p.notional||(+p.lot*+p.entry)||0):k==='time'?+p.t||0:k==='side'?p.side:k==='src'?p.src:0;
+document.addEventListener('click',e=>{const th=e.target.closest&&e.target.closest('[data-qsort]');if(!th)return;const [tbl,k]=th.dataset.qsort.split('|');const c=SORT[tbl]||{};
+  SORT[tbl]=c.k===k?{k,d:-c.d}:{k,d:(k==='sym'||k==='side'||k==='src')?1:-1};saveSort();try{render();}catch(_){}});
+document.addEventListener('change',e=>{const el=e.target;if(!el||!el.dataset||!el.dataset.qsel)return;SORT[el.dataset.qsel]=el.value;saveSort();try{render();}catch(_){}});
 function pr(p){return p.last&&p.entry?(p.side==='LONG'?(p.last/p.entry-1):(1-p.last/p.entry)):0;}
 function renderSrc(){const el=$('qxbSrc');if(!el)return;
   el.innerHTML=cfg.sources.length?'<table><tr><th>Tarama/çip</th><th>Liste</th><th>TF</th><th>Aktif</th><th></th></tr>'+cfg.sources.map((s,i)=>`<tr><td>${esc(s.label)}</td><td>${esc(s.list||'İzleme coin')}</td><td>${esc(s.interval||'-')}</td><td><input type="checkbox" data-src-on="${i}" ${s.on!==false?'checked':''}></td><td><button class="g" data-src-del="${i}">Sil</button></td></tr>`).join('')+'</table>':'<small>Henüz kaynak yok. İzleme\'de bir çipin yanındaki 🤖 butonuna bas ya da aşağıdan ekle.</small>';}
@@ -19039,7 +19058,7 @@ function evalCombo(w,d,cb){
 }
 function frameWin(m){const f=$(m==='bist'?'qxBistFrame':'qxIzlemeFrame');try{return f&&f.contentWindow&&f.contentWindow.DATA?f.contentWindow:null;}catch(e){return null;}}
 function scanCombo(cb,m){const w=frameWin(m);if(!w)return null;const D=w.DATA||{},out=[];
-  for(const sym of Object.keys(D)){const r=evalCombo(w,D[sym],cb);if(r)out.push({sym,price:D[sym].price,hits:r.hits,age:r.age,t:r.t});}return out;}
+  for(const sym of Object.keys(D)){const r=evalCombo(w,D[sym],cb);if(r)out.push({sym,price:D[sym].price,chg:D[sym].chg,hits:r.hits,age:r.age,t:r.t});}return out;}
 let comboRes={}, comboFired=load('qxbot_cfired_v1')||{};
 function comboAlarms(){
   for(const cb of cfg.combos.filter(c=>c.alarm)) for(const m of ['coin','bist']){
@@ -19067,11 +19086,16 @@ function condRow(ci,i,cd){
   else x=(cd.t==='pdov'?'':`periyot ${inp('p',cd.p)} `)+`min ${inp('min',cd.min)} max ${inp('max',cd.max)}`;
   return `<div class="row" style="margin-top:4px"><select data-cc="${ci}.${i}.t" style="max-width:190px">${opt}</select>${x}<button class="g" style="flex:0" data-cdel="${ci}.${i}">✕</button></div>`;
 }
+function sortRes(r){const m=SORT.cres||'hits',a=r.slice();
+  if(m==='az')a.sort((x,y)=>String(x.sym).localeCompare(String(y.sym),'tr'));else if(m==='new')a.sort((x,y)=>(x.age||0)-(y.age||0)||(y.t||0)-(x.t||0));
+  else if(m==='chgDesc'||m==='chgAsc'){const d=m==='chgDesc'?-1:1;a.sort((x,y)=>d*((+x.chg||0)-(+y.chg||0)));}else a.sort((x,y)=>(y.hits||0)-(x.hits||0)||(x.age||0)-(y.age||0));return a;}
+function comboCount(cb){return ((comboRes[cb.id+'|coin']||[]).length)+((comboRes[cb.id+'|bist']||[]).length);}
+function comboCreated(cb){const n=parseInt(String(cb.id||'').replace(/^c/,''),36);return isFinite(n)?n:0;}
 function renderCombos(){
   const el=$('qxbCombo'); if(!el) return;
-  el.innerHTML=cfg.combos.map((cb,ci)=>{
+  el.innerHTML=(cfg.combos.length>1||Object.keys(comboRes).length?`<div class="row" style="margin-bottom:6px"><small>Kombinleri sırala:</small><select id="qxbCSort" style="max-width:200px"><option value="">— seç (bir kez uygula) —</option><option value="az">ada göre A→Z</option><option value="za">ada göre Z→A</option><option value="new">oluşturma yeni→eski</option><option value="old">oluşturma eski→yeni</option><option value="res">son sonuç sayısı büyük→küçük</option></select><small>Sonuç etiketleri:</small><select data-qsel="cres" style="max-width:170px">${[['hits','isabet (hits)'],['az','alfabetik'],['new','yeni→eski'],['chgDesc','% değişim büyük→küçük'],['chgAsc','% değişim küçük→büyük']].map(o=>`<option value="${o[0]}" ${(SORT.cres||'hits')===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>`:'')+cfg.combos.map((cb,ci)=>{
     const rc=comboRes[cb.id+'|coin'], rb=comboRes[cb.id+'|bist'];
-    const tbl=(r,m)=>r?`<div><b>${m==='bist'?'BIST':'Coin'} sonuç: ${r.length}</b> ${r.slice(0,60).map(x=>`<a href="#" data-copen="${m}|${esc(x.sym)}" class="tag">${esc(x.sym)} ${x.hits}/${cb.conds.length}${x.age?' · '+x.age+' mum önce':''}</a>`).join(' ')}</div>`:'';
+    const tbl=(r,m)=>r?`<div><b>${m==='bist'?'BIST':'Coin'} sonuç: ${r.length}</b> ${sortRes(r).slice(0,60).map(x=>`<a href="#" data-copen="${m}|${esc(x.sym)}" class="tag">${esc(x.sym)} ${x.hits}/${cb.conds.length}${x.age?' · '+x.age+' mum önce':''}</a>`).join(' ')}</div>`:'';
     return `<div class="bx" style="background:#0d1422"><div class="row"><input data-cb="${ci}.name" value="${esc(cb.name)}" style="max-width:200px">
      <select data-cb="${ci}.side"><option ${cb.side==='LONG'?'selected':''}>LONG</option><option ${cb.side==='SHORT'?'selected':''}>SHORT</option></select>
      <select data-cb="${ci}.logic"><option value="all" ${cb.logic==='all'?'selected':''}>HEPSİ (VE)</option><option value="n" ${cb.logic==='n'?'selected':''}>EN AZ N</option></select>
@@ -19079,6 +19103,7 @@ function renderCombos(){
      <select data-cb="${ci}.mode"><option value="window" ${cb.mode==='window'?'selected':''}>son K mum içinde</option><option value="same" ${cb.mode==='same'?'selected':''}>aynı mumda</option></select>
      K <input data-cb="${ci}.K" value="${cb.K}" style="max-width:50px">
      <label><input type="checkbox" data-cb="${ci}.alarm" ${cb.alarm?'checked':''}> Alarm</label></div>
+     <span style="margin-left:auto"><button class="g" data-cmove="${ci}|-1" title="Yukarı taşı" ${ci===0?'disabled':''}>↑</button><button class="g" data-cmove="${ci}|1" title="Aşağı taşı" ${ci===cfg.combos.length-1?'disabled':''}>↓</button></span>
      ${cb.conds.map((cd,i)=>condRow(ci,i,cd)).join('')}
      <div class="row" style="margin-top:6px"><button class="g" data-cadd="${ci}">+ Koşul</button><button data-cscan="${ci}|coin">📡 Coin tara</button><button data-cscan="${ci}|bist">📈 BIST tara</button><button class="o" data-cbot="${ci}">🤖 Bota kaynak yap</button><button class="o" data-cbotb="${ci}">🇹🇷 BIST bota</button><button class="r" data-cdelc="${ci}">Kombini sil</button></div>
      ${tbl(rc,'coin')}${tbl(rb,'bist')}</div>`;}).join('')+`<button id="qxbNewCombo">+ Yeni kombin</button> <small>Tarama, ilgili İzleme sekmesinde yüklenmiş listenin KAPANMIŞ mumları ve İzleme'nin zaman dilimi üzerinde çalışır. Çip koşulları İzleme'deki çip ayarlarını kullanır. BIST'te yalnız tarama + alarm (bot emri yok).</small>`;
@@ -19101,6 +19126,8 @@ function renderCombos(){
   el.querySelectorAll('[data-cbotb]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbotb];if(cb.side==='SHORT'){note('BIST kâğıt bot yalnız LONG','err');return;}addSourceB({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});});
   el.querySelectorAll('[data-cbot]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbot];addSource({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});render();});
   el.querySelectorAll('[data-copen]').forEach(a=>a.onclick=e=>{e.preventDefault();const [m,sym]=a.dataset.copen.split('|');openChartIn(m,sym);});
+  const cs=$('qxbCSort');if(cs)cs.onchange=()=>{const m=cs.value;if(!m)return;const f={az:(a,b)=>String(a.name).localeCompare(String(b.name),'tr'),za:(a,b)=>String(b.name).localeCompare(String(a.name),'tr'),new:(a,b)=>comboCreated(b)-comboCreated(a),old:(a,b)=>comboCreated(a)-comboCreated(b),res:(a,b)=>comboCount(b)-comboCount(a)}[m];if(f){cfg.combos.sort(f);save();renderCombos();}};
+  el.querySelectorAll('[data-cmove]').forEach(b=>b.onclick=()=>{const [ci,d]=b.dataset.cmove.split('|').map(Number),j=ci+d;if(j<0||j>=cfg.combos.length)return;const t=cfg.combos[ci];cfg.combos[ci]=cfg.combos[j];cfg.combos[j]=t;save();renderCombos();});
   $('qxbNewCombo').onclick=()=>{cfg.combos.push(newCombo());save2();renderCombos();try{Notification&&Notification.permission==='default'&&Notification.requestPermission();}catch(e){}};
 }
 
@@ -19175,8 +19202,8 @@ function renderB(){
    <div style="margin-top:6px">${B.sources.length?B.sources.map((s,i)=>`<span class="tag">${esc(s.label)} · ${esc(s.interval||'')} <a href="#" data-bdel="${i}" style="color:#f87171">✕</a></span>`).join(' '):'<small>Kaynak yok.</small>'}
    <select id="qxbBAddId" style="max-width:220px">${Array.from({length:31},(_,q)=>'t'+(q+1)).map(i=>`<option value="${i}">${esc(LB(i))}</option>`).join('')}</select><button class="g" id="qxbBAdd">+ BIST tarama ekle</button></div>
    <div class="row" style="margin-top:6px"><span>Açık ${B.open.length}/${B.maxSlots}</span><span>Gerçekleşen: <b class="${B.pnl>=0?'ok':'bad'}">${fmtTL(B.pnl)} TL</b></span><span>Açık K/Z: <b class="${upnl>=0?'ok':'bad'}">${fmtTL(upnl)} TL</b></span></div>
-   <table><tr><th>Hisse</th><th>Lot</th><th>Giriş</th><th>Son</th><th>K/Z %</th><th>Kaynak</th><th></th></tr>${B.open.map((p,i)=>`<tr><td>${esc(p.sym)}</td><td>${p.lot}</td><td>${fmtTL(p.entry)}</td><td>${fmtTL(p.last)}</td><td class="${p.last>=p.entry?'ok':'bad'}">${((p.last/p.entry-1)*100).toFixed(2)}</td><td>${esc(p.src)}</td><td><button class="g" data-bclose="${i}">Kapat</button></td></tr>`).join('')}</table>
-   <div style="max-height:160px;overflow:auto;font-family:monospace;font-size:11px;margin-top:6px">${B.log.slice().reverse().map(esc).join('<br>')}</div>`;
+   <table><tr>${sortTh('bpos','sym','Hisse')}${sortTh('bpos','size','Lot / tutar')}${sortTh('bpos','entry','Giriş')}${sortTh('bpos','last','Son')}${sortTh('bpos','pnl','K/Z %')}${sortTh('bpos','src','Kaynak')}${sortTh('bpos','time','Süre')}<th></th></tr>${sortRows(B.open,SORT.bpos.k,SORT.bpos.d,(p,k)=>k==='pnl'?(p.last/p.entry-1):POS_GET(p,k)).map(({p,i})=>`<tr><td>${esc(p.sym)}</td><td>${p.lot}</td><td>${fmtTL(p.entry)}</td><td>${fmtTL(p.last)}</td><td class="${p.last>=p.entry?'ok':'bad'}">${((p.last/p.entry-1)*100).toFixed(2)}</td><td>${esc(p.src)}</td><td>${ageTxt(p.t)}</td><td><button class="g" data-bclose="${i}">Kapat</button></td></tr>`).join('')}</table>
+   <div class="row" style="margin-top:6px"><small>Günlük</small>${logSel('blog')}</div><div style="max-height:160px;overflow:auto;font-family:monospace;font-size:11px;margin-top:6px">${sortLog(B.log,SORT.blog).map(esc).join('<br>')}</div>`;
   el.querySelectorAll('[data-b]').forEach(i=>i.onchange=()=>{B[i.dataset.b]=+i.value;saveB();});
   el.querySelectorAll('[data-bdel]').forEach(a=>a.onclick=e=>{e.preventDefault();B.sources.splice(+a.dataset.bdel,1);saveB();render();});
   el.querySelectorAll('[data-bclose]').forEach(b=>b.onclick=()=>{closeB(+b.dataset.bclose,'elle');render();});
