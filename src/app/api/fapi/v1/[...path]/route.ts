@@ -16,7 +16,7 @@ export async function GET(
   }
   const src = req.nextUrl.searchParams;
   const q = new URLSearchParams();
-  for (const k of ["symbol", "interval", "limit"]) {
+  for (const k of ["symbol", "interval", "limit", "endTime"]) {
     const v = src.get(k);
     if (v) q.set(k, v.slice(0, 32));
   }
