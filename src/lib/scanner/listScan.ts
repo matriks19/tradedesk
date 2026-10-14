@@ -92,6 +92,8 @@ import {
   type JfkpsCond,
   type JfkpsParams,
 } from "@/lib/indicators/jfkps";
+export { DEFAULT_MDO_CONDS, ALL_MDO_CONDS, MDO_COND_LABEL, MDO_DEFAULTS, mdoMinBars, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
+import { mdoScan, DEFAULT_MDO_CONDS, MDO_BEAR_CONDS, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
 import {
   fractal8Scan,
   DEFAULT_FRACTAL8_CONDS,
@@ -580,6 +582,7 @@ export type ListScanKind =
   | "ema30Band"
   | "fractal8"
   | "jfkps"
+  | "mdo"
   | "pine";
 
 export type PineCond =
@@ -951,6 +954,12 @@ export type ListScanConfig = {
     enabled: boolean;
     conds: JfkpsCond[];
     params?: JfkpsParams;
+  };
+  /** T32 MDO — İvme×Volatilite kesişimleri (+Jurik), kapanmış mum. */
+  mdo?: {
+    enabled: boolean;
+    conds: MdoCond[];
+    params?: MdoParams;
   };
   fractal8?: {
     enabled: boolean;
@@ -2518,6 +2527,18 @@ function scanEma30Band(
   }));
 }
 
+function scanMdo(candles: Candle[], cfg: NonNullable<ListScanConfig["mdo"]>, maxBarsAgo: number): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_MDO_CONDS;
+  return mdoScan(candles, conds, maxBarsAgo, cfg.params ?? {}).map((h) => ({
+    kind: "mdo" as const,
+    cond: h.cond,
+    bias: MDO_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 function scanJfkps(candles: Candle[], cfg: NonNullable<ListScanConfig["jfkps"]>, maxBarsAgo: number): ListScanHit[] {
   if (!cfg.enabled) return [];
   const conds = cfg.conds.length ? cfg.conds : DEFAULT_JFKPS_CONDS;
@@ -2593,6 +2614,7 @@ export function scanSymbol(
   if (cfg.ema30Band?.enabled) enabledKinds.push("ema30Band");
   if (cfg.fractal8?.enabled) enabledKinds.push("fractal8");
   if (cfg.jfkps?.enabled) enabledKinds.push("jfkps");
+  if (cfg.mdo?.enabled) enabledKinds.push("mdo");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2622,6 +2644,7 @@ export function scanSymbol(
     ema30Band: cfg.ema30Band ? scanEma30Band(candles, cfg.ema30Band, maxBarsAgo) : [],
     fractal8: cfg.fractal8 ? scanFractal8(candles, cfg.fractal8, maxBarsAgo) : [],
     jfkps: cfg.jfkps ? scanJfkps(candles, cfg.jfkps, maxBarsAgo) : [],
+    mdo: cfg.mdo ? scanMdo(candles, cfg.mdo, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -3070,7 +3093,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps">,
+  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo">,
   | "hamJurikTpo"
   | "diagonalSr"
   | "macd"
