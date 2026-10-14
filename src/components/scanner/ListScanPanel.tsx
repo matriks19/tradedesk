@@ -1374,7 +1374,7 @@ export function ListScanPanel() {
       mdo: {
         enabled: mdoOn,
         conds: mdoConds,
-        params: { len: Number(mdoLen) || 100, mom: Number(mdoMom) || 70, bb: Number(mdoBb) || 100, mult: Number(mdoMult) || 1, st: Number(mdoSt) || 27, x: Number(mdoX) || 15, jl: Number(mdoJl) || 9, phase: Number(mdoPh) || 0, power: 2 },
+        params: { len: Number(mdoLen) || 100, mom: Number(mdoMom) || 70, bb: Number(mdoBb) || 100, mult: Number(mdoMult) || 1, st: Number(mdoSt) || 27, x: Number(mdoX) || 15, jl: Number(mdoJl) || 9, phase: Number(mdoPh) || 0 },
       },
       jfkps: {
         enabled: jfOn,
@@ -4095,11 +4095,11 @@ export function ListScanPanel() {
         onOpen={() => setOpenCard((c) => (c === "mdo" ? null : "mdo"))}
       >
         <p className="text-2xs text-desk-muted">
-          Multi-Dimension Oscillator [JMA]: İvme (power_norm) × Volatilite (vol_rank) kesişimleri, ham değerlerle · Jurik Al/Sat = trigger × signal ·
+          Multi-Dimension Oscillator [T3-JMA-Jurik]: İvme (power_norm) × Volatilite (bb_norm) kesişimleri, ikisi 0..100 · Jurik Al/Sat = trigger × signal ·
           ≥{mdoMinBars({ len: mdoLen, mom: mdoMom, bb: mdoBb, st: mdoSt, x: mdoX, jl: mdoJl })} mum · QUANTEX T32 ile aynı matematik
         </p>
         <div className="grid grid-cols-3 gap-1">
-          <NumInput label="Ana Periyot" value={mdoLen} onChange={setMdoLen} hint="Vol rank + normalize (100)" />
+          <NumInput label="Ana Periyot" value={mdoLen} onChange={setMdoLen} hint="Ana Periyot (100; Pine'da hesapta kullanılmıyor)" />
           <NumInput label="Momentum" value={mdoMom} onChange={setMdoMom} hint="Momentum Periyodu (70)" />
           <NumInput label="BB Periyodu" value={mdoBb} onChange={setMdoBb} hint="BB Periyodu (100)" />
           <NumInput label="BB Çarpanı" value={mdoMult} onChange={setMdoMult} hint="BB Çarpanı (1)" />
