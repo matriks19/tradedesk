@@ -19145,7 +19145,7 @@ function izIv(){const w=frameWin('coin');return w&&w.S&&w.S.interval;}
 function izOnlyChip(cb){return (cb.conds||[]).some(c=>c.t==='chip'&&(c.scan==='t10'||c.scan==='t11'));}
 function chipIds(cb){return [...new Set((cb.conds||[]).filter(c=>c.t==='chip').map(c=>c.scan))].sort();}
 function ownTf(cb,iv){if(!cb||izOnlyChip(cb))return null; // çip koşulları İzleme'nin kendi tarama verisini (d.scan) ister → İzleme verisi
-  if(TF_MS[cb.tf])return cb.tf;if(iv===undefined)iv=srcIv(cb);if(TF_MS[iv])return iv;if(!usesT30(cb)&&!hasChip(cb))return null;const w=frameWin('coin'),zv=w&&w.S&&w.S.interval;return TF_MS[zv]?zv:null;}
+  if(TF_MS[cb.tf])return cb.tf;if(iv===undefined)iv=srcIv(cb);if(TF_MS[iv])return iv;const w=frameWin('coin'),zv=w&&w.S&&w.S.interval;return TF_MS[zv]?zv:null;}
 const tfK={};
 let tfBlock=0; const cStat=(()=>{try{return JSON.parse(localStorage.getItem('qxbot_cstat_v1')||'{}')||{};}catch(e){return {};}})();
 function saveCStat(){try{localStorage.setItem('qxbot_cstat_v1',JSON.stringify(cStat));}catch(e){}}
@@ -19172,8 +19172,8 @@ let topSyms={t:0,l:[]};
 async function comboSyms(D){const k=Object.keys(D||{});if(k.length)return k;if(Date.now()-topSyms.t<6*36e5&&topSyms.l.length)return topSyms.l;
   try{const r=await fetch('/api/fapi/v1/ticker/24hr');const j=await r.json();if(Array.isArray(j)){topSyms={t:Date.now(),l:j.filter(x=>/USDT$/.test(x.symbol)).sort((a,b)=>+b.quoteVolume-+a.quoteVolume).slice(0,150).map(x=>x.symbol)};}}catch(e){}return topSyms.l;}
 // TF'li kombin taraması (Coin tara düğmesi + alarm): kombinin kendi TF'sinde
-async function scanComboTF(cb){const w=frameWin('coin');if(!w)return null;const D=w.DATA||{},st0={},K=await tfPrefetch(await comboSyms(D),ownTf(cb)||cb.tf,st0),out=[];
-  for(const sym of Object.keys(K)){const r=evalCombo(w,{kScan:K[sym]},cb);if(r)out.push({sym,price:D[sym]&&D[sym].price,chg:D[sym]&&D[sym].chg,hits:r.hits,age:r.age,t:r.t});}
+async function scanComboTF(cb){const w=frameWin('coin');if(!w)return null;const D=w.DATA||{},st0={},tf=ownTf(cb),K=await tfPrefetch(await comboSyms(D),tf,st0),out=[];out.tf=tf;const ci=chipIds(cb);
+  for(const sym of Object.keys(K)){const d=ci.length?hlD(w,tf,sym,K[sym],ci):{kScan:K[sym]};const r=d&&evalCombo(w,d,cb);if(r)out.push({sym,price:D[sym]&&D[sym].price,chg:D[sym]&&D[sym].chg,hits:r.hits,age:r.age,t:r.t});}
   noteCStat(cb,st0,out);return out;}
 function noteCStat(cb,f,res){const c=cStat[cb.id]=cStat[cb.id]||{};c.t=Date.now();c.ok=f.ok;c.fail=f.fail;c.err=f.err||'';c.n=res.length;
   if(res.length){c.sig=res.slice(0,5).map(r=>r.sym);c.sigT=Math.max(...res.map(r=>r.t||0))||Date.now();} saveCStat();}
@@ -19272,7 +19272,7 @@ function renderCombos(){try{if($("qxbRapor"))setTimeout(renderJ,0);}catch(e){}
   const el=$('qxbCombo'); if(!el) return;
   el.innerHTML=(cfg.combos.length>1||Object.keys(comboRes).length?`<div class="row" style="margin-bottom:6px"><small>Kombinleri sırala:</small><select id="qxbCSort" style="max-width:200px"><option value="">— seç (bir kez uygula) —</option><option value="az">ada göre A→Z</option><option value="za">ada göre Z→A</option><option value="new">oluşturma yeni→eski</option><option value="old">oluşturma eski→yeni</option><option value="res">son sonuç sayısı büyük→küçük</option></select><small>Sonuç etiketleri:</small><select data-qsel="cres" style="max-width:170px">${[['hits','isabet (hits)'],['az','alfabetik'],['new','yeni→eski'],['chgDesc','% değişim büyük→küçük'],['chgAsc','% değişim küçük→büyük']].map(o=>`<option value="${o[0]}" ${(SORT.cres||'hits')===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select></div>`:'')+cfg.combos.map((cb,ci)=>{
     const rc=comboRes[cb.id+'|coin'], rb=comboRes[cb.id+'|bist'];
-    const tbl=(r,m)=>r?`<div><b>${m==='bist'?'BIST':'Coin'} sonuç: ${r.length}</b> ${sortRes(r).slice(0,60).map(x=>`<a href="#" data-copen="${m}|${esc(x.sym)}" class="tag qxsym" title="Grafiği aç">${esc(x.sym)} ${x.hits}/${cb.conds.length}${x.age?' · '+x.age+' mum önce':''}</a>`).join(' ')}</div>`:'';
+    const tbl=(r,m)=>r?`<div><b>${m==='bist'?'BIST':'Coin'} sonuç: ${r.length}</b>${m==='coin'?` <span class="mut">· TF ${esc(r.tf||'İzleme '+((frameWin('coin')||{}).S||{}).interval)}${r.tf?' (kendi 1500 kapanmış vadeli mum'+(chipIds(cb).length?' + motor':'')+')':''}</span>`:''} ${sortRes(r).slice(0,60).map(x=>`<a href="#" data-copen="${m}|${esc(x.sym)}" class="tag qxsym" title="Grafiği aç">${esc(x.sym)} ${x.hits}/${cb.conds.length}${x.age?' · '+x.age+' mum önce':''}</a>`).join(' ')}</div>`:'';
     return `<div class="bx" style="background:#0d1422"><div class="row"><input data-cb="${ci}.name" value="${esc(cb.name)}" style="max-width:200px">
      <select data-cb="${ci}.side"><option ${cb.side==='LONG'?'selected':''}>LONG</option><option ${cb.side==='SHORT'?'selected':''}>SHORT</option></select>
      <select data-cb="${ci}.logic"><option value="all" ${cb.logic==='all'?'selected':''}>HEPSİ (VE)</option><option value="n" ${cb.logic==='n'?'selected':''}>EN AZ N</option></select>
@@ -19298,8 +19298,8 @@ function renderCombos(){try{if($("qxbRapor"))setTimeout(renderJ,0);}catch(e){}
   el.querySelectorAll('[data-cadd]').forEach(b=>b.onclick=()=>{cfg.combos[b.dataset.cadd].conds.push({t:'rsi',p:14,min:20,max:30});save2();renderCombos();});
   el.querySelectorAll('[data-cdelc]').forEach(b=>b.onclick=()=>{if(!confirm('Kombin silinsin mi?'))return;const cb=cfg.combos.splice(+b.dataset.cdelc,1)[0];cfg.sources=cfg.sources.filter(s=>s.comboId!==cb.id);save2();render();});
   el.querySelectorAll('[data-cscan]').forEach(b=>b.onclick=async()=>{const [ci,m]=b.dataset.cscan.split('|');const cb=cfg.combos[ci];
-    if(m==='coin'&&ownTf(cb)){if(!frameWin('coin')){note('📡 İzleme sekmesini açıp önce tara (sembol listesi oradan)','err');return;} b.disabled=true;const t0=b.textContent;b.textContent='⏳ '+cb.tf+' mumları…';
-      try{const r=await scanComboTF(cb);comboRes[cb.id+'|coin']=r||[];const c=cStat[cb.id]||{};note(cb.name+': '+(r||[]).length+' sonuç ('+cb.tf+', '+(c.ok||0)+' coin'+(c.fail?', '+c.fail+' hata':'')+')','ok');}finally{b.disabled=false;b.textContent=t0;} render();return;}
+    if(m==='coin'&&ownTf(cb)){if(!frameWin('coin')){note('📡 İzleme sekmesini açıp önce tara (sembol listesi oradan)','err');return;} b.disabled=true;const t0=b.textContent;b.textContent='⏳ '+ownTf(cb)+' mumları…';
+      try{const r=await scanComboTF(cb);comboRes[cb.id+'|coin']=r||[];const c=cStat[cb.id]||{};note(cb.name+': '+(r||[]).length+' sonuç ('+((r&&r.tf)||ownTf(cb))+', '+(c.ok||0)+' coin'+(c.fail?', '+c.fail+' hata':'')+')','ok');}finally{b.disabled=false;b.textContent=t0;} render();return;}
     const r=scanCombo(cb,m);
     if(!r){note((m==='bist'?'📈 İzleme BIST':'📡 İzleme')+' sekmesini açıp önce tara','err');return;} comboRes[cb.id+'|'+m]=r; note(cb.name+': '+r.length+' sonuç','ok');
     if(m==='bist'&&r.length&&cb.side!=='SHORT'){ // PAPER: kombin BIST kâğıt bota otomatik kaynak + bot başlar
