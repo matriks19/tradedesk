@@ -19142,11 +19142,11 @@ function noteCStat(cb,f,res){const c=cStat[cb.id]=cStat[cb.id]||{};c.t=Date.now(
   if(res.length){c.sig=res.slice(0,5).map(r=>r.sym);c.sigT=Math.max(...res.map(r=>r.t||0))||Date.now();} saveCStat();}
 // Kombin çıkış koşulu (cb.exit): son kapanmış mumda doğruysa o kombinle açılan pozisyon kapanır (SL/TP mantığı değişmez)
 function exitHit(w,d,cb){const k=d&&(d.kScan||d.k);if(!cb||!cb.exit||!k||!k.c||k.c.length<30)return false;try{return condFn(w,d,k,cb.exit)(k.c.length-1);}catch(e){return false;}}
-function presetT30T32(tf,side){const L=side!=='SHORT';
+function presetT30T32(tf,side,W){const L=side!=='SHORT';W=W||5;
   return {id:'c'+Date.now().toString(36)+tf+(L?'L':'S'),preset:'t30t32-'+tf+'-'+(L?'L':'S'),name:'T30 Mavi/Sarı + İvme/Volatilite '+tf+(L?'':' SHORT'),side:L?'LONG':'SHORT',tf,logic:'all',n:4,mode:'anchor',K:1,alarm:false,
     conds:[{t:'xcross',src:'t30',a:'l3',dir:L?'up':'down',bt:'line',b:'l4'},
       {t:'fr8',lvl:4,min:L?-100:0.0001,max:L?-0.0001:100,w:0},{t:'fr8',lvl:5,min:L?-100:0.0001,max:L?-0.0001:100,w:0},
-      {t:'mdo',dir:L?'ust':'alt',w:5}],
+      {t:'mdo',dir:L?'ust':'alt',w:W}],
     exit:{t:'xcross',src:'t30',a:'l3',dir:L?'down':'up',bt:'line',b:'l4'}};}
 function addPresetT30T32(){let add=0;
   let mig=0;
@@ -19154,7 +19154,11 @@ function addPresetT30T32(){let add=0;
     if(!cb){cb=presetT30T32(tf,sd);cfg.combos.push(cb);add++;}
     else{const md=(cb.conds||[]).find(c=>c.t==='mdo');if(md&&+md.w!==5){md.w=5;mig++;}} // geçiş: İvme penceresi 2→5 (backtest), başka hiçbir şeye dokunulmaz
     if(sd==='LONG'&&!cfg.sources.some(x=>x.comboId===cb.id))cfg.sources.push({on:true,interval:tf,list:'İzleme coin',added:Date.now(),scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});}
-  save();log('Hazır kombin: T30 Mavi/Sarı + İvme/Volatilite (30m+1h+2h LONG bota bağlı, İvme ≤5 mum; '+add+' yeni, '+mig+' güncellendi; SHORT ayna bağlı değil)');note('✓ Hazır kombin: 30m + 1h + 2h LONG robota bağlı (PAPER), İvme penceresi 5 mum'+(mig?' · '+mig+' mevcut kombin güncellendi':'')+'. SHORT ayna kapalı.','ok');render();}
+  { // ayrı 2s LONG, İvme penceresi 10 mum (backtest) — mevcut W=5 kombinlerine dokunmaz
+    let cb=cfg.combos.find(c=>c.preset==='t30t32-2h-L-w10');
+    if(!cb){cb=presetT30T32('2h','LONG',10);cb.id+='w10';cb.preset='t30t32-2h-L-w10';cb.name='T30 Mavi/Sarı + İvme/Volatilite 2s W10';cfg.combos.push(cb);add++;}
+    if(!cfg.sources.some(x=>x.comboId===cb.id))cfg.sources.push({on:true,interval:'2h',list:'İzleme coin',added:Date.now(),scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});}
+  save();log('Hazır kombin: T30 Mavi/Sarı + İvme/Volatilite (30m+1h+2h LONG bota bağlı, İvme ≤5 mum; '+add+' yeni, '+mig+' güncellendi; SHORT ayna bağlı değil)');note('✓ Hazır kombin: 30m + 1h + 2h LONG (İvme 5 mum) + 2s W10 robota bağlı (PAPER)'+(mig?' · '+mig+' mevcut kombin güncellendi':'')+'. SHORT ayna kapalı.','ok');render();}
 function frameWin(m){const f=$(m==='bist'?'qxBistFrame':'qxIzlemeFrame');try{return f&&f.contentWindow&&f.contentWindow.DATA?f.contentWindow:null;}catch(e){return null;}}
 function scanCombo(cb,m){const w=frameWin(m);if(!w)return null;const D=w.DATA||{},out=[];
   for(const sym of Object.keys(D)){const r=evalCombo(w,D[sym],cb);if(r)out.push({sym,price:D[sym].price,chg:D[sym].chg,hits:r.hits,age:r.age,t:r.t});}return out;}
