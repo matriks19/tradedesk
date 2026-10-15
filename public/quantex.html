@@ -18846,7 +18846,7 @@ function ozetBar(){ // 📊 Tümü kapatılırsa: açık pozisyonların komisyon
   return `<h3>📊 Tümü kapatılırsa</h3><div class="row" style="align-items:flex-start">${one('coin',st.open,+cfg.equity||0,'$')}${one('bist',B.open,+B.equity||0,'₺')}</div>`;}
 function pr(p){return p.last&&p.entry?(p.side==='LONG'?(p.last/p.entry-1):(1-p.last/p.entry)):0;}
 function renderSrc(){const el=$('qxbSrc');if(!el)return;
-  el.innerHTML=cfg.sources.length?'<table><tr><th>Tarama/çip</th><th>Liste</th><th>TF</th><th>Aktif</th><th></th></tr>'+cfg.sources.map((s,i)=>`<tr><td>${esc(s.label)}</td><td>${esc(s.list||'İzleme coin')}</td><td>${esc(s.interval||'-')}</td><td><input type="checkbox" data-src-on="${i}" ${s.on!==false?'checked':''}></td><td><button class="g" data-src-del="${i}">Sil</button></td></tr>`).join('')+'</table>':'<small>Henüz kaynak yok. İzleme\'de bir çipin yanındaki 🤖 butonuna bas ya da aşağıdan ekle.</small>';}
+  el.innerHTML=cfg.sources.length?'<table><tr><th>Tarama/çip</th><th>Liste</th><th>TF</th><th>Aktif</th><th></th></tr>'+cfg.sources.map((s,i)=>`<tr><td>${esc(s.label)}${s.hold?` <span style="color:#f59e0b">⏸ ${esc(s.hold)}</span> <button class="o" data-src-ok="${i}">Onayla</button>`:''}</td><td>${esc(s.list||'İzleme coin')}</td><td>${esc(s.interval||'-')}</td><td><input type="checkbox" data-src-on="${i}" ${s.on!==false?'checked':''}></td><td><button class="g" data-src-del="${i}">Sil</button></td></tr>`).join('')+'</table>':'<small>Henüz kaynak yok. İzleme\'de bir çipin yanındaki 🤖 butonuna bas ya da aşağıdan ekle.</small>';}
 function log(m){const t=new Date().toLocaleTimeString('tr-TR');st.log.push(t+' '+m);save();}
 function bind(){
   const h=$('qxBot');
@@ -18854,13 +18854,14 @@ function bind(){
   h.querySelectorAll('[data-k]').forEach(i=>i.onchange=()=>{const [ex,f]=i.dataset.k.split('.');keys[ex]=keys[ex]||{};keys[ex][f]=i.type==='checkbox'?i.checked:i.value.trim();connOk[ex]=false;});
   h.querySelectorAll('[data-test]').forEach(b=>b.onclick=()=>testConn(b.dataset.test));
   h.querySelectorAll('[data-src-del]').forEach(b=>b.onclick=()=>{cfg.sources.splice(+b.dataset.srcDel,1);save();render();});
+  h.querySelectorAll('[data-src-ok]').forEach(b=>b.onclick=()=>{const s0=cfg.sources[+b.dataset.srcOk];log('Kaynak onaylandı: '+s0.label+' ('+s0.hold+')');delete s0.hold;s0.ok=Date.now();save();render();});
   h.querySelectorAll('[data-src-on]').forEach(b=>b.onchange=()=>{cfg.sources[+b.dataset.srcOn].on=b.checked;save();});
   h.querySelectorAll('[data-close]').forEach(b=>b.onclick=()=>{const p=st.open[+b.dataset.close];if(!p)return;const v=pr(p)*(+p.notional||0)-feeAmt('coin',p.entry,p.last,p.qty,p.notional);if(!confirm(p.sym+' '+p.side+' şimdiki fiyattan ('+fmt(p.last)+') kapatılsın mı?\nTahmini net K/Z: '+(v>=0?'+':'')+v.toFixed(2)+' $'+(p.live?'\n⚠ CANLI: borsada piyasa emri verilir':'')))return;closePos(+b.dataset.close,'elle').then(render);});
   h.querySelectorAll('[data-ozclose]').forEach(b=>b.onclick=async()=>{const m=b.dataset.ozclose,L=m==='bist'?B.open:st.open;if(!L.length)return;
     if(!confirm((m==='bist'?'BIST':'Coin')+': açık '+L.length+' pozisyonun TÜMÜ şimdiki fiyattan kapatılsın mı?'+(m==='coin'&&L.some(p=>p.live)?'\n⚠ CANLI olanlar borsada piyasa emriyle kapanır':'')))return;
     for(let i=L.length-1;i>=0;i--){if(m==='bist')closeB(i,'elle');else await closePos(i,'elle');} if(m==='bist')saveB();else save(); render();});
   $('qxbAdd').onclick=()=>{const id=$('qxbAddId').value.toLowerCase();addSource({scanId:id,label:LB(id)});};
-  $('qxbStart').onclick=()=>{st.running=!st.running;log(st.running?'Bot başlatıldı ('+(cfg.live?'CANLI':'PAPER')+')':'Bot duraklatıldı');render();};
+  $('qxbStart').onclick=()=>{st.running=!st.running;log(st.running?'Bot başlatıldı ('+(cfg.live?'CANLI':'PAPER')+')':'Bot duraklatıldı');render();if(st.running)precheckAll();};
   $('qxbKill').onclick=killAll;
   $('qxbEvery').onchange=e=>{cfg.scanMin=+e.target.value;save();schedule();log('Tarama aralığı: '+cfg.scanMin+' dk');};
   $('qxbNow').onclick=()=>{note('Tarama başladı…','info');scanCycle().then(()=>{note('Tarama bitti','ok');render();});};
@@ -18979,11 +18980,19 @@ async function tick(sig){
         const ed=dFor(cb,p.sym,p.civ);if(ed&&exitHit(w,ed,cb)){log('Kombin çıkışı: '+p.sym+' ['+cb.name+']');await closePos(i,'ÇIKIŞ');}}
       for(const s of cfg.sources.filter(x=>x.on!==false)){
         const cbS=s.comboId&&cfg.combos.find(x=>x.id===s.comboId);
+        if(s.hold){warnOnce('hold'+s.label,'⏸ '+s.label+' beklemede ('+s.hold+') — Sinyal kaynakları tablosunda Onayla');continue;}
+        let PRE=null;
+        if(cbS){const want=TF_MS[cbS.tf]?cbS.tf:s.interval,zv=w.S&&w.S.interval;
+          if(hasChip(cbS)&&want&&zv&&want!==zv){warnOnce('chip'+s.label,'⚠ '+s.label+': çip koşulu İzleme verisi ister; kaynak TF '+want+' ≠ İzleme TF '+zv+' — kaynak atlandı (İzleme TF\'sini '+want+' yap veya Ön kontrol)');continue;}
+          const own=ownTf(cbS,s.interval),syms0=own?allSyms:Object.keys(D);let tot=0,hit=0;PRE={};
+          for(const sym of syms0){const dd=dFor(cbS,sym,s.interval);if(!dd)continue;tot++;const r=evalCombo(w,dd,cbS);if(r&&r.age<=cfg.maxAge){PRE[sym]=r;hit++;}}
+          if(own&&tot<Math.max(5,0.5*syms0.length)){warnOnce('data'+s.label,'⚠ '+s.label+': '+own+' verisi alınamadı ('+tot+'/'+syms0.length+') — bu tur emir yok');continue;}
+          if(tot>=20&&hit/tot>0.2&&!(s.ok&&Date.now()-s.ok<864e5)){s.hold='anomali: '+hit+'/'+tot+' coin aynı anda sinyal';log('⛔ '+s.label+': '+s.hold+' — kaynak durduruldu, Onayla gerekli');robotAlarm('⛔ Robot kaynağı durdu: '+s.label+' ('+s.hold+')');save();continue;}}
         for(const sym of (cbS&&ownTf(cbS,s.interval)?allSyms:Object.keys(D))){
           if(st.open.length>=cfg.maxSlots) break;
           const d=D[sym]||{}; let pass=false,age=null,dir='';
           let rT=null;
-          if(s.comboId){const cb=cfg.combos.find(x=>x.id===s.comboId); const dd=dFor(cb,sym,s.interval); const r=cb&&dd&&evalCombo(w,dd,cb); if(r){(SIG[cb.id]=SIG[cb.id]||[]).push({sym,t:r.t});pass=true;age=r.age;rT=r.t||null;dir=cb.side==='SHORT'?'SAT':'AL';}}
+          if(s.comboId){const cb=cfg.combos.find(x=>x.id===s.comboId); const r=PRE?(PRE[sym]||null):(()=>{const dd=dFor(cb,sym,s.interval);return cb&&dd&&evalCombo(w,dd,cb);})(); if(r){(SIG[cb.id]=SIG[cb.id]||[]).push({sym,t:r.t});pass=true;age=r.age;rT=r.t||null;dir=cb.side==='SHORT'?'SAT':'AL';}}
           else try{pass=w.scanPass(d,s.scanId);age=w.scanAge(d,s.scanId);dir=String(w.scanDirLabel(d,s.scanId)||'');}catch(e){}
           if(!pass) continue; if(age!=null&&age>cfg.maxAge) continue;
           const side=/SAT|SHORT|US\b|↓/i.test(dir)?'SHORT':/AL|LONG|UA\b|↑/i.test(dir)?'LONG':null;
@@ -19120,7 +19129,10 @@ const TF_MS={'5m':3e5,'15m':9e5,'30m':18e5,'1h':36e5,'2h':72e5,'4h':144e5,'6h':2
 function usesT30(cb){const t=c=>c&&(c.t==='fr8'||(c.t==='xcross'&&(c.src||'t30')==='t30'));return (cb.conds||[]).some(t)||t(cb.exit);}
 function srcIv(cb){const s0=(cfg.sources||[]).find(x=>x.comboId===cb.id&&x.on!==false)||(cfg.sources||[]).find(x=>x.comboId===cb.id);return s0&&s0.interval;}
 // Öncelik: kombinin kendi TF'si > robot kaynağının TF'si (bota bağlanırken kaydedilen, tabloda görünen) > T30 varsa İzleme TF'si. Bu TF'lerde robot kendi 1500 kapanmış mumunu çeker.
-function ownTf(cb,iv){if(!cb)return null;if(TF_MS[cb.tf])return cb.tf;if(iv===undefined)iv=srcIv(cb);if(TF_MS[iv])return iv;if(!usesT30(cb))return null;const w=frameWin('coin'),zv=w&&w.S&&w.S.interval;return TF_MS[zv]?zv:null;}
+function hasChip(cb){return (cb.conds||[]).some(c=>c.t==='chip');}
+function izIv(){const w=frameWin('coin');return w&&w.S&&w.S.interval;}
+function ownTf(cb,iv){if(!cb||hasChip(cb))return null; // çip koşulları İzleme'nin kendi tarama verisini (d.scan) ister → İzleme verisi
+  if(TF_MS[cb.tf])return cb.tf;if(iv===undefined)iv=srcIv(cb);if(TF_MS[iv])return iv;if(!usesT30(cb))return null;const w=frameWin('coin'),zv=w&&w.S&&w.S.interval;return TF_MS[zv]?zv:null;}
 const tfK={};
 let tfBlock=0; const cStat=(()=>{try{return JSON.parse(localStorage.getItem('qxbot_cstat_v1')||'{}')||{};}catch(e){return {};}})();
 function saveCStat(){try{localStorage.setItem('qxbot_cstat_v1',JSON.stringify(cStat));}catch(e){}}
@@ -19167,6 +19179,41 @@ function addPresetT30T32(silent){let add=0;
     if(!cb){cb=presetT30T32('2h','LONG',10);cb.id+='w10';cb.preset='t30t32-2h-L-w10';cb.name='T30 Mavi/Sarı + İvme/Volatilite 2s W10';cfg.combos.push(cb);add++;}
     if(!cfg.sources.some(x=>x.comboId===cb.id))cfg.sources.push({on:true,interval:'2h',list:'İzleme coin',added:Date.now(),scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});}
   save();if(silent){if(add)log('Hazır kombin geçişi: '+add+' eksik hazır kombin eklendi (30m / 2s W10)');return;}log('Hazır kombin: T30 Mavi/Sarı + İvme/Volatilite (30m+1h+2h LONG bota bağlı, İvme ≤5 mum; '+add+' yeni, '+mig+' güncellendi; SHORT ayna bağlı değil)');note('✓ Hazır kombin: 30m + 1h + 2h LONG (İvme 5 mum) + 2s W10 robota bağlı (PAPER)'+(mig?' · '+mig+' mevcut kombin güncellendi':'')+'. SHORT ayna kapalı.','ok');render();}
+const warnT={};function warnOnce(k,m){if(warnT[k]&&Date.now()-warnT[k]<36e5)return;warnT[k]=Date.now();log(m);}
+// ---- 🛡 ÖN KONTROL / TEDBİR TARAMA ----
+const comboPre={};
+function condNeed(w,k,cd){try{
+  if(cd.t==='fr8'||(cd.t==='xcross'&&(cd.src||'t30')==='t30')){const F=w.fr8Calc(k,fr8S(w,k));const l5=cd.t==='fr8'?(+cd.lvl===5):(cd.a==='l5'||(cd.bt==='line'&&cd.b==='l5'));return {lb:'T30 (ölçek '+F.scLbl+')',need:l5?F.need5:F.need,ok:!!(l5?F.v15:F.v12)[k.c.length-1]};}
+  if(cd.t==='mdo'||(cd.t==='xcross'&&cd.src==='t32')){const M=w.mdoCalc(k,w.S);return {lb:'T32 MDO',need:M.need,ok:k.c.length>M.need};}
+  if(cd.t==='jft'||(cd.t==='xcross'&&cd.src==='t31')){const J=w.jfkpsCalc(k,w.S);return {lb:'T31 JFKPS',need:J.need,ok:k.c.length>J.need};}
+  if(cd.t==='chip')return {lb:'Çip '+cd.scan+' (İzleme taraması)',need:null,ok:true};
+  const P=Math.max(2,+cd.p||14),need=cd.t==='ljma'?Math.max(30,3*P):cd.t==='pdo'||cd.t==='pdov'?120:3*P;return {lb:CTYPES[cd.t]?CTYPES[cd.t].lb:cd.t,need,ok:k.c.length>need};}catch(e){return {lb:cd.t,need:null,ok:false,err:e.message};}}
+async function precheck(cb,iv,auto){const w=frameWin('coin');if(!w){comboPre[cb.id]='<b style="color:#f87171">🛡 Ön kontrol: İzleme sekmesi açık değil</b>';renderCombos();return null;}
+  const srcs=cfg.sources.filter(x=>x.comboId===cb.id);if(iv===undefined)iv=srcs[0]&&srcs[0].interval;
+  const zv=izIv(),cardTf=TF_MS[cb.tf]?cb.tf:'',own=ownTf(cb,iv),eff=own||zv,warns=[],errs=[],fix=[];
+  if(!cardTf&&iv&&iv!==zv&&!hasChip(cb)){warns.push('Kart TF "İzleme" ('+zv+') ama robot kaynağı '+iv+' → robot <b>'+iv+'</b> kullanır.');fix.push(iv);}
+  if(cardTf&&iv&&iv!==cardTf)warns.push('Kart TF '+cardTf+' ≠ kaynak TF '+iv+' → robot kartın TF\'sini ('+cardTf+') kullanır.');
+  if(hasChip(cb)){const want=cardTf||iv;if(want&&want!==zv){errs.push('Çip koşulu İzleme taramasını kullanır: İzleme TF '+zv+' ≠ istenen '+want+'. Robot bu kaynağı ATLAR — İzleme TF\'sini '+want+' yap.');}
+    if((cb.conds||[]).some(c=>c.t==='fr8'||(c.t==='xcross'&&(c.src||'t30')==='t30'))&&!(w.S&&w.S.t30on))warns.push('İzleme\'de T30 kapalı → İzleme yalnız 499 mum yükler, T30 ölçeği grafiktekinden farklı olur. İzleme\'de T30\'u aç.');}
+  let syms=[],K={},st0={};
+  if(own){syms=(await comboSyms({})).slice(0,30);K=await tfPrefetch(syms,own,st0);}else{const D=w.DATA||{};syms=Object.keys(D).slice(0,30);syms.forEach(s=>{if(D[s]&&(D[s].kScan||D[s].k))K[s]=D[s];});st0={ok:Object.keys(K).length,fail:syms.length-Object.keys(K).length};}
+  const ks=Object.keys(K);if(!ks.length)errs.push(own?own+' verisi alınamadı (0/'+syms.length+') — robot bu TF\'de emir AÇMAZ.':'İzleme verisi yok — önce İzleme\'de tara.');
+  let need='',hits=[];
+  if(ks.length){const d0=own?{kScan:K[ks[0]]}:K[ks[0]],k0=d0.kScan||d0.k;
+    need=(cb.conds||[]).concat(cb.exit?[cb.exit]:[]).map(cd=>{const r=condNeed(w,k0,cd);return `${esc(r.lb)}: gerek ${r.need??'?'} / mevcut ${k0.c.length} ${r.ok?'✓':'<b style="color:#f87171">✗ yetersiz</b>'}`;}).join(' · ');
+    for(const s of ks){const r=evalCombo(w,own?{kScan:K[s]}:K[s],cb);if(r&&r.age<=cfg.maxAge)hits.push({s,age:r.age,t:r.t});}}
+  const ratio=ks.length?hits.length/ks.length:0;
+  if(ks.length>=10&&ratio>0.2){errs.push('ANOMALİ: '+hits.length+'/'+ks.length+' coin aynı anda sinyal (>%20). Bağlı robot kaynakları beklemeye alındı — kontrol edip Onayla.');srcs.forEach(x=>{if(!x.hold){x.hold='ön kontrol anomali '+hits.length+'/'+ks.length;}});save();}
+  if(cb.mode!=='anchor'&&(cb.conds||[]).some(c=>c.t==='xcross'||c.t==='mdo'||c.t==='pdo')&&cb.mode==='window'&&+cb.K>1)warns.push('Kesişim koşulu "son '+cb.K+' mum içinde" → kesişim '+(+cb.K-1)+' mum öncesine kadar kabul edilir (robot maks. yaş '+cfg.maxAge+').');
+  const html=`<div class="bx" style="background:#111a2b;margin-top:6px"><b>🛡 Ön kontrol</b> <small>${new Date().toLocaleTimeString('tr-TR')}${auto?' (otomatik)':''}</small><br>
+   <small>Kart TF: <b>${cardTf||'İzleme ('+esc(zv||'?')+')'}</b> · kaynak TF: <b>${esc(srcs.map(x=>x.interval||'-').join(', ')||'bağlı değil')}</b> · İzleme TF: <b>${esc(zv||'?')}</b> → robot TF: <b>${esc(eff||'?')}</b> (${own?'robotun kendi 1500 kapanmış vadeli mumu':'İzleme tarama verisi'})</small><br>
+   <small>Veri: ${st0.ok||0} coin ok${st0.fail?', '+st0.fail+' hata '+esc(st0.err||''):''} · ${need}</small><br>
+   ${errs.map(e=>`<div style="color:#f87171">⛔ ${e}</div>`).join('')}${warns.map(e=>`<div style="color:#f59e0b">⚠ ${e}</div>`).join('')}
+   ${fix.map(t=>`<button class="o" data-pfix="${esc(cb.id)}|${t}">Kart TF'sini ${t} yap</button>`).join('')}
+   <small>Kuru çalıştırma (${ks.length} coin, ${own?'en hacimli':'İzleme listesi'}): <b>${hits.length}</b> sinyal (%${Math.round(100*ratio)})</small> ${hits.slice(0,20).map(h=>`<a href="#" class="tag qxsym" data-copen="coin|${esc(h.s)}">${esc(h.s)}${h.age?' ·'+h.age:''}</a>`).join(' ')}
+   ${srcs.some(x=>x.hold)?`<div><button class="o" data-pok="${esc(cb.id)}">Onayla — robot kaynağını aç</button></div>`:''}</div>`;
+  comboPre[cb.id]=html;renderCombos();if(errs.length)note('🛡 '+cb.name+': '+errs[0].replace(/<[^>]+>/g,''),'err');return {errs,warns,hits:hits.length,n:ks.length};}
+async function precheckAll(){for(const s0 of cfg.sources.filter(x=>x.on!==false&&x.comboId)){const cb=cfg.combos.find(c=>c.id===s0.comboId);if(cb)try{await precheck(cb,s0.interval,true);}catch(e){}}}
 setTimeout(()=>{try{if(cfg.combos.some(c=>/^t30t32-/.test(c.preset||'')))addPresetT30T32(true);}catch(e){}},0); // mevcut hazır kombin kullanıcılarına eksikleri ekle (hiçbir şey silinmez)
 function frameWin(m){const f=$(m==='bist'?'qxBistFrame':'qxIzlemeFrame');try{return f&&f.contentWindow&&f.contentWindow.DATA?f.contentWindow:null;}catch(e){return null;}}
 function scanCombo(cb,m){const w=frameWin(m);if(!w)return null;const D=w.DATA||{},out=[];
@@ -19221,8 +19268,8 @@ function renderCombos(){try{if($("qxbRapor"))setTimeout(renderJ,0);}catch(e){}
      ${(()=>{try{const c=cStat[cb.id],bot=cfg.sources.some(x=>x.comboId===cb.id&&x.on!==false),rtf=ownTf(cb);if(!bot&&!c)return '';
        return `<div><small>📊 ${bot?(st.running?'🟢 Robot çalışıyor':'🔴 Robot DURDU — Başlat'):'⚪ Robota bağlı değil'}${rtf?' · robot TF: <b>'+esc(rtf)+'</b>':''}${bot&&st.running?' · tarama her '+cfg.scanMin+' dk, sıradaki '+hhmm(nextRun):''} · son tarama: ${c&&c.t?new Date(c.t).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'henüz yok'}${c&&c.t?' · '+(c.ok||0)+' coin'+(cb.tf?' ('+esc(cb.tf)+')':'')+(c.fail?' · ⚠ '+c.fail+' hata '+esc(c.err||''):'')+' · bu turda '+(c.n||0)+' sinyal':''} · son sinyal: ${c&&c.sigT?new Date(c.sigT).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' '+esc((c.sig||[]).join(', ')):'yok'}</small></div>`;}catch(e){return '';}})()}
      ${cb.exit?`<div><small>🚪 Çıkış: ${esc((XLINES[cb.exit.src]||XLINES.t30).l[cb.exit.a].lb)} ${cb.exit.dir==='down'?'↓':'↑'} ${esc((XLINES[cb.exit.src]||XLINES.t30).l[cb.exit.b].lb)} (son kapanmış mum${cb.tf?', '+esc(cb.tf):''}) — TP/SL ayrıca geçerli</small></div>`:''}
-     <div class="row" style="margin-top:6px"><button class="g" data-cadd="${ci}">+ Koşul</button><button data-cscan="${ci}|coin">📡 Coin tara</button><button data-cscan="${ci}|bist">📈 BIST tara</button><button class="o" data-cbot="${ci}">🤖 Bota kaynak yap</button><button class="o" data-cbotb="${ci}">🇹🇷 BIST bota</button><button class="r" data-cdelc="${ci}">Kombini sil</button></div>
-     ${tbl(rc,'coin')}${tbl(rb,'bist')}</div>`;}).join('')+`<button id="qxbNewCombo">+ Yeni kombin</button> <button class="o" id="qxbPresetT30T32" title="LONG: T30 Mavi↑Sarı, Sarı & Siyah [-100,0), T32 İvme↑Volatilite (aynı mum veya ≤5 mum önce). Çıkış: Mavi↓Sarı. 30m + 1h + 2h. Mevcut hazır kombinleri de günceller">⭐ Hazır: T30 Mavi/Sarı + İvme/Volatilite</button> <small>Tarama, ilgili İzleme sekmesinde yüklenmiş listenin KAPANMIŞ mumları ve İzleme'nin zaman dilimi üzerinde çalışır. Çip koşulları İzleme'deki çip ayarlarını kullanır. BIST'te yalnız tarama + alarm (bot emri yok).</small>`;
+     <div class="row" style="margin-top:6px"><button class="g" data-cadd="${ci}">+ Koşul</button><button data-cscan="${ci}|coin">📡 Coin tara</button><button data-cscan="${ci}|bist">📈 BIST tara</button><button class="g" data-pchk="${ci}">🛡 Ön kontrol</button><button class="o" data-cbot="${ci}">🤖 Bota kaynak yap</button><button class="o" data-cbotb="${ci}">🇹🇷 BIST bota</button><button class="r" data-cdelc="${ci}">Kombini sil</button></div>
+     ${comboPre[cb.id]||''}${tbl(rc,'coin')}${tbl(rb,'bist')}</div>`;}).join('')+`<button id="qxbNewCombo">+ Yeni kombin</button> <button class="o" id="qxbPresetT30T32" title="LONG: T30 Mavi↑Sarı, Sarı & Siyah [-100,0), T32 İvme↑Volatilite (aynı mum veya ≤5 mum önce). Çıkış: Mavi↓Sarı. 30m + 1h + 2h. Mevcut hazır kombinleri de günceller">⭐ Hazır: T30 Mavi/Sarı + İvme/Volatilite</button> <small>Tarama, ilgili İzleme sekmesinde yüklenmiş listenin KAPANMIŞ mumları ve İzleme'nin zaman dilimi üzerinde çalışır. Çip koşulları İzleme'deki çip ayarlarını kullanır. BIST'te yalnız tarama + alarm (bot emri yok).</small>`;
   const save2=()=>{save();};
   el.querySelectorAll('[data-cb]').forEach(i=>i.onchange=()=>{const [ci,f]=i.dataset.cb.split('.');let v=i.type==='checkbox'?i.checked:i.value;if(f==='K'||f==='n')v=Math.max(1,+v|0);cfg.combos[ci][f]=v;save2();renderCombos();});
   el.querySelectorAll('[data-cc]').forEach(i=>i.onchange=()=>{const [ci,ii,f]=i.dataset.cc.split('.');const cd=cfg.combos[ci].conds[ii];
@@ -19243,7 +19290,10 @@ function renderCombos(){try{if($("qxbRapor"))setTimeout(renderJ,0);}catch(e){}
     }
     render();});
   el.querySelectorAll('[data-cbotb]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbotb];if(cb.side==='SHORT'){note('BIST kâğıt bot yalnız LONG','err');return;}addSourceB({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});});
-  el.querySelectorAll('[data-cbot]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbot];addSource({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});render();});
+  el.querySelectorAll('[data-cbot]').forEach(b=>b.onclick=()=>{const cb=cfg.combos[b.dataset.cbot];addSource({scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});render();const s0=cfg.sources.filter(x=>x.comboId===cb.id).pop();precheck(cb,s0&&s0.interval,true);});
+  el.querySelectorAll('[data-pchk]').forEach(b=>b.onclick=async()=>{const cb=cfg.combos[b.dataset.pchk];b.disabled=true;b.textContent='⏳ kontrol…';try{await precheck(cb);}finally{b.disabled=false;b.textContent='🛡 Ön kontrol';}});
+  el.querySelectorAll('[data-pfix]').forEach(b=>b.onclick=()=>{const [id,tf]=b.dataset.pfix.split('|');const cb=cfg.combos.find(c=>c.id===id);if(cb&&TF_MS[tf]){cb.tf=tf;save();log('Kombin '+cb.name+' kart TF → '+tf);precheck(cb);}});
+  el.querySelectorAll('[data-pok]').forEach(b=>b.onclick=()=>{const id=b.dataset.pok;cfg.sources.filter(x=>x.comboId===id).forEach(x=>{delete x.hold;x.ok=Date.now();});save();log('Ön kontrol onaylandı: '+id);const cb=cfg.combos.find(c=>c.id===id);if(cb)comboPre[id]=(comboPre[id]||'').replace(/<button class="o" data-pok=[^<]*<\/button>/,'✓ onaylandı');render();});
   el.querySelectorAll('[data-copen]').forEach(a=>a.onclick=e=>{e.preventDefault();const [m,sym]=a.dataset.copen.split('|');openChartIn(m,sym);});
   const cs=$('qxbCSort');if(cs)cs.onchange=()=>{const m=cs.value;if(!m)return;const f={az:(a,b)=>String(a.name).localeCompare(String(b.name),'tr'),za:(a,b)=>String(b.name).localeCompare(String(a.name),'tr'),new:(a,b)=>comboCreated(b)-comboCreated(a),old:(a,b)=>comboCreated(a)-comboCreated(b),res:(a,b)=>comboCount(b)-comboCount(a)}[m];if(f){cfg.combos.sort(f);save();renderCombos();}};
   el.querySelectorAll('[data-cmove]').forEach(b=>b.onclick=()=>{const [ci,d]=b.dataset.cmove.split('|').map(Number),j=ci+d;if(j<0||j>=cfg.combos.length)return;const t=cfg.combos[ci];cfg.combos[ci]=cfg.combos[j];cfg.combos[j]=t;save();renderCombos();});
