@@ -19146,13 +19146,15 @@ function presetT30T32(tf,side){const L=side!=='SHORT';
   return {id:'c'+Date.now().toString(36)+tf+(L?'L':'S'),preset:'t30t32-'+tf+'-'+(L?'L':'S'),name:'T30 Mavi/Sarı + İvme/Volatilite '+tf+(L?'':' SHORT'),side:L?'LONG':'SHORT',tf,logic:'all',n:4,mode:'anchor',K:1,alarm:false,
     conds:[{t:'xcross',src:'t30',a:'l3',dir:L?'up':'down',bt:'line',b:'l4'},
       {t:'fr8',lvl:4,min:L?-100:0.0001,max:L?-0.0001:100,w:0},{t:'fr8',lvl:5,min:L?-100:0.0001,max:L?-0.0001:100,w:0},
-      {t:'mdo',dir:L?'ust':'alt',w:2}],
+      {t:'mdo',dir:L?'ust':'alt',w:5}],
     exit:{t:'xcross',src:'t30',a:'l3',dir:L?'down':'up',bt:'line',b:'l4'}};}
 function addPresetT30T32(){let add=0;
-  for(const tf of ['1h','2h'])for(const sd of ['LONG','SHORT']){const pk='t30t32-'+tf+'-'+(sd==='LONG'?'L':'S');let cb=cfg.combos.find(c=>c.preset===pk);
+  let mig=0;
+  for(const tf of ['30m','1h','2h'])for(const sd of ['LONG','SHORT']){const pk='t30t32-'+tf+'-'+(sd==='LONG'?'L':'S');let cb=cfg.combos.find(c=>c.preset===pk);
     if(!cb){cb=presetT30T32(tf,sd);cfg.combos.push(cb);add++;}
+    else{const md=(cb.conds||[]).find(c=>c.t==='mdo');if(md&&+md.w!==5){md.w=5;mig++;}} // geçiş: İvme penceresi 2→5 (backtest), başka hiçbir şeye dokunulmaz
     if(sd==='LONG'&&!cfg.sources.some(x=>x.comboId===cb.id))cfg.sources.push({on:true,interval:tf,list:'İzleme coin',added:Date.now(),scanId:'combo',comboId:cb.id,label:'KOMBİN: '+cb.name});}
-  save();log('Hazır kombin: T30 Mavi/Sarı + İvme/Volatilite (1h+2h LONG bota bağlı, SHORT ayna eklendi ama bağlı değil)');note('✓ Hazır kombin eklendi: 1h + 2h LONG robota bağlandı (PAPER). SHORT ayna kapalı.','ok');render();}
+  save();log('Hazır kombin: T30 Mavi/Sarı + İvme/Volatilite (30m+1h+2h LONG bota bağlı, İvme ≤5 mum; '+add+' yeni, '+mig+' güncellendi; SHORT ayna bağlı değil)');note('✓ Hazır kombin: 30m + 1h + 2h LONG robota bağlı (PAPER), İvme penceresi 5 mum'+(mig?' · '+mig+' mevcut kombin güncellendi':'')+'. SHORT ayna kapalı.','ok');render();}
 function frameWin(m){const f=$(m==='bist'?'qxBistFrame':'qxIzlemeFrame');try{return f&&f.contentWindow&&f.contentWindow.DATA?f.contentWindow:null;}catch(e){return null;}}
 function scanCombo(cb,m){const w=frameWin(m);if(!w)return null;const D=w.DATA||{},out=[];
   for(const sym of Object.keys(D)){const r=evalCombo(w,D[sym],cb);if(r)out.push({sym,price:D[sym].price,chg:D[sym].chg,hits:r.hits,age:r.age,t:r.t});}return out;}
@@ -19207,7 +19209,7 @@ function renderCombos(){try{if($("qxbRapor"))setTimeout(renderJ,0);}catch(e){}
        return `<div><small>📊 ${bot?(st.running?'🟢 Robot çalışıyor':'🔴 Robot DURDU — Başlat'):'⚪ Robota bağlı değil'}${bot&&st.running?' · tarama her '+cfg.scanMin+' dk, sıradaki '+hhmm(nextRun):''} · son tarama: ${c&&c.t?new Date(c.t).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'henüz yok'}${c&&c.t?' · '+(c.ok||0)+' coin'+(cb.tf?' ('+esc(cb.tf)+')':'')+(c.fail?' · ⚠ '+c.fail+' hata '+esc(c.err||''):'')+' · bu turda '+(c.n||0)+' sinyal':''} · son sinyal: ${c&&c.sigT?new Date(c.sigT).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' '+esc((c.sig||[]).join(', ')):'yok'}</small></div>`;}catch(e){return '';}})()}
      ${cb.exit?`<div><small>🚪 Çıkış: ${esc((XLINES[cb.exit.src]||XLINES.t30).l[cb.exit.a].lb)} ${cb.exit.dir==='down'?'↓':'↑'} ${esc((XLINES[cb.exit.src]||XLINES.t30).l[cb.exit.b].lb)} (son kapanmış mum${cb.tf?', '+esc(cb.tf):''}) — TP/SL ayrıca geçerli</small></div>`:''}
      <div class="row" style="margin-top:6px"><button class="g" data-cadd="${ci}">+ Koşul</button><button data-cscan="${ci}|coin">📡 Coin tara</button><button data-cscan="${ci}|bist">📈 BIST tara</button><button class="o" data-cbot="${ci}">🤖 Bota kaynak yap</button><button class="o" data-cbotb="${ci}">🇹🇷 BIST bota</button><button class="r" data-cdelc="${ci}">Kombini sil</button></div>
-     ${tbl(rc,'coin')}${tbl(rb,'bist')}</div>`;}).join('')+`<button id="qxbNewCombo">+ Yeni kombin</button> <button class="o" id="qxbPresetT30T32" title="LONG: T30 Mavi↑Sarı, Sarı & Siyah [-100,0), T32 İvme↑Volatilite (aynı mum veya ≤2 mum önce). Çıkış: Mavi↓Sarı. 1h + 2h, saatlik tarama">⭐ Hazır: T30 Mavi/Sarı + İvme/Volatilite</button> <small>Tarama, ilgili İzleme sekmesinde yüklenmiş listenin KAPANMIŞ mumları ve İzleme'nin zaman dilimi üzerinde çalışır. Çip koşulları İzleme'deki çip ayarlarını kullanır. BIST'te yalnız tarama + alarm (bot emri yok).</small>`;
+     ${tbl(rc,'coin')}${tbl(rb,'bist')}</div>`;}).join('')+`<button id="qxbNewCombo">+ Yeni kombin</button> <button class="o" id="qxbPresetT30T32" title="LONG: T30 Mavi↑Sarı, Sarı & Siyah [-100,0), T32 İvme↑Volatilite (aynı mum veya ≤5 mum önce). Çıkış: Mavi↓Sarı. 30m + 1h + 2h. Mevcut hazır kombinleri de günceller">⭐ Hazır: T30 Mavi/Sarı + İvme/Volatilite</button> <small>Tarama, ilgili İzleme sekmesinde yüklenmiş listenin KAPANMIŞ mumları ve İzleme'nin zaman dilimi üzerinde çalışır. Çip koşulları İzleme'deki çip ayarlarını kullanır. BIST'te yalnız tarama + alarm (bot emri yok).</small>`;
   const save2=()=>{save();};
   el.querySelectorAll('[data-cb]').forEach(i=>i.onchange=()=>{const [ci,f]=i.dataset.cb.split('.');let v=i.type==='checkbox'?i.checked:i.value;if(f==='K'||f==='n')v=Math.max(1,+v|0);cfg.combos[ci][f]=v;save2();renderCombos();});
   el.querySelectorAll('[data-cc]').forEach(i=>i.onchange=()=>{const [ci,ii,f]=i.dataset.cc.split('.');const cd=cfg.combos[ci].conds[ii];
