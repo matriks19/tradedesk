@@ -19010,6 +19010,10 @@ async function tick(sig){
           if(s.comboId){const cb=cfg.combos.find(x=>x.id===s.comboId); const r=PRE?(PRE[sym]||null):(()=>{const dd=dFor(cb,sym,s.interval);return cb&&dd&&evalCombo(w,dd,cb);})(); if(r){(SIG[cb.id]=SIG[cb.id]||[]).push({sym,t:r.t});pass=true;age=r.age;rT=r.t||null;dir=cb.side==='SHORT'?'SAT':'AL';}}
           else try{pass=w.scanPass(d,s.scanId);age=w.scanAge(d,s.scanId);dir=String(w.scanDirLabel(d,s.scanId)||'');}catch(e){}
           if(!pass) continue; if(age!=null&&age>cfg.maxAge) continue;
+          if(s.comboId){ // OTOMATİK GİRİŞ: kesişim yalnız kombin TF'sinin SON kapanmış mumunda (kartın 'son N mum' ayarından bağımsız; tarama görünümü değişmez)
+            const tfA=cbS&&ownTf(cbS,s.interval),msA=tfA&&TF_MS[tfA];
+            if(msA){const lc=Math.floor(Date.now()/msA)*msA-msA;if(!(rT>=lc)||(age!=null&&age>0)){warnOnce('stale'+sym+s.comboId+rT,'atlandı: '+sym+' ['+s.label+'] sinyal son kapanmış '+tfA+' mumunda değil ('+(rT?new Date(rT).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'?')+', '+age+' mum önce)');continue;}}
+            else if(age!=null&&age>1) continue;}
           const side=/SAT|SHORT|US\b|↓/i.test(dir)?'SHORT':/AL|LONG|UA\b|↑/i.test(dir)?'LONG':null;
           if(!side) continue; if(cfg.market==='spot'&&side==='SHORT') continue;
           if(turn.has(sym)) continue; turn.add(sym); // aynı turda aynı sembole yalnız ilk sinyal
