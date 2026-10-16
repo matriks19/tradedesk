@@ -34,7 +34,7 @@ function synth(n: number, seed0: number): Candle[] {
 }
 
 const IDS = [
-  "pdo", "hamJurikTpo", "hamAoJrmaZ", "aohamJrmaEngine", "goldKeko", "kijunBb", "multiDipBb",
+  "hamJurikTpo", "hamAoJrmaZ", "aohamJrmaEngine", "goldKeko", "kijunBb", "multiDipBb",
   "maSimple", "bbDivLg", "orderBlocks", "doktorHull", "macd", "eliziEdge", "macdEliziHybrid",
   "descendingBreak", "descendingBreakV2", "diagonalSr",
 ] as const;
@@ -104,11 +104,6 @@ function main() {
     }
     report[id] = { sig: sigs.length, line: lines.length, markers: n0 };
   }
-  // PDO spesifik: trend kapalı → T↑/T↓ yok, diğerleri kalır
-  const pdoBase: Record<string, number | string> = {};
-  const pdoP = run("pdo", candles, { ...pdoBase, showTrend: 0 });
-  const mk = pdoP.flatMap((p) => p.markers ?? []);
-  assert(!mk.some((m) => m.text === "T↑" || m.text === "T↓") && mk.some((m) => m.text.startsWith("AL")), "pdo trend off");
   // HAM: AL/SAT kapalı → AL/SAT yok, H×Y kalır
   const ham = run("hamJurikTpo", candles, { sigFlip: 0 }).flatMap((p) => p.markers ?? []);
   assert(!ham.some((m) => m.text === "AL" || m.text === "SAT") && ham.some((m) => m.text === "H×Y"), "ham flip off");
@@ -118,13 +113,6 @@ function main() {
   // Kijun: çizgi kapalı → işaretler başka çizgiye taşınır
   const kj = run("kijunBb", candles, { lineKijun: 0 });
   assert(!kj.some((p) => p.seriesKey === "kijun") && count(kj) === count(run("kijunBb", candles, {})), "kijun marker transfer");
-  // hafiflik: PDO sinyaller kapalı daha hızlı
-  const t0 = performance.now();
-  for (let r = 0; r < 5; r++) run("pdo", candles, {});
-  const tOn = (performance.now() - t0) / 5;
-  const t1 = performance.now();
-  for (let r = 0; r < 5; r++) run("pdo", candles, { showMarkers: 0, showPatterns: 0 });
-  const tOff = (performance.now() - t1) / 5;
-  console.log("OK smoke-ind-toggles", report, { pdoMsOn: tOn.toFixed(1), pdoMsOff: tOff.toFixed(1) });
+  console.log("OK smoke-ind-toggles", report);
 }
 main();

@@ -553,7 +553,7 @@ export function ChartPane({ pane, compact }: Props) {
             ? {
                 time: d.time as unknown as import("lightweight-charts").UTCTimestamp,
                 value: d.value,
-                // per-point renk (HAM rejim, MACD hist, PDO trend rengi)
+                // per-point renk (HAM rejim, MACD hist)
                 ...("color" in d && d.color ? { color: d.color } : {}),
               }
             : {
