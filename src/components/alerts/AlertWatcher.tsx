@@ -252,7 +252,6 @@ export function AlertWatcher() {
         try {
           const payload = (a.scanPayload ?? {}) as {
             hull?: { enabled?: boolean; tf?: string };
-            pdo?: { enabled?: boolean };
             pliDmi?: { enabled?: boolean };
             pliDtDiv?: { enabled?: boolean; length?: number; lbL?: number; lbR?: number; rangeUpper?: number };
             ppoDsiZ?: { enabled?: boolean; slow?: number; zlen?: number; smooth?: number; squeezeLen?: number };
@@ -265,7 +264,6 @@ export function AlertWatcher() {
           const hullOn = !!payload.hull?.enabled;
           const tf =
             (hullOn && payload.hull?.tf) || a.timeframe || "15m";
-          // PDO: liste taramasıyla aynı pencere (PDO_FETCH_LIMIT = 240)
           // PLI±DMI: pivot durum makinesi geçmişe bağlı → liste taramasıyla aynı pencere (300)
           // PPO-DSI-Z: yavaş EMA + 2·zlen + smooth + sıkışma + 100 (liste taramasıyla aynı formül)
           // PLI-DT Uyumsuz: PLI penceresi + pivot + range + 200 (liste taramasıyla aynı formül)
@@ -280,8 +278,6 @@ export function AlertWatcher() {
                 ? ppoDsiZFetchLimit(payload.ppoDsiZ.slow, payload.ppoDsiZ.zlen, payload.ppoDsiZ.smooth, payload.ppoDsiZ.squeezeLen)
                 : payload.pliDir?.enabled
                   ? pliDirFetchLimit(payload.pliDir.hullLen, payload.pliDir.length)
-                  : payload.pdo?.enabled
-                    ? 240
                     : 220;
           // Trend filtresi (4s EMA200 eşdeğeri): liste taramasıyla aynı → max(taban, periyot + ısınma)
           // ELIZI-LDR4: liste taramasıyla aynı pencere (≥500, ısınma + 120)

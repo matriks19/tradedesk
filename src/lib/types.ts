@@ -281,7 +281,6 @@ export type BuiltinIndicatorId =
   | "bbDivLg"
   | "maSimple"
   | "kijunBb"
-  | "pdo"
   | "cmoChande"
   | "eliziLdr4"
   | "ema30Band"
