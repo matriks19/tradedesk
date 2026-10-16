@@ -19068,8 +19068,6 @@ async function scanCycle(){
 function schedule(){ clearTimeout(schedT); nextRun=nextAt(); schedT=setTimeout(()=>{ scanCycle().finally(()=>{ schedule(); if(!$('qxBot').hidden) render(); }); }, Math.max(1000,nextRun-Date.now())); const e=$('qxbNext'); if(e) e.textContent=hhmm(nextRun); }
 schedule();
 setInterval(()=>{tick(false);tickB(false);},60000);
-// ⚡ Anlık giriş kombinleri: her 2 dk yalnız bu kaynaklar (kapanmış mum önbellekli; oluşan mum limit=2 → ~1 ağırlık/sembol)
-setInterval(()=>{try{if(!st.running||cycling||busy)return;if(!cfg.sources.some(x=>x.on!==false&&x.comboId&&(cfg.combos.find(c=>c.id===x.comboId)||{}).intrabar))return;tick(true,true).catch(()=>{});}catch(e){}},120000);
 
 
 // ---- ROBOT İŞLEM ALARMLARI (toast + ses + bildirim + TradeDesk kanalları: Telegram / WhatsApp / ntfy) ----
@@ -19189,36 +19187,38 @@ function ownTf(cb,iv){if(!cb||izOnlyChip(cb))return null; // çip koşulları İ
 const tfK={};
 let tfBlock=0; const cStat=(()=>{try{return JSON.parse(localStorage.getItem('qxbot_cstat_v1')||'{}')||{};}catch(e){return {};}})();
 function saveCStat(){try{localStorage.setItem('qxbot_cstat_v1',JSON.stringify(cStat));}catch(e){}}
-async function tfKlines(sym,tf){const ms=TF_MS[tf];if(!ms)return null;const now=Date.now(),lc=Math.floor(now/ms)*ms-ms,key=sym+'|'+tf,c=tfK[key];
+// İstek temposu: tüm robot mum istekleri tek sırada, aralarında ≥250 ms (≤4 istek/sn); 429/418'de Retry-After kadar dur, sonra kendiliğinden devam.
+let tfPaceT=0;async function tfPace(){const w=Math.max(0,tfPaceT-Date.now());tfPaceT=Math.max(Date.now(),tfPaceT)+250;if(w)await new Promise(r=>setTimeout(r,w));}
+function tfStale(c,why){if(!c)throw new Error(why);const k=Object.assign({},c.k,{stale:why});return k;} // önbellek varsa bayat kapanmış mumlar (giriş kuralı bayat mumda emir açmaz)
+async function tfKlines(sym,tf){try{return await tfKlines0(sym,tf);}catch(e){const c=tfK[sym+'|'+tf];return tfStale(c,e.message||'hata');}}
+async function tfKlines0(sym,tf){const ms=TF_MS[tf];if(!ms)return null;const now=Date.now(),lc=Math.floor(now/ms)*ms-ms,key=sym+'|'+tf,c=tfK[key];
   if(c&&c.lt===lc)return c.k;
-  if(Date.now()<tfBlock)throw new Error('429 bekleme');
+  if(Date.now()<tfBlock)throw new Error('429 bekleme ('+Math.ceil((tfBlock-Date.now())/1000)+' sn)');
+  await tfPace();if(Date.now()<tfBlock)throw new Error('429 bekleme');
   const miss=c?Math.round((lc-c.lt)/ms):0, inc=c&&miss>0&&miss<90; // önbellek varsa yalnız eksik mumlar (ağırlık 1); yoksa 1500 (T30 uzun geçmiş)
   const path='/v1/klines?symbol='+encodeURIComponent(sym)+'&interval='+tf+'&limit='+(inc?miss+3:1500),zw=frameWin('coin');let d;
   if(zw&&typeof zw.withFapiHosts==='function'){ // İzleme'nin vadeli host zinciri: kullanıcının tarayıcısından doğrudan Binance (yalnız vadeli), ortak 429 bekleme durumu
-    try{if(typeof zw.rlBlocked==='function'&&zw.rlBlocked()){tfBlock=Date.now()+60e3;throw new Error('429 bekleme');}d=await zw.withFapiHosts(path);}
-    catch(e){if(e&&(e.code===429||e.code===418)){tfBlock=Date.now()+90e3;throw new Error('HTTP '+e.code);}if(/429/.test(e&&e.message||''))throw e;d=null;}}
+    try{if(typeof zw.rlBlocked==='function'&&zw.rlBlocked()){tfBlock=Math.max(tfBlock,Date.now()+1000*(zw.rlWaitSec?zw.rlWaitSec():30));throw new Error('429 bekleme');}d=await zw.withFapiHosts(path);}
+    catch(e){if(e&&(e.code===429||e.code===418)){tfBlock=Date.now()+1000*Math.max(e.code===418?120:60,(zw.rlWaitSec&&zw.rlWaitSec())||0);throw new Error('HTTP '+e.code);}if(/429/.test(e&&e.message||''))throw e;d=null;}}
   if(!d){const r=await fetch('/api/fapi'+path);
-    if(r.status===429||r.status===418){tfBlock=Date.now()+90e3;throw new Error('HTTP '+r.status);} if(!r.ok)throw new Error('HTTP '+r.status);
+    if(r.status===429||r.status===418){const ra=+(r.headers.get('Retry-After')||0);tfBlock=Date.now()+1000*Math.max(r.status===418?120:60,ra||0);throw new Error('HTTP '+r.status);} if(!r.ok)throw new Error('HTTP '+r.status);
     d=await r.json();}if(!Array.isArray(d))return null;let k={t:[],o:[],h:[],l:[],c:[],v:[]};
   if(inc){const o=c.k;k={t:o.t.slice(),o:o.o.slice(),h:o.h.slice(),l:o.l.slice(),c:o.c.slice(),v:o.v.slice()};}
   for(const x of d){const t=+x[0];if(t+ms>now)continue;const L=k.t.length;if(L&&t<=k.t[L-1]){if(t===k.t[L-1]){k.o[L-1]=+x[1];k.h[L-1]=+x[2];k.l[L-1]=+x[3];k.c[L-1]=+x[4];k.v[L-1]=+x[5];}continue;}
     k.t.push(t);k.o.push(+x[1]);k.h.push(+x[2]);k.l.push(+x[3]);k.c.push(+x[4]);k.v.push(+x[5]);}
   if(k.t.length>1500)for(const f of ['t','o','h','l','c','v'])k[f]=k[f].slice(-1500);
   k.closedView=true;k.qxOwn=true;if(!k.t.length||k.t[k.t.length-1]<lc)return null; tfK[key]={lt:lc,k};return k;}
-// ⚡ Anlık giriş: kapanmış mumlar (tfKlines önbelleği) + oluşan mum (limit=2, ağırlık 1; 50 sn önbellek)
-const ibK={};
-async function ibKlines(sym,tf){const k=await tfKlines(sym,tf);if(!k)return null;const ms=TF_MS[tf],ot=Math.floor(Date.now()/ms)*ms,key=sym+'|'+tf,c=ibK[key];
-  if(c&&c.base===k&&Date.now()-c.at<50e3)return c.k;
-  if(Date.now()<tfBlock)throw new Error('429 bekleme');
-  const path='/v1/klines?symbol='+encodeURIComponent(sym)+'&interval='+tf+'&limit=2',zw=frameWin('coin');let d=null;
-  if(zw&&typeof zw.withFapiHosts==='function'){try{if(typeof zw.rlBlocked==='function'&&zw.rlBlocked()){tfBlock=Date.now()+60e3;throw new Error('429 bekleme');}d=await zw.withFapiHosts(path);}
-    catch(e){if(e&&(e.code===429||e.code===418)){tfBlock=Date.now()+90e3;throw new Error('HTTP '+e.code);}if(/429/.test(e&&e.message||''))throw e;d=null;}}
-  if(!d){const r=await fetch('/api/fapi'+path);if(r.status===429||r.status===418){tfBlock=Date.now()+90e3;throw new Error('HTTP '+r.status);}if(!r.ok)throw new Error('HTTP '+r.status);d=await r.json();}
-  const x=Array.isArray(d)&&d.find(r=>+r[0]===ot);let k2=k;
-  if(x&&ot>k.t[k.t.length-1]){k2={t:k.t.concat(ot),o:k.o.concat(+x[1]),h:k.h.concat(+x[2]),l:k.l.concat(+x[3]),c:k.c.concat(+x[4]),v:k.v.concat(+x[5]),closedView:true,qxOwn:true,qxIntrabar:true};}
-  ibK[key]={at:Date.now(),base:k,k:k2};return k2;}
-async function tfPrefetch(syms,tf,stat,ib){let i=0;const out={};let ok=0,fail=0,err='';const run=async()=>{while(i<syms.length){const s=syms[i++];if(i>3&&!(tfK[s+'|'+tf]&&tfK[s+'|'+tf].lt===Math.floor(Date.now()/TF_MS[tf])*TF_MS[tf]-TF_MS[tf]))await new Promise(r=>setTimeout(r,60));try{const k=await (ib?ibKlines:tfKlines)(s,tf);if(k){out[s]=k;ok++;}else fail++;}catch(e){fail++;err=e.message;}}};
-  await Promise.all([run(),run()]);if(stat)Object.assign(stat,{ok,fail,err});return out;}
+// ⚡ Anlık giriş: oluşan mum SEMBOL BAŞINA İSTEK OLMADAN kurulur — kapanmış mum önbelleği (tfKlines) + tek toplu canlı fiyat (prices(): 1 istek/tur).
+// açılış = son kapanmış mumun kapanışı; kapanış = canlı fiyat; yüksek/düşük = bu mum içinde gözlenen uçlar (tarama aralığı kadar örnek).
+const ibK={};let ibPX=null;
+async function ibPrices(){if(ibPX&&Date.now()-ibPX.__ts<60e3)return ibPX;try{const m=await prices();if(m&&m.__ts)ibPX=m;}catch(e){}return ibPX;}
+async function ibKlines(sym,tf){const k=await tfKlines(sym,tf);if(!k||k.stale)return k;const ms=TF_MS[tf],ot=Math.floor(Date.now()/ms)*ms;if(!(ot>k.t[k.t.length-1]))return k;
+  const PX=await ibPrices(),px=PX&&PX[sym];if(!(px>0)||Date.now()-PX.__ts>60e3)return k;
+  const key=sym+'|'+tf,o=k.c[k.c.length-1];let c=ibK[key];if(!c||c.ot!==ot)c=ibK[key]={ot,h:Math.max(o,px),l:Math.min(o,px)};c.h=Math.max(c.h,px);c.l=Math.min(c.l,px);
+  return {t:k.t.concat(ot),o:k.o.concat(o),h:k.h.concat(c.h),l:k.l.concat(c.l),c:k.c.concat(px),v:k.v.concat(0),closedView:true,qxOwn:true,qxIntrabar:true};}
+async function tfPrefetch(syms,tf,stat,ib){const out={};let ok=0,fail=0,err='',stale=0;
+  for(const s of syms){try{const k=await (ib?ibKlines:tfKlines)(s,tf);if(k){out[s]=k;ok++;if(k.stale){stale++;err=k.stale;}}else fail++;}catch(e){fail++;err=e.message;}}
+  if(stat)Object.assign(stat,{ok,fail,err,stale});return out;}
 // İzleme listesi boşsa (henüz taranmadıysa) TF'li kombinler için en hacimli 150 USDT vadeli
 let topSyms={t:0,l:[]};
 async function comboSyms(D){const k=Object.keys(D||{});if(k.length)return k;if(Date.now()-topSyms.t<6*36e5&&topSyms.l.length)return topSyms.l;
@@ -19266,7 +19266,7 @@ async function precheck(cb,iv,auto){const w=await izReady();if(!w){comboPre[cb.i
   if(izOnlyChip(cb)){const want=cardTf||iv;if(want&&want!==zv){errs.push('T10/T11 çipi (çok-TF PDO) yalnız İzleme verisiyle çalışır: İzleme TF '+zv+' ≠ istenen '+want+'. Robot bu kaynağı ATLAR.');}
     if((cb.conds||[]).some(c=>c.t==='fr8'||(c.t==='xcross'&&(c.src||'t30')==='t30'))&&!(w.S&&w.S.t30on))warns.push('İzleme\'de T30 kapalı → İzleme yalnız 499 mum yükler, T30 ölçeği grafiktekinden farklı olur. İzleme\'de T30\'u aç.');}
   let syms=[],K={},st0={};
-  if(cb.intrabar)warns.push('⚡ Mod: ANLIK giriş — oluşan '+(own||'?')+' mumu her ~2 dk değerlendirilir; kesişim mum kapanışında kaybolabilir (repaint riski). Fiyat ≤10 sn + 0.5×ATR koruması geçerli.');
+  if(cb.intrabar)warns.push('⚡ Mod: ANLIK giriş — oluşan '+(own||'?')+' mumu robotun tarama aralığında (her '+cfg.scanMin+' dk) canlı fiyatla değerlendirilir; kesişim mum kapanışında kaybolabilir (repaint riski). Fiyat ≤10 sn + 0.5×ATR koruması geçerli.');
   if(own){syms=(await comboSyms({})).slice(0,30);const KK=await tfPrefetch(syms,own,st0,!!cb.intrabar);for(const s of Object.keys(KK))K[s]=hasChip(cb)?hlD(w,own,s,KK[s],chipIds(cb)):{kScan:KK[s]};}else{const D=w.DATA||{};syms=Object.keys(D).slice(0,30);syms.forEach(s=>{if(D[s]&&(D[s].kScan||D[s].k))K[s]=D[s];});st0={ok:Object.keys(K).length,fail:syms.length-Object.keys(K).length};}
   const ks=Object.keys(K);if(!ks.length)errs.push(own?own+' verisi alınamadı (0/'+syms.length+') — robot bu TF\'de emir AÇMAZ.':'İzleme verisi yok — önce İzleme\'de tara.');
   let need='',hits=[];
@@ -19279,7 +19279,7 @@ async function precheck(cb,iv,auto){const w=await izReady();if(!w){comboPre[cb.i
   const html=`<div class="bx" style="background:#111a2b;margin-top:6px"><b>🛡 Ön kontrol</b> <small>${new Date().toLocaleTimeString('tr-TR')}${auto?' (otomatik)':''}</small><br>
    <small>Kart TF: <b>${cardTf||'İzleme ('+esc(zv||'?')+')'}</b> · kaynak TF: <b>${esc(srcs.map(x=>x.interval||'-').join(', ')||'bağlı değil')}</b> · İzleme TF: <b>${esc(zv||'?')}</b> → robot TF: <b>${esc(eff||'?')}</b> · giriş modu: <b>${cb.intrabar?'⚡ anlık (oluşan mum)':'kapanmış mum'}</b> (${own?'robotun kendi 1500 kapanmış vadeli mumu'+(hasChip(cb)?' + başsız tarama motoru ('+esc(chipIds(cb).join(','))+')':''):'İzleme tarama verisi'})</small><br>
    <small>🧠 Motor: ${Object.keys(hlStat).length?Object.entries(hlStat).map(([t,h])=>esc(t)+': '+h.n+' coin, son mum '+new Date(h.lt).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})).join(' · '):'henüz çalışmadı'}${Date.now()<tfBlock?' · ⏳ 429 bekleme':''} · TF önbelleği: ${[...new Set(Object.keys(tfK).map(x=>x.split('|')[1]))].map(t=>esc(t)+' '+Object.keys(tfK).filter(x=>x.endsWith('|'+t)).length).join(', ')||'-'}</small><br>
-   <small>Veri: ${st0.ok||0} coin ok${st0.fail?', '+st0.fail+' hata '+esc(st0.err||''):''} · ${need}</small><br>
+   <small>Veri: ${st0.ok||0} coin ok${st0.stale?" ("+st0.stale+" önbellekten, bayat: "+esc(st0.err||"")+" — bayat mumda emir açılmaz)":""}${st0.fail?', '+st0.fail+' hata '+esc(st0.err||''):''} · ${need}</small><br>
    ${errs.map(e=>`<div style="color:#f87171">⛔ ${e}</div>`).join('')}${warns.map(e=>`<div style="color:#f59e0b">⚠ ${e}</div>`).join('')}
    ${fix.map(t=>`<button class="o" data-pfix="${esc(cb.id)}|${t}">Kart TF'sini ${t} yap</button>`).join('')}
    <small>Kuru çalıştırma (${ks.length} coin, ${own?'en hacimli':'İzleme listesi'}): <b>${hits.length}</b> sinyal (%${Math.round(100*ratio)})</small> ${hits.slice(0,20).map(h=>`<a href="#" class="tag qxsym" data-copen="coin|${esc(h.s)}">${esc(h.s)}${h.age?' ·'+h.age:''}</a>`).join(' ')}
@@ -19338,7 +19338,7 @@ function renderCombos(){try{if($("qxbRapor"))setTimeout(renderJ,0);}catch(e){}
      <select data-cb="${ci}.tf" title="Robot bu kombini kendi zaman diliminde (kapanmış mumlar, vadeli) değerlendirir">${[['','İzleme TF ('+(((frameWin('coin')||{}).S||{}).interval||(()=>{try{return JSON.parse(localStorage.getItem('bfscreener')||'{}').interval}catch(e){}})()||'?')+')'],['15m','15m'],['30m','30m'],['1h','1h'],['2h','2h'],['4h','4h'],['6h','6h'],['8h','8h'],['12h','12h'],['1d','1d']].map(o=>`<option value="${o[0]}" ${(cb.tf||'')===o[0]?'selected':''}>${o[1]}</option>`).join('')}</select>
      K <input data-cb="${ci}.K" value="${cb.K}" style="max-width:50px">
      <label><input type="checkbox" data-cb="${ci}.alarm" ${cb.alarm?'checked':''}> Alarm</label>
-     <label title="AÇIK: robot kombinin TF'sindeki OLUŞAN (açık) mumu her 2 dk değerlendirir; kesişim olur olmaz girer (kaçarsa son kapanmış mumda). Sinyal mum kapanışında kaybolabilir (repaint riski). KAPALI: yalnız son kapanmış mum."><input type="checkbox" data-cb="${ci}.intrabar" ${cb.intrabar?'checked':''}> ⚡ Anlık giriş (mum kapanışı bekleme)</label></div>
+     <label title="AÇIK: robot kombinin TF'sindeki OLUŞAN (açık) mumu robotun normal tarama aralığında (varsayılan 15 dk) canlı fiyatla değerlendirir; kesişim olur olmaz girer (kaçarsa son kapanmış mumda). Sinyal mum kapanışında kaybolabilir (repaint riski). KAPALI: yalnız son kapanmış mum."><input type="checkbox" data-cb="${ci}.intrabar" ${cb.intrabar?'checked':''}> ⚡ Anlık giriş (mum kapanışı bekleme)</label></div>
      <span style="margin-left:auto"><button class="g" data-cmove="${ci}|-1" title="Yukarı taşı" ${ci===0?'disabled':''}>↑</button><button class="g" data-cmove="${ci}|1" title="Aşağı taşı" ${ci===cfg.combos.length-1?'disabled':''}>↓</button></span>
      ${cb.conds.map((cd,i)=>condRow(ci,i,cd)+(cb.mode==='anchor'&&i>0?`<small> ↳ çapa mumu veya en fazla <input style="max-width:40px" data-cc="${ci}.${i}.w" value="${+cd.w||0}"> mum önce</small>`:'')).join('')}
      ${(()=>{try{const c=cStat[cb.id],bot=cfg.sources.some(x=>x.comboId===cb.id&&x.on!==false),rtf=ownTf(cb);if(!bot&&!c)return '';
