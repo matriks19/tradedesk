@@ -18798,7 +18798,7 @@ function render(){
  <div class="row" style="margin-top:8px"><label><input type="checkbox" data-ca="tradeAlarm" ${cfg.tradeAlarm?'checked':''}> 🔔 Robot işlem alarmı</label><label><input type="checkbox" data-ca="tradeAlarmSound" ${cfg.tradeAlarmSound?'checked':''}> Ses</label><label><input type="checkbox" data-ca="tradeAlarmRemote" ${cfg.tradeAlarmRemote?'checked':''}> Telegram/WhatsApp/ntfy (TradeDesk alarm ayarlarından)</label></div>
  <div class="row" style="margin-top:8px"><label style="flex:2"><input type="checkbox" id="qxbLive" ${cfg.live?'checked':''}> <b class="bad">CANLI emir</b> (gerçek para — bağlantı testi + onay gerekir; şu an yalnız Binance)</label></div></div>
  <div class="bx"><div class="row"><h3>Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})</h3><span>Gerçekleşen PnL: <b class="${st.pnl>=0?'ok':'bad'}">${st.pnl.toFixed(2)} USDT</b></span></div>
- <div style="overflow-x:auto"><table style="min-width:900px"><tr><th></th>${sortTh('pos','sym','Sembol')}${sortTh('pos','side','Yön')}${sortTh('pos','src','Kaynak')}${sortTh('pos','entry','Giriş')}${sortTh('pos','last','Son')}${sortTh('pos','net','Net K/Z ($)')}${sortTh('pos','pnl','K/Z %')}<th title="${ROE_TIP}">ROE % (kaldıraçlı) ⓘ</th>${sortTh('pos','size','Marjin / büyüklük ($)')}${sortTh('pos','time','Süre')}<th>Mod</th></tr>${sortRows(st.open,SORT.pos.k,SORT.pos.d,POS_GET).map(({p,i})=>{const r=pr(p);return `<tr><td><button class="r" data-close="${i}" title="Bu pozisyonu şimdiki fiyattan kapat">Kapat</button></td><td>${symA('coin',p.sym)}</td><td>${p.side}</td><td>${esc(p.src)}</td><td>${fmt(p.entry)}</td><td>${fmt(p.last)}</td><td>${(()=>{const g=r*(+p.notional||0),f=feeAmt('coin',p.entry,p.last,p.qty,p.notional);return money(g-f,'coin',null,'Brüt '+(g>=0?'+':'')+g.toFixed(2)+' $ · tahmini komisyon −'+f.toFixed(2)+' $ (%'+FEE_C()+' × 2 taraf)');})()}${p.pxWarn?` <small class="bad" title="${esc(p.pxWarn)}">⚠ fiyat kaynağı şüpheli</small>`:''}</td><td class="${r>=0?'ok':'bad'}" title="Fiyat değişimi %">${r>=0?'+':''}${(r*100).toFixed(2)}%</td><td class="${r>=0?'ok':'bad'}" title="${ROE_TIP}">${r>=0?'+':''}${(r*100*(p.lev||1)).toFixed(2)}% <small>×${p.lev||1}</small></td><td>${((+p.notional||0)/(p.lev||1)).toFixed(2)} $ <small>/ ${(+p.notional||0).toFixed(2)} $</small></td><td>${ageTxt(p.t)}</td><td>${p.live?'CANLI':'paper'}</td></tr>`;}).join('')}</table></div></div>
+ <div style="overflow-x:auto"><table style="min-width:900px"><tr><th></th>${sortTh('pos','sym','Sembol')}${sortTh('pos','side','Yön')}${sortTh('pos','src','Kaynak')}${sortTh('pos','entry','Giriş')}${sortTh('pos','last','Son')}${sortTh('pos','net','Net K/Z ($)')}${sortTh('pos','pnl','K/Z %')}<th title="${ROE_TIP}">ROE % (kaldıraçlı) ⓘ</th>${sortTh('pos','size','Marjin / büyüklük ($)')}${sortTh('pos','time','Süre')}<th>Mod</th></tr>${sortRows(st.open,SORT.pos.k,SORT.pos.d,POS_GET).map(({p,i})=>{const r=pr(p);return `<tr><td><button class="r" data-close="${i}" title="Bu pozisyonu şimdiki fiyattan kapat">Kapat</button></td><td>${symA('coin',p.sym)}</td><td>${p.side}</td><td>${esc(p.src)}</td><td>${fmt(p.entry)}</td><td>${fmt(p.last)}</td><td>${(()=>{const g=r*(+p.notional||0),f=feeAmt('coin',p.entry,p.last,p.qty,p.notional);return money(g-f,'coin',null,'Brüt '+(g>=0?'+':'')+g.toFixed(2)+' $ · tahmini komisyon −'+f.toFixed(2)+' $ (%'+FEE_C()+' × 2 taraf)');})()}${p.pxWarn?` <small class="bad" title="${esc(p.pxWarn)}">⚠ ${/korumasız/.test(p.pxWarn)?'SL korumasız':'fiyat kaynağı şüpheli'}</small>`:''}</td><td class="${r>=0?'ok':'bad'}" title="Fiyat değişimi %">${r>=0?'+':''}${(r*100).toFixed(2)}%</td><td class="${r>=0?'ok':'bad'}" title="${ROE_TIP}">${r>=0?'+':''}${(r*100*(p.lev||1)).toFixed(2)}% <small>×${p.lev||1}</small></td><td>${((+p.notional||0)/(p.lev||1)).toFixed(2)} $ <small>/ ${(+p.notional||0).toFixed(2)} $</small></td><td>${ageTxt(p.t)}</td><td>${p.live?'CANLI':'paper'}</td></tr>`;}).join('')}</table></div></div>
  <div class="bx"><h3>Borsa API ayarları</h3><small>Anahtarlar yalnız bu tarayıcıda saklanır (localStorage). Parola verirsen AES-GCM ile şifrelenir. İstek başına sadece bu sitenin <code>/api/exchange</code> rotasına gider, orada imzalanıp borsaya iletilir; sunucuda saklanmaz/loglanmaz. Borsa tarafında <b>çekim (withdraw) iznini kapalı</b> tut, IP kısıtı koy.</small>
  ${locked?`<div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Anahtar parolası"><button id="qxbUnlock">Kilidi aç</button></div>`:`<div class="grid" style="margin-top:8px">${EXCHANGES.map(exCard).join('')}</div>
  <div class="row" style="margin-top:8px"><input type="password" id="qxbPw" placeholder="Şifreleme parolası (opsiyonel)"><button id="qxbSaveKeys">Anahtarları kaydet</button><button class="r" id="qxbWipe">Anahtarları sil</button></div>`}</div>
@@ -18925,7 +18925,7 @@ async function lotSize(sym){
   return lot[sym];
 }
 function roundQty(q,step){const d=(String(step).split('.')[1]||'').replace(/0+$/,'').length;return +(Math.floor(q/step)*step).toFixed(d);}
-async function openPos(sym,side,price,src,pxSrc,meta){
+let meta0=null;async function openPos(sym,side,price,src,pxSrc,meta){
   const margin=cfg.equity*cfg.riskPct/100, lev=cfg.market==='futures'?cfg.leverage:1, notional=margin*lev;
   const p={sym,side,entry:price,last:price,src,live:cfg.live,lev,notional,qty:notional/price,t:Date.now(),pxSrc:pxSrc||null};
   if(cfg.live){
@@ -18937,6 +18937,7 @@ async function openPos(sym,side,price,src,pxSrc,meta){
       if(d&&+d.avgPrice>0)p.entry=+d.avgPrice; if(d&&+d.executedQty>0)p.qty=+d.executedQty; p.orderId=d&&d.orderId;
     }catch(e){log('✗ CANLI açılış '+sym+': '+e.message);return;}
   }
+  if(meta0){p.priceSrc=meta0.priceSrc;p.priceTs=meta0.priceTs;meta0=null;}
   if(meta&&meta.comboId){p.cid=meta.comboId;p.civ=meta.interval||undefined;}
   st.open.push(p); try{jOpen('coin',p,meta);}catch(e){} robotAlarm('🤖 Robot '+(side==='LONG'?'AL':'SAT')+' verdi: '+sym+' '+lev+'x @'+fmt(p.entry)+' ('+src+')'+(p.live?' · CANLI':' · PAPER')); log((p.live?'CANLI ':'PAPER ')+'AÇ '+side+' '+sym+' @'+fmt(p.entry)+' ['+src+'] marjin '+margin.toFixed(2)+' x'+lev);
 }
@@ -18951,19 +18952,29 @@ async function closePos(i,why){
   try{jClose('coin',p,why,r,pnl);}catch(e){} st.open.splice(i,1); robotAlarm('🤖 Robot '+(why==='TP'?'TP':why==='SL'?'SL':'SAT/'+why)+' kapattı: '+p.sym+' '+(r>=0?'+':'')+(r*100).toFixed(2)+'% ('+(pnl>=0?'+':'')+pnl.toFixed(2)+' USDT)'+(p.live?' · CANLI':' · PAPER')); log((p.live?'CANLI ':'PAPER ')+'KAPAT '+p.sym+' '+why+' '+(r*100).toFixed(2)+'% → '+pnl.toFixed(2)+' USDT'); save();
 }
 async function prices(){
-  // Kaynak etiketi: /api/fapi yanıtında x-qx-cache başlığı varsa sunucu proxy'si (= spot aynası), yoksa doğrudan Binance vadeli
-  try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),20000);const fut=cfg.market==='futures';
-    const r=await fetch(fut?'/api/fapi/v1/ticker/price':'https://api.binance.com/api/v3/ticker/price',{signal:ac.signal});clearTimeout(to);
-    const j=await r.json();const m={};if(!Array.isArray(j))return {};
-    Object.defineProperty(m,'__src',{value:fut?(/^futures:/.test(r.headers.get('x-qx-src')||'')||r.headers.get('x-qx-cache')===null?'perp':'spot'):'spot',enumerable:false});
-    j.forEach(x=>m[x.symbol]=+x.price);return m;}catch(e){return {};}
+  // Canlı fiyat: vadeli → tarayıcıdan DOĞRUDAN Binance fapi; olmazsa aynı-köken proxy YALNIZ x-qx-src=futures:binance ise (OKX/spot aynası kabul edilmez)
+  const fut=cfg.market==='futures',m={};const mark=(src)=>{Object.defineProperty(m,'__src',{value:src,enumerable:false});Object.defineProperty(m,'__ts',{value:Date.now(),enumerable:false});return m;};
+  const get=async(u,ms)=>{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),ms||12000);try{return await fetch(u,{signal:ac.signal});}finally{clearTimeout(to);}};
+  if(!fut){try{const r=await get('https://api.binance.com/api/v3/ticker/price');const j=await r.json();if(Array.isArray(j))j.forEach(x=>m[x.symbol]=+x.price);return mark('spot');}catch(e){return mark('');}}
+  try{const r=await get('https://fapi.binance.com/fapi/v1/ticker/price');if(r.ok){const j=await r.json();if(Array.isArray(j)&&j.length){j.forEach(x=>m[x.symbol]=+x.price);return mark('perp');}}}catch(e){}
+  try{const r=await get('/api/fapi/v1/ticker/price');const src=r.headers.get('x-qx-src')||'';if(r.ok&&src==='futures:binance'){const j=await r.json();if(Array.isArray(j))j.forEach(x=>m[x.symbol]=+x.price);return mark('perp');}}catch(e){}
+  return mark('');
 }
+// Tek sembol canlı fiyat (+ son kapanmış 1m mumun yüksek/düşüğü, iğneler için) — doğrudan Binance vadeli
+async function px1(sym){const o={};try{const ac=new AbortController(),to=setTimeout(()=>ac.abort(),10000);const r=await fetch('https://fapi.binance.com/fapi/v1/klines?symbol='+encodeURIComponent(sym)+'&interval=1m&limit=3',{signal:ac.signal});clearTimeout(to);
+  const k=await r.json();if(Array.isArray(k)&&k.length){o.px=+k[k.length-1][4];o.ts=Date.now();o.bars=k.slice(0,-1).map(x=>({t:+x[0],h:+x[2],l:+x[3]}));}}catch(e){}return o;}
 let busy=false;
 async function tick(sig){
   if(!st.running) return; if(busy&&sig){for(let i=0;i<120&&busy;i++)await new Promise(r=>setTimeout(r,500));} if(busy) return; busy=true;
   try{
     const px=(st.open.length||sig)?await prices():{};
+    const W={};if(cfg.market==='futures')for(const p of st.open){const o=await px1(p.sym);W[p.sym]=o;if(!(px[p.sym]>0)&&o.px>0){px[p.sym]=o.px;}}
     for(let i=st.open.length-1;i>=0;i--){const p=st.open[i],np=px[p.sym];
+      if(!(np>0)){if(!p.noPx){p.noPx=1;log('⚠ '+p.sym+': canlı fiyat yok — SL korumasız');}p.pxWarn='SL korumasız (canlı fiyat yok)';continue;} if(p.noPx){p.noPx=0;p.pxWarn='';}
+      { // iğne: açılıştan sonra kapanmış 1m mumların yüksek/düşüğü SL/TP seviyesine değdiyse o seviyeden kapat (önce SL)
+        const bs=((W[p.sym]||{}).bars||[]).filter(b=>b.t>=p.t),slv=p.side==='LONG'?p.entry*(1-cfg.sl/100):p.entry*(1+cfg.sl/100),tpv=p.side==='LONG'?p.entry*(1+cfg.tp/100):p.entry*(1-cfg.tp/100);
+        let hit=null;for(const b of bs){if(p.side==='LONG'?b.l<=slv:b.h>=slv){hit=['SL',slv];break;}if(p.side==='LONG'?b.h>=tpv:b.l<=tpv){hit=['TP',tpv];break;}}
+        if(hit&&!p.live){p.last=hit[1];log('İğne: '+p.sym+' 1m mum '+hit[0]+' seviyesine değdi');await closePos(i,hit[0]);continue;}}
       if(np>0&&p.pxSrc&&px.__src&&px.__src!==p.pxSrc){if(!p.pxWarn)log('⚠ '+p.sym+' fiyat kaynağı farklı ('+px.__src+' ≠ giriş '+p.pxSrc+') — güncellenmedi');p.pxWarn='fiyat kaynağı şüpheli: '+px.__src+' ≠ giriş '+p.pxSrc;continue;}
       if(np>0){const near=x=>x>0&&Math.abs(np/x-1)<=0.3; // tek adımda >%30 sapma (giriş ve son fiyata göre) = farklı kaynak (spot/vadeli) şüphesi → kullanılmaz
         if(near(p.entry)||near(p.last)){p.last=np;if(p.pxWarn){p.pxWarn='';}} else {if(!p.pxWarn)log('⚠ '+p.sym+' şüpheli fiyat '+fmt(np)+' (giriş '+fmt(p.entry)+') — kaynak uyuşmazlığı, TP/SL için kullanılmadı');p.pxWarn='şüpheli fiyat '+fmt(np)+' atlandı';continue;}}
@@ -18999,15 +19010,27 @@ async function tick(sig){
           if(s.comboId){const cb=cfg.combos.find(x=>x.id===s.comboId); const r=PRE?(PRE[sym]||null):(()=>{const dd=dFor(cb,sym,s.interval);return cb&&dd&&evalCombo(w,dd,cb);})(); if(r){(SIG[cb.id]=SIG[cb.id]||[]).push({sym,t:r.t});pass=true;age=r.age;rT=r.t||null;dir=cb.side==='SHORT'?'SAT':'AL';}}
           else try{pass=w.scanPass(d,s.scanId);age=w.scanAge(d,s.scanId);dir=String(w.scanDirLabel(d,s.scanId)||'');}catch(e){}
           if(!pass) continue; if(age!=null&&age>cfg.maxAge) continue;
+          if(s.comboId){ // OTOMATİK GİRİŞ: kesişim yalnız kombin TF'sinin SON kapanmış mumunda (kartın 'son N mum' ayarından bağımsız; tarama görünümü değişmez)
+            const tfA=cbS&&ownTf(cbS,s.interval),msA=tfA&&TF_MS[tfA];
+            if(msA){const lc=Math.floor(Date.now()/msA)*msA-msA;if(!(rT>=lc)||(age!=null&&age>0)){warnOnce('stale'+sym+s.comboId+rT,'atlandı: '+sym+' ['+s.label+'] sinyal son kapanmış '+tfA+' mumunda değil ('+(rT?new Date(rT).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'?')+', '+age+' mum önce)');continue;}}
+            else if(age!=null&&age>1) continue;}
           const side=/SAT|SHORT|US\b|↓/i.test(dir)?'SHORT':/AL|LONG|UA\b|↑/i.test(dir)?'LONG':null;
           if(!side) continue; if(cfg.market==='spot'&&side==='SHORT') continue;
           if(turn.has(sym)) continue; turn.add(sym); // aynı turda aynı sembole yalnız ilk sinyal
           if(st.open.some(p=>p.sym===sym)){ log('atlandı: açık pozisyon var — '+sym+' ['+s.label+' '+dir+']'); continue; }
           const kO=s.comboId&&(()=>{const cb=cfg.combos.find(x=>x.id===s.comboId),tf=cb&&ownTf(cb,s.interval),k=tf&&tfK[sym+'|'+tf];return k&&k.c?k:null;})();
-          const pxs=px[sym]>0?px.__src:(d.pxSrc||null), price=px[sym]||d.price||(kO?kO.c[kO.c.length-1]:0); if(!(price>0)) continue;
+          let PX=(tick.PX&&Date.now()-tick.PX.__ts<8000)?tick.PX:px;if(!PX.__ts||Date.now()-PX.__ts>8000){PX=await prices();tick.PX=PX;}
+          let price=PX[sym],pxs=PX.__src,pts=PX.__ts;
+          if(cfg.market==='futures'&&!(price>0)){const o=await px1(sym);price=o.px;pxs='perp';pts=o.ts;}
+          if(!(price>0)||!pts||Date.now()-pts>10000||(cfg.market==='futures'&&pxs!=='perp')){log('atlandı: '+sym+' canlı fiyat yok, giriş atlandı');continue;}
+          { // sapma: canlı fiyat − sinyal mumu kapanışı > 0.5×ATR14 (sinyal TF) ya da ATR yoksa >%1.5
+            let ref=null,atr=null;const k=kO||(d.k&&d.k.c?d.k:null);
+            if(k&&k.c&&k.c.length>15){let ix=rT&&k.t?k.t.indexOf(rT):-1;if(ix<0)ix=k.c.length-(kO?1:2);ref=k.c[ix];let a=0;for(let q=ix-13;q<=ix;q++)a+=Math.max(k.h[q]-k.l[q],Math.abs(k.h[q]-k.c[q-1]),Math.abs(k.l[q]-k.c[q-1]));atr=a/14;}
+            if(!(ref>0))ref=d.price>0?d.price:null;
+            if(ref>0){const dev=Math.abs(price-ref),lim=atr>0?0.5*atr:0.015*ref;if(dev>lim){log('atlandı: '+sym+' fiyat sinyal kapanışından uzak ('+fmt(price)+' / sinyal '+fmt(ref)+', fark '+(dev/ref*100).toFixed(2)+'% > '+(atr>0?'0.5×ATR':'%1.5')+')');continue;}}}
           if(px[sym]>0&&d.price>0&&Math.abs(px[sym]/d.price-1)>0.05){log('⚠ '+sym+' giriş atlandı: fiyat kaynakları uyuşmuyor ('+fmt(px[sym])+' '+(px.__src||'?')+' / İzleme '+fmt(d.price)+' '+(d.pxSrc||'?')+')');continue;}
           const key=sym+'|'+s.scanId+'|'+(s.comboId||'')+'|'+(rT||(d.scan&&d.scan.lastT)||'')+'|'+age; if(!tick.seen){try{tick.seen=JSON.parse(localStorage.getItem('qxbot_seen_v1')||'{}')||{};}catch(e){tick.seen={};}} if(tick.seen[key]&&Date.now()-tick.seen[key]<(s.comboId?7*864e5:3600e3)) continue; if(s.comboId&&rT&&jHasSig(sym,s.comboId,rT)) continue; tick.seen[key]=Date.now(); try{for(const k in tick.seen)if(Date.now()-tick.seen[k]>8*864e5)delete tick.seen[k];localStorage.setItem('qxbot_seen_v1',JSON.stringify(tick.seen));}catch(e){}
-          const n0=st.open.length; await openPos(sym,side,price,s.label+(dir?' '+dir:''),pxs,{scanId:s.scanId,comboId:s.comboId,interval:s.interval||'',age,dir,sigT:rT||null});
+          const n0=st.open.length; meta0={priceSrc:pxs==='perp'?'binance-fapi':pxs,priceTs:pts}; await openPos(sym,side,price,s.label+(dir?' '+dir:''),pxs,{scanId:s.scanId,comboId:s.comboId,interval:s.interval||'',age,dir,sigT:rT||null});
           if(s.comboId&&st.open.length>n0){const cb=cfg.combos.find(x=>x.id===s.comboId),p1=st.open[st.open.length-1];p1.sigT=rT||null;log('🤖 Otomatik giriş: '+sym+' '+side+' · kombin '+(cb?cb.name:s.comboId)+' · TF '+(cb&&ownTf(cb,s.interval)||'İzleme')+' · sinyal mumu '+(rT?new Date(rT).toLocaleString('tr-TR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'?')+' ('+age+' mum önce, kapanmış)');}
         }
       }
