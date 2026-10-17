@@ -19690,17 +19690,34 @@ const jPer=m=>+JR.per[m]||1, tPer=t=>+t.per||1;
 let JF={m:'',from:'',to:'',key:'',st:'',per:'cur'};
 // 🔄 Paper sıfırla (kullanıcı tıklar, onaylı, otomatik çalışmaz): bakiye 1000 USDT / 1.000.000 TL, gerçekleşen PnL 0, yeni dönem.
 // Açık PAPER pozisyonlar son fiyattan 'paper sıfırlama' nedeniyle günlükte kapatılıp arşivlenir (bakiyeye eklenmez). Diğer localStorage anahtarları, kombinler, kaynaklar, ayarlar değişmez.
-function qxPaperReset(m){const isB=m==='bist',open=isB?B.open:st.open,eq=isB?1000000:1000,n0=jPer(m);
+// Basit onay penceresi (onay kutusu ile) — confirm() kutu taşıyamadığı için [dlgv1]
+function qxDlg(msg,chk){return new Promise(res=>{const o=document.createElement('div');o.id='qxDlg';o.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99999;display:flex;align-items:center;justify-content:center';
+  o.innerHTML='<div style="background:#0f172a;color:#e2e8f0;border:1px solid #334155;border-radius:10px;padding:16px;max-width:520px;width:92%;font-size:13px"><div style="white-space:pre-wrap">'+esc(msg)+'</div>'+(chk?'<label style="display:block;margin-top:10px"><input type="checkbox" id="qxDlgC" '+(chk.on?'checked':'')+'> '+esc(chk.lb)+'</label>':'')+'<div style="margin-top:14px;text-align:right"><button class="g" id="qxDlgN">İptal</button> <button class="r" id="qxDlgY">Sıfırla</button></div></div>';
+  document.body.appendChild(o);const done=ok=>{const c=o.querySelector('#qxDlgC');const v={ok,chk:!!(c&&c.checked)};o.remove();res(v);};o.querySelector('#qxDlgY').onclick=()=>done(true);o.querySelector('#qxDlgN').onclick=()=>done(false);});}
+async function qxPaperReset(m){const isB=m==='bist',open=isB?B.open:st.open,eq=isB?1000000:1000,n0=jPer(m);
   if(!isB&&open.some(p=>p.live)){alert('Açık CANLI pozisyon var — paper sıfırlama yapılamaz. Önce canlı pozisyonları kapat.');return false;}
   const nT=JR.trades.filter(t=>t.m===m&&tPer(t)===n0).length,eq0=isB?B.equity:cfg.equity,pnl0=isB?B.pnl:st.pnl;
-  if(!confirm((isB?'BIST':'Coin')+' paper sıfırlansın mı?\n\n• Bakiye → '+(isB?'1.000.000 TL':'1000 USDT')+' (şimdi '+(isB?fmtTL(eq0)+' TL':(+eq0).toFixed(2)+' USDT')+')\n• Gerçekleşen PnL → 0\n• Yeni dönem: '+(n0+1)+'. Dönem '+n0+' işlemleri ('+nT+') SİLİNMEZ — Robot Rapor > Dönem filtresinde ve CSV\'de arşiv olarak kalır.'+(open.length?'\n• Açık '+open.length+' paper pozisyon son fiyattan "paper sıfırlama" nedeniyle kapatılıp arşive yazılır.':'')+'\n\nAyarlar, kombinler, kaynaklar ve diğer kayıtlar değişmez.'))return false;
-  const now=Date.now();
+  const D0=await qxDlg((isB?'BIST':'Coin')+' paper sıfırlansın mı?\n\n• Bakiye → '+(isB?'1.000.000 TL':'1000 USDT')+' (şimdi '+(isB?fmtTL(eq0)+' TL':(+eq0).toFixed(2)+' USDT')+')\n• Gerçekleşen PnL → 0\n• Yeni dönem: '+(n0+1)+'. Dönem '+n0+' işlemleri ('+nT+') SİLİNMEZ — Robot Rapor > Dönem filtresinde ve CSV\'de arşiv olarak kalır.'+(open.length?'\n• Açık '+open.length+' paper pozisyon son fiyattan "paper sıfırlama" nedeniyle kapatılıp arşive yazılır.':'')+'\n\nAyarlar, kombinler, kaynaklar ve diğer kayıtlar değişmez.',{lb:'Kombin sinyal özetini de sıfırla ('+(isB?'BIST':'Coin')+')',on:true});if(!D0.ok)return false;
+  const now=Date.now();if(D0.chk)qxSumReset(m,'',now);
   for(const p of open.slice()){try{const r=isB?(p.last/p.entry-1):pr(p),pnl=isB?(p.last-p.entry)*p.lot:r*p.notional;jClose(m,p,'paper sıfırlama',r,pnl);}catch(e){}}
   JR.perLog.push({m,n:n0,start:(JR.perLog.filter(x=>x.m===m).slice(-1)[0]||{}).end||null,end:now,eq0,pnl:pnl0,trades:nT,closed:open.length});JR.per[m]=n0+1;saveJ();
   if(isB){B.open=[];B.equity=eq;B.pnl=0;logB('🔄 Paper sıfırlandı: bakiye 1.000.000 TL, dönem '+(n0+1)+' başladı (dönem '+n0+': '+nT+' işlem arşivde)');saveB();}
   else{st.open=[];cfg.equity=eq;st.pnl=0;log('🔄 Paper sıfırlandı: bakiye 1000 USDT, dönem '+(n0+1)+' başladı (dönem '+n0+': '+nT+' işlem arşivde)');save();}
   note((isB?'BIST':'Coin')+' paper sıfırlandı · dönem '+(n0+1),'ok');try{render();}catch(e){}return true;}
 window.qxPaperReset=qxPaperReset;
+// Kombin / sinyal özeti sıfırlama [sumrv1]: ayrı anahtar qxbot_sumreset_v1 = {m:{coin:ts,bist:ts}, k:{'coin|cid:x':ts}}.
+// İşlemler SİLİNMEZ: özet yalnız bu zamandan SONRA kapanan işlemleri (+ hâlâ açık olanları) sayar. Robot kartındaki 📊 son tarama/son sinyal (qxbot_cstat_v1) da temizlenir.
+const LS_SR='qxbot_sumreset_v1';let SR=(()=>{try{const o=JSON.parse(localStorage.getItem(LS_SR)||'{}')||{};return {m:o.m||{},k:o.k||{}};}catch(e){return {m:{},k:{}};}})();
+function saveSR(){try{localStorage.setItem(LS_SR,JSON.stringify(SR));}catch(e){}}
+const srAt=(m,gk)=>Math.max(+SR.m[m]||0,+SR.k[m+'|'+gk]||0);
+function qxSumReset(m,gk,t){t=t||Date.now();const ms=m?[m]:['coin','bist'];
+  if(gk){ms.forEach(x=>SR.k[x+'|'+gk]=t);if(String(gk).startsWith('cid:')&&ms.includes('coin'))delete cStat[gk.slice(4)];}
+  else{ms.forEach(x=>{SR.m[x]=t;Object.keys(SR.k).forEach(k=>{if(k.startsWith(x+'|'))delete SR.k[k];});});if(ms.includes('coin'))Object.keys(cStat).forEach(k=>delete cStat[k]);}
+  saveSR();saveCStat();}
+const tsTR=t=>t?new Date(t).toLocaleString('tr-TR',{timeZone:'Europe/Istanbul',day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit'})+' TSİ':'hiç';
+// aktif kombin: o piyasanın botuna bağlı + açık (✓) ya da alarmı açık; kombin olmayan (tarama/eski) satırlar her zaman görünür
+function jActive(s){if(!String(s.gk).startsWith('cid:'))return true;const cb=(cfg.combos||[]).find(c=>'cid:'+c.id===s.gk);if(!cb)return s.open>0;return s.wired==='✓'||s.open>0||(!!cb.alarm&&(cb.mkt?cb.mkt===s.m:s.m==='coin'));}
+let JSP=false;
 function saveJ(){try{if(JR.trades.length>J_CAP){const op=JR.trades.filter(t=>!t.t1),cl=JR.trades.filter(t=>t.t1);JR.trades=op.concat(cl.slice(-(J_CAP-op.length))).sort((a,b)=>(a.t0||0)-(b.t0||0));}localStorage.setItem(LS_J,JSON.stringify(JR));}catch(e){}}
 const jKey=(m,p)=>m+'|'+p.sym+'|'+(p.t||0);
 function jFind(m,p){const k=jKey(m,p);for(let i=JR.trades.length-1;i>=0;i--)if(JR.trades[i].pk===k)return JR.trades[i];return null;}
@@ -19746,7 +19763,7 @@ const cur=t=>t.m==='bist'?'TL':'USDT';
 function jSummary(list){const g={};const mk=(m,gk,kind,fb)=>({m,gk,key:jName(gk,fb),kind,wired:jWired(m,gk),n:0,w:0,sp:0,sa:0,gp:0,gl:0,maeS:0,maeN:0,maeW:0,mfeS:0,mfeN:0,durS:0,durN:0,open:0,uAmt:0,uPctS:0,uN:0});
   // tanımlı TÜM kombinler (işlemi olmasa da 0 satır) — coin + BIST
   (cfg.combos||[]).forEach(cb=>['coin','bist'].forEach(m=>{const gk='cid:'+cb.id;if((JF.m&&JF.m!==m)||(JF.key&&JF.key!==gk))return;if(m==='bist'&&cb.side==='SHORT')return;g[m+'|'+gk]=mk(m,gk,'combo');}));
-  list.forEach(t=>{const gk=jGk(t),k=t.m+'|'+gk;g[k]=g[k]||mk(t.m,gk,t.kind,t.key);const s=g[k];
+  list.forEach(t=>{const gk=jGk(t),k=t.m+'|'+gk;{const r0=srAt(t.m,gk);if(r0&&(t.t1||t.tStr)&&(t.t1||t.t0||0)<r0)return;}g[k]=g[k]||mk(t.m,gk,t.kind,t.key);const s=g[k];
   if(t.t1||t.tStr){const nv=t.net!=null?t.net:(t.pnl||0);s.n++;if(nv>0)s.w++;s.sp+=t.pnlPct||0;s.sa+=nv;s.sg=(s.sg||0)+(t.pnl||0);if(nv>0)s.gp+=nv;else s.gl-=nv;if(t.dur!=null){s.durS+=t.dur;s.durN++;}}
   else{s.open++;const u=jUnreal(t);if(u){s.uAmt+=u.amt;s.uPctS+=u.r;s.uN++;}}
   if(t.mae!=null){s.maeS+=t.mae;s.maeN++;s.maeW=Math.min(s.maeW,t.mae);}if(t.mfe!=null){s.mfeS+=t.mfe;s.mfeN++;}});
@@ -19766,8 +19783,9 @@ function renderJ(){const el=$('qxbRapor');if(!el)return;
   ['j','js','ju'].forEach(k=>{if(!SORT[k]||typeof SORT[k]!=='object')SORT[k]={k:k==='j'?'t0':k==='js'?'amt':'uAmt',d:-1};});
   const list=jFiltered(),S=jSummary(list),keys=[...(cfg.combos||[]).map(c=>['cid:'+c.id,'KOMBİN: '+c.name]),...[...new Set(JR.trades.map(jGk))].filter(k=>!(cfg.combos||[]).some(c=>'cid:'+c.id===k)).map(k=>[k,jName(k)])];
   const cls=v=>v==null?'':v>=0?'ok':'bad';
-  const sumRows=sortRows(S.map(s=>Object.assign(s,{amt:s.sa})),SORT.js.k,SORT.js.d,S_GET);
-  const openS=S;
+  const Sv=JSP?S:S.filter(jActive),nHid=S.length-Sv.length;
+  const sumRows=sortRows(Sv.map(s=>Object.assign(s,{amt:s.sa})),SORT.js.k,SORT.js.d,S_GET);
+  const openS=Sv;
   const PAR=jPareto(S);
   el.innerHTML=`<div class="row"><h3>📒 Robot Rapor</h3><small>Her işlem ayrı kaydedilir (qxbot_journal_v1, son ${J_CAP}). Bot verisi değişmez. Eski işlemler "bilinmiyor (eski)".</small></div>
   <div class="row" style="margin:6px 0"><div><label>Piyasa</label><select data-jf="m"><option value="">Hepsi</option><option value="coin" ${JF.m==='coin'?'selected':''}>Coin</option><option value="bist" ${JF.m==='bist'?'selected':''}>BIST</option></select></div>
@@ -19780,7 +19798,11 @@ function renderJ(){const el=$('qxbRapor');if(!el)return;
   <div class="row" style="margin-top:8px"><h3>Katkı (Pareto) · gerçekleşen / gerçekleşmemiş</h3><button class="g" id="qxjCsvP">⬇ Katkı CSV</button></div>
   ${['coin','bist'].filter(m=>PAR[m].rows.length).map(m=>{const P=PAR[m];return `<div><small><b>${m==='bist'?'BIST (₺)':'Coin ($)'}</b> · Gerçekleşen (kapalı, net): ${money(P.real,m)} · Gerçekleşmemiş (açık ${P.open}, net): ${money(P.unreal,m)} · Toplam: ${money(P.real+P.unreal,m)} · Brüt kâr ${money(P.gp,m)} / brüt zarar ${money(-P.gl,m)}</small></div>`;}).join('')}
   <table><tr><th>Piyasa</th><th>#</th><th>Kombin/sinyal</th><th>İşlem</th><th>Gerçekleşen net</th><th title="Kombinin net kârı ÷ o piyasadaki kârlı kombinlerin toplam net kârı (zarar edenler negatif pay)">Katkı %</th><th>Kümülatif %</th><th>Profit f.</th><th>Ort süre</th><th>Açık (gerçekleşmemiş)</th></tr>${['coin','bist'].map(m=>PAR[m].rows.map((s,i)=>`<tr><td>${m==='bist'?'BIST':'Coin'}</td><td>${i+1}</td><td>${esc(s.key)}</td><td>${s.n}</td><td>${money(s.sa,m)}</td><td class="${s.share>=0?'ok':'bad'}">${s.share==null?'-':(s.share*100).toFixed(1)+'%'}</td><td>${s.cum==null?'-':(s.cum*100).toFixed(1)+'%'}</td><td>${s.pf==null?'-':s.pf===Infinity?'∞':s.pf.toFixed(2)}</td><td>${s.durA!=null?ageTxt(Date.now()-s.durA):'-'}</td><td>${s.open?s.open+' · '+money(s.uAmt,m):'-'}</td></tr>`).join('')).join('')||'<tr><td colspan="10"><small>Kapanmış işlem yok</small></td></tr>'}</table>
-  <div class="row" style="margin-top:8px"><h3>Kombin / sinyal özeti</h3><button class="g" id="qxjCsvS">⬇ Özet CSV</button></div>
+  <div class="row" style="margin-top:8px"><h3>Kombin / sinyal özeti</h3><button class="g" id="qxjCsvS">⬇ Özet CSV</button>
+   <label style="flex:0 0 auto" title="Pasif = bota bağlı/açık değil ve alarmı kapalı (açık pozisyonu olanlar her zaman görünür). Kombinler silinmez."><input type="checkbox" id="qxjShowP" ${JSP?'checked':''}> Pasifleri göster${nHid?' ('+nHid+' gizli)':''}</label>
+   <select id="qxjSrK" style="max-width:200px;flex:0 0 auto" title="Sıfırlanacak kombin"><option value="">Tüm kombinler (coin + BIST)</option>${Sv.filter(s=>String(s.gk).startsWith('cid:')).map(s=>`<option value="${esc(s.m+'|'+s.gk)}">${s.m==='bist'?'BIST':'Coin'} · ${esc(s.key)}</option>`).join('')}</select>
+   <button class="r" id="qxjSumRst" style="flex:0 0 auto" title="Yalnız bu özeti sıfırlar (işlemler, kombinler, pozisyonlar, bakiye değişmez)">↺ Sıfırla</button>
+   <small id="qxjSrAt">son sıfırlama: coin ${tsTR(SR.m.coin)} · BIST ${tsTR(SR.m.bist)}${Object.keys(SR.k).length?' · kombin bazında '+Object.keys(SR.k).length+' (son '+tsTR(Math.max(...Object.values(SR.k))):''}${Object.keys(SR.k).length?')':''}</small></div>
   <table><tr>${sortTh('js','m','Piyasa')}${sortTh('js','key','Kombin/sinyal')}<th>Robot</th>${sortTh('js','n','İşlem')}${sortTh('js','wr','Kazanma')}${sortTh('js','amt','Toplam net K/Z')}${sortTh('js','avg','Ort K/Z %')}${sortTh('js','maeA','Ort MAE')}${sortTh('js','maeW','En kötü MAE')}${sortTh('js','mfeA','Ort MFE')}${sortTh('js','durA','Ort süre')}${sortTh('js','pf','Profit f.')}</tr>${sumRows.map(({p:s})=>`<tr><td>${s.m==='bist'?'BIST':'Coin'}</td><td>${esc(s.key)}${(()=>{const cb=qxCbByName(s.key);return cb?' · '+qxTfL(cb.tf):'';})()}</td><td class="${s.wired==='✓'?'ok':s.wired?'warn':''}">${s.wired}</td><td>${s.n}${s.open?` <small>(+${s.open} açık)</small>`:''}</td><td>${s.wr!=null?(s.wr*100).toFixed(0)+'%':'-'}</td><td>${money(s.sa,s.m,null,'Brüt '+(s.sg||0).toFixed(2)+' · komisyon sonrası net')}</td><td class="${cls(s.avg)}">${pc(s.avg)}</td><td class="bad">${pc(s.maeA)}</td><td class="bad">${pc(s.maeW)}</td><td class="ok">${pc(s.mfeA)}</td><td>${s.durA!=null?ageTxt(Date.now()-s.durA):'-'}</td><td>${s.pf==null?'-':s.pf===Infinity?'∞':s.pf.toFixed(2)}</td></tr>`).join('')||'<tr><td colspan="12"><small>Kayıt yok</small></td></tr>'}</table>
   <div class="row" style="margin-top:8px"><h3>İşlemler (${list.length})</h3><button class="g" id="qxjCsvT">⬇ İşlem CSV</button><button class="g" id="qxjJson">⬇ JSON yedek</button><label class="g" style="flex:0 0 auto;cursor:pointer;background:#334155;padding:7px 10px;border-radius:6px">⬆ JSON içe al<input type="file" id="qxjImp" accept=".json,application/json" hidden></label>
    <select id="qxjRstM" style="max-width:110px;flex:0 0 auto"><option value="both">İkisi</option><option value="coin">Coin</option><option value="bist">BIST</option></select>
@@ -19789,7 +19811,11 @@ function renderJ(){const el=$('qxbRapor');if(!el)return;
   ${sortRows(list,SORT.j.k,SORT.j.d,J_GET).map(({p:t})=>{const u=t.t1||t.tStr?null:jUnreal(t);return `<tr><td>${t.m==='bist'?'BIST':'Coin'}</td><td>${symA(t.m,t.sym)}</td><td>${t.side}</td><td title="${esc(t.rule||'')}">${esc(t.key)}${t.rule?`<br><small>${esc(String(t.rule).slice(0,90))}</small>`:''}</td><td>${esc(t.tf?qxTfL(t.tf):(()=>{const cb=(t.comboId&&(cfg.combos||[]).find(c=>c.id===t.comboId))||qxCbByName(t.key);return cb&&cb.tf?qxTfL(cb.tf)+' (şimdiki)':'?';})())}</td><td>${t.t0?dt(t.t0):'-'}</td><td>${fmt(t.e)}<br><small>${esc(t.pxSrc||'')}</small></td><td>${t.t1?fmt(t.x)+'<br><small>'+dt(t.t1)+'</small>':t.tStr?'<small>'+esc(t.tStr)+' (eski)</small>':'<span class="warn">açık</span>'}</td><td>${esc(t.why||'')}</td><td>${t.t1||t.tStr?money(t.net!=null?t.net:t.pnl,t.m,null,t.fee!=null?'Brüt '+(+t.pnl).toFixed(2)+' · komisyon −'+(+t.fee).toFixed(2):'eski kayıt: brüt'):u?money(u.amt,t.m,null,'Brüt '+u.gross.toFixed(2)+' · tahmini komisyon −'+u.fee.toFixed(2)):'-'}</td><td class="${cls(t.t1||t.tStr?t.pnlPct:u&&u.r)}">${pc(t.t1||t.tStr?t.pnlPct:u&&u.r)}</td><td title="${ROE_TIP}">${pc(t.roe!=null?t.roe:u&&u.r*(t.lev||1))}${t.lev>1?` <small>×${t.lev}</small>`:''}</td><td>${t.size?((t.size/(t.lev||1)).toFixed(2)+(t.m==='bist'?' ₺':' $')):'-'}</td><td class="bad" title="${t.maePx?'fiyat '+fmt(t.maePx)+' · '+dt(t.maeT):''}">${pc(t.mae)}</td><td class="ok" title="${t.mfePx?'fiyat '+fmt(t.mfePx)+' · '+dt(t.mfeT):''}">${pc(t.mfe)}</td><td>${t.dur!=null?ageTxt(Date.now()-t.dur):t.t0&&!t.tStr?ageTxt(t.t0):'-'}</td></tr>`;}).join('')}</table></div>`;
   el.querySelectorAll('[data-jf]').forEach(i=>i.onchange=()=>{JF[i.dataset.jf]=i.value;renderJ();});
   $('qxjCsvT').onclick=()=>dl('robot_islemler.csv',csv(jTradeRows(list)),'csv');
-  $('qxjCsvS').onclick=()=>dl('robot_kombin_ozet.csv',csv(jSumRows(S)),'csv');
+  $('qxjCsvS').onclick=()=>dl('robot_kombin_ozet.csv',csv(jSumRows(Sv)),'csv');
+  $('qxjShowP').onchange=e=>{JSP=e.target.checked;renderJ();};
+  $('qxjSumRst').onclick=async()=>{const v=$('qxjSrK').value,[m,gk]=v?[v.split('|')[0],v.slice(v.indexOf('|')+1)]:['',''],lb=v?$('qxjSrK').selectedOptions[0].textContent:'tüm kombinler (coin + BIST)';
+    const D0=await qxDlg('Kombin sinyal özeti sıfırlansın mı? — '+lb+'\n\n• Özet bundan sonra yalnız şu andan SONRA kapanan işlemleri sayar (açık pozisyonlar görünmeye devam eder).\n• Kombin kartındaki 📊 son tarama / son sinyal bilgisi temizlenir.\n• İşlem günlüğü, CSV, kombin tanımları, pozisyonlar ve bakiye DEĞİŞMEZ.');if(!D0.ok)return;
+    qxSumReset(m,gk);note('Kombin sinyal özeti sıfırlandı · '+lb,'ok');renderJ();try{render();}catch(e){}};
   $('qxjCsvP').onclick=()=>dl('robot_katki_pareto.csv',csv(jParRows(PAR)),'csv');
   $('qxjJson').onclick=()=>dl('qxbot_journal_yedek.json',JSON.stringify(JR),'json');
   $('qxjRst').onclick=()=>{const m=$('qxjRstM').value,ms=m==='both'?['coin','bist']:[m],lb=m==='both'?'Coin + BIST':m==='bist'?'BIST':'Coin',pp=$('qxjRstP').checked;
