@@ -2,7 +2,7 @@
    Kapsam: fetch('/api/fapi/v1/...') → https://fapi.binance.com/fapi/v1/... (USDT-M perp + TradFi perp)
            fetch('/api/klines?...exchange=binance...') → fapi (".P") / data-api.binance.vision (spot)
    Ayar: localStorage.qx_coin_src = 'direct' (varsayılan) | 'proxy'.
-   Direkt istek başarısız (CORS/ağ/451) → 10 dk boyunca otomatik sunucu proxy'si.
+   Direkt istek başarısız (CORS/ağ/451) → 10 dk boyunca otomatik sunucu proxy'si. 400 (Binance'te olmayan sembol) → o istek site proxy'sinden.
    418/429 → ban süresince Binance'e istek yok; 429 + Retry-After döner (proxy'ye YÜK AKTARILMAZ).
    Eşzamanlılık 4; X-MBX-USED-WEIGHT-1M okunabilirse limitin %60'ında dakika sonuna kadar bekler.
    İmzalı/emir istekleri (/api/exchange) etkilenmez. */
@@ -45,7 +45,7 @@
       var m=/^\/api\/fapi\/v1\/([a-zA-Z/0-9]+)(\?.*)?$/.exec(p);
       if(m&&ALLOW[m[1]]){
         var durl=FAPI+m[1]+(m[2]||'');
-        return direct(durl).catch(function(e){fail(e);return orig(input,init);});
+        return direct(durl).then(function(r){return r.status===400?orig(input,init):r;}).catch(function(e){fail(e);return orig(input,init);}); /* 400 (ör. -1121 Invalid symbol: Binance'te olmayan perp) → site proxy (Bybit/OKX/Gate zinciri) */
       }
       if(/^\/api\/klines\?/.test(p)){
         var q=new URLSearchParams(p.split('?')[1]);
@@ -56,6 +56,7 @@
             var perp=/\.P$/i.test(sym), rs=sym.replace(/\.P$/i,'').toUpperCase();
             var durl2=(perp?FAPI:SPOT)+'klines?symbol='+encodeURIComponent(rs)+'&interval='+iv+'&limit='+lim;
             return direct(durl2).then(function(r){
+              if(r.status===400) return orig(input,init); /* sembol Binance'te yok → site proxy */
               if(!r.ok) return r;
               return r.json().then(function(rows){
                 var candles=(rows||[]).map(function(x){return {time:Math.floor(+x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]};});
