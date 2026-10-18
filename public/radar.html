@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>QUANTEX · Radar v5 (taslak)</title>
+<title>QUANTEX · Radar v6 (taslak)</title>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <style>
 :root{--bg:#02060b;--tx:#d9fff4;--mut:#5f8f88;--g:#00ffaa;--r:#ff2e6e;--y:#ffe600;--c:#7dd3fc;--v:#c084fc;--ln:rgba(0,255,170,.16);--f:"JetBrains Mono","IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -23,7 +23,7 @@ select{background:#06121a;color:var(--tx);border:1px solid var(--ln);font:inheri
 #tScan{width:8px;height:8px;border-radius:50%;background:var(--mut)}#tScan.on{background:var(--y);box-shadow:0 0 10px var(--y);animation:bl .8s infinite}@keyframes bl{50%{opacity:.3}}
 #rdStatus{color:var(--mut);font-size:10.5px;max-width:330px}
 .prog{position:absolute;left:0;bottom:-1px;height:2px;width:100%}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--c),var(--v));box-shadow:0 0 10px var(--g);transition:width .4s}
-main{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;grid-template-areas:"pulse hero port" "regime regime brief" "watch mirror brief" "river river brief" "alarm robot brief";grid-template-rows:auto auto auto auto 1fr;gap:12px;padding:12px 14px}
+main{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;grid-template-areas:"pulse hero port" "regime regime brief" "watch mirror brief" "sess contra contra" "stress stress stress" "river river alarm" "robot robot alarm";grid-template-rows:auto auto auto auto auto auto 1fr;gap:12px;padding:12px 14px}
 #cards{display:contents}#cPulse{grid-area:pulse}#hero{grid-area:hero}#cPort{grid-area:port}#cRiver{grid-area:river}#cRobot{grid-area:robot}#cRegime{grid-area:regime}#cBrief{grid-area:brief}#cAlarm{grid-area:alarm}#cdots{display:none}
 .lab,.live{display:inline-block;font-size:8px;letter-spacing:1px;padding:0 4px;border-radius:3px;font-weight:800;vertical-align:1px}.lab{color:#e9d5ff;background:rgba(192,132,252,.22);border:1px solid rgba(192,132,252,.5)}.live{color:#b9ffe6;background:rgba(0,255,170,.14);border:1px solid rgba(0,255,170,.45)}
 #hTools{right:14px;top:12px;display:flex;gap:6px}#hTools .btn{font-size:10.5px;padding:4px 8px}#tbCorr.on{color:#e9d5ff;border-color:rgba(192,132,252,.6);background:rgba(192,132,252,.16);box-shadow:0 0 12px rgba(192,132,252,.3)}#tbTf.on{color:#ffe08a;border-color:rgba(255,200,0,.55);background:rgba(255,200,0,.12)}
@@ -128,6 +128,26 @@ canvas.eq{width:100%;height:34px;display:block;border-radius:6px;background:rgba
 #hPerf{position:absolute;right:14px;bottom:12px;font-size:9.5px;color:var(--mut);pointer-events:none;z-index:3}
 .hk{display:grid;grid-template-columns:110px 1fr;gap:6px 12px;font-size:12px}.hk kbd{justify-self:start;font-size:11px}
 .hb{display:flex;gap:6px;align-items:center}
+
+/* ---- v6 ---- */
+#cContra{grid-area:contra}#cStress{grid-area:stress}#cSess{grid-area:sess}
+.btn.ws{font-size:10px}.btn.ws.on{color:#00ffaa;border-color:rgba(0,255,170,.55);box-shadow:0 0 12px rgba(0,255,170,.25)}.btn.ws.wait{color:#ffb020;border-color:rgba(255,176,32,.5)}.btn.ws.off{color:var(--mut)}
+.t5 .sc{grid-column:1/-1;justify-self:start}.sc{display:inline-block;font-style:normal;font-size:8.5px;font-weight:800;padding:0 4px;border-radius:3px;margin:2px 0 1px;letter-spacing:.3px}.sc.o{color:#ffb020;border:1px dashed rgba(255,176,32,.75)}.sc.k{color:#02060b;background:var(--y)}
+.g3lab .cl.fm{color:#ffd28a}.g3lab .sl.ss{color:rgba(125,211,252,.75);font-size:9px}.g3lab .sl.sb{color:#ffe600}.g3lab .sl.sn{color:#fff;font-weight:800;font-size:10px;text-shadow:0 0 8px #000}
+.qs.qK{color:#ffe27a;border-color:#ffe27a;background:rgba(255,226,122,.12)}
+.kt{display:grid;grid-template-columns:minmax(150px,2.2fr) 64px 40px 50px 50px 60px 30px;gap:3px 8px;align-items:center;font-size:10.5px;margin:6px 0}.kt>small{font-size:8.5px;color:var(--mut)}.kt .kn{grid-row:span 2;font-size:10px;line-height:1.35}.kt .kn b{color:#fff}.kt em{font-style:normal;color:var(--mut)}.kt .kv2{grid-column:1/-1;font-size:10px;padding:0 0 6px;border-bottom:1px dashed rgba(0,255,170,.1)}
+.xt{display:grid;grid-template-columns:90px 70px 44px 70px 80px 70px 80px;gap:3px 10px;align-items:center;font-size:10.5px;margin:8px 0}.xt small{font-size:8.5px;color:var(--mut)}.xt em{font-style:normal;color:var(--mut);font-size:10px}
+#sWrap{display:grid;grid-template-columns:1fr;gap:6px}#sCv{width:250px;height:250px;margin:0 auto}.dot{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px}
+.colb{margin-left:auto;background:none;border:0;color:var(--mut);cursor:pointer;font-size:12px;padding:0 2px}#cards>section.pn>h3{display:flex;align-items:center;gap:8px}#cards>section.pn>h3>span{margin-left:auto}#cards>section.pn>h3>span+.colb{margin-left:4px}
+#cards>section.pn.col>*:not(h3){display:none!important}#cards>section.pn.col{max-height:none;min-height:0;align-self:start}#cards>section.pn.col .colb{transform:rotate(-90deg)}
+body.clean #top5,body.clean #score,body.clean #hLeg,body.clean #rpLog,body.clean #hCorr,body.clean #hTools,body.clean #hTitle .cnt3,body.clean #hPerf{display:none!important}
+body.clean main{grid-template-columns:1fr;grid-template-areas:"hero"}body.clean #cards,body.clean #cdots{display:none!important}body.clean #hero{height:calc(100vh - 86px)}
+body.clean #zTag{display:block}#zTag{display:none;position:absolute;top:14px;right:16px;z-index:4;font-size:10px;color:var(--y);border:1px solid rgba(255,230,0,.4);border-radius:6px;padding:2px 7px;background:rgba(0,0,0,.4)}
+#tour{position:fixed;z-index:70;display:none;background:linear-gradient(160deg,rgba(14,30,40,.97),rgba(4,10,16,.97));border:1px solid rgba(255,230,0,.5);border-radius:12px;padding:10px 12px;font-size:12px;color:var(--tx);box-shadow:0 10px 40px rgba(0,0,0,.6)}#tour.on{display:block}#tour .tn{color:var(--y);font-size:9px;letter-spacing:2px;margin-bottom:4px}
+.tourhl{outline:2px solid var(--y)!important;outline-offset:3px;box-shadow:0 0 30px rgba(255,230,0,.35)!important}
+@media (max-width:1100px){#cSess{order:3}#cContra{order:4}#cStress{order:5}#sWrap{grid-template-columns:1fr}#sCv{margin:0 auto}body.clean #hero{height:calc(100vh - 140px)}}
+@media (max-width:560px){.pn{font-size:12px}.pn .kv,.pn .sm0{font-size:11.5px}.pn .lbl{font-size:10px}.pn h3{font-size:12px}#brTxt{font-size:11.5px}.t5 small,.t5 .ms{font-size:10px}.sc{font-size:9.5px}
+ #wsPill{order:9}.kt{grid-template-columns:1fr 54px 30px 40px 40px 46px 22px;font-size:10px}.kt .kn{grid-column:1/-1;grid-row:auto}.xt{grid-template-columns:58px 44px 30px 54px 54px 1fr;gap:3px 6px;font-size:10px}#xBody .fbt{flex-wrap:wrap}#xBody .fbt .btn{flex:1}#xBody .fbt .sm0{flex-basis:100%}.xt>:nth-child(7n){display:none}#zBtn{display:none}}
 @media (max-width:560px){#kBtn{font-size:0;padding:4px 9px}#kBtn::before{content:'⌕';font-size:13px}#hlpBtn{display:none}}
 @media (max-width:1100px){#cWatch{order:0}#cMirror{order:2}.pgrid{grid-template-columns:1fr}.ovl{padding-top:3vh}#hPerf{display:none}}
 @media (max-width:1100px){main{grid-template-columns:1fr;grid-template-areas:"hero" "cards";padding:8px}#hero{height:74vh;min-height:520px}.tk{margin-left:0;flex-wrap:wrap}#rdStatus{max-width:none}
@@ -142,11 +162,11 @@ canvas.eq{width:100%;height:34px;display:block;border-radius:6px;background:rgba
 </head><body>
 <div id="intro"><div id="iT"></div><div id="iL"></div><div id="iB"><i id="iBar"></i></div><div id="iSkip">TIKLA / ESC → GEÇ</div></div>
 <header>
- <div class="logo">QUANTEX <span>RADAR</span></div><span class="tag">TASLAK v5</span>
+ <div class="logo">QUANTEX <span>RADAR</span></div><span class="tag">TASLAK v6</span>
  <div class="sw"><button data-mode="coin" class="on">Coin</button><button data-mode="bist">BIST</button></div>
  <button class="btn" id="vBtn">2D</button><button class="btn" id="sBtn">🔇 ses</button>
  <label class="mut" id="rdNl">evren <select id="rdN"><option>30</option><option selected>50</option><option>80</option></select></label>
- <button class="btn" id="rdBtn">⟳ Tara</button><button class="btn" id="kBtn" title="Komut paleti (Ctrl+K veya /)">⌕ Ctrl+K</button><button class="btn" id="setBtn" title="Ayarlar (,)">⚙</button><button class="btn" id="hlpBtn" title="Kısayollar (?)">?</button><a class="btn" href="/quantex.html?v=124">← QUANTEX</a>
+ <button class="btn" id="rdBtn">⟳ Tara</button><button class="btn" id="kBtn" title="Komut paleti (Ctrl+K veya /)">⌕ Ctrl+K</button><button class="btn" id="setBtn" title="Ayarlar (,)">⚙</button><button class="btn" id="hlpBtn" title="Kısayollar (?)">?</button><button class="btn" id="zBtn" title="Temiz mod (Z)">Z</button><button class="btn ws off" id="wsPill" title="canlı akış">○ REST</button><a class="btn" href="/quantex.html?v=124">← QUANTEX</a>
  <div class="tk"><span id="tBtc">BTC —</span><span id="tClock"></span><i id="tScan"></i><span id="rdStatus">başlıyor…</span></div>
  <div class="prog"><i id="tProg"></i></div>
 </header>
@@ -163,7 +183,7 @@ canvas.eq{width:100%;height:34px;display:block;border-radius:6px;background:rgba
   <div class="hov" id="rp"><button class="btn hot" id="rpBtn">⏱ ZAMAN MAKİNESİ · son 30 gün</button><button class="btn" id="lgBtn">?</button>
    <div class="rpx"><button class="btn" id="rpPlay">▶</button><input type="range" id="rpS" min="0" max="1" step="0.01" value="0"><span id="rpD">—</span>
     <button class="btn" data-spd="3">½×</button><button class="btn on" data-spd="6">1×</button><button class="btn" data-spd="14">2×</button><button class="btn" id="rpLiveB">● CANLI</button></div></div>
-  <div id="rdTip"></div><div id="hPerf"></div>
+  <div id="rdTip"></div><div id="hPerf"></div><div id="zTag">TEMİZ MOD · Z ile çık</div>
  </section>
  <div id="cards">
   <section class="pn glass" id="cPulse"><h3>Piyasa Nabzı <span>sepet stresi</span></h3>
@@ -180,16 +200,20 @@ canvas.eq{width:100%;height:34px;display:block;border-radius:6px;background:rgba
   <section class="pn glass" id="cBrief"><h3>Günlük brifing <span>şablon · LLM yok</span></h3><div class="fbt" style="margin:0 0 8px"><button class="btn" id="brCopy">Kopyala</button><span class="mut sm0">rejim · adaylar + eksikler · BIST z&lt;−2 · açık pozisyonlar</span></div><pre id="brTxt">veri bekleniyor…</pre></section>
   <section class="pn glass" id="cWatch"><h3>İzleme listesi <span>★ sabit · W</span></h3><div id="wBody"></div></section>
   <section class="pn glass" id="cMirror"><h3>Performans aynası <span>canlı ↔ lab · M</span></h3><div id="mBody"><div class="mut">veri bekleniyor</div></div></section>
+  <section class="pn glass" id="cSess"><h3>Seans saati &amp; likidite <span>TSİ · lab isabeti</span></h3><div id="sWrap"><canvas id="sCv"></canvas><div id="sTxt"></div></div></section>
+  <section class="pn glass" id="cContra"><h3>Kontraryan keşif <span>ön-kayıt · erken/geç</span></h3><div id="kBody"></div></section>
+  <section class="pn glass" id="cStress"><h3>Senaryo stres testi <span>β · acil stop</span></h3><div id="xBody"></div></section>
   <section class="pn glass" id="cAlarm"><h3>Alarm köprüsü <span>opt-in · varsayılan kapalı</span></h3><div id="alBody"></div></section>
  </div>
  <div id="cdots"><i class="on"></i><i></i><i></i><i></i></div>
 </main>
 <div id="rToasts"></div>
+<div id="tour"></div>
 <div class="ovl" id="plan"><div class="glass" id="plBody"></div></div>
 <div class="ovl" id="pal"><div class="glass"><input id="palQ" placeholder="coin / hisse / komut ara…  (↑↓ seç · Enter git · Esc kapat)" autocomplete="off"><div id="palL"></div></div></div>
 <div class="ovl" id="set"><div class="glass"><div class="ph"><b>Ayarlar</b><span>radar_settings_v1</span><button class="btn" id="setX">✕</button></div><div id="setBody"></div></div></div>
 <div class="ovl" id="help"><div class="glass"><div class="ph"><b>Kısayollar</b><button class="btn" id="hlpX">✕</button></div><div class="hk">
 <kbd>Ctrl+K · /</kbd><span>komut paleti — coin/hisseye atla, ☆ ile sabitle</span><kbd>Space</kbd><span>zaman makinesi oynat / duraklat (kapalıysa başlatır)</span><kbd>F</kbd><span>en yakın adaya odaklan</span><kbd>P</kbd><span>odaktaki yakın aday için işlem planı</span>
-<kbd>R</kbd><span>piyasa rejimi paneli</span><kbd>B</kbd><span>günlük brifing</span><kbd>W</kbd><span>izleme listesi</span><kbd>M</kbd><span>performans aynası</span><kbd>,</kbd><span>ayarlar</span><kbd>?</kbd><span>bu yardım</span><kbd>Esc</kbd><span>pencereyi kapat / odaktan çık</span></div></div></div>
-<script src="/radar.js?v=5"></script>
+<kbd>R</kbd><span>piyasa rejimi paneli</span><kbd>B</kbd><span>günlük brifing</span><kbd>W</kbd><span>izleme listesi</span><kbd>M</kbd><span>performans aynası</span><kbd>Z</kbd><span>temiz mod (yalnız galaksi)</span><kbd>,</kbd><span>ayarlar</span><kbd>?</kbd><span>bu yardım</span><kbd>Esc</kbd><span>pencereyi kapat / odaktan çık</span></div></div></div>
+<script src="/radar.js?v=6"></script>
 </body></html>

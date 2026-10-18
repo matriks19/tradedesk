@@ -1,6 +1,7 @@
 /* QUANTEX Radar v4 — "Sinyal Galaksisi" (Three.js + UnrealBloom). Tüm görseller gerçek veriyi kodlar:
    çekirdeğe uzaklık = kurulum yakınlığı · yükseklik = 24s değişim · parlaklık/dönüş = RVOL · renk = OBV akış yönü
    dış torus = son 48 mum OBV akışı · bulutsu = sektör akış genişliği · kuyruklu yıldız = gerçek işlem sonucu (lab çıkış kuralı)
+   v6: seans halkası (giriş saati TSİ başına lab isabeti, şimdi = beyaz yay, BIST açılış/kapanış) · ◌ oluşuyor / ✓ kesinleşti etiketleri.
    v5: izleme listesi halkası (sabitlenen semboller) · performans modu (ölçülen fps'e göre parçacık yoğunluğu / piksel oranı / bloom).
    v4: takımyıldız çizgisi = 7g getiri korelasyonu ρ>0.8 · TF yörüngesi = 1s (camgöbeği) / 4s (mor) yakınlığı, hizalı = altın hale. */
 import * as THREE from 'three';
@@ -48,6 +49,19 @@ export function create(host,opt){
   const PLV=[{d:1,pr:PR,b:true,n:'yüksek'},{d:0.5,pr:Math.min(PR,1.25),b:true,n:'orta'},{d:0.2,pr:1,b:false,n:'düşük'}];
   function applyPerf(l){S.perf.lvl=l;const L=PLV[l];U.uDens.value=L.d;renderer.setPixelRatio(L.pr);U.pr.value=L.pr;comp.setPixelRatio(L.pr);bloom.enabled=L.b;size();}
   function setPerf(m){S.perf.mode=m;S.perf.last=clock();applyPerf(m==='high'?0:m==='low'?2:S.perf.lvl);}
+  // seans halkası (v6)
+  const SR={g:null,now:null,key:'',nkey:''},SRI=[15.6,16.05,16.5],SRW=0.36,SY=-0.7;
+  function hAng(h){return -Math.PI/2+h/24*Math.PI*2;}
+  function setSession(D){if(!D||!D.hr)return;const key=JSON.stringify(D.hr).length+'';if(SR.key!==key){SR.key=key;if(SR.g){scene.remove(SR.g);SR.g.traverse(o=>{if(o.geometry)o.geometry.dispose();});}
+      const pos=[],col=[];['yo6','loxx','bist'].forEach((leg,li)=>{const r1=SRI[li],r2=r1+SRW;for(let h=0;h<24;h++){const a=D.hr[leg][h],n=a[0],wr=n?a[1]/n:0,c=new THREE.Color();if(n)c.setHSL(0.333*Math.max(0,Math.min(1,(wr-0.3)/0.6)),1,0.5).multiplyScalar(0.08+0.30*Math.min(1,n/15));else c.setRGB(0.015,0.02,0.025);
+        const S=6;for(let q=0;q<S;q++){const a0=hAng(h+q/S+0.02),a1=hAng(h+(q+1)/S-(q===S-1?0.04:0));const P=[[r1,a0],[r2,a0],[r2,a1],[r1,a0],[r2,a1],[r1,a1]];for(const [r,a] of P){pos.push(Math.cos(a)*r,SY,Math.sin(a)*r);col.push(c.r,c.g,c.b);}}}});
+      const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));g.setAttribute('color',new THREE.Float32BufferAttribute(col,3));
+      SR.g=new THREE.Group();SR.g.add(new THREE.Mesh(g,new THREE.MeshBasicMaterial({vertexColors:true,transparent:true,opacity:0.9,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false})));
+      const tk=[];for(const h of [10,18]){const a=hAng(h);tk.push(Math.cos(a)*15.2,SY,Math.sin(a)*15.2,Math.cos(a)*17.4,SY,Math.sin(a)*17.4);}const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute(tk,3));SR.g.add(new THREE.LineSegments(tg,new THREE.LineBasicMaterial({color:0xffe600})));
+      scene.add(SR.g);}
+    const nk=D.now+':'+D.min;if(SR.nkey!==nk){SR.nkey=nk;if(SR.now){SR.g.remove(SR.now);SR.now.geometry.dispose();}const p=[];for(let q=0;q<=12;q++){const a=hAng(D.now+q/12);p.push(new THREE.Vector3(Math.cos(a)*17.0,SY,Math.sin(a)*17.0));}const an=hAng(D.now+D.min/60);
+      const g=new THREE.BufferGeometry().setFromPoints(p.concat([new THREE.Vector3(Math.cos(an)*15.0,SY,Math.sin(an)*15.0),new THREE.Vector3(Math.cos(an)*17.6,SY,Math.sin(an)*17.6)]));SR.now=new THREE.Line(g,new THREE.LineBasicMaterial({color:0xffffff}));SR.g.add(SR.now);}
+    SR.D=D;}
   // izleme listesi halkaları
   const PINC=16,PSEG=32;const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(PINC*PSEG*6),3));pg.setDrawRange(0,0);
   const pinL=new THREE.LineSegments(pg,new THREE.LineBasicMaterial({color:0xffe27a,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));pinL.frustumCulled=false;scene.add(pinL);
@@ -88,7 +102,7 @@ export function create(host,opt){
     if(S.asmT0===null&&info.assemble!==false)S.asmT0=clock();if(info.assemble===false)U.uAsm.value=1;}
   // kare durumu (canlı ya da geri oynatma imleci)
   function setFrame(F){for(let k=0;k<S.n;k++){const f=F.c[k],d=S.syms[k];if(!f)continue;const r=R0+(RM-R0)*Math.max(0,Math.min(1,f.r)),y=(isFinite(f.ch)?Math.max(-15,Math.min(15,f.ch)):0)/15*3.2,T=S.tgt[k];
-      T.p.set(Math.cos(d.a)*r,y,Math.sin(d.a)*r);T.col.copy(flowCol(f.up,f.fl));const rv=Math.max(0.2,Math.min(isFinite(f.rv)?f.rv:1,6));T.br=0.45+0.55*Math.sqrt(rv/6);T.spin=0.15+0.25*rv;T.sz=0.75+0.45*Math.sqrt(rv/6);T.r=f.r;T.ch=f.ch;T.r1=f.r1;T.r4=f.r4;T.al=!!f.al;}
+      T.p.set(Math.cos(d.a)*r,y,Math.sin(d.a)*r);T.col.copy(flowCol(f.up,f.fl));const rv=Math.max(0.2,Math.min(isFinite(f.rv)?f.rv:1,6));T.br=0.45+0.55*Math.sqrt(rv/6);T.spin=0.15+0.25*rv;T.sz=0.75+0.45*Math.sqrt(rv/6);T.r=f.r;T.ch=f.ch;T.r1=f.r1;T.r4=f.r4;T.al=!!f.al;T.fs=f.fs||'';}
     S.corr=F.corr||null;
     if(F.tor){const tc=S.geo.attributes.tcol,tb=S.geo.attributes.tb;for(let q=0;q<S.torusMap.length;q++){const [k,j]=S.torusMap[q],a=F.tor[k];if(!a)continue;const v=a[j],pv=j>0?a[j-1]:NaN,ix=S.torusStart+q;
         if(!isFinite(v)||!isFinite(pv)){tc.setXYZ(ix,0.1,0.1,0.12);tb.setX(ix,0.15);continue;}const cl=flowCol(v>pv,v);tc.setXYZ(ix,cl.r,cl.g,cl.b);tb.setX(ix,j===S.TL-1?1.1:0.3+0.45*Math.min(1,Math.abs(v)/1.5));}tc.needsUpdate=true;tb.needsUpdate=true;}
@@ -97,11 +111,13 @@ export function create(host,opt){
   function fire(k){S.fx.push({k,t0:clock()});}
   // HTML etiketleri
   const lab=document.createElement('div');lab.className='g3lab';host.appendChild(lab);
-  function labels(){const W=host.clientWidth,H=host.clientHeight,v=new THREE.Vector3();let h='';
+  function labels(){const W=host.clientWidth,H=host.clientHeight,v=new THREE.Vector3();let h='';const labelsH=[];
     if(!S.focus)S.sectors.forEach(s=>{const am=(s.a0+s.a1)/2;v.set(Math.cos(am)*(TOR+TUBE+1.6),0.2,Math.sin(am)*(TOR+TUBE+1.6)).project(cam);if(v.z<1)h+=`<span class="sl" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${s.nm} ${s.n}</span>`;});
-    S.syms.forEach((d,k)=>{const c=S.cur[k],T=S.tgt[k];const pn=S.pin.indexOf(k)>=0;if(!(T.r<0.5||d.top||S.focus===k||pn))return;v.copy(c.p).project(cam);if(v.z<1&&U.uAsm.value>0.9)h+=`<span class="cl${T.r<0.05?' f':''}${S.focus===k?' fo':''}${pn?' pn':''}" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${pn?'★ ':''}${d.b}</span>`;});
+    S.syms.forEach((d,k)=>{const c=S.cur[k],T=S.tgt[k];const pn=S.pin.indexOf(k)>=0;if(!(T.r<0.5||d.top||S.focus===k||pn))return;v.copy(c.p).project(cam);if(v.z<1&&U.uAsm.value>0.9)h+=`<span class="cl${T.r<0.05?' f':''}${S.focus===k?' fo':''}${pn?' pn':''}${T.fs==='o'?' fm':''}" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${pn?'★ ':''}${d.b}${T.fs==='k'&&T.r<0.05?' ✓':T.fs==='o'?' ◌':''}</span>`;});
+    if(!S.focus&&SR.D&&!S.opt.noSess){for(const [hh,t,r] of [[0,'00',17.9],[6,'06',17.9],[12,'12',17.9],[18,'18',17.9],[10,'BIST açılış 10:00',18.7],[18,'BIST kapanış 18:00',18.9]]){const a=hAng(hh);v.set(Math.cos(a)*r,SY,Math.sin(a)*r).project(cam);if(v.z<1)labelsH.push(`<span class="sl ss${t.length>3?' sb':''}" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H+(t.indexOf('kapan')>0?12:0)}px">${t}</span>`);}
+      const a=hAng(SR.D.now+SR.D.min/60);v.set(Math.cos(a)*19.2,SY,Math.sin(a)*19.2).project(cam);if(v.z<1)labelsH.push(`<span class="sl sn" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">şimdi ${String(SR.D.now).padStart(2,'0')}:${String(SR.D.min).padStart(2,'0')} TSİ</span>`);}
     if(!S.focus)[['ateşliyor',0.25],['yakın',0.5],['izlemede',0.75],['uzak',1]].forEach(([t,q])=>{v.set(0,0,R0+(RM-R0)*q).project(cam);if(v.z<1)h+=`<span class="rl" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${t}</span>`;});
-    lab.innerHTML=h;}
+    lab.innerHTML=h+labelsH.join('');}
   // etkileşim
   const ray=new THREE.Raycaster();ray.params.Points.threshold=0.6;const m2=new THREE.Vector2();let downAt=null;
   function pick(e){const b=renderer.domElement.getBoundingClientRect();m2.set((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1);ray.setFromCamera(m2,cam);if(!S.hit)return -1;const hs=ray.intersectObject(S.hit);return hs.length?hs[0].index:-1;}
@@ -129,7 +145,7 @@ export function create(host,opt){
       U.uC.value[k].set(c.p.x,c.p.y,c.p.z,c.spin);U.uS.value[k].set(c.col.r,c.col.g,c.col.b,c.br);
       sp[k*6]=c.p.x;sp[k*6+1]=0;sp[k*6+2]=c.p.z;sp[k*6+3]=c.p.x;sp[k*6+4]=c.p.y;sp[k*6+5]=c.p.z;const up=(T.ch||0)>=0;for(let q=0;q<2;q++){scol[k*6+q*3]=up?0:1;scol[k*6+q*3+1]=up?1:0.24;scol[k*6+q*3+2]=up?0.55:0.47;}
       hp[k*3]=c.p.x;hp[k*3+1]=c.p.y;hp[k*3+2]=c.p.z;
-      const fireNow=T.r<0.05,near=T.r<0.35,pul=fireNow?0.6+0.4*Math.sin(t*6):near?0.18+0.08*Math.sin(t*2):0;bp[k*6]=c.p.x;bp[k*6+1]=c.p.y;bp[k*6+2]=c.p.z;bp[k*6+3]=0;bp[k*6+4]=0;bp[k*6+5]=0;
+      const fireNow=T.fs==='k'||(T.fs!=='o'&&T.r<0.05),near=T.r<0.35,pul=fireNow?0.6+0.4*Math.sin(t*6):near?0.18+0.08*Math.sin(t*2):0;bp[k*6]=c.p.x;bp[k*6+1]=c.p.y;bp[k*6+2]=c.p.z;bp[k*6+3]=0;bp[k*6+4]=0;bp[k*6+5]=0;
       const bcol=fireNow?[1,0.9,0]:[0.49,0.83,0.99];for(let q=0;q<2;q++){bc[k*6+q*3]=bcol[0]*pul*(q?0.25:1);bc[k*6+q*3+1]=bcol[1]*pul*(q?0.25:1);bc[k*6+q*3+2]=bcol[2]*pul*(q?0.25:1);}}
     if(S.stems){S.stems.geometry.attributes.position.needsUpdate=true;S.stems.geometry.attributes.color.needsUpdate=true;S.hit.geometry.attributes.position.needsUpdate=true;S.beams.geometry.attributes.position.needsUpdate=true;S.beams.geometry.attributes.color.needsUpdate=true;S.hit.geometry.computeBoundingSphere();}
     // ateşleme efektleri: genişleyen halka (parçacık) + ışın
@@ -170,6 +186,6 @@ export function create(host,opt){
   function loop(){renderer.setAnimationLoop(S.running&&!opt.capture?frame:null);}loop();
   document.addEventListener('visibilitychange',()=>{S.running=!document.hidden;loop();});
   function setOpts(o){S.opt=Object.assign({},S.opt,o||{});}
-  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
+  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,setSession,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
     orbit(az){const r=Math.hypot(cam.position.x-ctl.target.x,cam.position.z-ctl.target.z);cam.position.x=ctl.target.x+Math.sin(az)*r;cam.position.z=ctl.target.z+Math.cos(az)*r;},
     dispose(){renderer.setAnimationLoop(null);renderer.dispose();host.removeChild(renderer.domElement);host.removeChild(lab);}};}
