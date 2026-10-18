@@ -3,7 +3,8 @@
            fetch('/api/klines?...exchange=binance...') → fapi (".P") / data-api.binance.vision (spot)
    Ayar: localStorage.qx_coin_src = 'direct' (varsayılan) | 'proxy'.
    Direkt istek başarısız (CORS/ağ/451) → 10 dk boyunca otomatik sunucu proxy'si. 400 (Binance'te olmayan sembol) → o istek site proxy'sinden.
-   418/429 → ban süresince Binance'e istek yok; 429 + Retry-After döner (proxy'ye YÜK AKTARILMAZ).
+   418/429 → ban süresince Binance'e istek yok; istekler site proxy'sine (Bybit/OKX/Gate zinciri) aktarılır, ≤4 istek/sn + eşzamanlılık 4.
+   Ban süresi sekme boyunca sessionStorage.qx_direct_ban ile paylaşılır (iframe/yenilemede Binance tekrar denenmez).
    Eşzamanlılık 4; X-MBX-USED-WEIGHT-1M okunabilirse limitin %60'ında dakika sonuna kadar bekler.
    İmzalı/emir istekleri (/api/exchange) etkilenmez. */
 (function(){
@@ -12,7 +13,10 @@
   var FAPI='https://fapi.binance.com/fapi/v1/', SPOT='https://data-api.binance.vision/api/v3/';
   var ALLOW={klines:1,'ticker/24hr':1,'ticker/price':1,exchangeInfo:1,ping:1,time:1,premiumIndex:1};
   var NATIVE={'1m':1,'3m':1,'5m':1,'15m':1,'30m':1,'1h':1,'2h':1,'4h':1,'6h':1,'8h':1,'12h':1,'1d':1,'3d':1,'1w':1,'1M':1};
-  var st={broken:0,ban:0,w:0,wmin:0,active:0,q:[],n:0,fail:0,lastErr:''};
+  var st={broken:0,ban:0,w:0,wmin:0,active:0,q:[],n:0,fail:0,lastErr:'',viaProxy:0};
+  try{var sb=+sessionStorage.getItem('qx_direct_ban')||0;if(sb>Date.now())st.ban=sb;}catch(e){}
+  var plast=0;function setBan(t){st.ban=t;try{sessionStorage.setItem('qx_direct_ban',String(t));}catch(e){}try{console.warn('[QX direct] Binance tarayıcı IP engeli → '+new Date(t).toLocaleTimeString('tr-TR')+' saatine kadar site proxy kullanılıyor');}catch(_){}}
+  async function proxied(input,init){var t=Math.max(Date.now(),plast+250);plast=t;if(t>Date.now())await sleep(t-Date.now());await acq();try{st.viaProxy++;return await orig(input,init);}finally{rel();}}
   window.QX_DIRECT={state:st,mode:mode,setMode:function(m){try{localStorage.setItem('qx_coin_src',m==='proxy'?'proxy':'direct');}catch(e){} st.broken=0;}};
   function mode(){try{return localStorage.getItem('qx_coin_src')==='proxy'?'proxy':'direct';}catch(e){return 'direct';}}
   function usable(){return mode()==='direct'&&Date.now()>st.broken;}
@@ -30,7 +34,7 @@
       var r=await orig(url,{cache:'no-store'});
       var w=+(r.headers.get('x-mbx-used-weight-1m')||NaN); if(isFinite(w)){st.w=w;st.wmin=Math.floor(Date.now()/60000);}
       if(r.status===418||r.status===429){
-        var ra=+(r.headers.get('retry-after')||0); st.ban=Date.now()+Math.max(r.status===418?120:60,ra||0)*1000; return banResp();
+        var ra=+(r.headers.get('retry-after')||0); setBan(Date.now()+Math.min(6*3600,Math.max(r.status===418?600:60,ra||0))*1000); return banResp();
       }
       if(r.status===451||r.status===403){ throw new Error('bölge '+r.status); }
       st.n++; return r;
@@ -45,7 +49,8 @@
       var m=/^\/api\/fapi\/v1\/([a-zA-Z/0-9]+)(\?.*)?$/.exec(p);
       if(m&&ALLOW[m[1]]){
         var durl=FAPI+m[1]+(m[2]||'');
-        return direct(durl).then(function(r){return r.status===400?orig(input,init):r;}).catch(function(e){fail(e);return orig(input,init);}); /* 400 (ör. -1121 Invalid symbol: Binance'te olmayan perp) → site proxy (Bybit/OKX/Gate zinciri) */
+        if(Date.now()<st.ban) return proxied(input,init);
+        return direct(durl).then(function(r){return (r.status===400||(r.status===429&&Date.now()<st.ban))?(r.status===400?orig(input,init):proxied(input,init)):r;}).catch(function(e){fail(e);return orig(input,init);}); /* 400 (ör. -1121 Invalid symbol: Binance'te olmayan perp) → site proxy (Bybit/OKX/Gate zinciri) */
       }
       if(/^\/api\/klines\?/.test(p)){
         var q=new URLSearchParams(p.split('?')[1]);
@@ -55,8 +60,10 @@
           if(iv){
             var perp=/\.P$/i.test(sym), rs=sym.replace(/\.P$/i,'').toUpperCase();
             var durl2=(perp?FAPI:SPOT)+'klines?symbol='+encodeURIComponent(rs)+'&interval='+iv+'&limit='+lim;
+            if(Date.now()<st.ban) return proxied(input,init);
             return direct(durl2).then(function(r){
               if(r.status===400) return orig(input,init); /* sembol Binance'te yok → site proxy */
+              if(r.status===429&&Date.now()<st.ban) return proxied(input,init); /* Binance engeli → site proxy */
               if(!r.ok) return r;
               return r.json().then(function(rows){
                 var candles=(rows||[]).map(function(x){return {time:Math.floor(+x[0]/1000),open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]};});
