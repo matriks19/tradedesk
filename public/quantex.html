@@ -963,6 +963,7 @@ body.qx-izleme-on{overflow:hidden}
     <button class="nb qx-nb-izleme" id="qxNavIzleme" onclick="switchMainTab(&#39;izleme&#39;,this)">📡 İzleme</button>
     <button class="nb qx-nb-bist" id="qxNavBist" onclick="switchMainTab(&#39;bist&#39;,this)">📈 İzleme BIST</button>
     <button class="nb qx-nb-bot" id="qxNavBot" onclick="switchMainTab(&#39;robot&#39;,this)">🤖 Robot Bağla</button>
+    <a class="nb" id="qxNavRadar" style="text-decoration:none" href="/radar.html" target="_blank" rel="noopener" title="Sinyal radarı (taslak)">🛰 Radar</a>
     <button class="nb" onclick="notify(&#39;Portföy Faz 3&#39;,&#39;info&#39;)">Portföy</button>
   <button class="nb" id="navHelpBtn">Sözlük</button><button class="nb">Geçmiş</button></nav>
   <div class="hdr-r">
@@ -19904,4 +19905,9 @@ window.QX_BOT={addSource,get cfg(){return cfg;},get state(){return st;},killAll}
   chk(); setInterval(chk,60000);
 })();
 </script>
+<script>/* Radar derin bağlantı: #ac=coin:BTCUSDT | #ac=bist:THYAO → ilgili İzleme sekmesinde grafiği açar */
+(function(){function go(){var m=/[#&]ac=(coin|bist):([A-Za-z0-9._-]+)/.exec(location.hash||'');if(!m)return;var bist=m[1]==='bist',sym=decodeURIComponent(m[2]).toUpperCase(),tries=0;
+ try{window.switchMainTab(bist?'bist':'izleme',document.getElementById(bist?'qxNavBist':'qxNavIzleme'));}catch(e){}
+ var iv=setInterval(function(){tries++;try{var f=document.getElementById(bist?'qxBistFrame':'qxIzlemeFrame'),w=f&&f.contentWindow;if(w&&typeof w.qxOpenChart==='function'&&w.document.readyState==='complete'){clearInterval(iv);w.qxOpenChart(sym);}}catch(e){}if(tries>120)clearInterval(iv);},250);}
+ function later(){setTimeout(go,700);}if(document.readyState==='complete')later();else window.addEventListener('load',later);window.addEventListener('hashchange',go);})();</script>
 </body></html>

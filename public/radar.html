@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>QUANTEX · Radar (taslak)</title>
+<style>
+:root{--bg:#04080d;--pn:#07111a;--ln:rgba(0,255,170,.18);--tx:#d6fff2;--mut:#5f8f86;--g:#00ff8c;--r:#ff3c5a;--y:#ffe600;--c:#7dd3fc}
+*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--tx);font:13px/1.4 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+body{background:radial-gradient(1200px 700px at 50% 40%,rgba(0,255,170,.06),transparent 60%),var(--bg);min-height:100vh}
+a{color:inherit;text-decoration:none}
+header{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--ln)}
+header h1{margin:0;font-size:16px;letter-spacing:3px;color:var(--g);text-shadow:0 0 12px rgba(0,255,140,.6)}
+.tag{border:1px solid var(--y);color:var(--y);padding:1px 6px;border-radius:3px;font-size:10px;letter-spacing:1px}
+.sw{display:flex;border:1px solid var(--ln);border-radius:4px;overflow:hidden}.sw button{background:none;border:0;color:var(--mut);padding:5px 10px;font:inherit;cursor:pointer}.sw button.on{background:rgba(0,255,170,.15);color:var(--g)}
+.btn{background:rgba(0,255,170,.08);border:1px solid var(--ln);color:var(--g);padding:5px 10px;border-radius:4px;font:inherit;cursor:pointer}.btn:disabled{opacity:.4}
+select{background:var(--pn);color:var(--tx);border:1px solid var(--ln);font:inherit;padding:4px}
+#rdStatus{color:var(--mut);font-size:11px;flex:1;min-width:200px;text-align:right}
+main{display:grid;grid-template-columns:300px 1fr 330px;grid-template-rows:auto auto;gap:12px;padding:12px 16px}
+.pn{background:linear-gradient(180deg,rgba(7,17,26,.95),rgba(4,10,16,.95));border:1px solid var(--ln);border-radius:6px;padding:12px;box-shadow:inset 0 0 30px rgba(0,255,170,.04);min-width:0}
+.pn h3{margin:0 0 10px;font-size:11px;letter-spacing:2px;color:var(--c);text-transform:uppercase;display:flex;justify-content:space-between}
+.pn h3 span{color:var(--mut);letter-spacing:0;text-transform:none}
+#cRadar{display:flex;flex-direction:column;align-items:center}
+#rdWrap{position:relative;width:100%;height:min(64vh,640px);display:flex;justify-content:center;align-items:center}
+#rdTip{position:absolute;display:none;background:rgba(2,8,12,.96);border:1px solid var(--g);padding:8px 10px;border-radius:4px;font-size:11px;pointer-events:none;z-index:5;max-width:260px;box-shadow:0 0 16px rgba(0,255,140,.25)}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;color:var(--mut);justify-content:center;margin-top:6px}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+.kv{display:flex;justify-content:space-between;gap:8px;padding:3px 0;border-bottom:1px dashed rgba(0,255,170,.08)}.kv span{color:var(--mut)}
+.lbl{color:var(--c);font-size:10px;letter-spacing:1px;margin:10px 0 4px;text-transform:uppercase}
+.g{color:var(--g)}.r{color:var(--r)}.y{color:var(--y)}.mut{color:var(--mut)}.sm{font-size:10px;margin-top:8px}
+canvas.gauge{width:100%;height:110px;display:block}canvas.sp{width:100%;height:36px;display:block}
+.state{margin:8px 0;padding:6px;text-align:center;border-radius:4px;font-weight:bold;letter-spacing:1px;font-size:11px}
+.state.calm{border:1px solid var(--ln);color:var(--mut)}.state.hot{border:1px solid var(--y);color:var(--y);box-shadow:0 0 14px rgba(255,230,0,.25)}
+.bar{position:relative;height:16px;background:rgba(255,60,90,.25);border-radius:3px;overflow:hidden}.bar i{position:absolute;inset:0 auto 0 0;background:rgba(0,255,140,.55)}.bar em{position:relative;font-style:normal;font-size:10px;padding-left:6px;line-height:16px}
+.heat{display:grid;grid-template-columns:repeat(auto-fill,minmax(9px,1fr));gap:2px}.heat a{height:14px;border-radius:1px}
+.leg{border:1px solid rgba(0,255,170,.12);border-radius:5px;padding:8px;margin-bottom:10px}
+.leg h4{margin:0 0 6px;font-size:12px;color:var(--g)}.leg h4 small{color:var(--mut);font-weight:normal;margin-left:4px}
+.bdg{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px}.bdg span{font-size:10px;border:1px solid var(--ln);padding:1px 5px;border-radius:10px;color:var(--mut)}.bdg span b{color:var(--y)}
+.cnt{font-size:11px;color:var(--mut);margin-bottom:4px}.cnt b{color:var(--tx)}
+.sig{display:grid;grid-template-columns:70px 1fr auto;gap:6px;padding:3px 4px;border-radius:3px;font-size:11px}.sig:hover{background:rgba(0,255,170,.08)}.sig b{color:var(--g)}.sig span{color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.sig em{color:var(--mut);font-style:normal}
+#bot{grid-column:1/-1;display:grid;grid-template-columns:1fr 360px;gap:12px}
+#rdTape{overflow:hidden;white-space:nowrap;mask-image:linear-gradient(90deg,transparent,#000 4%,#000 96%,transparent)}
+.tr{display:inline-block;animation:tape 60s linear infinite}.tr:hover{animation-play-state:paused}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+.ti{display:inline-block;margin-right:22px;padding:4px 8px;border-left:3px solid var(--c);background:rgba(255,255,255,.02)}.ti b{color:var(--c)}.ti em{color:var(--mut);font-style:normal;margin-left:4px}.ti i{color:#000;background:var(--y);font-style:normal;font-size:9px;padding:0 3px;margin-right:4px;border-radius:2px}
+.ti{border-left-color:var(--c)}.ti b{color:var(--c)}
+#rdRobot{display:grid;grid-template-columns:1fr 1fr;gap:8px}.rb h5{margin:0 0 4px;color:var(--c);font-size:11px}.op{display:inline-block;font-size:10px;border:1px solid var(--ln);border-radius:3px;padding:0 4px;margin:2px 2px 0 0}
+#rdRobot .sm{grid-column:1/-1}
+#rdCount{font-size:12px;color:var(--mut)}
+@media (max-width:1100px){main{grid-template-columns:1fr}#bot{grid-template-columns:1fr}#cRadar{order:-1}#rdWrap{height:auto}}
+@media (prefers-reduced-motion:reduce){.tr{animation:none}}
+</style>
+<script src="/qx-direct.js?v=124"></script>
+</head><body>
+<header>
+ <h1>◎ QUANTEX RADAR</h1><span class="tag">TASLAK</span>
+ <div class="sw"><button data-mode="coin" class="on">Coin</button><button data-mode="bist">BIST</button></div>
+ <label class="mut">evren <select id="rdN"><option>30</option><option selected>50</option><option>80</option></select></label>
+ <button class="btn" id="rdBtn">⟳ Tara</button>
+ <a class="btn" href="/quantex.html?v=124">← QUANTEX</a>
+ <div id="rdStatus">başlıyor…</div>
+</header>
+<main>
+ <section class="pn" id="cPulse"><h3>Piyasa Nabzı <span id="rdPT"></span></h3><div id="rdPulse"></div></section>
+ <section class="pn" id="cRadar"><h3 style="width:100%">Sinyal Radarı <span id="rdCount"></span></h3>
+  <div class="mut" id="rdModeLbl" style="font-size:11px"></div>
+  <div id="rdWrap"><canvas id="rdCv"></canvas><div id="rdTip"></div></div>
+  <div class="legend"><span>merkez = kurulum şimdi ateşliyor</span><span><i style="background:var(--g)"></i>OBV akışı yükseliyor</span><span><i style="background:var(--r)"></i>düşüyor</span><span>nokta boyu = RVOL (1s, 20 mum)</span><span>açı = sektör</span><span><i style="background:none;border:2px solid var(--y)"></i>AL / üçgen / z kesişimi</span></div>
+ </section>
+ <section class="pn" id="cPort"><h3>Portföy A · canlı <span>laboratuvar rozetli</span></h3><div id="rdPort"></div></section>
+ <div id="bot">
+  <section class="pn"><h3>Alarm şeridi <span id="rdTapeN"></span></h3><div id="rdTape"></div></section>
+  <section class="pn"><h3>Kağıt robot <span>sadece okuma</span></h3><div id="rdRobot"></div></section>
+ </div>
+</main>
+<script src="/radar.js?v=1"></script>
+</body></html>
