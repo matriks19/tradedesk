@@ -325,7 +325,7 @@ function fmtT(t){return new Date(t).toLocaleString('tr-TR',{timeZone:'Europe/Ist
 function pct(x,d){return isFinite(x)?(x>=0?'+':'')+(x*100).toFixed(d==null?1:d)+'%':'—';}
 function usd(x){return isFinite(x)?(x>=0?'+$':'−$')+Math.abs(x).toFixed(1):'—';}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function chartUrlS(mode,sym){return '/quantex.html?v=125#ac='+mode+':'+encodeURIComponent(sym);}
+function chartUrlS(mode,sym){return '/quantex.html?v=126#ac='+mode+':'+encodeURIComponent(sym);}
 function chartUrl(c){return chartUrlS(ST.mode==='bist'?'bist':'coin',c.sym);}
 function cur(){return ST.mode==='bist'?ST.bist:ST.coins;}
 function hidpi(cv){var dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}var g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);return {g:g,w:w,h:h};}
