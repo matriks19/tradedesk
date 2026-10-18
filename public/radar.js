@@ -143,10 +143,10 @@ function evrenSel(u,N){if(evrenMode()==='lab37'&&typeof LAB37!=='undefined'){var
 async function scanCoins(N){
   status('Binance 24s özet alınıyor…');
   var tk=await getJSON('/api/fapi/v1/ticker/24hr');
-  var u=tk.filter(function(x){return /USDT$/.test(x.symbol)&&!STABLE.test(x.symbol)&&+x.quoteVolume>0&&+x.count>0;}).sort(function(a,b){return b.quoteVolume-a.quoteVolume;});
+  var u=tk.filter(function(x){return /USDT$/.test(x.symbol)&&!STABLE.test(x.symbol)&&+x.quoteVolume>0&&(x.count==null||+x.count>0);}).sort(function(a,b){return b.quoteVolume-a.quoteVolume;});
   var info=null;try{info=await getJSON('/api/fapi/v1/exchangeInfo');}catch(e){}
   if(info&&info.symbols){var ok={};info.symbols.forEach(function(s){if(s.status==='TRADING'&&s.contractType==='PERPETUAL')ok[s.symbol]=1;});u=u.filter(function(x){return ok[x.symbol];});}
-  u=evrenSel(u,N);var out=[],done=0;
+  u=evrenSel(u,N);if(!u.length)throw new Error('coin listesi boş geldi (ticker '+(tk&&tk.length||0)+' satır) — veri kaynağı yanıtı beklenen biçimde değil');var out=[],done=0;
   await pool(u,4,async function(x){var s=x.symbol;
     var r4=await getJSON('/api/fapi/v1/klines?symbol='+s+'&interval=4h&limit=500');
     var r1=await getJSON('/api/fapi/v1/klines?symbol='+s+'&interval=1h&limit=1500');
@@ -1685,4 +1685,17 @@ function init11(){if(init11.done)return;init11.done=1;var s=uiLoad();VW11.basit=
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init11);else init11();
 window.QX_V11.view=function(v){if(v)vw11Set(v==='basit',true);return VW11.basit?'basit':'gelismis';};window.QX_V11.list=function(on){lv11Toggle(on);return LV11.on;};window.QX_V11.sent=function(sym){var k=kOfSym(sym);return k==null||!FR?null:sent11(LAY.dots[k].c,FR.c[k]);};
 window.QX_V11.states=function(){if(!FR)return null;var o={};LAY.dots.forEach(function(d,k){var f=FR.c[k];if(f)o[d.c.b]={durum:ST11[f.st11].nm,r:+(+f.r).toFixed(3),rp:f.rp==null?null:+(+f.rp).toFixed(3),dir:f.dir,z:f.stx?+f.stx.z.toFixed(2):null,rsi:f.stx?+f.stx.rsi.toFixed(1):null};});return o;};window.QX_V11.lbr=function(){var S=G.api&&G.api.state;if(!S||!S.lbr)return [];var b=$("hero3d").getBoundingClientRect();return S.lbr.map(function(r){return {k:r.k,b:LAY.dots[r.k].c.b,x:b.left+(r.x0+r.x1)/2,y:b.top+(r.y0+r.y1)/2};});};window.QX_V11.qsym=function(){return document.querySelectorAll('.qsym').length;};
+/* ---- v128: Binance WS bu ağdan kapalıysa → REST yoklama (site yedeği üzerinden, 60 sn'de 1 istek) ---- */
+var WP={on:false,t:0,last:0,n:0,err:''};
+var _wsRetry128=wsRetry;wsRetry=function(cn,why){if(!WSS.stopped&&!cn.openAt&&cn.att>=2&&!WP.on){WP.on=true;wsLog('Binance akışı bu ağdan açılamıyor → REST yoklama (60 sn) · akış 10 dk\'da bir yeniden denenir');wpStart();}
+  if(WP.on&&!WSS.stopped){cn.att++;WSS.reconn++;cn.state='bekliyor';clearTimeout(cn.rt);cn.rt=setTimeout(function(){wsOpen(cn);},10*60000);return;}return _wsRetry128(cn,why);};
+function wpStart(){if(WP.t)return;wpPoll();WP.t=setInterval(wpPoll,60000);}
+async function wpPoll(){if(!WP.on){clearInterval(WP.t);WP.t=0;return;}if(wsLive()){WP.on=false;clearInterval(WP.t);WP.t=0;wsLog('akış açıldı → REST yoklama durdu');return;}if(document.hidden||ST.busy||ST.mode!=='coin')return;
+  try{var tk=await getJSON('/api/fapi/v1/ticker/24hr'),m={};(tk||[]).forEach(function(x){m[x.symbol]=x;});var n=0;
+    ST.coins.forEach(function(c){var x=m[c.sym];if(!x)return;var p=+x.lastPrice,ch=+x.priceChangePercent;if(isFinite(p)){c.px=p;n++;}if(isFinite(ch))c.ch=ch;});
+    var b=m.BTCUSDT;if(b&&isFinite(+b.lastPrice)){var el=$('tBtc');if(el)el.innerHTML='<small>BTC</small> <b>'+(+b.lastPrice).toLocaleString('tr-TR',{maximumFractionDigits:1})+'</b> <span class="'+(+b.priceChangePercent>=0?'g':'r')+'">'+(+b.priceChangePercent>=0?'+':'')+(+b.priceChangePercent).toFixed(2)+'%</span> <small>REST</small>';}
+    WP.last=Date.now();WP.n++;WP.err='';try{pushFrame();}catch(e){}}catch(e){WP.err=String(e&&e.message||e);}}
+var _wsTick128=wsTick;wsTick=function(){_wsTick128.apply(this,arguments);if(!WP.on)return;var el=$('wsPill');if(!el)return;var a=WP.last?Math.round((Date.now()-WP.last)/1000):null;
+  el.textContent='↻ REST yoklama'+(a!=null?' · '+a+' sn önce':'')+(WP.err?' · hata':'');el.title='Binance canlı akışı (WebSocket) bu ağdan/IP\'den açılamıyor. Fiyatlar 60 sn\'de bir site yedeği (Bybit/OKX) üzerinden yenileniyor; mumlar 15 dk\'da bir tam tarama ile kesinleşir. '+(WP.err?'Son hata: '+WP.err:'');};
+window.QX_V128={poll:function(){return {on:WP.on,last:WP.last,n:WP.n,err:WP.err};}};
 })();
