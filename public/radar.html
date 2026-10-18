@@ -23,8 +23,8 @@ select{background:#06121a;color:var(--tx);border:1px solid var(--ln);font:inheri
 #tScan{width:8px;height:8px;border-radius:50%;background:var(--mut)}#tScan.on{background:var(--y);box-shadow:0 0 10px var(--y);animation:bl .8s infinite}@keyframes bl{50%{opacity:.3}}
 #rdStatus{color:var(--mut);font-size:10.5px;max-width:330px}
 .prog{position:absolute;left:0;bottom:-1px;height:2px;width:100%}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--c),var(--v));box-shadow:0 0 10px var(--g);transition:width .4s}
-main{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;grid-template-areas:"pulse hero port" "regime regime brief" "watch mirror brief" "health health daily" "clust clust daily" "oto oto oto" "rmap rmap rmap" "evr evr evr" "cap cap cap" "wf wf wf" "port port port" "why why why" "exit exit exit" "karne karne sim" "sess contra contra" "stress stress stress" "river river alarm" "robot robot alarm";grid-template-rows:auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto 1fr;gap:12px;padding:12px 14px}
-#cards{display:contents}#cPulse{grid-area:pulse}#hero{grid-area:hero}#cPort{grid-area:port}#cRiver{grid-area:river}#cRobot{grid-area:robot}#cRegime{grid-area:regime}#cBrief{grid-area:brief}#cAlarm{grid-area:alarm}#cdots{display:none}
+main{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;grid-template-areas:"pulse hero port" "regime regime brief" "watch mirror brief" "health health daily" "clust clust daily" "oto oto oto" "rmap rmap rmap" "evr evr evr" "cap cap cap" "wf wf wf" "pfol pfol pfol" "why why why" "exit exit exit" "karne karne sim" "sess contra contra" "stress stress stress" "river river alarm" "robot robot alarm";grid-template-rows:auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto auto 1fr;gap:12px;padding:12px 14px}
+#cards{display:contents}#cPulse{grid-area:pulse}#hero{grid-area:hero}#cPfol{grid-area:pfol}#cRiver{grid-area:river}#cRobot{grid-area:robot}#cRegime{grid-area:regime}#cBrief{grid-area:brief}#cAlarm{grid-area:alarm}#cdots{display:none}
 .lab,.live{display:inline-block;font-size:8px;letter-spacing:1px;padding:0 4px;border-radius:3px;font-weight:800;vertical-align:1px}.lab{color:#e9d5ff;background:rgba(192,132,252,.22);border:1px solid rgba(192,132,252,.5)}.live{color:#b9ffe6;background:rgba(0,255,170,.14);border:1px solid rgba(0,255,170,.45)}
 #hTools{right:14px;top:12px;display:flex;gap:6px}#hTools .btn{font-size:10.5px;padding:4px 8px}#tbCorr.on{color:#e9d5ff;border-color:rgba(192,132,252,.6);background:rgba(192,132,252,.16);box-shadow:0 0 12px rgba(192,132,252,.3)}#tbTf.on{color:#ffe08a;border-color:rgba(255,200,0,.55);background:rgba(255,200,0,.12)}
 .t5 .tw{grid-column:1/-1;font-size:9px;color:#ffb020;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.t5.al{box-shadow:0 0 16px rgba(255,200,0,.28);border-color:rgba(255,200,0,.5)}i.tw{font-style:normal;color:#ffb020;font-size:9.5px}
@@ -182,17 +182,17 @@ table.kt7 th:nth-child(-n+3),table.kt7 td:nth-child(-n+3){text-align:left}table.
 @media (max-width:1100px){#rpOut{top:auto;bottom:62px;left:10px;right:10px;width:auto}#rpOut .oc:nth-child(n+2){display:none}.ksum{grid-template-columns:repeat(2,minmax(0,1fr))}#rpWin,#rpPrev{display:none}}
 @media (max-width:560px){.rpTag{font-size:8px;padding:3px 4px}#rp .btn[data-spd="1"],#rp.on #lgBtn,#rp.on #rpWin{display:none}#rp.on #rpD{font-size:9px}#rp.on .rpx{gap:4px;flex-wrap:wrap;row-gap:5px}#rp.on .btn{padding:4px 6px}#rp.on #rpS{min-width:30px}#rp.on #rpD{flex:1 1 auto}body.rpon7 #rpOut{bottom:104px}}
 /* ---- v10 ---- */
-#cEvr{grid-area:evr}#cCap{grid-area:cap}#cWF{grid-area:wf}#cPort{grid-area:port}
+#cEvr{grid-area:evr}#cCap{grid-area:cap}#cWF{grid-area:wf}#cPfol{grid-area:pfol}
 #evBtn b{color:#38f5c0}#evBtn.on{border-color:rgba(255,230,0,.6)}#evBtn.on b{color:#ffe600}select:disabled{opacity:.45}
 .ev10t{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px}.ev10t .btn.on{background:rgba(255,230,0,.16);border-color:#ffe600;color:#ffe600}
 tr.hl10 td{background:rgba(255,77,109,.08)}tr.cur td{color:#cfe}td.g{color:#38f5c0}td.r{color:#ff4d6d}
 .evc{display:inline-block;margin:2px 3px;padding:1px 6px;border-radius:6px;background:rgba(56,245,192,.08)}.evc.neg{background:rgba(255,77,109,.12)}.evc i{color:#ffe600;font-style:normal}
-#cEvr h5,#cCap h5,#cWF h5,#cPort h5{margin:10px 0 4px;font-size:12px;color:#ffe600}
+#cEvr h5,#cCap h5,#cWF h5,#cPfol h5{margin:10px 0 4px;font-size:12px;color:#ffe600}
 .wf10s{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}.wf10s>div{background:rgba(255,255,255,.04);border-radius:8px;padding:6px 8px}.wf10s span{display:block;font-size:10.5px;color:#8fb3ad}.wf10s b{font-size:18px;display:block}.wf10s b.y{color:#ffd84d}.wf10s em{font-size:10px;color:#8fb3ad;font-style:normal}
 .wf10g{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}.wf10g canvas{width:100%;height:190px;display:block}
 #poCv{width:100%;height:260px;display:block;margin-top:6px}.po10l{display:flex;flex-wrap:wrap;gap:12px;font-size:11px;margin:4px 0}
 table.hm10{border-collapse:collapse;font-size:11.5px;width:100%}table.hm10 th,table.hm10 td{padding:4px 5px;text-align:center;border:1px solid rgba(0,0,0,.35)}table.hm10 th{color:#8fb3ad;font-weight:600}table.hm10 tr.tt th,table.hm10 tr.tt td{border-top:2px solid rgba(255,230,0,.5);font-weight:700}
-@media (max-width:1100px){.wf10s{grid-template-columns:1fr 1fr}.wf10g{grid-template-columns:1fr}table.hm10{font-size:9.5px}table.hm10 th,table.hm10 td{padding:3px 2px}#cPort,#cEvr{overflow-x:auto}}
+@media (max-width:1100px){.wf10s{grid-template-columns:1fr 1fr}.wf10g{grid-template-columns:1fr}table.hm10{font-size:9.5px}table.hm10 th,table.hm10 td{padding:3px 2px}#cPfol,#cEvr{overflow-x:auto}#evBtn{display:none}}
 /* ---- v9 ---- */
 #cOto{grid-area:oto}#cDaily{grid-area:daily;align-self:start}#cClust{align-self:start}#cRmap{grid-area:rmap}
 .ov9{border:1px solid rgba(255,216,77,.45);background:rgba(255,216,77,.07);border-radius:9px;padding:8px 10px;font-size:12.5px;line-height:1.5;margin-bottom:8px}
@@ -276,7 +276,7 @@ table.ex8{width:100%;border-collapse:collapse;font:11px ui-monospace,monospace}t
   <section class="pn glass" id="cEvr"><h3>Evren uyumu <span>LAB · Lab37 ↔ Top50 ↔ yeni coinler · IS/OOS</span></h3><div id="evBody"><div class="mut">veri bekleniyor</div></div></section>
   <section class="pn glass" id="cCap"><h3>Mum başına giriş sınırı · YO6 MA <span>LAB · ön-kayıt · K=2/3 · rastgele seçim tabanı</span></h3><div id="cpBody"><div class="mut">veri bekleniyor</div></div></section>
   <section class="pn glass" id="cWF"><h3>Zaman içinde dayanıklılık <span>LAB · walk-forward 3 ay eğitim / 1 ay test · sabit kurallar</span></h3><div id="wfBody"><div class="mut">veri bekleniyor</div></div></section>
-  <section class="pn glass" id="cPort"><h3>Birleşik portföy · 3 bacak <span>LAB özsermaye · aylık ısı haritası · korelasyon · CANLI üst üste</span></h3><div id="poBody"><div class="mut">veri bekleniyor</div></div></section>
+  <section class="pn glass" id="cPfol"><h3>Birleşik portföy · 3 bacak <span>LAB özsermaye · aylık ısı haritası · korelasyon · CANLI üst üste</span></h3><div id="poBody"><div class="mut">veri bekleniyor</div></div></section>
   <section class="pn glass" id="cWhy"><h3>Neden? <span>ilk 5 aday · koşul listesi · lab benzerleri</span></h3><div id="whBody"><div class="mut">veri bekleniyor</div></div></section>
   <section class="pn glass" id="cExit"><h3>Çıkış labı · YO6 MA <span>LAB · ön-kayıt · IS/OOS · rastgele</span></h3><div id="exBody"></div></section>
   <section class="pn glass" id="cKarne"><h3>Sinyal karnesi <span>LAB + CANLI · bacak bacak</span></h3><div id="kaBody"><div class="mut">veri bekleniyor</div></div></section>
