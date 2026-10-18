@@ -2,10 +2,11 @@
 
 Yeni işlem mantığı yok; tablo mevcut motorun hesapladıklarını gösterir.
 
-**Hazırlık %** = round(100 · (1 − r)), r = mevcut `proxCoin` / `proxBist` yakınlığı
+**Hazırlık %** = round((Y_r + 100 · X/Y) / 2), en fazla 99; Y_r = 100 · (1 − r), r = mevcut `proxCoin` / `proxBist` yakınlığı
 (YO6 MA → r4 (4s), Loxx → r1 (1s), BIST z−2 → r). Sinyal ateşlediyse (`yo6f`, `lxf`, `bf`; r ≤ 0,03) = 100.
+Böylece 48-mum dibine yakın ama fitil/hacim koşulu eksik coinler sabit %40'ta kalmaz (ör. r=0,60 ve 1/6 koşul → %28 Uzak).
 Bantlar: 0–40 Uzak (gri) · 40–70 Yaklaşıyor (sarı) · 70–99 Hazır olmak üzere (turuncu) · 100 SİNYAL (yeşil).
-↑↓ = aynı hesap bir önceki mumda (YO6 için 4s, Loxx/BIST için 1s) ile fark. "Tümü" sekmesinde coinin en hazır bacağı gösterilir.
+↑↓ = aynı hesap (koşul oranı sabit tutularak, r) bir önceki mumda (YO6 için 4s, Loxx/BIST için 1s) ile fark. "Tümü" sekmesinde coinin en hazır bacağı gösterilir.
 
 | Bacak | Koşullar (X/Y) | Kaynak |
 |---|---|---|

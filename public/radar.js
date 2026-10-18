@@ -1745,7 +1745,8 @@ function ok12Bi(c){if(!c.Z||!c.cr)return null;var L=c.Z.length-1,P=proxBist(c,L)
   return {leg:'bist',lg:'BIST z−2',tf:'1s',p:ok12Pct(P.r,fired),pp:ok12Pct(Pp.r,Pp.st==='bf'),C:C,st:P.st};}
 function ok12Row(c,bist,L){var X=L.C.filter(function(x){return x.ok;}).length,ms=L.C.filter(function(x){return !x.ok&&x.m;}).slice(0,2).map(function(x){return x.m;});
   var ser=bist?c.k1:c.k4,S=null;try{S=st11(ser&&ser.c,ser?ser.c.length-1:null);}catch(e){}
-  return {c:c,bist:bist,key:(bist?'bist:':'coin:')+c.sym,nm:bist?c.sym:(c.b||c.sym.replace(/USDT$/,'')),leg:L.leg,lg:L.lg,tf:L.tf,p:L.p,d:L.p-L.pp,X:X,Y:L.C.length,miss:ms,C:L.C,s:S?S.s:4};}
+  var bl=function(q){return q>=100?100:Math.min(99,Math.round((q+100*X/L.C.length)/2));},P=bl(L.p),PP=bl(L.pp);
+  return {c:c,bist:bist,key:(bist?'bist:':'coin:')+c.sym,nm:bist?c.sym:(c.b||c.sym.replace(/USDT$/,'')),leg:L.leg,lg:L.lg,tf:L.tf,p:P,pr:L.p,d:P-PP,X:X,Y:L.C.length,miss:ms,C:L.C,s:S?S.s:4};}
 function ok12Rows(tab){var R=[];
   if(tab!=='bist')(ST.coins||[]).forEach(function(c){var a=null,b=null;try{a=ok12Yo6(c);}catch(e){}try{b=ok12Lx(c);}catch(e){}
     if(tab==='yo6'){if(a)R.push(ok12Row(c,false,a));}else if(tab==='loxx'){if(b)R.push(ok12Row(c,false,b));}
@@ -1756,7 +1757,7 @@ function ok12Save(){var s=uiLoad();s.ok12={on:OK12.on,tab:OK12.tab,vw:OK12.vw};u
 function ok12Head(){var tabs=[['all','Tümü'],['yo6','YO6 MA'],['loxx','Loxx'],['bist','BIST z−2']];
   return '<div class="o12top"><b class="o12tt">Sinyale hazırlık</b><div class="o12tabs">'+tabs.map(function(t){return '<button data-o12t="'+t[0]+'" class="'+(OK12.tab===t[0]?'on':'')+'">'+t[1]+'</button>';}).join('')+'</div>'+
   '<div class="o12vw"><button data-o12v="list" class="'+(OK12.vw==='list'?'on':'')+'">☰ Tablo</button><button data-o12v="radar" class="'+(OK12.vw==='radar'?'on':'')+'">◎ 2D radar</button><button id="o12to3" title="Eski 3D galaksiye geç">3D görünüm</button></div></div>'+
-  '<div class="o12leg">Hazırlık % = sinyal koşullarının ne kadarı tamam · '+OK12B.slice().reverse().map(function(b){return '<span><i style="background:'+b.col+'"></i>'+(b.lo===100?'100':b.lo+'–'+(b.lo===70?99:b.lo===40?70:40))+' '+b.nm+'</span>';}).join('')+'<span class="o12h">isme tıkla → grafik</span></div>';}
+  '<div class="o12leg">Hazırlık % = motor yakınlığı ile tamamlanan koşul oranının ortalaması · '+OK12B.slice().reverse().map(function(b){return '<span><i style="background:'+b.col+'"></i>'+(b.lo===100?'100':b.lo+'–'+(b.lo===70?99:b.lo===40?70:40))+' '+b.nm+'</span>';}).join('')+'<span class="o12h">isme tıkla → grafik</span></div>';}
 function ok12List(R){if(!R.length)return '<div class="o12empty">Veri bekleniyor… (tarama bitince liste dolar)</div>';
   return R.map(function(r){var b=ok12Band(r.p),S=ST11[r.s]||ST11[4],d=r.d>0?'<span class="o12d up" title="son mumdan beri hazırlık arttı">↑ '+r.d+'</span>':r.d<0?'<span class="o12d dn" title="son mumdan beri hazırlık azaldı">↓ '+(-r.d)+'</span>':'<span class="o12d" title="son mumdan beri değişmedi">=</span>';
     return '<div class="o12r b-'+b.id+'"><div class="o12a"><span class="qsym o12nm" data-qs="'+esc(r.key)+'" title="Grafiği aç">'+esc(r.nm)+'</span><span class="o12lg">'+esc(r.lg)+' · '+r.tf+'</span><span class="o12st" style="border-color:'+S.col+';color:'+S.col+'" title="'+esc(S.ne)+'">'+esc(S.nm)+'</span></div>'+
@@ -1770,7 +1771,7 @@ function ok12Draw(R){var cv=$('o12cv');if(!cv)return;var W=cv.parentNode.clientW
   x.beginPath();x.arc(cx,cy,10,0,7);x.fillStyle='rgba(46,232,138,.25)';x.fill();x.font='700 14px system-ui,sans-serif';x.fillStyle='#2ee88a';x.fillText('SİNYAL',cx,cy+26);
   var n=R.length,pts=[];R.forEach(function(r,i){var h=0;for(var q=0;q<r.key.length;q++)h=(h*31+r.key.charCodeAt(q))>>>0;var a=(h%3600)/3600*Math.PI*2,rr=Rr*(1-r.p/100)+(r.p>=100?0:4),b=ok12Band(r.p);
     var px=cx+Math.cos(a)*rr,py=cy+Math.sin(a)*rr;pts.push({x:px,y:py,r:r});x.beginPath();x.arc(px,py,r.p>=70?6:4,0,7);x.fillStyle=b.col;x.globalAlpha=r.p>=40?1:.55;x.fill();x.globalAlpha=1;});
-  var box=[],lab=0;x.font='700 14px system-ui,sans-serif';x.textAlign='left';RL.forEach(function(g,gi){var r=Rr*(1-g[0]/100),a=Math.PI*(0.62+gi*0.09),w=x.measureText(g[1]).width+12,bx=cx+Math.cos(a)*r-w/2,by=cy+Math.sin(a)*r-11;x.fillStyle='rgba(6,12,18,.92)';x.fillRect(bx,by,w,22);x.fillStyle=g[2];x.fillText(g[1],bx+6,by+16);box.push([bx,by,w,22]);});x.font='700 16px system-ui,sans-serif';
+  var box=[],lab=0;x.font='700 14px system-ui,sans-serif';x.textAlign='left';box.push([cx-45,cy-14,90,48]);RL.forEach(function(g,gi){var r=Rr*(1-g[0]/100),a=Math.PI*(0.62+gi*0.09),w=x.measureText(g[1]).width+12,bx=cx+Math.cos(a)*r-w/2,by=cy+Math.sin(a)*r-11;x.fillStyle='rgba(6,12,18,.92)';x.fillRect(bx,by,w,22);x.fillStyle=g[2];x.fillText(g[1],bx+6,by+16);box.push([bx,by,w,22]);});x.font='700 16px system-ui,sans-serif';
   pts.forEach(function(p){if(lab>=15)return;var t=p.r.nm+' %'+p.r.p,w=x.measureText(t).width+12,bx=p.x+8,by=p.y-11;if(bx+w>W)bx=p.x-8-w;
     if(box.some(function(o){return bx<o[0]+o[2]&&bx+w>o[0]&&by<o[1]+o[3]&&by+22>o[1];}))return;box.push([bx,by,w,22]);lab++;
     x.fillStyle='rgba(6,12,18,.85)';x.fillRect(bx,by,w,22);x.strokeStyle=ok12Band(p.r.p).col;x.lineWidth=1;x.strokeRect(bx+.5,by+.5,w-1,21);x.fillStyle='#f1f5f9';x.fillText(t,bx+6,by+16);p.lb=[bx,by,w,22];});
