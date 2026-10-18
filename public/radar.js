@@ -1208,7 +1208,7 @@ function renderExit(){var el=$('exBody');if(!el||el._done)return;el._done=1;var 
    '<div class="mut sm">Çıkış dağılımı: V1 '+JSON.stringify(E.whyc.V1).replace(/[{}"]/g,'').replace(/,/g,' · ')+' · V2 '+JSON.stringify(E.whyc.V2).replace(/[{}"]/g,'').replace(/,/g,' · ')+' · V3 '+JSON.stringify(E.whyc.V3).replace(/[{}"]/g,'').replace(/,/g,' · ')+'. En kötü işlem tüm varyantlarda aynı: o işlemler hiç +%3 / +1 ATR görmeden düştü, yani çıkış kuralı kuyruğu kesmiyor. IS’de rastgele çıkışın PF’si (p50 '+E.out.IS.rnd.p50.toFixed(2)+') mevcuttan yüksek: kısa tutmanın IS’de şanslı olduğu bir dönem; OOS’ta mevcut '+E.out.OOS.CUR.pf.toFixed(2)+' ≈ rastgele p90 '+E.out.OOS.rnd.p90.toFixed(2)+'. Maliyet: net = r − 0,0004·(2+r), kısmi çıkışta her yarı ayrı. Dosyalar: radar8_cikis.csv / .png.</div></div></div>';}
 
 /* ---------- 3) NEDEN? KARTI ---------- */
-function legOf8(c,f){if(c.mkt==='bist'||ST.bist.indexOf(c)>=0)return 'bist';var s=(f&&(f.st||''))+'';return /^lx/.test(s)||/Loxx/.test(f&&f.setup||'')?'loxx':'yo6';}
+function legOf8(c,f){if(c.mkt==='bist'||ST.bist.indexOf(c)>=0)return 'bist';var s=(f&&(f.st||''))+'';if(/^lx/.test(s)||/Loxx/.test(f&&f.setup||''))return 'loxx';if(s==='far'&&/pst|z200/.test((f.miss||'')+(f.why||'')))return 'loxx';return 'yo6';}
 function why8(c,f){var leg=legOf8(c,f),L=[],F;function ck(st,txt,sub){L.push({st:st,txt:txt,sub:sub||''});}
   if(leg==='yo6'){var i=c.k4.t.length-1;F=nd8Yo6(c,i);if(!F)return null;var B=ST.cB,t=c.k4.t[i],mr=B&&B.mr?B.mr[t]:NaN,br=B&&B.br?B.br[t]:NaN;
     ck(F.sw?'y':'n',F.sw?'48 mum dip süpürmesi var':'dip süpürmesi yok',F.sw?'low dibin %'+Math.abs(F.dep).toFixed(1)+' altına indi, üstünde kapattı':F.dep>=0?'low 48-mum dibinin %'+F.dep.toFixed(1)+' üstünde':'kapanış dibin altında');
