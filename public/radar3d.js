@@ -1,6 +1,7 @@
-/* QUANTEX Radar v3 — "Sinyal Galaksisi" (Three.js + UnrealBloom). Tüm görseller gerçek veriyi kodlar:
+/* QUANTEX Radar v4 — "Sinyal Galaksisi" (Three.js + UnrealBloom). Tüm görseller gerçek veriyi kodlar:
    çekirdeğe uzaklık = kurulum yakınlığı · yükseklik = 24s değişim · parlaklık/dönüş = RVOL · renk = OBV akış yönü
-   dış torus = son 48 mum OBV akışı · bulutsu = sektör akış genişliği · kuyruklu yıldız = gerçek işlem sonucu (lab çıkış kuralı). */
+   dış torus = son 48 mum OBV akışı · bulutsu = sektör akış genişliği · kuyruklu yıldız = gerçek işlem sonucu (lab çıkış kuralı)
+   v4: takımyıldız çizgisi = 7g getiri korelasyonu ρ>0.8 · TF yörüngesi = 1s (camgöbeği) / 4s (mor) yakınlığı, hizalı = altın hale. */
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
 import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
@@ -36,13 +37,14 @@ export function create(host,opt){
   const comp=new EffectComposer(renderer);comp.addPass(new RenderPass(scene,cam));const bloom=new UnrealBloomPass(new THREE.Vector2(256,256),lite?0.75:0.9,0.5,0.14);comp.addPass(bloom);comp.addPass(new OutputPass());
   const U={time:{value:0},sweep:{value:0},pr:{value:PR},uAsm:{value:0},uF:{value:-1},uC:{value:Array.from({length:MAXC},()=>new THREE.Vector4())},uS:{value:Array.from({length:MAXC},()=>new THREE.Vector4(0.5,0.5,0.5,0.5))}};
   const mat=new THREE.ShaderMaterial({uniforms:U,vertexShader:VS,fragmentShader:FS,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
-  const R0=0.9,RM=10.5,TOR=13.4,TUBE=1.35,GT=glowTex();
+  const R0=0.9,RM=10.5,TOR=13.4,TUBE=1.35,TFY=-0.9,GT=glowTex();
   [[0.25,0.45],[0.5,0.26],[0.75,0.18],[1,0.14]].forEach(([q,o])=>{const g=new THREE.BufferGeometry().setFromPoints(Array.from({length:181},(_,i)=>{const a=i/180*Math.PI*2,r=R0+(RM-R0)*q;return new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r);}));scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x00ffaa,transparent:true,opacity:o})));});
   const coreM=new THREE.MeshBasicMaterial({color:0xffe27a});const core=new THREE.Mesh(new THREE.SphereGeometry(0.55,32,16),coreM);scene.add(core);
   const haloM=new THREE.SpriteMaterial({map:GT,color:0xffc400,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false});const halo=new THREE.Sprite(haloM);halo.scale.set(4,4,1);scene.add(halo);
   const fan=new THREE.Mesh(new THREE.CircleGeometry(RM,48,0,0.55),new THREE.MeshBasicMaterial({color:0x00ffaa,transparent:true,opacity:0.06,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));fan.rotation.x=-Math.PI/2;scene.add(fan);
   let dyn=new THREE.Group();scene.add(dyn);
-  const S={n:0,syms:[],cur:[],tgt:[],sectors:[],neb:[],stems:null,hit:null,torus:null,torusMap:[],comets:null,cometCap:lite?1200:3000,fx:[],coreLevel:0,focus:null,fly:null,holo:null,holoTex:null,asmT0:null,running:true,fps:0,frames:0,lastF:0,manualT:null,count:0};
+  const S={n:0,syms:[],cur:[],tgt:[],sectors:[],neb:[],stems:null,hit:null,torus:null,torusMap:[],comets:null,cometCap:lite?1200:3000,fx:[],coreLevel:0,focus:null,fly:null,holo:null,holoTex:null,asmT0:null,running:true,fps:0,frames:0,lastF:0,manualT:null,count:0,opt:{corr:true,tf:false},corr:null};
+  const ECAP=240;
   function setData(list,info){scene.remove(dyn);dyn.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&o.material!==mat&&o.material.dispose)o.material.dispose();});dyn=new THREE.Group();scene.add(dyn);
     S.n=Math.min(MAXC,list.length);S.syms=list.slice(0,S.n);S.sectors=info.sectors||[];S.cur=[];S.tgt=[];S.fx=[];
     const A={tpos:[],offs:[],tcol:[],cid:[],size:[],phase:[],spinm:[],tb:[]};const per=lite?16:28,TL=info.histLen||48;
@@ -70,10 +72,17 @@ export function create(host,opt){
     // kuyruklu yıldızlar (dinamik tampon)
     const cg=new THREE.BufferGeometry();cg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.cometCap*3),3));cg.setAttribute('col',new THREE.Float32BufferAttribute(new Float32Array(S.cometCap*3),3));cg.setAttribute('al',new THREE.Float32BufferAttribute(new Float32Array(S.cometCap),1));cg.setAttribute('size',new THREE.Float32BufferAttribute(new Float32Array(S.cometCap),1));
     cg.setDrawRange(0,0);S.comets=new THREE.Points(cg,new THREE.ShaderMaterial({uniforms:{pr:U.pr},vertexShader:CVS,fragmentShader:FS,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending}));S.comets.frustumCulled=false;dyn.add(S.comets);
+    // korelasyon takımyıldızı (dinamik çizgiler) + TF yörüngesi bağları
+    const eg=new THREE.BufferGeometry();eg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(ECAP*6),3));eg.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(ECAP*6),3));eg.setDrawRange(0,0);
+    S.cl=new THREE.LineSegments(eg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.85,blending:THREE.AdditiveBlending,depthWrite:false}));S.cl.frustumCulled=false;dyn.add(S.cl);
+    const tg=new THREE.BufferGeometry();tg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));tg.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));tg.setDrawRange(0,0);
+    S.tfl=new THREE.LineSegments(tg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.6,blending:THREE.AdditiveBlending,depthWrite:false}));S.tfl.frustumCulled=false;dyn.add(S.tfl);
+    const rr=R0+(RM-R0)*0.45;S.tfRing=new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({length:121},(_,i)=>{const a=i/120*Math.PI*2;return new THREE.Vector3(Math.cos(a)*rr,TFY,Math.sin(a)*rr);})),new THREE.LineBasicMaterial({color:0xffc400,transparent:true,opacity:0.22}));S.tfRing.visible=false;dyn.add(S.tfRing);
     if(S.asmT0===null&&info.assemble!==false)S.asmT0=clock();if(info.assemble===false)U.uAsm.value=1;}
   // kare durumu (canlı ya da geri oynatma imleci)
   function setFrame(F){for(let k=0;k<S.n;k++){const f=F.c[k],d=S.syms[k];if(!f)continue;const r=R0+(RM-R0)*Math.max(0,Math.min(1,f.r)),y=(isFinite(f.ch)?Math.max(-15,Math.min(15,f.ch)):0)/15*3.2,T=S.tgt[k];
-      T.p.set(Math.cos(d.a)*r,y,Math.sin(d.a)*r);T.col.copy(flowCol(f.up,f.fl));const rv=Math.max(0.2,Math.min(isFinite(f.rv)?f.rv:1,6));T.br=0.45+0.55*Math.sqrt(rv/6);T.spin=0.15+0.25*rv;T.sz=0.75+0.45*Math.sqrt(rv/6);T.r=f.r;T.ch=f.ch;}
+      T.p.set(Math.cos(d.a)*r,y,Math.sin(d.a)*r);T.col.copy(flowCol(f.up,f.fl));const rv=Math.max(0.2,Math.min(isFinite(f.rv)?f.rv:1,6));T.br=0.45+0.55*Math.sqrt(rv/6);T.spin=0.15+0.25*rv;T.sz=0.75+0.45*Math.sqrt(rv/6);T.r=f.r;T.ch=f.ch;T.r1=f.r1;T.r4=f.r4;T.al=!!f.al;}
+    S.corr=F.corr||null;
     if(F.tor){const tc=S.geo.attributes.tcol,tb=S.geo.attributes.tb;for(let q=0;q<S.torusMap.length;q++){const [k,j]=S.torusMap[q],a=F.tor[k];if(!a)continue;const v=a[j],pv=j>0?a[j-1]:NaN,ix=S.torusStart+q;
         if(!isFinite(v)||!isFinite(pv)){tc.setXYZ(ix,0.1,0.1,0.12);tb.setX(ix,0.15);continue;}const cl=flowCol(v>pv,v);tc.setXYZ(ix,cl.r,cl.g,cl.b);tb.setX(ix,j===S.TL-1?1.1:0.3+0.45*Math.min(1,Math.abs(v)/1.5));}tc.needsUpdate=true;tb.needsUpdate=true;}
     if(F.neb)S.neb.forEach(n=>{const b=F.neb[n.si];if(b==null)return;n.sp.material.color.setHSL(b>=0.5?0.42:0.93,1,0.5);n.sp.material.opacity=0.04+0.22*Math.abs(b-0.5)*2*0.6+0.1*b;});
@@ -95,7 +104,7 @@ export function create(host,opt){
   renderer.domElement.addEventListener('pointerleave',()=>{opt.onHover&&opt.onHover(null);});
   // odak: kameranın coine uçuşu + holografik mini grafik
   function focus(k){S.focus=k;ctl.autoRotate=false;const p=S.cur[k].p.clone(),out=new THREE.Vector3(p.x,0,p.z).normalize();if(!isFinite(out.x))out.set(0,0,1);
-    const side=new THREE.Vector3(-out.z,0,out.x);S.holoOut=out;const tg=p.clone().addScaledVector(out,1.0).addScaledVector(side,0.5).add(new THREE.Vector3(0,0.75,0));const camTo=tg.clone().addScaledVector(side,-7.6).addScaledVector(out,1.6).add(new THREE.Vector3(0,1.3,0));
+    const side=new THREE.Vector3(-out.z,0,out.x);S.holoOut=out;const tg=p.clone().addScaledVector(out,1.0).addScaledVector(side,0.5).add(new THREE.Vector3(0,0.75,0));const camTo=tg.clone().addScaledVector(side,-8.4).addScaledVector(out,1.6).add(new THREE.Vector3(0,1.3,0));
     S.fly={t0:clock(),dur:1400,p0:cam.position.clone(),t0v:ctl.target.clone(),p1:camTo,t1:tg};S.tg=tg;
     if(!S.holo){const cv=document.createElement('canvas');cv.width=768;cv.height=460;S.holoCv=cv;S.holoTex=new THREE.CanvasTexture(cv);S.holoTex.colorSpace=THREE.SRGBColorSpace;
       S.holo=new THREE.Mesh(new THREE.PlaneGeometry(4.2,2.52),new THREE.MeshBasicMaterial({map:S.holoTex,color:0xb8c8c8,transparent:true,opacity:0.92,depthWrite:false,side:THREE.DoubleSide}));scene.add(S.holo);}
@@ -128,16 +137,29 @@ export function create(host,opt){
         put(dx*r0,y0,dz*r0,1,1,1,0.9*fade,cm.open?5:6.5);});
       S.fx.forEach(f=>{const c=S.cur[f.k];if(!c)return;const ph=(now-f.t0)/2400,R=0.4+3.2*ph;for(let q=0;q<36;q++){const a=q/36*Math.PI*2;put(c.p.x+Math.cos(a)*R,c.p.y,c.p.z+Math.sin(a)*R,1,0.9,0.1,(1-ph)*0.95,3.6);}
         for(let q=0;q<20;q++){const u=((q/20)+ph*3)%1;put(c.p.x*(1-u),c.p.y*(1-u),c.p.z*(1-u),1,0.92,0.2,(1-ph)*0.9,3);}});
+      // TF yörüngeleri: 1s yakınlığı (iç nokta, camgöbeği) · 4s yakınlığı (mor) · hizalı → altın hale
+      const tfp=S.tfl&&S.tfl.geometry.attributes.position.array,tfc=S.tfl&&S.tfl.geometry.attributes.color.array;let nt=0;
+      if(S.opt.tf&&S.tfl){for(let k=0;k<S.n;k++){const T=S.tgt[k],d=S.syms[k],c=S.cur[k];if(T.r1==null)continue;const dx=Math.cos(d.a),dz=Math.sin(d.a),r1=R0+(RM-R0)*Math.max(0,Math.min(1,T.r1)),r4=R0+(RM-R0)*Math.max(0,Math.min(1,T.r4)),dim=S.focus!=null&&S.focus!==k?0.3:1;
+          put(dx*r1,TFY,dz*r1,0.49,0.83,0.99,0.95*dim,T.al?6:4.6);put(dx*r4,TFY,dz*r4,0.75,0.52,0.99,0.95*dim,T.al?6:4.6);
+          tfp.set([dx*r1,TFY,dz*r1,dx*r4,TFY,dz*r4],nt*6);const a=0.6*dim;tfc.set([0.49*a,0.83*a,0.99*a,0.75*a,0.52*a,0.99*a],nt*6);nt++;
+          if(T.al){const pl=0.75+0.25*Math.sin(t*4+k);put(c.p.x,c.p.y,c.p.z,1,0.78,0.1,0.75*pl,16);for(let q=0;q<18;q++){const a2=q/18*Math.PI*2+t;put(c.p.x+Math.cos(a2)*0.75,c.p.y,c.p.z+Math.sin(a2)*0.75,1,0.8,0.2,0.8,2.6);}}}}
+      if(S.tfl){S.tfl.geometry.setDrawRange(0,nt*2);S.tfl.geometry.attributes.position.needsUpdate=true;S.tfl.geometry.attributes.color.needsUpdate=true;S.tfRing.visible=!!S.opt.tf;}
       S.comets.geometry.setDrawRange(0,n);for(const a of ['position','col','al','size'])S.comets.geometry.attributes[a].needsUpdate=true;}
+    // korelasyon takımyıldızı
+    if(S.cl){let ne=0;const ep=S.cl.geometry.attributes.position.array,ec=S.cl.geometry.attributes.color.array;
+      if(S.opt.corr&&S.corr){for(const e of (S.focus!=null?S.corr.E:(S.corr.S||S.corr.E))){if(ne>=ECAP)break;const A=S.cur[e[0]],B=S.cur[e[1]];if(!A||!B)continue;const foc=S.focus!=null&&(e[0]===S.focus||e[1]===S.focus);if(S.focus!=null&&!foc)continue;const w=Math.max(0,Math.min(1,(e[2]-0.8)/0.2)),a=foc?1:(0.35+0.65*w)*(0.85+0.15*Math.sin(t*1.5+e[0]*0.7));
+        ep.set([A.p.x,A.p.y,A.p.z,B.p.x,B.p.y,B.p.z],ne*6);ec.set([0.75*a,0.52*a,0.99*a,(0.75+0.25*w)*a,(0.52+0.4*w)*a,0.99*a],ne*6);ne++;}}
+      S.cl.geometry.setDrawRange(0,ne*2);S.cl.geometry.attributes.position.needsUpdate=true;S.cl.geometry.attributes.color.needsUpdate=true;}
     S.neb.forEach(nb=>{nb.sp.material.rotation+=nb.rot*0.016;});
     const cl=0.35+0.65*S.coreLevel,pz=1+0.06*Math.sin(t*(2+4*S.coreLevel));core.scale.set(pz,pz,pz);coreM.color.setRGB(cl+0.3,0.85*cl+0.2,0.35*cl+0.1);halo.scale.setScalar(3.4+1.6*S.coreLevel+0.3*Math.sin(t*3));haloM.opacity=(0.18+0.3*S.coreLevel)*(S.focus!=null?0.3:1);coreM.color.multiplyScalar(S.focus!=null?0.45:1);bloom.strength+=(((S.focus!=null)?0.55:(lite?0.75:0.9))-bloom.strength)*0.08;
     if(S.fly){const u=Math.min(1,(now-S.fly.t0)/S.fly.dur),e=u<0.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;cam.position.lerpVectors(S.fly.p0,S.fly.p1,e);ctl.target.lerpVectors(S.fly.t0v,S.fly.t1,e);if(u>=1){if(S.fly.home)ctl.autoRotate=true;S.fly=null;}}
-    else if(S.focus!=null){/* odakta hedef sabit */}
+    if(S.focus!=null){/* odakta coin yer değiştirirse (geri oynatma → canlı) kamera onu izler */const fp=S.cur[S.focus].p;if(S.lastFocP){const dx=fp.x-S.lastFocP.x,dy=fp.y-S.lastFocP.y,dz=fp.z-S.lastFocP.z;cam.position.x+=dx;cam.position.y+=dy;cam.position.z+=dz;ctl.target.x+=dx;ctl.target.y+=dy;ctl.target.z+=dz;if(S.fly){for(const v of [S.fly.p1,S.fly.t1]){v.x+=dx;v.y+=dy;v.z+=dz;}}}S.lastFocP=fp.clone();}else S.lastFocP=null;
     if(S.holo&&S.holo.visible&&S.focus!=null){const c=S.cur[S.focus].p;S.holo.position.copy(c).addScaledVector(S.holoOut,2.0).addScaledVector(S.holoSide,1.0).add(new THREE.Vector3(0,1.5,0));S.holo.lookAt(cam.position);S.holo.material.opacity=0.86+0.06*Math.sin(t*9)*Math.sin(t*2.3);}
     if(S.manualT==null||S.fly)ctl.update();else cam.lookAt(ctl.target);comp.render();labels();
     S.frames++;if(now-S.lastF>1000){S.fps=S.frames*1000/(now-S.lastF);S.frames=0;S.lastF=now;}}
   function loop(){renderer.setAnimationLoop(S.running&&!opt.capture?frame:null);}loop();
   document.addEventListener('visibilitychange',()=>{S.running=!document.hidden;loop();});
-  return {setData,setFrame,fire,focus,unfocus,redrawHolo,state:S,frame,
+  function setOpts(o){S.opt=Object.assign({},S.opt,o||{});}
+  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,
     orbit(az){const r=Math.hypot(cam.position.x-ctl.target.x,cam.position.z-ctl.target.z);cam.position.x=ctl.target.x+Math.sin(az)*r;cam.position.z=ctl.target.z+Math.cos(az)*r;},
     dispose(){renderer.setAnimationLoop(null);renderer.dispose();host.removeChild(renderer.domElement);host.removeChild(lab);}};}
