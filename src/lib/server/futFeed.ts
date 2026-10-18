@@ -119,13 +119,28 @@ async function klGate(sym: string, iv: string, limit: number, endTime?: number):
   return out.slice(-limit);
 }
 
+/** 3g mumu olmayan kaynaklar (Bybit/OKX/Gate) için: 1g mumlarından UTC 3 günlük kovalar (Binance 3d ile aynı hiza: t % 3g = 0).
+ *  Eksik başlayan ilk kova atlanır; son (açık) kova Binance'teki gibi açık mum olarak kalır. */
+function agg3d(rows: Row[], limit: number): Row[] {
+  const B = IV_MS["3d"]!; const out: Row[] = []; let cur: number[] | null = null; let b0 = -1; let first = 0;
+  const flush = () => { if (cur && first === b0) out.push(klRow(b0, cur[0]!, cur[1]!, cur[2]!, cur[3]!, cur[4]!, cur[5]!, B)); };
+  for (const r of rows) {
+    const t = Number(r[0]), b = Math.floor(t / B) * B;
+    if (b !== b0) { flush(); b0 = b; first = t; cur = [n(r[1]), n(r[2]), n(r[3]), n(r[4]), n(r[5]), n(r[7])]; }
+    else if (cur) { cur[1] = Math.max(cur[1]!, n(r[2])); cur[2] = Math.min(cur[2]!, n(r[3])); cur[3] = n(r[4]); cur[4] = cur[4]! + n(r[5]); cur[5] = cur[5]! + n(r[7]); }
+  }
+  flush();
+  return out.slice(-limit);
+}
+
 export async function futKlines(sym: string, iv: string, limit: number, endTime?: number): Promise<{ rows: Row[]; src: FutSrc }> {
   const s = mapSym(sym).sym; const errs: string[] = [];
   const chain: [FutSrc, typeof klBinance][] = [["binance", klBinance], ["bybit", klBybit], ["okx", klOkx], ["gate", klGate]];
   for (const [src, f] of chain) {
     if (isDown(src)) continue;
     try {
-      const rows = await f(s, iv, limit, endTime);
+      const a3 = iv === "3d" && src !== "binance";
+      const rows = a3 ? agg3d(await f(s, "1d", Math.min(4500, limit * 3 + 3), endTime), limit) : await f(s, iv, limit, endTime);
       if (rows.length) {
         const last = Number(rows[rows.length - 1]![0]);
         // bayat veri reddi (endTime yoksa)
