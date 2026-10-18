@@ -183,9 +183,10 @@ export function create(host,opt){
     S.frames++;if(now-S.lastF>1000){S.fps=S.frames*1000/(now-S.lastF);S.frames=0;S.lastF=now;}
     /* otomatik performans: 2 sn'de bir ölçülen fps → <30 ise yoğunluğu düşür, >55 ise geri yükselt (yakalama modunda saat sanal → kapalı) */
     const P=S.perf;if(P.mode==='auto'&&!opt.capture&&S.fps>0&&now-P.last>2000){P.last=now;P.hist.push({t:Math.round(now),fps:+S.fps.toFixed(1),lvl:P.lvl});if(P.hist.length>30)P.hist.shift();if(S.fps<30&&P.lvl<2)applyPerf(P.lvl+1);else if(S.fps>55&&P.lvl>0)applyPerf(P.lvl-1);}}
-  function loop(){renderer.setAnimationLoop(S.running&&!opt.capture?frame:null);}loop();
+  function loop(){renderer.setAnimationLoop(S.running&&!S.paused&&!opt.capture?frame:null);}loop();
+  function pause(v){S.paused=!!v;loop();}
   document.addEventListener('visibilitychange',()=>{S.running=!document.hidden;loop();});
   function setOpts(o){S.opt=Object.assign({},S.opt,o||{});}
-  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,setSession,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
+  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,setSession,pause,paused:()=>!!S.paused,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
     orbit(az){const r=Math.hypot(cam.position.x-ctl.target.x,cam.position.z-ctl.target.z);cam.position.x=ctl.target.x+Math.sin(az)*r;cam.position.z=ctl.target.z+Math.cos(az)*r;},
     dispose(){renderer.setAnimationLoop(null);renderer.dispose();host.removeChild(renderer.domElement);host.removeChild(lab);}};}

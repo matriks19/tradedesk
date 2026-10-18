@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>QUANTEX · Radar v6 (taslak)</title>
+<title>QUANTEX · Radar v7 (taslak)</title>
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <style>
 :root{--bg:#02060b;--tx:#d9fff4;--mut:#5f8f88;--g:#00ffaa;--r:#ff2e6e;--y:#ffe600;--c:#7dd3fc;--v:#c084fc;--ln:rgba(0,255,170,.16);--f:"JetBrains Mono","IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -23,7 +23,7 @@ select{background:#06121a;color:var(--tx);border:1px solid var(--ln);font:inheri
 #tScan{width:8px;height:8px;border-radius:50%;background:var(--mut)}#tScan.on{background:var(--y);box-shadow:0 0 10px var(--y);animation:bl .8s infinite}@keyframes bl{50%{opacity:.3}}
 #rdStatus{color:var(--mut);font-size:10.5px;max-width:330px}
 .prog{position:absolute;left:0;bottom:-1px;height:2px;width:100%}.prog i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--g),var(--c),var(--v));box-shadow:0 0 10px var(--g);transition:width .4s}
-main{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;grid-template-areas:"pulse hero port" "regime regime brief" "watch mirror brief" "sess contra contra" "stress stress stress" "river river alarm" "robot robot alarm";grid-template-rows:auto auto auto auto auto auto 1fr;gap:12px;padding:12px 14px}
+main{display:grid;grid-template-columns:300px minmax(0,1fr) 330px;grid-template-areas:"pulse hero port" "regime regime brief" "watch mirror brief" "karne karne sim" "sess contra contra" "stress stress stress" "river river alarm" "robot robot alarm";grid-template-rows:auto auto auto auto auto auto auto 1fr;gap:12px;padding:12px 14px}
 #cards{display:contents}#cPulse{grid-area:pulse}#hero{grid-area:hero}#cPort{grid-area:port}#cRiver{grid-area:river}#cRobot{grid-area:robot}#cRegime{grid-area:regime}#cBrief{grid-area:brief}#cAlarm{grid-area:alarm}#cdots{display:none}
 .lab,.live{display:inline-block;font-size:8px;letter-spacing:1px;padding:0 4px;border-radius:3px;font-weight:800;vertical-align:1px}.lab{color:#e9d5ff;background:rgba(192,132,252,.22);border:1px solid rgba(192,132,252,.5)}.live{color:#b9ffe6;background:rgba(0,255,170,.14);border:1px solid rgba(0,255,170,.45)}
 #hTools{right:14px;top:12px;display:flex;gap:6px}#hTools .btn{font-size:10.5px;padding:4px 8px}#tbCorr.on{color:#e9d5ff;border-color:rgba(192,132,252,.6);background:rgba(192,132,252,.16);box-shadow:0 0 12px rgba(192,132,252,.3)}#tbTf.on{color:#ffe08a;border-color:rgba(255,200,0,.55);background:rgba(255,200,0,.12)}
@@ -157,12 +157,36 @@ body.clean #zTag{display:block}#zTag{display:none;position:absolute;top:14px;rig
  #score{top:auto;bottom:62px;left:10px;right:auto;width:min(330px,calc(100% - 20px))}#focus{left:10px;right:10px;width:auto;bottom:62px;z-index:6}#hLeg{right:14px}#rpLog{display:none}}
 @media (max-width:560px){header{padding:7px 10px}.logo{font-size:13px;letter-spacing:3px}#rdN,#rdNl{display:none}#hero{height:80vh;min-height:560px}#top5{top:92px;left:10px;right:10px}.t5{min-width:142px}#score{display:none}#score.mob{display:block}#rpD{min-width:0;font-size:10px}#rp{left:8px;right:8px;padding:6px 8px;gap:5px}#rp .btn{padding:4px 7px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
+/* ---- v7 ---- */
+#rp.on .rpx{gap:5px;min-width:0}#rp.on #rpD{min-width:0;flex:0 0 auto;font-size:10.5px;white-space:nowrap}#rp.on #rpS{min-width:40px;flex:1 1 60px}#rp.on .btn{flex:0 0 auto}#rp.on .btn{padding:4px 8px}#rpOut .oc{padding:5px 8px;font-size:10.5px}#rpOut .oc .res{font-size:12px}
+#cKarne{grid-area:karne}#cSim{grid-area:sim}
+.rpTag{font:700 9.5px/1 ui-monospace,monospace;letter-spacing:1px;color:#1a1200;background:#ffd84d;padding:4px 6px;border-radius:4px;white-space:nowrap}
+#rp.on{border-color:rgba(255,216,77,.45)}
+#rpOut{left:14px;top:150px;width:272px;display:flex;flex-direction:column;gap:6px;pointer-events:none}
+#rpOut .oc{background:rgba(3,12,18,.84);border:1px solid rgba(255,255,255,.12);border-left:4px solid var(--c);border-radius:8px;padding:7px 9px;font-size:11px;animation:inl .4s}
+#rpOut .oc b{color:#fff}#rpOut .oc .h{display:flex;justify-content:space-between;gap:6px;margin-bottom:3px}#rpOut .oc .res{font:700 13px ui-monospace,monospace}
+#rpOut .oc small{color:#8fb3ad;display:block;margin-top:2px}.lb7{font:700 8.5px ui-monospace,monospace;letter-spacing:.8px;padding:2px 4px;border-radius:3px;background:#ffd84d;color:#1a1200}.lb7.cv{background:#38f5c0;color:#002018}
+#hero.foc #rpOut{display:none}body.clean #rpOut{display:none!important}
+#lpBan{left:50%;top:44%;transform:translate(-50%,-50%);display:none;z-index:7;text-align:center;background:rgba(3,12,18,.9);border:1px solid rgba(255,216,77,.5);border-radius:14px;padding:16px 20px;max-width:420px;box-shadow:0 0 40px rgba(0,0,0,.6)}
+#lpBan.on{display:block}#lpBan h4{margin:0 0 6px;color:#ffd84d;letter-spacing:2px;font-size:13px}#lpBan p{margin:4px 0;font-size:11.5px;color:#cfe}#lpBan .btn{margin-top:8px}
+#hero.lp canvas{filter:grayscale(.75) brightness(.45)}
+.ktab{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.ktab .btn.on{border-color:var(--c,#38f5c0);color:#fff;box-shadow:inset 0 -2px 0 var(--c,#38f5c0)}
+.ksum{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin-bottom:8px}.ksum div{background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.07);border-radius:8px;padding:6px 8px}.ksum small{display:block;color:#8fb3ad;font-size:9.5px}.ksum b{font:700 13px ui-monospace,monospace}
+.ktw{max-height:330px;overflow:auto;border:1px solid rgba(255,255,255,.07);border-radius:8px}
+table.kt7{width:100%;border-collapse:collapse;font:11px ui-monospace,monospace}table.kt7 th{position:sticky;top:0;background:#071a20;color:#8fb3ad;font-weight:600;text-align:right;padding:5px 6px;white-space:nowrap;z-index:1}table.kt7 td{text-align:right;padding:4px 6px;border-top:1px solid rgba(255,255,255,.05);white-space:nowrap}
+table.kt7 th:nth-child(-n+3),table.kt7 td:nth-child(-n+3){text-align:left}table.kt7 tr.cv td{background:rgba(56,245,192,.05)}table.kt7 tr.v1 td:first-child{box-shadow:inset 3px 0 0 #ffd84d}table.kt7 tr:hover td{background:rgba(255,255,255,.05);cursor:pointer}
+.bd{padding:1px 5px;border-radius:3px;font-size:9.5px}.bd.ok{background:rgba(56,245,192,.15);color:#38f5c0}.bd.dr{background:rgba(255,77,109,.18);color:#ff8aa0}.bd.up{background:rgba(120,170,255,.18);color:#9cc0ff}.bd.az{background:rgba(255,255,255,.07);color:#9ab}
+#siCv{width:100%;height:150px;display:block;background:rgba(0,0,0,.18);border-radius:8px;margin:6px 0}
+.sil{font:11px ui-monospace,monospace}.sil div{display:flex;justify-content:space-between;gap:6px;padding:3px 0;border-top:1px solid rgba(255,255,255,.05)}.sil em{color:#8fb3ad;font-style:normal}
+.al7{margin:6px 0;padding:7px;border:1px dashed rgba(125,255,220,.2);border-radius:8px}.al7 input[type=number]{width:58px;background:#04161b;color:#dff;border:1px solid rgba(125,255,220,.25);border-radius:5px;padding:2px 4px;font:11px ui-monospace,monospace}
+@media (max-width:1100px){#rpOut{top:auto;bottom:62px;left:10px;right:10px;width:auto}#rpOut .oc:nth-child(n+2){display:none}.ksum{grid-template-columns:repeat(2,minmax(0,1fr))}#rpWin,#rpPrev{display:none}}
+@media (max-width:560px){.rpTag{font-size:8px;padding:3px 4px}#rp .btn[data-spd="1"],#rp.on #lgBtn,#rp.on #rpWin{display:none}#rp.on #rpD{font-size:9px}#rp.on .rpx{gap:4px;flex-wrap:wrap;row-gap:5px}#rp.on .btn{padding:4px 6px}#rp.on #rpS{min-width:30px}#rp.on #rpD{flex:1 1 auto}body.rpon7 #rpOut{bottom:104px}}
 </style>
 <script src="/qx-direct.js?v=124"></script>
 </head><body>
 <div id="intro"><div id="iT"></div><div id="iL"></div><div id="iB"><i id="iBar"></i></div><div id="iSkip">TIKLA / ESC → GEÇ</div></div>
 <header>
- <div class="logo">QUANTEX <span>RADAR</span></div><span class="tag">TASLAK v6</span>
+ <div class="logo">QUANTEX <span>RADAR</span></div><span class="tag">TASLAK v7</span>
  <div class="sw"><button data-mode="coin" class="on">Coin</button><button data-mode="bist">BIST</button></div>
  <button class="btn" id="vBtn">2D</button><button class="btn" id="sBtn">🔇 ses</button>
  <label class="mut" id="rdNl">evren <select id="rdN"><option>30</option><option selected>50</option><option>80</option></select></label>
@@ -180,9 +204,10 @@ body.clean #zTag{display:block}#zTag{display:none;position:absolute;top:14px;rig
   <div class="hov" id="hLeg"><span>çekirdeğe uzaklık = kuruluma uzaklık</span><span>yükseklik = 24s değişim</span><span>parlaklık + dönüş = RVOL</span><span><i style="background:var(--g)"></i>OBV akışı ↑</span><span><i style="background:var(--r)"></i>OBV akışı ↓</span><span>dış torus = son 48 mum OBV akışı</span><span>bulutsu = sektör akış genişliği</span><span><i style="background:var(--y)"></i>ateşleme: halka + ışın</span><span>kuyruklu yıldız = gerçek işlem sonucu (yeşil kâr / kırmızı zarar, boy = |getiri|, soluk = açık)</span><span><i style="background:var(--v)"></i>takımyıldız = 7g getiri ρ&gt;0.8</span><span><i style="background:var(--c)"></i>1s / <i style="background:var(--v)"></i>4s yakınlık yörüngesi · <i style="background:#ffc400"></i>hizalı hale</span><span>odak hologramı: mor koni = benzeri kâhin p10–p90 / p25–p75 / medyan</span></div>
   <div class="hov" id="rpLog"></div>
   <div class="hov" id="focus"><div id="fBody"></div><canvas id="fMini"></canvas><div class="fbt"><button class="btn" id="fOpen">QUANTEX grafiği ↗</button><button class="btn" id="fClose">Esc · geri</button></div></div>
-  <div class="hov" id="rp"><button class="btn hot" id="rpBtn">⏱ ZAMAN MAKİNESİ · son 30 gün</button><button class="btn" id="lgBtn">?</button>
-   <div class="rpx"><button class="btn" id="rpPlay">▶</button><input type="range" id="rpS" min="0" max="1" step="0.01" value="0"><span id="rpD">—</span>
-    <button class="btn" data-spd="3">½×</button><button class="btn on" data-spd="6">1×</button><button class="btn" data-spd="14">2×</button><button class="btn" id="rpLiveB">● CANLI</button></div></div>
+  <div class="hov" id="rp"><button class="btn hot" id="rpBtn">⏱ ZAMAN MAKİNESİ · 30/60 gün</button><button class="btn" id="lgBtn">?</button>
+   <div class="rpx"><span class="rpTag" title="Geçmiş mumlar lab kurallarıyla yeniden oynatılıyor — canlı değil">LAB · REPLAY</span><button class="btn" id="rpPrev" title="önceki sinyal ([)">⏮</button><button class="btn" id="rpPlay">▶</button><button class="btn" id="rpNext" title="sonraki sinyal (])">⏭</button><input type="range" id="rpS" min="0" max="1" step="0.01" value="0"><span id="rpD">—</span>
+    <button class="btn" data-spd="1" title="saniyede 1 mum">1×</button><button class="btn on" data-spd="10" title="saniyede 10 mum">10×</button><button class="btn" data-spd="100" title="saniyede 100 mum">100×</button><button class="btn" id="rpWin" title="pencere">30g</button><button class="btn" id="rpLiveB">● CANLI</button></div></div>
+  <div class="hov" id="rpOut"></div><div class="hov" id="lpBan"></div>
   <div id="rdTip"></div><div id="hPerf"></div><div id="zTag">TEMİZ MOD · Z ile çık</div>
  </section>
  <div id="cards">
@@ -203,6 +228,8 @@ body.clean #zTag{display:block}#zTag{display:none;position:absolute;top:14px;rig
   <section class="pn glass" id="cSess"><h3>Seans saati &amp; likidite <span>TSİ · lab isabeti</span></h3><div id="sWrap"><canvas id="sCv"></canvas><div id="sTxt"></div></div></section>
   <section class="pn glass" id="cContra"><h3>Kontraryan keşif <span>ön-kayıt · erken/geç</span></h3><div id="kBody"></div></section>
   <section class="pn glass" id="cStress"><h3>Senaryo stres testi <span>β · acil stop</span></h3><div id="xBody"></div></section>
+  <section class="pn glass" id="cKarne"><h3>Sinyal karnesi <span>LAB + CANLI · bacak bacak</span></h3><div id="kaBody"><div class="mut">veri bekleniyor</div></div></section>
+  <section class="pn glass" id="cSim"><h3>Radar kâğıt sim <span>radar_sim_v1 · $10 × 2x</span></h3><div id="siBody"><div class="mut">veri bekleniyor</div></div></section>
   <section class="pn glass" id="cAlarm"><h3>Alarm köprüsü <span>opt-in · varsayılan kapalı</span></h3><div id="alBody"></div></section>
  </div>
  <div id="cdots"><i class="on"></i><i></i><i></i><i></i></div>
@@ -215,5 +242,5 @@ body.clean #zTag{display:block}#zTag{display:none;position:absolute;top:14px;rig
 <div class="ovl" id="help"><div class="glass"><div class="ph"><b>Kısayollar</b><button class="btn" id="hlpX">✕</button></div><div class="hk">
 <kbd>Ctrl+K · /</kbd><span>komut paleti — coin/hisseye atla, ☆ ile sabitle</span><kbd>Space</kbd><span>zaman makinesi oynat / duraklat (kapalıysa başlatır)</span><kbd>F</kbd><span>en yakın adaya odaklan</span><kbd>P</kbd><span>odaktaki yakın aday için işlem planı</span>
 <kbd>R</kbd><span>piyasa rejimi paneli</span><kbd>B</kbd><span>günlük brifing</span><kbd>W</kbd><span>izleme listesi</span><kbd>M</kbd><span>performans aynası</span><kbd>Z</kbd><span>temiz mod (yalnız galaksi)</span><kbd>,</kbd><span>ayarlar</span><kbd>?</kbd><span>bu yardım</span><kbd>Esc</kbd><span>pencereyi kapat / odaktan çık</span></div></div></div>
-<script src="/radar.js?v=6"></script>
+<script src="/radar.js?v=7"></script>
 </body></html>
