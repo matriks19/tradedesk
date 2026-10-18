@@ -27,6 +27,7 @@ void main(){if(cid>=0.0&&spinm>0.0&&phase>uDens){gl_PointSize=0.0;gl_Position=ve
 const FS=`varying vec3 vC;varying float vA;void main(){vec2 p=gl_PointCoord-0.5;float d=length(p);if(d>0.5)discard;float a=smoothstep(0.5,0.0,d);a*=a;gl_FragColor=vec4(vC,a*vA);}`;
 const CVS=`attribute vec3 col;attribute float al;attribute float size;uniform float pr;varying vec3 vC;varying float vA;void main(){vec4 mv=modelViewMatrix*vec4(position,1.0);vC=col;vA=al;gl_PointSize=size*pr*(42.0/-mv.z);gl_Position=projectionMatrix*mv;}`;
 function gauss(){let u=0,v=0;while(!u)u=Math.random();while(!v)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
+export function dirCol(d){return d>0?new THREE.Color(0.12,1,0.55):d<0?new THREE.Color(1,0.25,0.42):new THREE.Color(0.6,0.65,0.72);}
 export function flowCol(up,str){if(up==null)return new THREE.Color(0.45,0.5,0.55);const s=Math.min(1,Math.abs(str||0)/1.5);return up?new THREE.Color().setHSL(0.40+0.10*s,1,0.55):new THREE.Color().setHSL(0.95-0.04*s,1,0.58);}
 function glowTex(){const c=document.createElement('canvas');c.width=c.height=128;const g=c.getContext('2d'),gr=g.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,'rgba(255,255,255,1)');gr.addColorStop(0.35,'rgba(255,255,255,.35)');gr.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=gr;g.fillRect(0,0,128,128);return new THREE.CanvasTexture(c);}
 export function create(host,opt){
@@ -40,7 +41,8 @@ export function create(host,opt){
   const U={time:{value:0},sweep:{value:0},pr:{value:PR},uAsm:{value:0},uF:{value:-1},uDens:{value:1},uC:{value:Array.from({length:MAXC},()=>new THREE.Vector4())},uS:{value:Array.from({length:MAXC},()=>new THREE.Vector4(0.5,0.5,0.5,0.5))}};
   const mat=new THREE.ShaderMaterial({uniforms:U,vertexShader:VS,fragmentShader:FS,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
   const R0=0.9,RM=10.5,TOR=13.4,TUBE=1.35,TFY=-0.9,GT=glowTex();
-  [[0.25,0.45],[0.5,0.26],[0.75,0.18],[1,0.14]].forEach(([q,o])=>{const g=new THREE.BufferGeometry().setFromPoints(Array.from({length:181},(_,i)=>{const a=i/180*Math.PI*2,r=R0+(RM-R0)*q;return new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r);}));scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x00ffaa,transparent:true,opacity:o})));});
+  [[0.2,0.75],[0.6,0.4],[1,0.22]].forEach(([q,o])=>{const g=new THREE.BufferGeometry().setFromPoints(Array.from({length:181},(_,i)=>{const a=i/180*Math.PI*2,r=R0+(RM-R0)*q;return new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r);}));scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x00ffaa,transparent:true,opacity:o})));});
+  [[0,0.2,0xffe600,0.075],[0.2,0.6,0x00ffaa,0.03]].forEach(([q0,q1,cl,o])=>{const rg=new THREE.Mesh(new THREE.RingGeometry(R0+(RM-R0)*q0,R0+(RM-R0)*q1,120),new THREE.MeshBasicMaterial({color:cl,transparent:true,opacity:o,side:THREE.DoubleSide,depthWrite:false}));rg.rotation.x=-Math.PI/2;rg.position.y=-0.02;scene.add(rg);});
   const coreM=new THREE.MeshBasicMaterial({color:0xffe27a});const core=new THREE.Mesh(new THREE.SphereGeometry(0.55,32,16),coreM);scene.add(core);
   const haloM=new THREE.SpriteMaterial({map:GT,color:0xffc400,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false});const halo=new THREE.Sprite(haloM);halo.scale.set(4,4,1);scene.add(halo);
   const fan=new THREE.Mesh(new THREE.CircleGeometry(RM,48,0,0.55),new THREE.MeshBasicMaterial({color:0x00ffaa,transparent:true,opacity:0.06,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));fan.rotation.x=-Math.PI/2;scene.add(fan);
@@ -77,7 +79,7 @@ export function create(host,opt){
     const t0=A.tpos.length/3;S.syms.forEach((d,k)=>{for(let j=0;j<TL;j++){const th=-Math.PI/2+(j/(TL-1))*Math.PI*2*0.92,rr=TOR+TUBE*Math.cos(th);push(new THREE.Vector3(Math.cos(d.a)*rr,TUBE*Math.sin(th),Math.sin(d.a)*rr),Z,new THREE.Color(0.2,0.2,0.2),-1,j===TL-1?4.6:2.2,Math.random(),0,0.4);S.torusMap.push([k,j]);}});
     S.torusStart=t0;S.TL=TL;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(A.tpos,3));
     for(const k of ['tpos','offs','tcol'])g.setAttribute(k,new THREE.Float32BufferAttribute(A[k],3));for(const k of ['cid','size','phase','spinm','tb'])g.setAttribute(k,new THREE.Float32BufferAttribute(A[k],1));
-    g.attributes.tcol.setUsage(THREE.DynamicDrawUsage);g.attributes.tb.setUsage(THREE.DynamicDrawUsage);S.geo=g;const pts=new THREE.Points(g,mat);pts.frustumCulled=false;dyn.add(pts);S.count=A.size.length;
+    g.attributes.tcol.setUsage(THREE.DynamicDrawUsage);g.attributes.tb.setUsage(THREE.DynamicDrawUsage);S.geo=g;S.base=null;const pts=new THREE.Points(g,mat);pts.frustumCulled=false;dyn.add(pts);S.count=A.size.length;applyScl();
     // yükseklik sapları
     const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));sg.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));
     S.stems=new THREE.LineSegments(sg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.3}));S.stems.frustumCulled=false;dyn.add(S.stems);
@@ -85,7 +87,7 @@ export function create(host,opt){
     const bg=new THREE.BufferGeometry();bg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));bg.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));
     S.beams=new THREE.LineSegments(bg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.9,blending:THREE.AdditiveBlending,depthWrite:false}));S.beams.frustumCulled=false;dyn.add(S.beams);
     // vuruş alanı
-    const hg=new THREE.BufferGeometry();hg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.n*3),3));S.hit=new THREE.Points(hg,new THREE.PointsMaterial({size:0.01,transparent:true,opacity:0}));S.hit.frustumCulled=false;dyn.add(S.hit);
+    const hg=new THREE.BufferGeometry();hg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.n*3),3));S.hit=new THREE.Points(hg,new THREE.PointsMaterial({size:0.01,transparent:true,opacity:0}));S.hit.frustumCulled=false;dyn.add(S.hit);const tlg=new THREE.BufferGeometry();tlg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));tlg.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));S.tail=new THREE.LineSegments(tlg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));S.tail.frustumCulled=false;dyn.add(S.tail);
     // sektör sınırları + bulutsular
     S.neb=[];S.sectors.forEach((s,si)=>{const lg=new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(Math.cos(s.a0)*R0,0,Math.sin(s.a0)*R0),new THREE.Vector3(Math.cos(s.a0)*(TOR+TUBE+0.6),0,Math.sin(s.a0)*(TOR+TUBE+0.6))]);dyn.add(new THREE.Line(lg,new THREE.LineBasicMaterial({color:0x7dd3fc,transparent:true,opacity:0.1})));
       const span=s.a1-s.a0,nb=Math.max(2,Math.min(6,Math.round(span*3)));for(let q=0;q<nb;q++){const a=s.a0+span*(q+0.5)/nb,rr=R0+(RM-R0)*(0.45+0.4*Math.random()),m=new THREE.SpriteMaterial({map:GT,color:0x00ffaa,transparent:true,opacity:0,blending:THREE.AdditiveBlending,depthWrite:false});
@@ -102,7 +104,7 @@ export function create(host,opt){
     if(S.asmT0===null&&info.assemble!==false)S.asmT0=clock();if(info.assemble===false)U.uAsm.value=1;}
   // kare durumu (canlı ya da geri oynatma imleci)
   function setFrame(F){for(let k=0;k<S.n;k++){const f=F.c[k],d=S.syms[k];if(!f)continue;const r=R0+(RM-R0)*Math.max(0,Math.min(1,f.r)),y=(isFinite(f.ch)?Math.max(-15,Math.min(15,f.ch)):0)/15*3.2,T=S.tgt[k];
-      T.p.set(Math.cos(d.a)*r,y,Math.sin(d.a)*r);T.col.copy(flowCol(f.up,f.fl));const rv=Math.max(0.2,Math.min(isFinite(f.rv)?f.rv:1,6));T.br=0.45+0.55*Math.sqrt(rv/6);T.spin=0.15+0.25*rv;T.sz=0.75+0.45*Math.sqrt(rv/6);T.r=f.r;T.ch=f.ch;T.r1=f.r1;T.r4=f.r4;T.al=!!f.al;T.fs=f.fs||'';}
+      T.p.set(Math.cos(d.a)*r,y,Math.sin(d.a)*r);T.col.copy(f.dir!==undefined?dirCol(f.dir):flowCol(f.up,f.fl));T.rp=f.rp;const rv=Math.max(0.2,Math.min(isFinite(f.rv)?f.rv:1,6));T.br=0.45+0.55*Math.sqrt(rv/6);T.spin=0.15+0.25*rv;T.sz=0.75+0.45*Math.sqrt(rv/6);T.r=f.r;T.ch=f.ch;T.r1=f.r1;T.r4=f.r4;T.al=!!f.al;T.fs=f.fs||'';}
     S.corr=F.corr||null;
     if(F.tor){const tc=S.geo.attributes.tcol,tb=S.geo.attributes.tb;for(let q=0;q<S.torusMap.length;q++){const [k,j]=S.torusMap[q],a=F.tor[k];if(!a)continue;const v=a[j],pv=j>0?a[j-1]:NaN,ix=S.torusStart+q;
         if(!isFinite(v)||!isFinite(pv)){tc.setXYZ(ix,0.1,0.1,0.12);tb.setX(ix,0.15);continue;}const cl=flowCol(v>pv,v);tc.setXYZ(ix,cl.r,cl.g,cl.b);tb.setX(ix,j===S.TL-1?1.1:0.3+0.45*Math.min(1,Math.abs(v)/1.5));}tc.needsUpdate=true;tb.needsUpdate=true;}
@@ -112,19 +114,22 @@ export function create(host,opt){
   // HTML etiketleri
   const lab=document.createElement('div');lab.className='g3lab';host.appendChild(lab);
   function labels(){const W=host.clientWidth,H=host.clientHeight,v=new THREE.Vector3();let h='';const labelsH=[];
-    if(!S.focus)S.sectors.forEach(s=>{const am=(s.a0+s.a1)/2;v.set(Math.cos(am)*(TOR+TUBE+1.6),0.2,Math.sin(am)*(TOR+TUBE+1.6)).project(cam);if(v.z<1)h+=`<span class="sl" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${s.nm} ${s.n}</span>`;});
-    S.syms.forEach((d,k)=>{const c=S.cur[k],T=S.tgt[k];const pn=S.pin.indexOf(k)>=0;if(!(T.r<0.5||d.top||S.focus===k||pn))return;v.copy(c.p).project(cam);if(v.z<1&&U.uAsm.value>0.9)h+=`<span class="cl${T.r<0.05?' f':''}${S.focus===k?' fo':''}${pn?' pn':''}${T.fs==='o'?' fm':''}" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${pn?'★ ':''}${d.b}${T.fs==='k'&&T.r<0.05?' ✓':T.fs==='o'?' ◌':''}</span>`;});
+    const SPL=[];if(!S.focus)S.sectors.forEach(s=>{const am=(s.a0+s.a1)/2;v.set(Math.cos(am)*(RM+1.6),0.2,Math.sin(am)*(RM+1.6)).project(cam);if(v.z<1){const nm=W<600&&s.sh?s.sh:s.nm,w=(nm.length+String(s.n).length+1)*8.7+22,hw=w/2,x=Math.max(hw+4,Math.min(W-hw-4,(v.x+1)/2*W)),y=Math.max(18,Math.min(H-18,(1-v.y)/2*H));SPL.push({x0:x-hw,y0:y-15,x1:x+hw,y1:y+15});h+=`<span class="sl sp" style="left:${x}px;top:${y}px;--sc:${s.col||'#7dd3fc'}">${nm}<b>${s.n}</b></span>`;}});
+    const cand=[];S.syms.forEach((d,k)=>{const c=S.cur[k],T=S.tgt[k];const pn=S.pin.indexOf(k)>=0,hv=S.hov===k;v.copy(c.p).project(cam);if(!(v.z<1&&U.uAsm.value>0.9))return;const x=(v.x+1)/2*W,y=(1-v.y)/2*H;if(x<0||y<0||x>W||y>H)return;cand.push({k,d,T,pn,x,y,pr:(S.focus===k||hv?-10:0)+(pn?-5:0)+(T.r<0.05?-2:0)+T.r-(d.top?0.3:0)});});
+    cand.sort((a,b)=>a.pr-b.pr);const NL=S.opt.lblN||12,placed=SPL.slice(),NS=placed.length;S.lbr=[];
+    for(const o of cand){const must=S.focus===o.k||S.hov===o.k;if(placed.length-NS>=NL&&!must)continue;const txt=(o.pn?'★ ':'')+o.d.b+(o.T.fs==='k'&&o.T.r<0.05?' ✓':o.T.fs==='o'?' ◌':'');const fz=must?16:14,w=txt.length*fz*0.64+16,hh=fz+10,x0=o.x+7,y0=o.y-hh-5;let hit=false;if(!must)for(const p of placed){if(x0<p.x1+3&&x0+w>p.x0-3&&y0<p.y1+2&&y0+hh>p.y0-2){hit=true;break;}}if(hit)continue;placed.push({x0,y0,x1:x0+w,y1:y0+hh});S.lbr.push({k:o.k,x0:x0-4,y0:y0-4,x1:x0+w+4,y1:y0+hh+4});
+      h+=`<span class="cl cp${o.T.r<0.05?' f':''}${S.focus===o.k?' fo':''}${o.pn?' pn':''}${o.T.fs==='o'?' fm':''}${S.hov===o.k?' hv':''}" style="left:${x0}px;top:${y0}px">${txt}</span>`;}
     if(!S.focus&&SR.D&&!S.opt.noSess){for(const [hh,t,r] of [[0,'00',17.9],[6,'06',17.9],[12,'12',17.9],[18,'18',17.9],[10,'BIST açılış 10:00',18.7],[18,'BIST kapanış 18:00',18.9]]){const a=hAng(hh);v.set(Math.cos(a)*r,SY,Math.sin(a)*r).project(cam);if(v.z<1)labelsH.push(`<span class="sl ss${t.length>3?' sb':''}" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H+(t.indexOf('kapan')>0?12:0)}px">${t}</span>`);}
       const a=hAng(SR.D.now+SR.D.min/60);v.set(Math.cos(a)*19.2,SY,Math.sin(a)*19.2).project(cam);if(v.z<1)labelsH.push(`<span class="sl sn" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">şimdi ${String(SR.D.now).padStart(2,'0')}:${String(SR.D.min).padStart(2,'0')} TSİ</span>`);}
-    if(!S.focus)[['ateşliyor',0.25],['yakın',0.5],['izlemede',0.75],['uzak',1]].forEach(([t,q])=>{v.set(0,0,R0+(RM-R0)*q).project(cam);if(v.z<1)h+=`<span class="rl" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${t}</span>`;});
+    if(!S.focus)[['Sinyale çok yakın',0.1],['Yaklaşıyor',0.4],['Uzak',0.85]].forEach(([t,q])=>{v.set(0,0,R0+(RM-R0)*q).project(cam);if(v.z<1)h+=`<span class="rl rp" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${t}</span>`;});
     lab.innerHTML=h+labelsH.join('');}
   // etkileşim
   const ray=new THREE.Raycaster();ray.params.Points.threshold=0.6;const m2=new THREE.Vector2();let downAt=null;
-  function pick(e){const b=renderer.domElement.getBoundingClientRect();m2.set((e.clientX-b.left)/b.width*2-1,-(e.clientY-b.top)/b.height*2+1);ray.setFromCamera(m2,cam);if(!S.hit)return -1;const hs=ray.intersectObject(S.hit);return hs.length?hs[0].index:-1;}
-  renderer.domElement.addEventListener('pointermove',e=>{const k=pick(e);renderer.domElement.style.cursor=k>=0?'pointer':'grab';opt.onHover&&opt.onHover(k>=0?S.syms[k]:null,e);});
+  function pick(e){const b=renderer.domElement.getBoundingClientRect(),x=e.clientX-b.left,y=e.clientY-b.top;if(S.lbr)for(const r of S.lbr)if(x>=r.x0&&x<=r.x1&&y>=r.y0&&y<=r.y1)return r.k;if(!S.n||U.uAsm.value<0.9)return -1;const v=new THREE.Vector3();let best=-1,bd=1e9;for(let k=0;k<S.n;k++){const c=S.cur[k];if(!c)continue;v.copy(c.p).project(cam);if(v.z>=1)continue;const px=(v.x+1)/2*b.width,py=(1-v.y)/2*b.height,q=Math.hypot(px-x,py-y),lim=16+10*(c.sz||1)*((S.scl&&S.scl[k])||1);if(q<lim&&q<bd){bd=q;best=k;}}return best;}
+  renderer.domElement.addEventListener('pointermove',e=>{const k=pick(e);renderer.domElement.style.cursor=k>=0?'pointer':'grab';S.hov=k>=0?k:null;opt.onHover&&opt.onHover(k>=0?S.syms[k]:null,e);});
   renderer.domElement.addEventListener('pointerdown',e=>{downAt=[e.clientX,e.clientY];ctl.autoRotate=false;});
   renderer.domElement.addEventListener('pointerup',e=>{if(downAt&&Math.hypot(e.clientX-downAt[0],e.clientY-downAt[1])<5){const k=pick(e);if(k>=0&&opt.onPick)opt.onPick(k);}downAt=null;if(!S.focus)setTimeout(()=>{if(!S.focus)ctl.autoRotate=true;},4000);});
-  renderer.domElement.addEventListener('pointerleave',()=>{opt.onHover&&opt.onHover(null);});
+  renderer.domElement.addEventListener('pointerleave',()=>{S.hov=null;opt.onHover&&opt.onHover(null);});
   // odak: kameranın coine uçuşu + holografik mini grafik
   function focus(k){S.focus=k;ctl.autoRotate=false;const p=S.cur[k].p.clone(),out=new THREE.Vector3(p.x,0,p.z).normalize();if(!isFinite(out.x))out.set(0,0,1);
     const side=new THREE.Vector3(-out.z,0,out.x);S.holoOut=out;const tg=p.clone().addScaledVector(out,1.0).addScaledVector(side,0.5).add(new THREE.Vector3(0,0.75,0));const camTo=tg.clone().addScaledVector(side,-8.4).addScaledVector(out,1.6).add(new THREE.Vector3(0,1.3,0));
@@ -140,14 +145,15 @@ export function create(host,opt){
   function frame(){const now=clock(),t=now/1000;U.time.value=t;U.uF.value=S.focus==null?-1:S.focus;const sw=(t*2*Math.PI/7)%(2*Math.PI);U.sweep.value=sw;fan.rotation.z=-sw;
     if(S.asmT0!==null)U.uAsm.value=Math.min(1,(now-S.asmT0)/2200);
     const kL=1-Math.pow(0.0015,1/60*Math.min(4,(now-(S.lastNow||now))/16.7||1));S.lastNow=now;
-    const sp=S.stems&&S.stems.geometry.attributes.position.array,scol=S.stems&&S.stems.geometry.attributes.color.array,hp=S.hit&&S.hit.geometry.attributes.position.array,bp=S.beams&&S.beams.geometry.attributes.position.array,bc=S.beams&&S.beams.geometry.attributes.color.array;
+    const sp=S.stems&&S.stems.geometry.attributes.position.array,scol=S.stems&&S.stems.geometry.attributes.color.array,hp=S.hit&&S.hit.geometry.attributes.position.array,bp=S.beams&&S.beams.geometry.attributes.position.array,bc=S.beams&&S.beams.geometry.attributes.color.array,tp=S.tail&&S.tail.geometry.attributes.position.array,tc=S.tail&&S.tail.geometry.attributes.color.array;
     for(let k=0;k<S.n;k++){const c=S.cur[k],T=S.tgt[k];c.p.lerp(T.p,kL);c.col.lerp(T.col,kL);c.br+=(T.br-c.br)*kL;c.spin+=(T.spin-c.spin)*kL;c.sz+=(T.sz-c.sz)*kL;
       U.uC.value[k].set(c.p.x,c.p.y,c.p.z,c.spin);U.uS.value[k].set(c.col.r,c.col.g,c.col.b,c.br);
       sp[k*6]=c.p.x;sp[k*6+1]=0;sp[k*6+2]=c.p.z;sp[k*6+3]=c.p.x;sp[k*6+4]=c.p.y;sp[k*6+5]=c.p.z;const up=(T.ch||0)>=0;for(let q=0;q<2;q++){scol[k*6+q*3]=up?0:1;scol[k*6+q*3+1]=up?1:0.24;scol[k*6+q*3+2]=up?0.55:0.47;}
       hp[k*3]=c.p.x;hp[k*3+1]=c.p.y;hp[k*3+2]=c.p.z;
+      if(tp){const rr=Math.hypot(c.p.x,c.p.z)||1,ux=c.p.x/rr,uz=c.p.z/rr,ok=T.rp!=null&&isFinite(T.rp)&&Math.abs(T.rp-T.r)>0.012,r0=ok?R0+(RM-R0)*Math.max(0,Math.min(1,T.rp)):rr,dm=S.focus!=null&&S.focus!==k?0.25:1;tp.set([ux*r0,c.p.y,uz*r0,c.p.x,c.p.y,c.p.z],k*6);const cc=!ok?[0,0,0]:T.rp>T.r?[1,0.85,0.1]:[0.45,0.6,0.9];tc.set([cc[0]*0.12*dm,cc[1]*0.12*dm,cc[2]*0.12*dm,cc[0]*dm,cc[1]*dm,cc[2]*dm],k*6);}
       const fireNow=T.fs==='k'||(T.fs!=='o'&&T.r<0.05),near=T.r<0.35,pul=fireNow?0.6+0.4*Math.sin(t*6):near?0.18+0.08*Math.sin(t*2):0;bp[k*6]=c.p.x;bp[k*6+1]=c.p.y;bp[k*6+2]=c.p.z;bp[k*6+3]=0;bp[k*6+4]=0;bp[k*6+5]=0;
       const bcol=fireNow?[1,0.9,0]:[0.49,0.83,0.99];for(let q=0;q<2;q++){bc[k*6+q*3]=bcol[0]*pul*(q?0.25:1);bc[k*6+q*3+1]=bcol[1]*pul*(q?0.25:1);bc[k*6+q*3+2]=bcol[2]*pul*(q?0.25:1);}}
-    if(S.stems){S.stems.geometry.attributes.position.needsUpdate=true;S.stems.geometry.attributes.color.needsUpdate=true;S.hit.geometry.attributes.position.needsUpdate=true;S.beams.geometry.attributes.position.needsUpdate=true;S.beams.geometry.attributes.color.needsUpdate=true;S.hit.geometry.computeBoundingSphere();}
+    if(S.stems){S.stems.geometry.attributes.position.needsUpdate=true;S.stems.geometry.attributes.color.needsUpdate=true;S.hit.geometry.attributes.position.needsUpdate=true;S.beams.geometry.attributes.position.needsUpdate=true;S.beams.geometry.attributes.color.needsUpdate=true;S.hit.geometry.computeBoundingSphere();if(S.tail){S.tail.geometry.attributes.position.needsUpdate=true;S.tail.geometry.attributes.color.needsUpdate=true;}}
     // ateşleme efektleri: genişleyen halka (parçacık) + ışın
     S.fx=S.fx.filter(f=>now-f.t0<2400);
     // kuyruklu yıldızlar
@@ -186,7 +192,12 @@ export function create(host,opt){
   function loop(){renderer.setAnimationLoop(S.running&&!S.paused&&!opt.capture?frame:null);}loop();
   function pause(v){S.paused=!!v;loop();}
   document.addEventListener('visibilitychange',()=>{S.running=!document.hidden;loop();});
+  /* v11: seçili düğüm ölçeği — cid'e göre parçacık boyutu ve küme yayılımı çarpılır (veri değişmez) */
+  function applyScl(){const g=S.geo;if(!g)return;const sz=g.attributes.size,of=g.attributes.offs,cid=g.attributes.cid.array;if(!S.base||S.base.s.length!==sz.array.length)S.base={s:Float32Array.from(sz.array),o:Float32Array.from(of.array)};const M=S.scl||{};let ch=false;
+    for(let i=0;i<cid.length;i++){const m=cid[i]>=0?(M[cid[i]]||1):1,ns=S.base.s[i]*m;if(sz.array[i]!==ns){sz.array[i]=ns;ch=true;}for(let q=0;q<3;q++){const no=S.base.o[i*3+q]*m;if(of.array[i*3+q]!==no){of.array[i*3+q]=no;ch=true;}}}
+    if(ch){sz.needsUpdate=true;of.needsUpdate=true;}}
+  function setScale(map){S.scl={};Object.keys(map||{}).forEach(k=>{const v=+map[k];if(isFinite(v)&&v>0&&v!==1)S.scl[k]=Math.min(4,Math.max(0.3,v));});applyScl();}
   function setOpts(o){S.opt=Object.assign({},S.opt,o||{});}
-  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,setSession,pause,paused:()=>!!S.paused,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
+  return {setData,setFrame,setOpts,setScale,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,setSession,pause,paused:()=>!!S.paused,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
     orbit(az){const r=Math.hypot(cam.position.x-ctl.target.x,cam.position.z-ctl.target.z);cam.position.x=ctl.target.x+Math.sin(az)*r;cam.position.z=ctl.target.z+Math.cos(az)*r;},
     dispose(){renderer.setAnimationLoop(null);renderer.dispose();host.removeChild(renderer.domElement);host.removeChild(lab);}};}
