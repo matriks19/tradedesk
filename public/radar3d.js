@@ -1,6 +1,7 @@
 /* QUANTEX Radar v4 — "Sinyal Galaksisi" (Three.js + UnrealBloom). Tüm görseller gerçek veriyi kodlar:
    çekirdeğe uzaklık = kurulum yakınlığı · yükseklik = 24s değişim · parlaklık/dönüş = RVOL · renk = OBV akış yönü
    dış torus = son 48 mum OBV akışı · bulutsu = sektör akış genişliği · kuyruklu yıldız = gerçek işlem sonucu (lab çıkış kuralı)
+   v5: izleme listesi halkası (sabitlenen semboller) · performans modu (ölçülen fps'e göre parçacık yoğunluğu / piksel oranı / bloom).
    v4: takımyıldız çizgisi = 7g getiri korelasyonu ρ>0.8 · TF yörüngesi = 1s (camgöbeği) / 4s (mor) yakınlığı, hizalı = altın hale. */
 import * as THREE from 'three';
 import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
@@ -11,9 +12,9 @@ import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 const MAXC=80;
 const VS=`#define MAXC ${MAXC}
 attribute vec3 tpos;attribute vec3 offs;attribute vec3 tcol;attribute float cid;attribute float size;attribute float phase;attribute float spinm;attribute float tb;
-uniform vec4 uC[MAXC];uniform vec4 uS[MAXC];uniform float time,sweep,pr,uAsm,uF;varying vec3 vC;varying float vA;
+uniform vec4 uC[MAXC];uniform vec4 uS[MAXC];uniform float time,sweep,pr,uAsm,uF,uDens;varying vec3 vC;varying float vA;
 float h1(float n){return fract(sin(n)*43758.5453);}
-void main(){vec3 cen;vec3 col;float br;float spin;float ang;float sz=size;
+void main(){if(cid>=0.0&&spinm>0.0&&phase>uDens){gl_PointSize=0.0;gl_Position=vec4(2.0,2.0,2.0,1.0);vA=0.0;vC=vec3(0.0);return;}vec3 cen;vec3 col;float br;float spin;float ang;float sz=size;
  if(cid>=0.0){int k=int(cid);cen=uC[k].xyz;col=uS[k].rgb;float b0=uS[k].a;br=b0*tb;spin=uC[k].w*spinm;sz*=(0.75+0.45*clamp((b0-0.45)/0.55,0.0,1.0))*(abs(cid-uF)<0.5?1.4:1.0);if(uF>=0.0&&abs(cid-uF)>0.5)br*=0.35;}else{cen=tpos;col=tcol;br=tb;spin=0.0;}
  ang=atan(cen.z,cen.x);if(ang<0.0)ang+=6.2831;
  float a=time*spin+phase*6.2831;float cs=cos(a),sn=sin(a);vec3 o=vec3(offs.x*cs-offs.z*sn,offs.y,offs.x*sn+offs.z*cs);vec3 p=cen+o;
@@ -35,7 +36,7 @@ export function create(host,opt){
   const cam=new THREE.PerspectiveCamera(48,1,0.1,400);const HOME={p:new THREE.Vector3(0,12.5,27.5),t:new THREE.Vector3(0,0.4,0)};cam.position.copy(HOME.p);
   const ctl=new OrbitControls(cam,renderer.domElement);ctl.enableDamping=true;ctl.dampingFactor=0.06;ctl.autoRotate=true;ctl.autoRotateSpeed=0.4;ctl.minDistance=3;ctl.maxDistance=48;ctl.maxPolarAngle=Math.PI*0.86;ctl.target.copy(HOME.t);
   const comp=new EffectComposer(renderer);comp.addPass(new RenderPass(scene,cam));const bloom=new UnrealBloomPass(new THREE.Vector2(256,256),lite?0.75:0.9,0.5,0.14);comp.addPass(bloom);comp.addPass(new OutputPass());
-  const U={time:{value:0},sweep:{value:0},pr:{value:PR},uAsm:{value:0},uF:{value:-1},uC:{value:Array.from({length:MAXC},()=>new THREE.Vector4())},uS:{value:Array.from({length:MAXC},()=>new THREE.Vector4(0.5,0.5,0.5,0.5))}};
+  const U={time:{value:0},sweep:{value:0},pr:{value:PR},uAsm:{value:0},uF:{value:-1},uDens:{value:1},uC:{value:Array.from({length:MAXC},()=>new THREE.Vector4())},uS:{value:Array.from({length:MAXC},()=>new THREE.Vector4(0.5,0.5,0.5,0.5))}};
   const mat=new THREE.ShaderMaterial({uniforms:U,vertexShader:VS,fragmentShader:FS,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
   const R0=0.9,RM=10.5,TOR=13.4,TUBE=1.35,TFY=-0.9,GT=glowTex();
   [[0.25,0.45],[0.5,0.26],[0.75,0.18],[1,0.14]].forEach(([q,o])=>{const g=new THREE.BufferGeometry().setFromPoints(Array.from({length:181},(_,i)=>{const a=i/180*Math.PI*2,r=R0+(RM-R0)*q;return new THREE.Vector3(Math.cos(a)*r,0,Math.sin(a)*r);}));scene.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:0x00ffaa,transparent:true,opacity:o})));});
@@ -43,7 +44,13 @@ export function create(host,opt){
   const haloM=new THREE.SpriteMaterial({map:GT,color:0xffc400,transparent:true,opacity:0.3,blending:THREE.AdditiveBlending,depthWrite:false});const halo=new THREE.Sprite(haloM);halo.scale.set(4,4,1);scene.add(halo);
   const fan=new THREE.Mesh(new THREE.CircleGeometry(RM,48,0,0.55),new THREE.MeshBasicMaterial({color:0x00ffaa,transparent:true,opacity:0.06,side:THREE.DoubleSide,blending:THREE.AdditiveBlending,depthWrite:false}));fan.rotation.x=-Math.PI/2;scene.add(fan);
   let dyn=new THREE.Group();scene.add(dyn);
-  const S={n:0,syms:[],cur:[],tgt:[],sectors:[],neb:[],stems:null,hit:null,torus:null,torusMap:[],comets:null,cometCap:lite?1200:3000,fx:[],coreLevel:0,focus:null,fly:null,holo:null,holoTex:null,asmT0:null,running:true,fps:0,frames:0,lastF:0,manualT:null,count:0,opt:{corr:true,tf:false},corr:null};
+  const S={n:0,syms:[],cur:[],tgt:[],sectors:[],neb:[],stems:null,hit:null,torus:null,torusMap:[],comets:null,cometCap:lite?1200:3000,fx:[],coreLevel:0,focus:null,fly:null,holo:null,holoTex:null,asmT0:null,running:true,fps:0,frames:0,lastF:0,manualT:null,count:0,opt:{corr:true,tf:false},corr:null,pin:[],perf:{mode:'auto',lvl:0,last:0,hist:[]}};
+  const PLV=[{d:1,pr:PR,b:true,n:'yüksek'},{d:0.5,pr:Math.min(PR,1.25),b:true,n:'orta'},{d:0.2,pr:1,b:false,n:'düşük'}];
+  function applyPerf(l){S.perf.lvl=l;const L=PLV[l];U.uDens.value=L.d;renderer.setPixelRatio(L.pr);U.pr.value=L.pr;comp.setPixelRatio(L.pr);bloom.enabled=L.b;size();}
+  function setPerf(m){S.perf.mode=m;S.perf.last=clock();applyPerf(m==='high'?0:m==='low'?2:S.perf.lvl);}
+  // izleme listesi halkaları
+  const PINC=16,PSEG=32;const pg=new THREE.BufferGeometry();pg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(PINC*PSEG*6),3));pg.setDrawRange(0,0);
+  const pinL=new THREE.LineSegments(pg,new THREE.LineBasicMaterial({color:0xffe27a,transparent:true,opacity:0.95,blending:THREE.AdditiveBlending,depthWrite:false}));pinL.frustumCulled=false;scene.add(pinL);
   const ECAP=240;
   function setData(list,info){scene.remove(dyn);dyn.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material&&o.material!==mat&&o.material.dispose)o.material.dispose();});dyn=new THREE.Group();scene.add(dyn);
     S.n=Math.min(MAXC,list.length);S.syms=list.slice(0,S.n);S.sectors=info.sectors||[];S.cur=[];S.tgt=[];S.fx=[];
@@ -85,14 +92,14 @@ export function create(host,opt){
     S.corr=F.corr||null;
     if(F.tor){const tc=S.geo.attributes.tcol,tb=S.geo.attributes.tb;for(let q=0;q<S.torusMap.length;q++){const [k,j]=S.torusMap[q],a=F.tor[k];if(!a)continue;const v=a[j],pv=j>0?a[j-1]:NaN,ix=S.torusStart+q;
         if(!isFinite(v)||!isFinite(pv)){tc.setXYZ(ix,0.1,0.1,0.12);tb.setX(ix,0.15);continue;}const cl=flowCol(v>pv,v);tc.setXYZ(ix,cl.r,cl.g,cl.b);tb.setX(ix,j===S.TL-1?1.1:0.3+0.45*Math.min(1,Math.abs(v)/1.5));}tc.needsUpdate=true;tb.needsUpdate=true;}
-    if(F.neb)S.neb.forEach(n=>{const b=F.neb[n.si];if(b==null)return;n.sp.material.color.setHSL(b>=0.5?0.42:0.93,1,0.5);n.sp.material.opacity=0.04+0.22*Math.abs(b-0.5)*2*0.6+0.1*b;});
-    S.coreLevel=Math.min(1,((F.fire||0)*2+(F.near||0))/10);S.cometData=F.comets||[];}
+    if(F.neb)S.neb.forEach(n=>{const b=F.neb[n.si];if(b==null)return;n.sp.material.color.setHSL(b>=0.5?0.42:0.93,1,0.5);n.op0=0.04+0.22*Math.abs(b-0.5)*2*0.6+0.1*b;});
+    S.pin=(F.pin||[]).slice(0,PINC);S.coreLevel=Math.min(1,((F.fire||0)*2+(F.near||0))/10);S.cometData=F.comets||[];}
   function fire(k){S.fx.push({k,t0:clock()});}
   // HTML etiketleri
   const lab=document.createElement('div');lab.className='g3lab';host.appendChild(lab);
   function labels(){const W=host.clientWidth,H=host.clientHeight,v=new THREE.Vector3();let h='';
     if(!S.focus)S.sectors.forEach(s=>{const am=(s.a0+s.a1)/2;v.set(Math.cos(am)*(TOR+TUBE+1.6),0.2,Math.sin(am)*(TOR+TUBE+1.6)).project(cam);if(v.z<1)h+=`<span class="sl" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${s.nm} ${s.n}</span>`;});
-    S.syms.forEach((d,k)=>{const c=S.cur[k],T=S.tgt[k];if(!(T.r<0.5||d.top||S.focus===k))return;v.copy(c.p).project(cam);if(v.z<1&&U.uAsm.value>0.9)h+=`<span class="cl${T.r<0.05?' f':''}${S.focus===k?' fo':''}" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${d.b}</span>`;});
+    S.syms.forEach((d,k)=>{const c=S.cur[k],T=S.tgt[k];const pn=S.pin.indexOf(k)>=0;if(!(T.r<0.5||d.top||S.focus===k||pn))return;v.copy(c.p).project(cam);if(v.z<1&&U.uAsm.value>0.9)h+=`<span class="cl${T.r<0.05?' f':''}${S.focus===k?' fo':''}${pn?' pn':''}" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${pn?'★ ':''}${d.b}</span>`;});
     if(!S.focus)[['ateşliyor',0.25],['yakın',0.5],['izlemede',0.75],['uzak',1]].forEach(([t,q])=>{v.set(0,0,R0+(RM-R0)*q).project(cam);if(v.z<1)h+=`<span class="rl" style="left:${(v.x+1)/2*W}px;top:${(1-v.y)/2*H}px">${t}</span>`;});
     lab.innerHTML=h;}
   // etkileşim
@@ -150,16 +157,19 @@ export function create(host,opt){
       if(S.opt.corr&&S.corr){for(const e of (S.focus!=null?S.corr.E:(S.corr.S||S.corr.E))){if(ne>=ECAP)break;const A=S.cur[e[0]],B=S.cur[e[1]];if(!A||!B)continue;const foc=S.focus!=null&&(e[0]===S.focus||e[1]===S.focus);if(S.focus!=null&&!foc)continue;const w=Math.max(0,Math.min(1,(e[2]-0.8)/0.2)),a=foc?1:(0.35+0.65*w)*(0.85+0.15*Math.sin(t*1.5+e[0]*0.7));
         ep.set([A.p.x,A.p.y,A.p.z,B.p.x,B.p.y,B.p.z],ne*6);ec.set([0.75*a,0.52*a,0.99*a,(0.75+0.25*w)*a,(0.52+0.4*w)*a,0.99*a],ne*6);ne++;}}
       S.cl.geometry.setDrawRange(0,ne*2);S.cl.geometry.attributes.position.needsUpdate=true;S.cl.geometry.attributes.color.needsUpdate=true;}
-    S.neb.forEach(nb=>{nb.sp.material.rotation+=nb.rot*0.016;});
+    {const pa=pg.attributes.position.array;let q=0;for(const k of S.pin){const c=S.cur[k];if(!c)continue;const rr=0.62+0.06*Math.sin(t*3),a0=t*0.8;for(let i=0;i<PSEG;i++){if(i%4===3)continue;const a=a0+i/PSEG*6.2831,b=a0+(i+1)/PSEG*6.2831;pa.set([c.p.x+Math.cos(a)*rr,c.p.y,c.p.z+Math.sin(a)*rr,c.p.x+Math.cos(b)*rr,c.p.y,c.p.z+Math.sin(b)*rr],q*6);q++;}}pg.setDrawRange(0,q*2);pg.attributes.position.needsUpdate=true;}
+    S.neb.forEach(nb=>{nb.sp.material.rotation+=nb.rot*0.016;if(nb.op0!=null){const tg=nb.op0*(S.focus!=null?0.22:1);nb.sp.material.opacity+=(tg-nb.sp.material.opacity)*0.08;}});
     const cl=0.35+0.65*S.coreLevel,pz=1+0.06*Math.sin(t*(2+4*S.coreLevel));core.scale.set(pz,pz,pz);coreM.color.setRGB(cl+0.3,0.85*cl+0.2,0.35*cl+0.1);halo.scale.setScalar(3.4+1.6*S.coreLevel+0.3*Math.sin(t*3));haloM.opacity=(0.18+0.3*S.coreLevel)*(S.focus!=null?0.3:1);coreM.color.multiplyScalar(S.focus!=null?0.45:1);bloom.strength+=(((S.focus!=null)?0.55:(lite?0.75:0.9))-bloom.strength)*0.08;
     if(S.fly){const u=Math.min(1,(now-S.fly.t0)/S.fly.dur),e=u<0.5?4*u*u*u:1-Math.pow(-2*u+2,3)/2;cam.position.lerpVectors(S.fly.p0,S.fly.p1,e);ctl.target.lerpVectors(S.fly.t0v,S.fly.t1,e);if(u>=1){if(S.fly.home)ctl.autoRotate=true;S.fly=null;}}
     if(S.focus!=null){/* odakta coin yer değiştirirse (geri oynatma → canlı) kamera onu izler */const fp=S.cur[S.focus].p;if(S.lastFocP){const dx=fp.x-S.lastFocP.x,dy=fp.y-S.lastFocP.y,dz=fp.z-S.lastFocP.z;cam.position.x+=dx;cam.position.y+=dy;cam.position.z+=dz;ctl.target.x+=dx;ctl.target.y+=dy;ctl.target.z+=dz;if(S.fly){for(const v of [S.fly.p1,S.fly.t1]){v.x+=dx;v.y+=dy;v.z+=dz;}}}S.lastFocP=fp.clone();}else S.lastFocP=null;
     if(S.holo&&S.holo.visible&&S.focus!=null){const c=S.cur[S.focus].p;S.holo.position.copy(c).addScaledVector(S.holoOut,2.0).addScaledVector(S.holoSide,1.0).add(new THREE.Vector3(0,1.5,0));S.holo.lookAt(cam.position);S.holo.material.opacity=0.86+0.06*Math.sin(t*9)*Math.sin(t*2.3);}
     if(S.manualT==null||S.fly)ctl.update();else cam.lookAt(ctl.target);comp.render();labels();
-    S.frames++;if(now-S.lastF>1000){S.fps=S.frames*1000/(now-S.lastF);S.frames=0;S.lastF=now;}}
+    S.frames++;if(now-S.lastF>1000){S.fps=S.frames*1000/(now-S.lastF);S.frames=0;S.lastF=now;}
+    /* otomatik performans: 2 sn'de bir ölçülen fps → <30 ise yoğunluğu düşür, >55 ise geri yükselt (yakalama modunda saat sanal → kapalı) */
+    const P=S.perf;if(P.mode==='auto'&&!opt.capture&&S.fps>0&&now-P.last>2000){P.last=now;P.hist.push({t:Math.round(now),fps:+S.fps.toFixed(1),lvl:P.lvl});if(P.hist.length>30)P.hist.shift();if(S.fps<30&&P.lvl<2)applyPerf(P.lvl+1);else if(S.fps>55&&P.lvl>0)applyPerf(P.lvl-1);}}
   function loop(){renderer.setAnimationLoop(S.running&&!opt.capture?frame:null);}loop();
   document.addEventListener('visibilitychange',()=>{S.running=!document.hidden;loop();});
   function setOpts(o){S.opt=Object.assign({},S.opt,o||{});}
-  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,
+  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
     orbit(az){const r=Math.hypot(cam.position.x-ctl.target.x,cam.position.z-ctl.target.z);cam.position.x=ctl.target.x+Math.sin(az)*r;cam.position.z=ctl.target.z+Math.cos(az)*r;},
     dispose(){renderer.setAnimationLoop(null);renderer.dispose();host.removeChild(renderer.domElement);host.removeChild(lab);}};}

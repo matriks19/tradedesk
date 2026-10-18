@@ -223,22 +223,25 @@ function trust(leg,reg){var o=LABREG.legs[leg]&&LABREG.legs[leg][reg];if(!o||o.n
 function pfTxt(o){return !o?'—':o.pf==null?'∞':o.pf.toFixed(2);}
 /* ---------- BENZERİ KAHİN: geçmiş analog anlar → ileri 12 mum getiri konisi ---------- */
 var ANH=12;
+/* ayarlar (radar_settings_v1; yalnız radar_* anahtarı) */
+var CFG={N:50,rho:0.8,al:0.45,nmin:15,perf:'auto'};
+(function(){try{var v=JSON.parse(localStorage.getItem('radar_settings_v1')||'null');if(v&&typeof v==='object')for(var k in CFG)if(k in v)CFG[k]=v[k];}catch(e){}})();
 function featCoin(c,B){var k=c.k4,n=k.c.length,F={st:new Array(n),r:new Array(n),fl:c.T.fl,lrv:new Array(n),s:new Array(n)};
   for(var i=0;i<n;i++){if(i<60){F.st[i]=null;continue;}var j=idxAt(c.k1.t,k.t[i]+H4,H1),P=proxCoin(c,i,j);F.st[i]=P.st;F.r[i]=P.r;F.lrv[i]=Math.log(Math.max(0.05,j>=0?c.rv1[j]:1));F.s[i]=stressOf(B.mr[k.t[i]],B.br[k.t[i]]);}c.F=F;}
 function featBist(c,B){var k=c.k1,n=k.c.length,F={st:new Array(n),r:new Array(n),z:c.Z,fl:c.flowSer,lrv:new Array(n),s:new Array(n)};
   for(var i=0;i<n;i++){if(i<210){F.st[i]=null;continue;}var P=proxBist(c,i);F.st[i]=P.st;F.r[i]=P.r;F.lrv[i]=Math.log(Math.max(0.05,c.rv1[i]));F.s[i]=B?stressOf(B.mr[k.t[i]],B.br[k.t[i]]):0;}c.F=F;}
 function qnt(a,p){if(!a.length)return NaN;var x=(a.length-1)*p,lo=Math.floor(x),hi=Math.ceil(x);return a[lo]+(a[hi]-a[lo])*(x-lo);}
 var STN={far:'uzak',vfw:'YO6 VF bekliyor',yo6f:'YO6 MA ateşledi',lxz:'Loxx bölgede',lxf:'Loxx ateşledi',sw:'süpürme (filtresiz)',bf:'z−2 kesti',bz:'z<−2',bn:'z −2 yakınında'};
-function analog(c0,i0,Tc){var bist=ST.mode==='bist',tf=bist?H1:H4,F0=c0.F;if(!F0||F0.st[i0]==null)return null;
+function analog(c0,i0,Tc,opt){opt=opt||{};var bist=opt.bist!=null?opt.bist:ST.mode==='bist',tf=bist?H1:H4,F0=c0.F,LIST=opt.list||cur(),NMIN=opt.nmin||CFG.nmin;if(!F0||F0.st[i0]==null)return null;
   var st=F0.st[i0],r0=F0.r[i0],a0=bist?F0.z[i0]:F0.fl[i0],l0=F0.lrv[i0],s0=F0.s[i0],cand=[],tot=0;
-  cur().forEach(function(c){var F=c.F,k=bist?c.k1:c.k4;if(!F)return;for(var q=bist?210:60;q+ANH<k.c.length;q++){if(k.t[q+ANH]+tf>Tc)break;if(F.st[q]!==st)continue;tot++;
+  LIST.forEach(function(c){var F=c.F,k=bist?c.k1:c.k4;if(!F)return;for(var q=bist?210:60;q+ANH<k.c.length;q++){if(k.t[q+ANH]+tf>Tc)break;if(F.st[q]!==st)continue;tot++;
     var a=bist?F.z[q]:F.fl[q];if(!isFinite(a)||!isFinite(a0))continue;var d=Math.abs(F.r[q]-r0)/0.12+Math.abs(a-a0)/(bist?0.4:0.8)+Math.abs(F.lrv[q]-l0)/0.6+Math.abs(F.s[q]-s0)/0.4;if(d<=3)cand.push({c:c,k:k,q:q,d:d});}});
   cand.sort(function(x,y){return x.d-y.d;});var pick=[],used={};
   for(var u=0;u<cand.length&&pick.length<60;u++){var x=cand[u],key=x.c.sym,arr=used[key]=used[key]||[],ok=true;for(var w=0;w<arr.length;w++)if(Math.abs(arr[w]-x.q)<6){ok=false;break;}if(ok){arr.push(x.q);pick.push(x);}}
   var P=pick.map(function(x){var o=[];for(var h=0;h<=ANH;h++)o.push(x.k.c[x.q+h]/x.k.c[x.q]-1);return o;});
   var Q=[];for(var h=0;h<=ANH;h++){var col=P.map(function(p){return p[h];}).sort(function(a,b){return a-b;});Q.push([qnt(col,0.1),qnt(col,0.25),qnt(col,0.5),qnt(col,0.75),qnt(col,0.9)]);}
   var end=P.map(function(p){return p[ANH];}),win=end.length?end.filter(function(v){return v>0;}).length/end.length:NaN,mean=end.length?end.reduce(function(a,b){return a+b;},0)/end.length:NaN;
-  return {st:st,n:P.length,pool:tot,ok:P.length>=15,q:Q,win:win,mean:mean,med:Q[ANH][2],tf:bist?'1s':'4s',picks:pick.slice(0,8).map(function(x){return {s:x.c.b,t:x.k.t[x.q]+tf,r:x.k.c[x.q+ANH]/x.k.c[x.q]-1,d:x.d};})};}
+  return {st:st,n:P.length,pool:tot,ok:P.length>=NMIN,nmin:NMIN,q:Q,win:win,mean:mean,med:Q[ANH][2],tf:bist?'1s':'4s',picks:pick.slice(0,8).map(function(x){return {s:x.c.b,t:x.k.t[x.q]+tf,r:x.k.c[x.q+ANH]/x.k.c[x.q]-1,d:x.d};})};}
 function stLeg(st){return st==='vfw'||st==='yo6f'||st==='sw'?'yo6':st==='lxz'||st==='lxf'?'loxx':ST.mode==='bist'?'bist':null;}
 /* ---------- KORELASYON TAKIMYILDIZI: son 7 gün getirilerinin Pearson korelasyonu (coin 4s×42, BIST 1s×63) ---------- */
 function corrList(list,bist,Tc){var tf=bist?H1:H4,W=bist?63:42,R=[],cnt={};
@@ -246,16 +249,34 @@ function corrList(list,bist,Tc){var tf=bist?H1:H4,W=bist?63:42,R=[],cnt={};
     R.push({t:k.t[i],a:a,m:m,sd:sd});cnt[k.t[i]]=(cnt[k.t[i]]||0)+1;});
   var tm=null,best=0;for(var t in cnt)if(cnt[t]>best){best=cnt[t];tm=+t;}
   var E=[],par=list.map(function(_,k){return k;});function fd(x){while(par[x]!==x){par[x]=par[par[x]];x=par[x];}return x;}
-  for(var x=0;x<R.length;x++){var A=R[x];if(!A||A.t!==tm||!(A.sd>0))continue;for(var y=x+1;y<R.length;y++){var B=R[y];if(!B||B.t!==tm||!(B.sd>0))continue;var s=0;for(var q=0;q<W;q++)s+=(A.a[q]-A.m)*(B.a[q]-B.m);var rho=s/(A.sd*B.sd);if(rho>0.8){E.push([x,y,rho]);par[fd(x)]=fd(y);}}}
+  for(var x=0;x<R.length;x++){var A=R[x];if(!A||A.t!==tm||!(A.sd>0))continue;for(var y=x+1;y<R.length;y++){var B=R[y];if(!B||B.t!==tm||!(B.sd>0))continue;var s=0;for(var q=0;q<W;q++)s+=(A.a[q]-A.m)*(B.a[q]-B.m);var rho=s/(A.sd*B.sd);if(rho>CFG.rho){E.push([x,y,rho]);par[fd(x)]=fd(y);}}}
   E.sort(function(p,q){return q[2]-p[2];});var cl={},sz={};list.forEach(function(_,k){var r=fd(k);sz[r]=(sz[r]||0)+1;});var cid={},nc=0,big=0;list.forEach(function(_,k){var r=fd(k);if(sz[r]>1){if(cid[r]==null)cid[r]=++nc;cl[k]=cid[r];big=Math.max(big,sz[r]);}});
   var M={};E.forEach(function(e){(M[e[0]]=M[e[0]]||{})[e[1]]=e[2];(M[e[1]]=M[e[1]]||{})[e[0]]=e[2];});
   var ok=R.filter(function(x){return x&&x.t===tm;}).length,deg={},S=[];E.forEach(function(e){var a=deg[e[0]]=(deg[e[0]]||0),b=deg[e[1]]=(deg[e[1]]||0);if(a<3||b<3){S.push(e);deg[e[0]]++;deg[e[1]]++;}});
   return {S:S,E:E,cl:cl,nc:nc,big:big,M:M,W:W,tf:bist?'1s':'4s',T:tm,n:ok,pairs:ok*(ok-1)/2};}
+/* iki enstrüman arası 7g getiri korelasyonu (doğrulama ve plan için) */
+function rhoPair(ka,kb,Tc,tf,W){var ia=idxAt(ka.t,Tc,tf),ib=idxAt(kb.t,Tc,tf);if(ia<W+1||ib<W+1||ka.t[ia]!==kb.t[ib])return NaN;var a=[],b=[],ma=0,mb=0;for(var q=0;q<W;q++){var x=Math.log(ka.c[ia-q]/ka.c[ia-q-1]),y=Math.log(kb.c[ib-q]/kb.c[ib-q-1]);a.push(x);b.push(y);ma+=x;mb+=y;}ma/=W;mb/=W;var s=0,sa=0,sb=0;for(q=0;q<W;q++){s+=(a[q]-ma)*(b[q]-mb);sa+=(a[q]-ma)*(a[q]-ma);sb+=(b[q]-mb)*(b[q]-mb);}return sa>0&&sb>0?s/Math.sqrt(sa*sb):NaN;}
 function corrAt(Tc){return corrList(LAY.dots.map(function(d){return d.c;}),ST.mode==='bist',Tc);}
 function rho(k1,k2){var C=FR&&FR.corr;return C&&C.M[k1]&&C.M[k1][k2]||null;}
 /* bir listede ρ>0.8 olan çiftler → "aynı kümeden iki sinyal" */
 function twins(ks){var out={};for(var a=0;a<ks.length;a++)for(var b=0;b<ks.length;b++){if(a===b)continue;var r=rho(ks[a],ks[b]);if(r&&(!out[ks[a]]||out[ks[a]].r<r))out[ks[a]]={k:ks[b],r:r};}return out;}
 function kOfSym(sym){var d=LAY.dots.filter(function(d){return d.c.sym===sym;})[0];return d?d.c._k:null;}
+/* ================= v5 · SİNYAL KALİTE PUANI (0-100) — ağırlıklar önceden sabit, veriye uydurulmadı ================= */
+var W5={reg:30,cone:25,tf:15,div:15,flow:15},W5N={reg:'rejim güveni',cone:'kâhin konisi',tf:'1s/4s hizası',div:'çeşitlendirme',flow:'RVOL / OBV akışı'};
+function letter(s){return s>=70?'A':s>=55?'B':s>=40?'C':'D';}
+function legOfState(st,r1,r4,bist){if(bist)return 'bist';var l=stLeg(st);if(l&&l!=='bist')return l;return (r1!=null&&r4!=null&&r1<r4)?'loxx':'yo6';}
+/* x: {leg, regO (lab: o bacak + rejim istatistiği), an (analog), r1, r4, bist, partner, up, rv} */
+function qscore(x){var o=x.regO,pf=o?(o.pf==null?3:o.pf):NaN;
+  var reg=!o||o.n<5?0.3:clamp((pf-0.8)/1.7,0,1)*(0.5+0.5*Math.min(1,o.n/30));
+  var A=x.an,cone=!A||!A.ok?0.35:0.5*clamp((A.win-0.40)/0.25,0,1)+0.5*clamp((A.med+0.01)/0.04,0,1);
+  var tf=x.bist?0.5:(x.r1<CFG.al&&x.r4<CFG.al)?1:(Math.min(x.r1,x.r4)<CFG.al?0.55:0.2);
+  var div=x.partner?0:1,flow=0.6*(x.up?1:0)+0.4*clamp(((isFinite(x.rv)?x.rv:1)-0.7)/1.3,0,1);
+  var P={reg:reg,cone:cone,tf:tf,div:div,flow:flow},s=0;for(var k in W5)s+=W5[k]*P[k];s=Math.round(s);return {s:s,L:letter(s),P:P,leg:x.leg};}
+/* geri test için: bacak+rejim istatistiği, yalnız Tc'den önce KAPANMIŞ lab işlemlerinden (ileriye bakmadan) */
+function regStatsBefore(rows,Tc){var o={};rows.forEach(function(r){if(r.closeT>Tc||!r.reg)return;var x=o[r.reg]=o[r.reg]||{n:0,w:0,gp:0,gl:0};x.n++;if(r.ret>0){x.w++;x.gp+=r.ret;}else x.gl-=r.ret;});
+  for(var k in o){var x=o[k];x.pf=x.gl>0?x.gp/x.gl:null;x.win=100*x.w/x.n;}return o;}
+var LABRET={"yo6":[0.063846,0.074396,0.073893,0.032209,0.041797,0.047708,0.051476,0.077122,0.00825,0.027855,-0.005045,-0.029199,-0.04921,-0.032168,-0.01691,-0.03416,-0.062172,-0.030586,-0.029241,-0.117642,-0.057204,-0.039265,0.061063,0.005557,0.010239,-0.012603,0.036735,0.00864,-0.014287,0.034979,-0.003361,0.012994,0.010435,0.000694,-0.0008,-0.014879,-0.003293,0.002963,-0.042566,0.130437,0.049665,0.077611,0.102312,0.036591,0.050522,0.07176,0.303255,0.03278,0.142,0.072175,0.079041,-0.04202,0.089047,0.104446,0.03217,0.051357,0.054454,0.048585,0.048333,0.024749,0.021348,0.015506,0.047073,0.054723,0.043393,0.027483,0.009712,0.038826,-0.016218,0.038242,0.035133,0.04651,0.03473,0.023142,0.059417,0.037458,0.026609,-0.010205,-0.003611,0.043732,0.012073,-0.002886,0.019588,-0.003238,-0.003753,0.020032,0.011634,0.023289,0.042141,0.013146,0.021421,0.008735,0.007475,-0.023291,-0.002994,-0.049389,-0.017428,-0.039758,-0.005283,-0.02287,0.058381,-0.129504,-0.144828,0.065011,0.012891,0.081181,0.035475,-0.037304,0.053295,0.046183,0.03992,0.01907,0.053241,-0.043971,0.007586,0.033685,0.031936,0.064068,0.012952,0.029566,-0.013388,0.017679,0.046001,0.017909,-0.021498,0.000246,-0.001283,0.007574,0.123759,0.002269,-0.026824,0.01069,0.025764,0.036392,-0.020265,0.082656,-0.044551,-0.012317,0.062727,0.01944,0.02874,0.067677,0.081657,0.019576,-0.071575,0.006286,0.009862,0.049282,0.028975,-0.066054,-0.001233,-0.017859,-0.010558,0.027444,0.020085,-0.042029,-0.019925,0.004428,0.017185,-0.011655,-0.028096,0.010095,-0.002485,-0.031386,0.036525,-0.019139,-0.002873,-0.022129,0.016663,-0.003291,0.023501,0.177219,0.170607,0.212095,0.174333,-0.059483,0.065574,0.103136,0.130512,0.070283,0.001728,0.003598,-0.008565,-0.011394,0.031876,0.103653,0.055855,0.019004,0.015837,0.021698,0.017524,0.053821,-0.004364,0.014194,-0.02047,-0.06643,-0.038494,-0.045015,-0.028135,-0.023896,-0.042989,0.011353,-0.029849],"loxx":[0.345793,-0.083519,-0.068477,0.463839,0.494335,0.171291,0.217232,0.169355,0.683471,0.092246,-0.037394,-0.10758,0.110229,0.06761,-0.040062,0.139493,-0.086188,0.340864,-0.2507,-0.2507,0.133855,0.446211,0.05302,0.271599,0.574883,0.161945,0.493837,-0.2507,0.244002,0.333627,-0.089773,-0.2507,0.076801,-0.134353,0.462129,-0.089434,0.6754,0.003507,-0.156466,0.344558,-0.10402,0.2876,-0.2507,-0.2507,-0.2507,0.320444,-0.2507,0.11747],"bist":[0.04918,0.04918,0.04918,-0.003782,0.04918,0.04918,0.04918,0.04918,-0.141686,-0.163123,0.04918,0.04918,0.04918,-0.0855,0.04918,0.04918,0.04918,0.04918,-0.044697,-0.079879,0.04918,0.04918,0.04918,-0.120506,0.04918,-0.077692,0.04918,0.04918,0.04918,-0.212273,0.04918,0.04918,-0.001521,-0.080346,0.04918,0.04918,0.04918,0.04918,0.04918,0.04918,0.04918,-0.003475,0.04918,0.04918,-0.2507,-0.110405,-0.057191,0.04918,0.04918,0.04918,-0.004218,0.04918,0.04918,0.04918,0.04918,-0.2507,0.04918,0.04918,0.04918,0.04918,-0.2507,0.04918,-0.114858,0.04918,0.04918,0.04918,0.04918,0.00548,0.04918,0.04918,0.04918,-0.167726,0.04918,0.04918,-0.036399,0.04918,0.04918,0.04918,0.04918,0.04918,0.04918,0.04918,-0.004106,0.04918,0.04918,-0.078864,0.04918,-0.082982,0.04918,0.04918,0.04918,0.04918,0.04918,-0.026114,0.04918,0.04918,0.04918,0.04918,0.04918,0.001168,0.04918,-0.021014,0.04918,0.04918,0.04918]};
+var SCOREVAL={"t\u00fcm\u00fc":{"rho":-0.2127,"b":{"A":{"n":50,"win":70,"avg":1.0113,"usd":10.1126,"sc":77.34},"B":{"n":102,"win":64.7059,"avg":-0.3099,"usd":-6.3224,"sc":62.2941},"C":{"n":105,"win":62.8571,"avg":2.9208,"usd":61.3362,"sc":46.7238},"D":{"n":99,"win":73.7374,"avg":7.4384,"usd":147.2803,"sc":30.7172}},"hi":{"n":178,"win":66.8539,"avg":0.5025,"usd":17.8891,"sc":65.0506},"lo":{"n":178,"win":67.9775,"avg":5.464,"usd":194.5175,"sc":37.0169},"md":51},"yo6":{"rho":-0.1449,"b":{"A":{"n":34,"win":70.5882,"avg":1.5379,"usd":10.4578,"sc":78.0588},"B":{"n":71,"win":69.0141,"avg":1.2501,"usd":17.7513,"sc":62.6901},"C":{"n":50,"win":46,"avg":1.4648,"usd":14.6481,"sc":45.72},"D":{"n":48,"win":75,"avg":3.8763,"usd":37.2129,"sc":30.2917}},"hi":{"n":104,"win":69.2308,"avg":1.3157,"usd":27.3662,"sc":67.7885},"lo":{"n":99,"win":60.6061,"avg":2.6618,"usd":52.7038,"sc":38.3333},"md":56},"loxx":{"rho":-0.3031,"b":{"A":{"n":1,"win":100,"avg":0.3507,"usd":0.0701,"sc":82},"B":{"n":4,"win":0,"avg":-17.2235,"usd":-13.7788,"sc":57.5},"C":{"n":14,"win":50,"avg":6.7994,"usd":19.0383,"sc":46.6429},"D":{"n":29,"win":72.4138,"avg":17.3355,"usd":100.546,"sc":30.5517}},"hi":{"n":26,"win":46.1538,"avg":3.8605,"usd":20.0746,"sc":46.9231},"lo":{"n":22,"win":77.2727,"avg":19.5002,"usd":85.801,"sc":28.6818},"md":36},"bist":{"rho":-0.0866,"b":{"A":{"n":15,"win":66.6667,"avg":-0.1384,"usd":-0.4153,"sc":75.4},"B":{"n":27,"win":62.963,"avg":-1.9065,"usd":-10.2949,"sc":61.963},"C":{"n":41,"win":87.8049,"avg":3.3719,"usd":27.6498,"sc":47.9756},"D":{"n":22,"win":72.7273,"avg":2.164,"usd":9.5214,"sc":31.8636}},"hi":{"n":57,"win":70.1754,"avg":-0.0273,"usd":-0.311,"sc":62.9298},"lo":{"n":48,"win":81.25,"avg":2.7888,"usd":26.772,"sc":39.2708},"md":51}};
 var LABEQ={"bist":{"n":105,"usd":26.5,"win":75.2,"dd":-25.4,"pts":[[1767684600,0.98],[1767695400,1.97],[1769423400,3.93],[1770201000,4.92],[1770816600,5.9],[1773124200,7.87],[1773138600,8.85],[1773210600,9.84],[1773315000,11.8],[1773642600,12.79],[1774272600,13.77],[1775629800,14.75],[1775651400,16.72],[1775802600,17.7],[1775817000,18.69],[1776061800,20.66],[1776148200,21.64],[1776173400,22.62],[1776429000,24.59],[1776432600,25.57],[1778567400,26.56],[1779690600,28.52],[1779690600,29.51],[1780381800,30.49],[1781159400,32.46],[1781245800,33.44],[1781249400,34.43],[1781505000,36.39],[1781505000,37.38],[1782984600,38.36],[1783060200,39.34],[1783337400,38.73],[1783409400,39.71],[1783503000,38.57],[1784017800,37.95],[1784017800,38.93],[1784622600,39.91],[1785936600,41.88],[1786012200,42.86],[1786534200,43.85],[1786714200,45.82],[1787308200,46.8],[1787553000,47.78],[1787837400,44.52],[1787837400,45.5],[1788762600,46.49],[1788877800,48.46],[1789115400,49.44],[1789464600,46.6],[1789543800,39.18],[1789565400,34.17],[1789644600,35.15],[1789651800,36.13],[1789741800,38.1],[1789993800,39.08],[1789997400,40.07],[1790069400,42.04],[1790076600,43.02],[1790076600,44.0],[1790145000,45.97],[1790152200,46.95],[1790163000,47.94],[1790922600,49.9],[1791185400,50.89],[1791268200,51.87],[1792162800,44.56],[1792162800,44.48],[1792162800,42.77],[1792162800,42.62],[1792162800,40.41],[1792162800,40.38],[1792162800,37.12],[1792162800,34.67],[1792162800,34.15],[1792162800,34.07],[1792162800,30.83],[1792162800,27.48],[1792162800,27.59],[1792162800,26.88],[1792162800,26.46]],"t0":1767335400},"loxx":{"n":48,"usd":105.9,"win":60.4,"dd":-40.0,"pts":[[1769864400,-5.01],[1769882400,-6.68],[1770303600,-7.49],[1774584000,-12.5],[1776319200,-9.26],[1776373200,-8.2],[1776441600,-4.81],[1777050000,-2.97],[1777150800,-0.29],[1777633200,3.13],[1779526800,0.98],[1780441200,-0.39],[1780538400,-2.18],[1780538400,-5.31],[1780686000,-10.33],[1780718400,-15.34],[1780722000,-17.42],[1781125200,-19.14],[1782316800,-20.93],[1782392400,-25.95],[1782522000,-20.51],[1785193200,-23.2],[1785294000,-28.22],[1785294000,-33.23],[1786453200,-31.88],[1786568400,-36.89],[1788206400,-30.0],[1789765200,-20.12],[1790229600,-11.2],[1790355600,-6.85],[1790384400,-0.04],[1790395200,11.46],[1790398800,16.34],[1790449200,17.88],[1790492400,27.15],[1790499600,36.4],[1790506800,46.28],[1792314000,49.07],[1792314000,48.32],[1792314000,55.24],[1792314000,61.91],[1792314000,75.58],[1792314000,77.79],[1792314000,77.86],[1792314000,91.37],[1792314000,97.12],[1792314000,103.53],[1792314000,105.88]],"t0":1767286800},"yo6":{"n":203,"usd":80.1,"win":65.0,"dd":-10.1,"pts":[[1768392000,1.28],[1768435200,4.89],[1768449600,6.68],[1768449600,9.41],[1769184000,9.87],[1769184000,7.66],[1769184000,6.64],[1769889600,4.2],[1770206400,0.7],[1770537600,1.25],[1770552000,1.93],[1770552000,1.82],[1770552000,2.71],[1770552000,2.94],[1770552000,2.56],[1771761600,1.77],[1772121600,6.92],[1772121600,9.7],[1772150400,18.21],[1772150400,23.15],[1772150400,23.89],[1772179200,28.4],[1774425600,30.52],[1774425600,32.95],[1774425600,33.69],[1774425600,36.59],[1774425600,37.34],[1774425600,38.55],[1774425600,40.88],[1774425600,42.53],[1775001600,43.61],[1775001600,44.41],[1775001600,44.99],[1775001600,44.85],[1780156800,45.95],[1780200000,47.05],[1780200000,47.8],[1780228800,46.29],[1780228800,45.15],[1780300800,45.75],[1780761600,40.26],[1780948800,43.45],[1780948800,43.41],[1780948800,46.2],[1780963200,46.76],[1780963200,47.59],[1780963200,49.77],[1780963200,50.09],[1780963200,51.72],[1780963200,51.3],[1780992000,53.9],[1782489600,53.41],[1782504000,54.87],[1782604800,55.22],[1783036800,56.23],[1783080000,58.55],[1783080000,60.57],[1784721600,59.46],[1784750400,61.03],[1785470400,59.33],[1785542400,59.66],[1785571200,58.83],[1785585600,59.03],[1785600000,58.67],[1785816000,58.72],[1786953600,58.28],[1786982400,58.1],[1789761600,62.12],[1789776000,73.26],[1791676800,73.38],[1791691200,79.46],[1791691200,79.39],[1791748800,79.8],[1791748800,83.37],[1791763200,84.13],[1792065600,85.46],[1792108800,85.34],[1792108800,82.34],[1792108800,81.3],[1792108800,80.07]],"t0":1768219200}};
 /* ================= v3 arayüz ================= */
 var CLK={cap:/[?&]capture=1/.test(location.search),v:0,now:function(){return this.cap?this.v:performance.now();}};
@@ -296,7 +317,7 @@ function buildFrame(){var T=ST.replay&&ST.replay.on?ST.replay.T:null,Tc=T==null?
     if(tr.r0==null){var f0=at(d.c,tr.fireT);tr.r0=f0?f0.r:0.05;tr.ch0=f0?f0.ch:0;}
     comets.push({k:k,r0:tr.r0,ch0:tr.ch0,ret:s.ret,open:!s.closed,grow:1,fade:clamp(1-(age-3*DAY)/(4*DAY),0.15,1),tr:tr});});});
   var ck=ST.mode+'|'+(T==null?'L'+ST.lastAt:T)+'|'+LAY.dots.length;if(G.corrKey!==ck){G.corrKey=ck;G.corr=corrAt(T);}
-  var al=0;c.forEach(function(f){f.al=f.r1!=null&&f.r1<0.45&&f.r4<0.45;if(f.al)al++;});
+  var al=0;c.forEach(function(f){f.al=f.r1!=null&&f.r1<CFG.al&&f.r4<CFG.al;if(f.al)al++;});
   FR={T:T,Tc:Tc,c:c,tor:tor,neb:neb,fire:fire,near:near,comets:comets,list:list,corr:G.corr,al:al,reg:{c:regAt(ST.cReg,Tc),b:regAt(ST.bReg,Tc)},opt:VIEW};return FR;}
 function pushFrame(){if(!LAY.dots.length)return;buildFrame();if(G.mode==='3d'&&G.api)G.api.setFrame(FR);renderTop5();renderScore();renderCounts();renderPulse();renderRegime();renderBrief();if(FOC.k!=null)renderFocus();}
 /* ---------- HERO ---------- */
@@ -305,14 +326,14 @@ function webglOK(){try{var c=document.createElement('canvas');return !!(c.getCon
 function lowPower(){var n=navigator,c=n.connection||{};return !!(c.saveData||(n.deviceMemory&&n.deviceMemory<=2)||(n.hardwareConcurrency&&n.hardwareConcurrency<=2));}
 async function heroInit(){var host=$('hero3d'),use3d=G.want==='3d'||(G.want==='auto'&&webglOK()&&!lowPower());
   if(G.api&&G.mode==='3d'&&use3d){heroData();return;}if(G.api&&!use3d){G.api.dispose();G.api=null;}
-  if(use3d){try{status2('3D motor yükleniyor (three.js)…');var M=await import('/radar3d.js?v=4');
+  if(use3d){try{status2('3D motor yükleniyor (three.js)…');var M=await import('/radar3d.js?v=5');
       G.api=M.create(host,{lite:innerWidth<700,capture:CLK.cap,clock:function(){return CLK.now();},onHover:hoverTip,onPick:function(k){focusOn(k);},drawHolo:function(g,w,h,k){drawMini(g,w,h,k,true);}});
       G.mode='3d';$('hero2d').style.display='none';window.RD3=G.api;if(G.api.setOpts)G.api.setOpts(VIEW);heroData();return;}catch(e){console.warn('3D yüklenemedi, 2D radar',e);G.reason='WebGL/three.js yüklenemedi';}}
   else G.reason=webglOK()?'düşük güç':'WebGL yok';G.mode='2d';$('hero2d').style.display='block';R2.start();heroData();}
 function heroData(){if(!cur().length)return;var fresh=LAY.mode!==ST.mode||LAY.dots.length!==Math.min(80,cur().length);layout();
   if(G.mode==='3d'&&G.api&&(fresh||G.api.state.n!==LAY.dots.length||G.dataGen!==ST.lastAt)){G.api.setData(LAY.dots,{sectors:LAY.secs,histLen:48,assemble:fresh&&!INTRO.on});G.dataGen=ST.lastAt;}pushFrame();
   $('hMode').textContent=(G.mode==='3d'?'3D · WebGL':'2D radar'+(G.reason?' ('+G.reason+')':''))+' · '+(ST.mode==='bist'?'BIST 30 · 1s · yarıçap = z200’ün −2’ye uzaklığı':'Coin vadeli · yarıçap = YO6 MA / Loxx kurulumuna uzaklık');}
-function renderCounts(){if(!FR)return;var hc=$('hCorr');if(hc)hc.innerHTML=FR.corr?'✦ <b>'+FR.corr.E.length+'</b> çift ρ&gt;0.8 / '+FR.corr.pairs+' · en büyük küme '+FR.corr.big+' · çizilen '+FR.corr.S.length+(FR.al?' · <span class="y">◎ '+FR.al+' hizalı</span>':''):'';num($('hFire'),FR.fire,Math.round);num($('hNear'),FR.near,Math.round);num($('hTot'),FR.list.length,Math.round);}
+function renderCounts(){if(!FR)return;var hc=$('hCorr');if(hc)hc.innerHTML=FR.corr?'✦ <b>'+FR.corr.E.length+'</b> çift ρ&gt;'+CFG.rho+' / '+FR.corr.pairs+' · en büyük küme '+FR.corr.big+' · çizilen '+FR.corr.S.length+(FR.al?' · <span class="y">◎ '+FR.al+' hizalı</span>':''):'';num($('hFire'),FR.fire,Math.round);num($('hNear'),FR.near,Math.round);num($('hTot'),FR.list.length,Math.round);}
 function hoverTip(d,ev){var t=$('rdTip');if(!d||!FR){t.style.display='none';return;}var f=FR.c[d.c._k]||{},c=d.c,b=$('hero').getBoundingClientRect();
   var rows=['<b>'+esc(c.b)+'</b> <span class="mut">'+esc(c.sec)+'</span>','<span class="y">'+esc(f.why||'')+'</span>','<span class="c">eksik: '+esc(f.miss||'—')+'</span>',
    'yakınlık <b>'+(1-(f.r||1)).toFixed(2)+'</b> · RVOL <b>'+(isFinite(f.rv)?f.rv.toFixed(2):'—')+'×</b> · 24s <b class="'+(f.ch>=0?'g':'r')+'">'+(isFinite(f.ch)?(f.ch>=0?'+':'')+f.ch.toFixed(2)+'%':'—')+'</b>',
@@ -336,7 +357,8 @@ var R2={on:false,ang:0,last:0,start:function(){if(this.on)return;this.on=true;va
     var since=((R2.ang-((d.a%(2*Math.PI))+2*Math.PI)%(2*Math.PI))+4*Math.PI)%(2*Math.PI),gl=Math.exp(-since/1.2),col=f.up==null?'160,160,160':f.up?'0,255,170':'255,46,110';
     g.shadowColor='rgba('+col+',1)';g.shadowBlur=4+18*gl;g.fillStyle='rgba('+col+','+(0.45+0.55*gl)+')';g.beginPath();g.arc(d.x,d.y,d.sz,0,2*Math.PI);g.fill();g.shadowBlur=0;
     if(f.r<0.05){g.strokeStyle='rgba(255,230,0,'+(0.9-0.6*ph)+')';g.lineWidth=2;g.beginPath();g.arc(d.x,d.y,d.sz+3+5*ph,0,2*Math.PI);g.stroke();g.lineWidth=1;}
-    if(f.r<0.5||d.top||FOC.k===k){g.fillStyle=FOC.k===k?'#ffe600':'#e6fff6';g.font='10px ui-monospace,monospace';g.fillText(d.c.b,d.x+d.sz+3,d.y+3);}});}};
+    var pn=FR.pin&&FR.pin.indexOf(k)>=0;if(pn){g.strokeStyle='rgba(255,226,122,.95)';g.setLineDash([4,3]);g.lineWidth=1.5;g.beginPath();g.arc(d.x,d.y,d.sz+7,R2.ang*2,R2.ang*2+2*Math.PI);g.stroke();g.setLineDash([]);g.lineWidth=1;}
+    if(f.r<0.5||d.top||FOC.k===k||pn){g.fillStyle=FOC.k===k?'#ffe600':pn?'#ffe27a':'#e6fff6';g.font='10px ui-monospace,monospace';g.fillText((pn?'★ ':'')+d.c.b,d.x+d.sz+3,d.y+3);}});}};
 /* ---------- odak modu ---------- */
 var FOC={k:null};
 function focusOn(k){if(k==null||!LAY.dots[k])return;FOC.k=k;var fe=$('focus');if(innerWidth>1100){if(fe.parentNode.tagName!=='MAIN')document.querySelector('main').appendChild(fe);fe.classList.add('side');}else{if(fe.parentNode!==$('hero'))$('hero').appendChild(fe);fe.classList.remove('side');}if(G.mode==='3d'&&G.api)G.api.focus(k);$('focus').classList.add('on');$('hero').classList.add('foc');renderFocus();sfx('focus');}
@@ -399,8 +421,8 @@ function rpLog(x){var el=$('rpLog'),d=LAY.dots[x.k],s='<div style="--c:'+LEGC[x.
 function rpTick(dt){var R=ST.replay;if(!R||!R.on||!R.play)return;R.x+=dt/1000*R.speed;if(R.x>=R.steps.length-1){R.x=R.steps.length-1;R.play=false;}rpApply(false);}
 /* ---------- giriş sekansı ---------- */
 var INTRO={on:false,t0:0,dur:2700,skipAsm:false,lines:[]};
-function introWanted(){var m=/[?&]intro=([01])/.exec(location.search);if(m)return m[1]==='1';try{return !sessionStorage.getItem('qxr_intro4');}catch(e){return false;}}
-function introStart(){INTRO.on=true;INTRO.t0=CLK.now();$('intro').classList.add('on');try{sessionStorage.setItem('qxr_intro4','1');}catch(e){}
+function introWanted(){var m=/[?&]intro=([01])/.exec(location.search);if(m)return m[1]==='1';try{return !sessionStorage.getItem('qxr_intro5');}catch(e){return false;}}
+function introStart(){INTRO.on=true;INTRO.t0=CLK.now();$('intro').classList.add('on');try{sessionStorage.setItem('qxr_intro5','1');}catch(e){}
   INTRO.lines=['› evren: Binance USDT-M ilk '+($('rdN').value||50)+' · BIST 30','› mumlar: 4s×500 · 1s×1500 · BIST 1s×700','› kuyruk ≤4 istek/sn · 429 → Retry-After','› lab kuralları: YO6 MA 12 mum · Loxx C(50/80) · BIST TP %5','› rejim · kâhin · takımyıldız katmanları hazırlanıyor','› sinyal galaksisi kuruluyor…'];}
 function introTick(){if(!INTRO.on)return;var u=(CLK.now()-INTRO.t0)/INTRO.dur,T='QUANTEX RADAR',n=Math.min(T.length,Math.floor(clamp(u/0.35,0,1)*T.length));
   $('iT').textContent=T.slice(0,n)+(u<0.4?'▌':'');var ls=INTRO.lines,m=Math.floor(clamp((u-0.3)/0.55,0,1)*ls.length*1.0001);$('iL').innerHTML=ls.slice(0,m).map(function(s){return '<div>'+esc(s)+'</div>';}).join('');
@@ -509,11 +531,11 @@ function sgn(x,d){return pct(x,d==null?1:d);}
 /* ---------- odak istihbaratı ---------- */
 function focusIntel(k,f,c,Tc){var key=ST.mode+'|'+k+'|'+f.i+'|'+Tc;if(FOC.key!==key){FOC.key=key;FOC.an=f.i!=null?analog(c,f.i,Tc):null;}var A=FOC.an,h='<div class="lbl">◈ Benzeri kâhin <span class="live">CANLI geçmiş</span> <span class="mut">ileri '+ANH+'×'+(ST.mode==='bist'?'1s':'4s')+'</span></div>';
   if(!A)h+='<div class="ins">durum verisi yok</div>';
-  else if(!A.ok)h+='<div class="ins">yetersiz örnek · n='+A.n+' (&lt;15) · durum: '+esc(STN[A.st]||A.st)+' · aynı durumdaki havuz '+A.pool+' mum</div>';
+  else if(!A.ok)h+='<div class="ins">yetersiz örnek · n='+A.n+' (&lt;'+A.nmin+') · durum: '+esc(STN[A.st]||A.st)+' · aynı durumdaki havuz '+A.pool+' mum</div>';
   else h+='<div class="cone"><span>n <b>'+A.n+'</b></span><span>kazanma <b class="'+(A.win>=0.5?'g':'r')+'">%'+Math.round(100*A.win)+'</b></span><span>medyan <b class="'+(A.med>=0?'g':'r')+'">'+sgn(A.med)+'</b></span><span>p10 <b class="r">'+sgn(A.q[ANH][0])+'</b></span><span>p90 <b class="g">'+sgn(A.q[ANH][4])+'</b></span></div><div class="mut sm0">durum: '+esc(STN[A.st]||A.st)+' · benzer yakınlık/akış/RVOL/stres · '+A.pool+' mumluk havuzdan · kapanıştan kapanışa, brüt · imleçten önce kapanmış pencereler</div>';
   var leg=stLeg(A?A.st:null);if(leg){var rg=legReg(leg,Tc),tr=rg?trust(leg,rg.reg):null,o=tr&&tr.o;h+='<div class="kv"><span><span class="lab">LAB</span> '+LEGN[leg]+' · '+(rg?REGN[rg.reg]:'—')+'</span><b>'+(o?o.n+' işlem · PF '+pfTxt(o)+' · %'+o.win:'bu rejimde işlem yok')+(tr?' <i class="tr '+tr.k+'">'+tr.t+'</i>':'')+'</b></div>';}
   var M=FR.corr&&FR.corr.M[k],ps=M?Object.keys(M).map(function(x){return [+x,M[x]];}).sort(function(a,b){return b[1]-a[1];}):[];
-  h+='<div class="kv"><span>✦ ρ&gt;0.8 (7g, '+(FR.corr?FR.corr.tf:'')+')</span><b>'+(ps.length?ps.slice(0,4).map(function(p){return esc(LAY.dots[p[0]].c.b)+' '+p[1].toFixed(2);}).join(' · ')+(ps.length>4?' +'+(ps.length-4):''):'<span class="mut">eşi yok</span>')+'</b></div>';
+  h+='<div class="kv"><span>✦ ρ&gt;'+CFG.rho+' (7g, '+(FR.corr?FR.corr.tf:'')+')</span><b>'+(ps.length?ps.slice(0,4).map(function(p){return esc(LAY.dots[p[0]].c.b)+' '+p[1].toFixed(2);}).join(' · ')+(ps.length>4?' +'+(ps.length-4):''):'<span class="mut">eşi yok</span>')+'</b></div>';
   if(ST.mode==='coin'&&f.r1!=null)h+='<div class="kv"><span>◎ yakınlık 1s · 4s</span><b><span class="c">'+(1-f.r1).toFixed(2)+'</span> · <span class="v">'+(1-f.r4).toFixed(2)+'</span> '+(f.al?'<i class="tr ok">HİZALI</i>':'<span class="mut">hizasız</span>')+'</b></div>';
   return h;}
 function drawCone(g,A,x0,w,Y,c0,top,ph,holo){var fs=holo?15:9;g.save();g.strokeStyle='rgba(192,132,252,.5)';g.setLineDash([4,4]);g.beginPath();g.moveTo(x0+2,top-6);g.lineTo(x0+2,top+ph+4);g.stroke();g.setLineDash([]);
@@ -555,11 +577,11 @@ function briefText(){var T=FR?FR.T:null,Tc=FR?FR.Tc:Date.now(),L=[],rp=ST.replay
   var cs=ST.coins.slice(0,80),cf=cs.map(function(c){return atCoin(c,T);}),idx=cf.map(function(f,i){return f?i:-1;}).filter(function(i){return i>=0;}).sort(function(a,b){return cf[a].r-cf[b].r;});
   var ck='c|'+(T==null?'L'+ST.lastAt:T);if(BR.ck!==ck){BR.ck=ck;BR.corr=cs.length?corrList(cs,false,T):null;}
   L.push('');L.push('■ EN YAKIN ADAYLAR (coin, CANLI)');var top=idx.slice(0,5);
-  top.forEach(function(i,n){var f=cf[i];L.push((n+1)+'. '+cs[i].b+' — '+(f.setup==='—'?'kurulum yok':f.setup)+' · yakınlık '+(1-f.r).toFixed(2)+' · eksik: '+f.miss+(f.r1<0.45&&f.r4<0.45?' · 1s+4s hizalı':''));});
+  top.forEach(function(i,n){var f=cf[i];L.push((n+1)+'. '+cs[i].b+' — '+(f.setup==='—'?'kurulum yok':f.setup)+' · yakınlık '+(1-f.r).toFixed(2)+' · eksik: '+f.miss+(f.r1<CFG.al&&f.r4<CFG.al?' · 1s+4s hizalı':''));});
   if(!top.length)L.push('veri yok');
   if(BR.corr){var M=BR.corr.M,warn=[];for(var a=0;a<top.length;a++)for(var b=a+1;b<top.length;b++){var r=M[top[a]]&&M[top[a]][top[b]];if(r)warn.push(cs[top[a]].b+' ↔ '+cs[top[b]].b+' (ρ '+r.toFixed(2)+')');}
-    L.push(warn.length?'⚠ Aynı kümeden iki sinyal: '+warn.join(', ')+' — ikisini birden almak riski ikiler.':'Korelasyon: ilk 5 aday arasında ρ>0.8 çift yok ('+BR.corr.E.length+' çift ρ>0.8 / '+BR.corr.pairs+').');}
-  var al=idx.filter(function(i){return cf[i].r1<0.45&&cf[i].r4<0.45;}).map(function(i){return cs[i].b;});L.push('◎ 1s+4s hizalı: '+(al.length?al.join(', '):'yok'));
+    L.push(warn.length?'⚠ Aynı kümeden iki sinyal: '+warn.join(', ')+' — ikisini birden almak riski ikiler.':'Korelasyon: ilk 5 aday arasında ρ>'+CFG.rho+' çift yok ('+BR.corr.E.length+' çift ρ>'+CFG.rho+' / '+BR.corr.pairs+').');}
+  var al=idx.filter(function(i){return cf[i].r1<CFG.al&&cf[i].r4<CFG.al;}).map(function(i){return cs[i].b;});L.push('◎ 1s+4s hizalı: '+(al.length?al.join(', '):'yok'));
   // BIST
   L.push('');L.push('■ BIST z<−2 (1s, CANLI)');var bl=ST.bist.map(function(c){var f=atBist(c,T);return f?{b:c.b,z:f.z,f:f,c:c}:null;}).filter(Boolean),lo=bl.filter(function(x){return x.z<-2;}).sort(function(a,b){return a.z-b.z;});
   L.push(lo.length?lo.map(function(x){return x.b+' '+x.z.toFixed(2);}).join(' · ')+' → −2 üstü kapanış beklenir':'z<−2 hisse yok');
@@ -619,4 +641,181 @@ window.addEventListener('DOMContentLoaded',function(){$('tbCorr').onclick=functi
   var nd=document.querySelectorAll('#cards>section').length,cd=$('cdots');cd.innerHTML=Array.from({length:nd},function(_,i){return '<i'+(i?'':' class="on"')+'></i>';}).join('');
   window.addEventListener('resize',function(){drawStrip();});});
 window.QX_AN=function(){return FOC.an;};window.QX_BRIEF=function(){return BR.txt;};window.QX_INTEL={analog:analog,corrList:corrList,regAt:regAt,cur:cur,LAY:function(){return LAY;},FR:function(){return FR;},trust:trust,LABREG:LABREG};
+
+/* ================= v5: karar motoru · kalite puanı · işlem planı · izleme listesi · performans aynası · palet/kısayollar/ayarlar/perf ================= */
+var SC5={cache:{},sig:{}};
+function mkt(){return ST.mode==='bist'?'bist':'coin';}
+function wKey(m,b){return m+':'+b;}
+/* ---------- kalite puanı (canlı) ---------- */
+function sigList(bist,Tc){var m=bist?'b':'c',key=Tc+'|'+ST.lastAt+'|'+ST.req;if(SC5.sig['k'+m]===key)return SC5.sig[m];
+  var L=(bist?ST.bist:ST.coins.slice(0,80)),T=ST.replay&&ST.replay.on?Tc:null,o=[];L.forEach(function(c){var f=bist?atBist(c,T):atCoin(c,T);if(f&&f.r<0.35)o.push(c);});SC5.sig[m]=o;SC5.sig['k'+m]=key;return o;}
+function partnerOf(c,bist,Tc){var tf=bist?H1:H4,W=bist?63:42,best=null;
+  function chk(c2,why){if(c2===c)return;var r=rhoPair(bist?c.k1:c.k4,bist?c2.k1:c2.k4,Tc,tf,W);if(r>CFG.rho&&(!best||r>best.r))best={b:c2.b,r:r,why:why};}
+  (bist?ST.bist:ST.coins).forEach(function(c2){(c2.trades||[]).forEach(function(t){var s=tradeAt(t,Tc);if(s&&!s.closed)chk(c2,'açık poz.');});});
+  sigList(bist,Tc).forEach(function(c2){chk(c2,'eş zamanlı sinyal');});return best;}
+function scoreOf(c,bist,f,Tc){if(!f||f.i==null)return null;var key=(bist?'b':'c')+'|'+c.sym+'|'+f.i+'|'+Tc+'|'+CFG.rho+'|'+CFG.al+'|'+CFG.nmin;if(SC5.cache[key])return SC5.cache[key];
+  var leg=legOfState(f.st,f.r1,f.r4,bist),rg=legReg(leg,Tc),regO=rg&&LABREG.legs[leg]?LABREG.legs[leg][rg.reg]:null;
+  var an=analog(c,f.i,Tc,{list:bist?ST.bist:ST.coins.slice(0,80),bist:bist}),pt=partnerOf(c,bist,Tc);
+  var S=qscore({leg:leg,regO:regO,an:an,r1:f.r1,r4:f.r4,bist:bist,partner:pt,up:f.up,rv:f.rv});S.reg=rg;S.regO=regO;S.an=an;S.pt=pt;S.f=f;S.c=c;S.bist=bist;
+  var ks=Object.keys(SC5.cache);if(ks.length>400)SC5.cache={};SC5.cache[key]=S;return S;}
+function sv(){return SCOREVAL&&SCOREVAL['tümü'];}
+function infoOnly(){var o=sv();return !o||!(o.rho>0.1&&o.b.A.avg>o.b.D.avg);}
+function qBadge(S){return S?'<i class="qs q'+S.L+'" title="Sinyal kalite puanı · '+(infoOnly()?'bilgi amaçlı (lab geri testinde ayrıştırmadı)':'lab doğrulamalı')+'">'+S.L+' '+S.s+'</i>':'';}
+function qBlock(S){if(!S)return '';var o=sv(),h='<div class="lbl">⚖ Sinyal kalite puanı '+qBadge(S)+' <span class="'+(infoOnly()?'warnc':'live')+'">'+(infoOnly()?'BİLGİ AMAÇLI':'DOĞRULANDI')+'</span></div><div class="qbars">';
+  for(var k in W5){var v=S.P[k];h+='<div class="qb"><span>'+W5N[k]+'</span><i><b style="width:'+Math.round(100*v)+'%"></b></i><em>'+Math.round(W5[k]*v)+'/'+W5[k]+'</em></div>';}
+  h+='</div><div class="mut sm0">'+LEGN[S.leg]+' · rejim '+(S.reg?REGN[S.reg.reg]:'—')+' <span class="lab">LAB</span> '+(S.regO?'n '+S.regO.n+' PF '+pfTxt(S.regO):'işlem yok')+' · koni '+(S.an&&S.an.ok?'n '+S.an.n+' %'+Math.round(100*S.an.win)+' med '+sgn(S.an.med):'yetersiz')+(S.pt?' · ⚠ '+esc(S.pt.b)+' ρ '+S.pt.r.toFixed(2)+' ('+S.pt.why+')':'')+'</div>';
+  if(infoOnly()&&o)h+='<div class="ins sm0">Geri test (356 lab işlemi, ileriye bakmadan): puan getiriyi <b>ayırmadı</b> — Spearman ρ '+o.rho.toFixed(2)+'; A ort '+sgn(o.b.A.avg/100)+' · D ort '+sgn(o.b.D.avg/100)+'. Karar için kullanmayın; yalnız bağlam.</div>';
+  return h;}
+/* ---------- işlem planı ---------- */
+var PLAN={txt:''};
+var EXIT={yo6:'Lab çıkışı: 12 × 4s mum (48 saat) sonra kapanışta çık (time12). Kâr hedefi yok.',loxx:'Lab çıkışı C(50/80): Loxx pst ilk ≥50 kapanışında yarısı, ≥80 kapanışında kalanı (1s).',bist:'Lab çıkışı TP %5 (giriş × 1.05 limit), en fazla 720 × 1s mum.'};
+var ENTRY={yo6:'4s mum SMA10 üstünde kapanıp YO6 MA AL ateşlerse → bir sonraki 4s mumun AÇILIŞINDA gir.',loxx:'1s Loxx üçgen + pst 10–20 + z>0 + vortex onayı ateşlerse → bir sonraki 1s mumun AÇILIŞINDA gir.',bist:'z200 −2’nin yukarı kesişi 1s kapanışla gelirse → bir sonraki 1s mumun AÇILIŞINDA gir.'};
+function openTrades(Tc){var o=[];allTrades().forEach(function(t){var s=tradeAt(t,Tc);if(s&&!s.closed)o.push(t);});return o;}
+function planOpen(c,bist){var Tc=FR?FR.Tc:Date.now(),T=ST.replay&&ST.replay.on?Tc:null,f=bist?atBist(c,T):atCoin(c,T);if(!f)return;var S=scoreOf(c,bist,f,Tc);if(!S)return;
+  var k=bist?c.k1:(S.leg==='loxx'?c.k1:c.k4),i=idxAt(k.t,Tc,S.leg==='yo6'?H4:H1),P=k.c[i],qty=20/P,stop=P*0.75,A=S.an,op=openTrades(Tc),R=robot(),ro=(R.coin?R.coin.open.length:0)+(R.bist?R.bist.open.length:0);
+  var dg=P<1?6:P<10?4:2,px=function(x){return isFinite(x)?x.toFixed(dg):'—';},fire=f.r<0.05;
+  var cnt={};op.forEach(function(t){cnt[t.leg]=(cnt[t.leg]||0)+1;});var worst=20*netR(-0.25);
+  var L=[],H='';
+  L.push('QUANTEX RADAR · İŞLEM PLANI · '+c.b+' ('+(bist?'BIST':'coin')+') · '+LEGN[S.leg]+' · '+fmtT(Tc)+' TSİ'+(T!=null?' (geri oynatma imleci)':''));
+  L.push('Durum: '+(fire?'ATEŞLEDİ':'YAKIN (yakınlık '+(1-f.r).toFixed(2)+')')+' — '+f.why+' · eksik: '+f.miss);
+  L.push('Giriş: '+ENTRY[S.leg]+' Referans ≈ son kapanış '+px(P)+'.');
+  L.push('Çıkış: '+EXIT[S.leg]+(S.leg==='bist'?' Hedef ≈ '+px(P*1.05)+'.':''));
+  L.push('Acil stop: −%25 → '+px(stop)+' (düşük bu seviyeye değerse, lab kuralı; global SL robot ayarlarınıza tabidir).');
+  L.push('Büyüklük: $10 marj × 2x = $20 nominal ≈ '+(qty>=100?qty.toFixed(0):qty.toPrecision(4))+' adet · komisyon %0.04 × 2 · acil stopta ≈ '+usd(worst)+'.');
+  if(A&&A.ok){var q=A.q[ANH];L.push('Beklenen aralık (benzeri kâhin, '+ANH+' mum, brüt, n '+A.n+', kazanma %'+Math.round(100*A.win)+'): p10 '+sgn(q[0])+' ('+px(P*(1+q[0]))+', '+usd(20*netR(q[0]))+') · p25 '+sgn(q[1])+' · medyan '+sgn(q[2])+' ('+usd(20*netR(q[2]))+') · p75 '+sgn(q[3])+' · p90 '+sgn(q[4])+' ('+px(P*(1+q[4]))+', '+usd(20*netR(q[4]))+')');}
+  else L.push('Beklenen aralık: benzeri kâhin için örnek yetersiz (n='+(A?A.n:0)+' < '+CFG.nmin+') — aralık verilmiyor.');
+  L.push('Eşzamanlı risk: radar simülasyonunda '+op.length+' açık ('+Object.keys(cnt).map(function(x){return LEGN[x]+' '+cnt[x];}).join(', ')+(op.length?'':'yok')+') + bu = '+(op.length+1)+' → nominal $'+20*(op.length+1)+' · hepsi acil stopta en kötü ≈ '+usd(worst*(op.length+1))+'. QUANTEX kağıt robotu (salt okuma): '+ro+' açık.');
+  var tr=S.reg?trust(S.leg,S.reg.reg):null;
+  L.push('Notlar:');
+  L.push('• Rejim: '+(S.reg?REGN[S.reg.reg]:'—')+' — LAB '+(tr&&tr.o?'n '+tr.o.n+', PF '+pfTxt(tr.o)+', %'+Math.round(tr.o.win)+' → '+tr.t:'bu rejimde lab işlemi yok')+'.');
+  if(S.pt)L.push('• Korelasyon: '+S.pt.b+' ile ρ '+S.pt.r.toFixed(2)+' ('+S.pt.why+') — ikisi aynı risk; birini seçin.');else L.push('• Korelasyon: açık pozisyon / eş zamanlı sinyal ile ρ>'+CFG.rho+' çift yok.');
+  if(f.st==='vfw')L.push('• YO6 VF ateşledi, MA AL bekleniyor: SMA10 geri alınmadan giriş yok (12 mum içinde).');
+  if(!bist&&f.r1!=null)L.push('• 1s/4s hizası: '+(f.al?'HİZALI':'hizasız')+' (1s '+(1-f.r1).toFixed(2)+' · 4s '+(1-f.r4).toFixed(2)+').');
+  L.push('• Kalite puanı '+S.L+' '+S.s+'/100 — '+(infoOnly()?'BİLGİ AMAÇLI: lab geri testinde ayrıştırmadı (Spearman '+sv().rho.toFixed(2)+').':'lab doğrulamalı.'));
+  L.push('• Kağıt robota gönderim yok: QUANTEX güvenli bir kağıt-robot pozisyon API’si sunmuyor; plan yalnız gösterilir. Yatırım tavsiyesi değildir.');
+  PLAN.txt=L.join('\n');
+  function row(a,b,cl){return '<div class="kv"><span>'+a+'</span><b'+(cl?' class="'+cl+'"':'')+'>'+b+'</b></div>';}
+  H='<div class="ph"><b>'+esc(c.b)+'</b><span>'+(bist?'BIST 1s':'coin')+' · '+LEGN[S.leg]+'</span>'+qBadge(S)+'<i class="st '+(fire?'f':'n')+'">'+(fire?'ATEŞLEDİ':'YAKIN '+(1-f.r).toFixed(2))+'</i><button class="btn" id="plX">✕</button></div>'+
+   '<div class="mut sm0">'+esc(f.why)+' · eksik: '+esc(f.miss)+' · '+fmtT(Tc)+' TSİ'+(T!=null?' · <span class="y">geri oynatma imleci</span>':'')+'</div><div class="pgrid"><div>'+
+   '<div class="lbl">Giriş <span class="lab">LAB kuralı</span></div><div class="ins">'+ENTRY[S.leg]+'<br>Referans ≈ <b>'+px(P)+'</b> (son kapanış)</div>'+
+   '<div class="lbl">Çıkış <span class="lab">LAB kuralı</span></div><div class="ins">'+EXIT[S.leg]+(S.leg==='bist'?'<br>Hedef ≈ <b class="g">'+px(P*1.05)+'</b>':'')+'</div>'+
+   row('Acil stop −%25','<span class="r">'+px(stop)+'</span>')+row('Büyüklük','$10 marj × 2x = $20 · '+(qty>=100?qty.toFixed(0):qty.toPrecision(4))+' adet')+row('Acil stopta kayıp',usd(worst),'r')+
+   '</div><div><div class="lbl">Beklenen aralık <span class="live">CANLI geçmiş</span> <span class="mut">kâhin konisi · '+ANH+' mum · brüt</span></div>'+
+   (A&&A.ok?'<div class="rng">'+['p10','p25','medyan','p75','p90'].map(function(nm,j){var q=A.q[ANH][j];return '<div><small>'+nm+'</small><b class="'+(q>=0?'g':'r')+'">'+sgn(q)+'</b><em>'+px(P*(1+q))+'</em><em>'+usd(20*netR(q))+'</em></div>';}).join('')+'</div><div class="mut sm0">n '+A.n+' · kazanma %'+Math.round(100*A.win)+' · havuz '+A.pool+' mum</div>':'<div class="ins">örnek yetersiz (n='+(A?A.n:0)+' &lt; '+CFG.nmin+') — aralık verilmiyor</div>')+
+   '<div class="lbl">Eşzamanlı risk <span class="live">CANLI</span></div>'+row('Radar sim. açık',op.length+(op.length?' ('+Object.keys(cnt).map(function(x){return LEGN[x]+' '+cnt[x];}).join(', ')+')':''))+row('Bu dahil toplam nominal','$'+20*(op.length+1))+row('Hepsi acil stopta',usd(worst*(op.length+1)),'r')+row('QUANTEX robot açık (salt okuma)',ro)+
+   '</div></div><div class="lbl">Notlar</div><div class="ins sm0">'+L.slice(L.indexOf('Notlar:')+1).map(esc).join('<br>')+'</div>'+
+   '<div class="fbt"><button class="btn hot" id="plCopy">Planı kopyala</button><button class="btn" disabled title="QUANTEX güvenli kağıt-robot API sunmuyor">Kağıt robota gönder · yok</button><button class="btn" id="plChart">QUANTEX grafiği ↗</button></div>';
+  $('plBody').innerHTML=H;$('plan').classList.add('on');$('plX').onclick=planClose;$('plChart').onclick=function(){window.open(chartUrlS(bist?'bist':'coin',c.sym),'_blank');};
+  $('plCopy').onclick=function(){copyTxt(PLAN.txt,$('plCopy'),'Planı kopyala');};}
+function planClose(){$('plan').classList.remove('on');}
+function copyTxt(t,b,lbl){var done=function(){b.textContent='✓ kopyalandı';setTimeout(function(){b.textContent=lbl;},1600);};
+  if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(t).then(done,fb);else fb();
+  function fb(){var ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');done();}catch(e){}ta.remove();}}
+/* ---------- izleme listesi (radar_watch_v1) ---------- */
+var WL={LS:'radar_watch_v1',a:null};
+function wLoad(){if(WL.a)return WL.a;try{var v=JSON.parse(localStorage.getItem(WL.LS)||'[]');WL.a=Array.isArray(v)?v.filter(function(x){return typeof x==='string';}).slice(0,40):[];}catch(e){WL.a=[];}return WL.a;}
+function wHas(m,b){return wLoad().indexOf(wKey(m,b))>=0;}
+function wToggle(m,b){var a=wLoad(),k=wKey(m,b),i=a.indexOf(k);if(i>=0)a.splice(i,1);else a.unshift(k);try{localStorage.setItem(WL.LS,JSON.stringify(a));}catch(e){}BR.key=null;renderWatch();pushFrame();}
+function wItem(k){var p=k.split(':'),bist=p[0]==='bist',c=(bist?ST.bist:ST.coins).filter(function(x){return x.b===p[1];})[0];return {k:k,m:p[0],b:p[1],bist:bist,c:c};}
+function renderWatch(){var el=$('wBody');if(!el)return;var a=wLoad(),Tc=FR?FR.Tc:Date.now(),T=ST.replay&&ST.replay.on?Tc:null;
+  if(!a.length){el.innerHTML='<div class="ins">Henüz sabitlenen yok. Odak panelinde <b>☆ izle</b> ya da <b>Ctrl+K</b> paletinde ☆ ile ekleyin. Sabitlenenler galakside ★ halka ile işaretlenir, brifing ve alarmlarda en başta yer alır.</div>';return;}
+  el.innerHTML=a.map(function(k){var w=wItem(k);if(!w.c)return '<div class="wr"><em class="mk">'+w.m+'</em><b>'+esc(w.b)+'</b><span class="mut">evrende yok / veri bekleniyor</span><button class="btn sm" data-wx="'+k+'">✕</button></div>';
+    var f=w.bist?atBist(w.c,T):atCoin(w.c,T),S=f?scoreOf(w.c,w.bist,f,Tc):null,p=f?Math.round(100*(1-f.r)):0,near=f&&f.r<0.35;
+    return '<div class="wr'+(f&&f.r<0.05?' fire':'')+'"><em class="mk">'+(w.bist?'BIST':'coin')+'</em><span><b>'+esc(w.b)+'</b>'+qBadge(S)+'</span><span class="pb"><i style="width:'+p+'%"></i></span><span class="ws">'+(f?esc(f.setup==='—'?'kurulum yok':f.setup)+' · <span class="mut">'+esc(f.miss)+'</span>':'—')+'</span>'+
+      '<span class="wb"><button class="btn sm" data-wf="'+k+'">odak</button>'+(near?'<button class="btn sm hot" data-wp="'+k+'">plan</button>':'')+'<button class="btn sm" data-wx="'+k+'" title="listeden çıkar">✕</button></span></div>';}).join('')+
+   '<div class="mut sm0">'+a.length+' sabit · yalnız <code>radar_watch_v1</code> anahtarına yazılır</div>';
+  el.querySelectorAll('[data-wx]').forEach(function(b){b.onclick=function(){var w=wItem(b.getAttribute('data-wx'));wToggle(w.m,w.b);};});
+  el.querySelectorAll('[data-wf]').forEach(function(b){b.onclick=function(){jumpTo(wItem(b.getAttribute('data-wf')));};});
+  el.querySelectorAll('[data-wp]').forEach(function(b){b.onclick=function(){var w=wItem(b.getAttribute('data-wp'));planOpen(w.c,w.bist);};});}
+function jumpTo(w){if(!w||!w.c)return;var m=w.bist?'bist':'coin';if(ST.mode!==m){setMode(m);}setTimeout(function(){var k=kOfSym(w.c.sym);if(k!=null){focusOn(k);document.getElementById('hero').scrollIntoView({behavior:'smooth',block:'start'});}},60);}
+/* ---------- performans aynası ---------- */
+function lcg(seed){var s=seed>>>0;return function(){s=(s*1664525+1013904223)>>>0;return s/4294967296;};}
+function statsOf(r){var n=r.length,w=0,gp=0,gl=0,s=0;r.forEach(function(x){s+=x;if(x>0){w++;gp+=x;}else gl-=x;});return {n:n,win:n?w/n:NaN,pf:gl>0?gp/gl:(gp>0?Infinity:NaN),avg:n?s/n:NaN};}
+var BOOT={};
+function bootBand(leg,n){var key=leg+'|'+n;if(BOOT[key])return BOOT[key];var R=LABRET[leg],rnd=lcg(1234+n),M=[],P=[];for(var b=0;b<2000;b++){var a=[];for(var q=0;q<n;q++)a.push(R[Math.floor(rnd()*R.length)]);var s=statsOf(a);M.push(s.avg);P.push(isFinite(s.pf)?s.pf:99);}
+  M.sort(function(a,b){return a-b;});P.sort(function(a,b){return a-b;});return BOOT[key]={m5:qnt(M,0.05),m95:qnt(M,0.95),p5:qnt(P,0.05),p50:qnt(P,0.5)};}
+function mirrorData(){var now=Date.now(),out={};['yo6','loxx','bist'].forEach(function(leg){var r=[],open=0;allTrades().forEach(function(t){if(t.leg!==leg)return;var s=tradeAt(t,now);if(!s)return;if(s.closed)r.push(t.ret);else open++;});
+  var lab=statsOf(LABRET[leg]),live=statsOf(r),n=live.n,o={leg:leg,lab:lab,live:live,open:open};
+  if(n>0){var se=Math.sqrt(lab.win*(1-lab.win)/n);o.wLo=Math.max(0,lab.win-1.645*se);o.wHi=Math.min(1,lab.win+1.645*se);var B=bootBand(leg,n);o.mLo=B.m5;o.mHi=B.m95;o.pf5=B.p5;}
+  o.st=n<5?'az':(live.win<o.wLo||live.avg<o.mLo)?'drift':(live.win>o.wHi||live.avg>o.mHi)?'ust':'ok';out[leg]=o;});return out;}
+function renderMirror(){var el=$('mBody');if(!el)return;var D=mirrorData(),SN={az:['örnek az','az'],drift:['⚠ SAPMA — beklentinin altında','dr'],ust:['beklentinin üstünde','up'],ok:['bant içinde · normal','ok']};
+  function bar(lo,hi,lab,live,mn,mx,fmt){var X=function(v){return clamp((v-mn)/(mx-mn),0,1)*100;};return '<div class="mbar"><i class="bd" style="left:'+X(lo)+'%;width:'+Math.max(1,X(hi)-X(lo))+'%"></i><i class="lb" style="left:'+X(lab)+'%"></i>'+(isFinite(live)?'<i class="lv" style="left:'+X(live)+'%"></i>':'')+'<small style="left:0">'+fmt(mn)+'</small><small style="right:0">'+fmt(mx)+'</small></div>';}
+  el.innerHTML='<div class="mut sm0"><span class="lab">LAB</span> Oca–Eki 2026 tüm işlemler · <span class="live">CANLI</span> son 30 gün kapanan, aynı kural · bant: kazanma binom %90, ortalama bootstrap %5–95 (2000, tohumlu)</div>'+
+   ['yo6','loxx','bist'].map(function(leg){var o=D[leg],L=o.lab,V=o.live,s=SN[o.st];
+    return '<div class="mrow"><div class="mh"><i style="background:'+LEGC[leg]+'"></i><b>'+LEGN[leg]+'</b><em class="ms '+s[1]+'">'+s[0]+'</em><span class="mut">canlı n '+V.n+(o.open?' · açık '+o.open:'')+'</span></div>'+
+     '<div class="mg"><span></span><small class="lab">LAB</small><small class="live">CANLI</small><small>bant</small>'+
+     '<span>kazanma</span><b>%'+Math.round(100*L.win)+'</b><b class="'+(V.n&&V.win<o.wLo?'r':'')+'">'+(V.n?'%'+Math.round(100*V.win):'—')+'</b><em>'+(V.n?'%'+Math.round(100*o.wLo)+'–'+Math.round(100*o.wHi):'—')+'</em>'+
+     '<span>ort. getiri</span><b>'+sgn(L.avg,2)+'</b><b class="'+(V.n&&V.avg<o.mLo?'r':'')+'">'+(V.n?sgn(V.avg,2):'—')+'</b><em>'+(V.n?sgn(o.mLo,1)+' … '+sgn(o.mHi,1):'—')+'</em>'+
+     '<span>PF</span><b>'+(isFinite(L.pf)?L.pf.toFixed(2):'∞')+'</b><b>'+(V.n?(isFinite(V.pf)?V.pf.toFixed(2):'∞'):'—')+'</b><em>'+(V.n?'p5 '+(o.pf5>=99?'∞':o.pf5.toFixed(2)):'—')+'</em></div>'+
+     (V.n?bar(o.wLo,o.wHi,L.win,V.win,0,1,function(v){return '%'+Math.round(100*v);}):'')+'</div>';}).join('')+
+   '<div class="lbl">⚖ Kalite puanı geri testi <span class="lab">LAB</span> <span class="warnc">'+(infoOnly()?'AYRIŞTIRMADI → bilgi amaçlı':'ayrıştırdı')+'</span></div>'+svTable()+
+   '<div class="mut sm">Sapma uyarısı yalnız canlı sonuç bandın altına düşerse yanar; n&lt;5 iken yorum yapılmaz. Gürültü bandı lab dağılımından; rejim farkı (ör. lab ağırlıkla TREND↓) canlıyı tek başına bandın dışına itebilir.</div>';}
+function svTable(){var o=sv();if(!o)return '';var h='<div class="svt"><span></span><small>n</small><small>kazanma</small><small>ort.</small><small>Σ $</small>';
+  ['A','B','C','D'].forEach(function(L){var b=o.b[L];h+='<span><i class="qs q'+L+'">'+L+'</i></span><b>'+b.n+'</b><b>%'+(b.win==null?'—':b.win.toFixed(0))+'</b><b class="'+(b.avg>=0?'g':'r')+'">'+(b.avg>=0?'+':'')+b.avg.toFixed(2)+'%</b><b>'+usd(b.usd)+'</b>';});
+  return h+'</div><div class="mut sm0">Spearman ρ(puan, getiri) = <b class="'+(o.rho>0?'g':'r')+'">'+o.rho.toFixed(3)+'</b> · YO6 '+SCOREVAL.yo6.rho.toFixed(2)+' · Loxx '+SCOREVAL.loxx.rho.toFixed(2)+' · BIST '+SCOREVAL.bist.rho.toFixed(2)+'</div>';}
+/* ---------- odak / En yakın 5 / brifing / alarm kancaları ---------- */
+var _bf5=buildFrame;buildFrame=function(){var F=_bf5(),a=wLoad(),m=mkt();F.pin=[];LAY.dots.forEach(function(d,k){if(a.indexOf(wKey(m,d.c.b))>=0)F.pin.push(k);});return F;};
+var _pf5=pushFrame;pushFrame=function(){_pf5();renderWatch();renderPerf();};
+var _rt5=renderTop5;renderTop5=function(){_rt5();if(!FR)return;var bist=ST.mode==='bist';$('top5').querySelectorAll('.t5').forEach(function(b){var k=+b.getAttribute('data-k'),f=FR.c[k],d=LAY.dots[k];if(!f||!d)return;var S=scoreOf(d.c,bist,f,FR.Tc),em=b.querySelector('em');if(em)em.insertAdjacentHTML('afterend',qBadge(S));if(wHas(mkt(),d.c.b))b.classList.add('pin');});};
+var _rf5=renderFocus;renderFocus=function(){_rf5();var k=FOC.k,d=LAY.dots[k];if(!d||!FR)return;var f=FR.c[k],bist=ST.mode==='bist',S=scoreOf(d.c,bist,f,FR.Tc),near=f&&f.r<0.35,pin=wHas(mkt(),d.c.b);
+  var box=document.createElement('div');box.className='q5';box.innerHTML='<div class="fbt"><button class="btn'+(pin?' on':'')+'" id="fPin">'+(pin?'★ izleniyor':'☆ izle')+'</button>'+(near?'<button class="btn hot" id="fPlan">▤ İşlem planı</button>':'<button class="btn" disabled title="plan yalnız yakın (≥0.65) veya ateşleyen adayda">▤ plan · aday değil</button>')+'</div>'+qBlock(S);
+  var cEl=$('fBody').querySelector('.c');if(cEl)cEl.insertAdjacentElement('afterend',box);else $('fBody').appendChild(box);
+  $('fPin').onclick=function(){wToggle(mkt(),d.c.b);};if(near)$('fPlan').onclick=function(){planOpen(d.c,bist);};};
+var _bt5=briefText;briefText=function(){var t=_bt5(),a=wLoad();if(!a.length)return t;var Tc=FR?FR.Tc:Date.now(),T=ST.replay&&ST.replay.on?Tc:null,L=['','■ İZLEME LİSTESİ (sabitlenen, CANLI)'];
+  a.forEach(function(k){var w=wItem(k);if(!w.c){L.push('★ '+w.b+' ('+w.m+') — veri yok');return;}var f=w.bist?atBist(w.c,T):atCoin(w.c,T);if(!f){L.push('★ '+w.b+' — veri yok');return;}var S=scoreOf(w.c,w.bist,f,Tc);
+    L.push('★ '+w.b+' ('+(w.bist?'BIST':'coin')+') — '+(f.setup==='—'?'kurulum yok':f.setup)+' · yakınlık '+(1-f.r).toFixed(2)+' · eksik: '+f.miss+(S?' · kalite '+S.L+' '+S.s+(infoOnly()?' (bilgi)':''):''));});
+  var x=t.split('\n');x.splice(1,0,L.join('\n'));return x.join('\n');};
+var _ae5=almEvents;almEvents=function(){var ev=_ae5(),a=wLoad();ev.forEach(function(e){var bist=e.id.indexOf('bist|')===0,c=(bist?ST.bist:ST.coins).filter(function(x){return x.sym===e.sym;})[0];if(c&&a.indexOf(wKey(bist?'bist':'coin',c.b))>=0){e.pin=1;e.txt='★ '+e.txt;}});ev.sort(function(x,y){return (y.pin||0)-(x.pin||0);});return ev;};
+var _ra5=renderAll;renderAll=function(){_ra5();SC5.cache={};renderMirror();renderWatch();};
+/* ---------- komut paleti ---------- */
+var PAL={on:false,sel:0,items:[]};
+function cmds(){return [
+  {t:'En yakın adaya odaklan',k:'F',f:focusNearest},{t:'Piyasa rejimi paneli',k:'R',f:function(){goCard('cRegime');}},{t:'Günlük brifing',k:'B',f:function(){goCard('cBrief');}},
+  {t:'İzleme listesi',k:'W',f:function(){goCard('cWatch');}},{t:'Performans aynası',k:'M',f:function(){goCard('cMirror');}},{t:'Zaman makinesi oynat / duraklat',k:'Space',f:spaceAct},
+  {t:'Coin moduna geç',k:'',f:function(){setMode('coin');}},{t:'BIST moduna geç',k:'',f:function(){setMode('bist');}},{t:'Ayarlar',k:',',f:setOpen},{t:'Kısayollar',k:'?',f:helpOpen},{t:'Şimdi tara',k:'',f:refresh}];}
+function palItems(q){q=(q||'').trim().toUpperCase();var it=[];cmds().forEach(function(c){if(!q||c.t.toUpperCase().indexOf(q)>=0)it.push({cmd:c});});
+  var T=ST.replay&&ST.replay.on?FR.Tc:null;[['coin',ST.coins],['bist',ST.bist]].forEach(function(p){p[1].forEach(function(c){if(q&&c.b.indexOf(q)<0&&(c.sec||'').toUpperCase().indexOf(q)<0)return;it.push({w:{k:wKey(p[0],c.b),m:p[0],b:c.b,bist:p[0]==='bist',c:c}});});});
+  if(q)it.sort(function(a,b){var sa=a.w?(a.w.b===q?0:a.w.b.indexOf(q)===0?1:2):1.5,sb=b.w?(b.w.b===q?0:b.w.b.indexOf(q)===0?1:2):1.5;return sa-sb;});return it.slice(0,40);}
+function palOpen(){PAL.on=true;$('pal').classList.add('on');var i=$('palQ');i.value='';palRender();setTimeout(function(){i.focus();},10);}
+function palClose(){PAL.on=false;$('pal').classList.remove('on');}
+function palRender(){PAL.items=palItems($('palQ').value);PAL.sel=Math.min(PAL.sel,Math.max(0,PAL.items.length-1));var T=FR&&ST.replay&&ST.replay.on?FR.Tc:null;
+  $('palL').innerHTML=PAL.items.map(function(x,i){if(x.cmd)return '<div class="pi'+(i===PAL.sel?' on':'')+'" data-i="'+i+'"><em>⌘</em><b>'+esc(x.cmd.t)+'</b><kbd>'+esc(x.cmd.k)+'</kbd></div>';
+    var w=x.w,f=w.bist?atBist(w.c,T):atCoin(w.c,T),p=f?Math.round(100*(1-f.r)):0,pin=wHas(w.m,w.b);
+    return '<div class="pi'+(i===PAL.sel?' on':'')+'" data-i="'+i+'"><em class="mk">'+(w.bist?'BIST':'coin')+'</em><b>'+esc(w.b)+'</b><span class="mut">'+esc(w.c.sec||'')+' · '+(f?esc(f.setup==='—'?'kurulum yok':f.setup):'—')+'</span><span class="pb"><i style="width:'+p+'%"></i></span><button class="btn sm'+(pin?' on':'')+'" data-pin="'+i+'">'+(pin?'★':'☆')+'</button></div>';}).join('')||'<div class="mut" style="padding:10px">eşleşme yok</div>';
+  $('palL').querySelectorAll('.pi').forEach(function(el){el.onclick=function(e){var i=+el.getAttribute('data-i');if(e.target.hasAttribute('data-pin')){var w=PAL.items[i].w;wToggle(w.m,w.b);palRender();return;}PAL.sel=i;palGo();};});}
+function palGo(){var x=PAL.items[PAL.sel];if(!x)return;palClose();if(x.cmd)x.cmd.f();else jumpTo(x.w);}
+/* ---------- kısayollar / yardım ---------- */
+function focusNearest(){if(!FR||!FR.list.length)return;var f=FR.list.slice().sort(function(a,b){return a.r-b.r;})[0];focusOn(f.k);}
+function goCard(id){var el=$(id);if(!el)return;el.scrollIntoView({behavior:'smooth',block:'center',inline:'center'});el.classList.add('flash');setTimeout(function(){el.classList.remove('flash');},1200);}
+function spaceAct(){if(ST.replay&&ST.replay.on)$('rpPlay').click();else rpStart();}
+function helpOpen(){$('help').classList.add('on');}
+function anyModal(){return PAL.on||$('help').classList.contains('on')||$('plan').classList.contains('on')||$('set').classList.contains('on');}
+function closeModals(){palClose();$('help').classList.remove('on');planClose();$('set').classList.remove('on');}
+window.addEventListener('keydown',function(e){var tg=e.target,typing=tg&&(tg.tagName==='INPUT'||tg.tagName==='TEXTAREA'||tg.tagName==='SELECT');
+  if((e.ctrlKey||e.metaKey)&&(e.key==='k'||e.key==='K')){e.preventDefault();e.stopImmediatePropagation();PAL.on?palClose():palOpen();return;}
+  if(PAL.on){if(e.key==='Escape'){palClose();}else if(e.key==='ArrowDown'){PAL.sel=Math.min(PAL.items.length-1,PAL.sel+1);palRender();}else if(e.key==='ArrowUp'){PAL.sel=Math.max(0,PAL.sel-1);palRender();}else if(e.key==='Enter'){palGo();}else return;e.preventDefault();e.stopImmediatePropagation();return;}
+  if(e.key==='Escape'&&anyModal()){closeModals();e.preventDefault();e.stopImmediatePropagation();return;}
+  if(typing||e.ctrlKey||e.metaKey||e.altKey)return;var k=e.key;
+  var map={'/':palOpen,'?':helpOpen,'f':focusNearest,'F':focusNearest,'r':function(){goCard('cRegime');},'R':function(){goCard('cRegime');},'b':function(){goCard('cBrief');},'B':function(){goCard('cBrief');},'w':function(){goCard('cWatch');},'W':function(){goCard('cWatch');},'m':function(){goCard('cMirror');},'M':function(){goCard('cMirror');},',':setOpen,
+    'p':function(){if(FOC.k!=null){var d=LAY.dots[FOC.k],f=FR.c[FOC.k];if(f&&f.r<0.35)planOpen(d.c,ST.mode==='bist');}}};
+  if(k===' '&&!(ST.replay&&ST.replay.on)){e.preventDefault();e.stopImmediatePropagation();rpStart();return;}
+  if(map[k]){e.preventDefault();e.stopImmediatePropagation();map[k]();}},true);
+/* ---------- ayarlar (radar_settings_v1) + performans modu ---------- */
+function setSave(){try{localStorage.setItem('radar_settings_v1',JSON.stringify(CFG));}catch(e){}}
+function setOpen(){var el=$('setBody');function sel(id,lbl,opts,v,note){return '<div class="kv"><span>'+lbl+(note?'<br><small class="mut">'+note+'</small>':'')+'</span><b><select data-set="'+id+'">'+opts.map(function(o){return '<option value="'+o[0]+'"'+(String(o[0])===String(v)?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></b></div>';}
+  el.innerHTML=sel('N','Coin evreni',[[30,'ilk 30'],[50,'ilk 50'],[80,'ilk 80']],CFG.N,'değişince yeniden tarar (≤4 istek/sn)')+sel('rho','Korelasyon eşiği ρ',[[0.7,'0.70'],[0.75,'0.75'],[0.8,'0.80'],[0.85,'0.85'],[0.9,'0.90']],CFG.rho,'takımyıldız, çift-risk, puan çeşitlendirme')+
+   sel('al','1s+4s hiza eşiği',[[0.35,'yakınlık ≥0.65'],[0.4,'≥0.60'],[0.45,'≥0.55'],[0.5,'≥0.50'],[0.55,'≥0.45']],CFG.al)+sel('nmin','Kâhin asgari örnek',[[10,'10'],[15,'15'],[20,'20'],[30,'30']],CFG.nmin,'altında koni gösterilmez')+
+   sel('perf','3B performans',[['auto','otomatik (fps)'],['high','yüksek'],['low','düşük']],perfMode(),'otomatik: 2 sn’de bir ölçülen fps &lt;30 → düşür, &gt;55 → yükselt')+'<div class="kv"><span>Ölçülen</span><b id="setPerf">—</b></div>'+
+   '<div class="mut sm">Yalnız <code>radar_settings_v1</code> anahtarına yazılır. Lab sonuçları (PF, n, geri test) sabittir; eşikler yalnız canlı görünümü etkiler.</div>';
+  el.querySelectorAll('[data-set]').forEach(function(s){s.onchange=function(){var id=s.getAttribute('data-set'),v=id==='perf'?s.value:+s.value,old=CFG[id];CFG[id]=v;setSave();
+    if(id==='perf'){if(G.api&&G.api.setPerf)G.api.setPerf(v);}else if(id==='N'){$('rdN').value=String(v);if(old!==v)refresh();}else{G.corrKey=null;BR.key=null;BR.ck=null;FOC.key=null;SC5.cache={};pushFrame();renderMirror();}};});
+  $('set').classList.add('on');renderPerf();}
+function perfMode(){var m=/[?&]perf=(auto|high|low)/.exec(location.search);return m?m[1]:CFG.perf;}
+function renderPerf(){if(G.api&&G.api.setPerf&&!G.api._pf){G.api._pf=1;G.api.setPerf(perfMode());}var el=$('setPerf'),pi=G.api&&G.api.perfInfo?G.api.perfInfo():null,t=G.mode!=='3d'||!pi?'2D çizim · perf modu yok':pi.mode+' · seviye '+pi.name+' · yoğunluk %'+Math.round(100*pi.dens)+' · '+pi.fps.toFixed(0)+' fps';if(el)el.textContent=t;var b=$('hPerf');if(b)b.textContent=G.mode==='3d'&&pi?'⚡ '+pi.name+' · '+pi.fps.toFixed(0)+' fps':'';}
+window.addEventListener('DOMContentLoaded',function(){$('rdN').value=String(CFG.N);$('rdN').addEventListener('change',function(){CFG.N=+this.value;setSave();});
+  $('palQ').addEventListener('input',function(){PAL.sel=0;palRender();});$('pal').addEventListener('click',function(e){if(e.target.id==='pal')palClose();});
+  ['help','plan','set'].forEach(function(id){$(id).addEventListener('click',function(e){if(e.target.id===id)$(id).classList.remove('on');});});
+  $('kBtn').onclick=palOpen;$('setBtn').onclick=setOpen;$('hlpBtn').onclick=helpOpen;$('setX').onclick=function(){$('set').classList.remove('on');};$('hlpX').onclick=function(){$('help').classList.remove('on');};
+  renderWatch();renderMirror();setInterval(renderPerf,2000);});
+window.QX_V5={scoreOf:scoreOf,planOpen:planOpen,planTxt:function(){return PLAN.txt;},mirror:mirrorData,watch:wLoad,palOpen:palOpen,setOpen:setOpen,helpOpen:helpOpen,closeModals:closeModals,jump:function(m,b){jumpTo(wItem(wKey(m,b)));},perf:function(){return G.api&&G.api.perfInfo?G.api.perfInfo():null;}};
 })();
