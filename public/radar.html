@@ -270,6 +270,36 @@ body.basit #cards>section.pn#cRegime,body.basit #cMirror,body.basit #cHealth,bod
 @media (min-width:1101px){body.basit main{grid-template-areas:"pulse hero port" "why why brief" "watch watch brief" "more more more";grid-template-rows:auto auto auto auto}#vw11more{grid-area:more}}
 body.basit #score{display:none}
 @media (max-width:1100px){#leg11{bottom:110px;left:8px;right:8px;max-width:none}#leg11 details{font-size:13px}#lv11{inset:50px 6px 50px 6px;padding:8px}.lvt td,.lvt th{padding:4px}#vw11 button{padding:4px 9px;font-size:13px}}
+/* v12 · Sinyale hazırlık tablosu */
+#ok12{display:none;position:absolute;inset:0;z-index:30;background:#070d14;flex-direction:column;font-size:15px;color:#e8eef4}
+#hero.ok12on #ok12{display:flex}
+#hero.ok12on>.hov,#hero.ok12on #leg11,#hero.ok12on #lv11{visibility:hidden}
+.o12top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px;padding:12px 16px 6px}
+.o12tt{font-size:20px;letter-spacing:.5px;color:#fff}
+.o12tabs,.o12vw{display:flex;gap:6px;flex-wrap:wrap}.o12vw{margin-left:auto}
+.o12tabs button,.o12vw button{font:600 15px system-ui,sans-serif;padding:7px 14px;border-radius:8px;border:1px solid #2a3846;background:#0e1822;color:#c9d4de;cursor:pointer}
+.o12tabs button.on,.o12vw button.on{background:#e8eef4;color:#071018;border-color:#e8eef4}
+#o12to3{border-style:dashed!important}
+.o12leg{display:flex;flex-wrap:wrap;gap:4px 16px;padding:4px 16px 10px;font-size:14px;color:#aab6c2;border-bottom:1px solid #1b2733}
+.o12leg i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}.o12h{margin-left:auto;color:#e8eef4}
+#o12body{flex:1;overflow-y:auto;padding:8px 12px 16px}
+.o12r{display:grid;grid-template-columns:minmax(220px,1.1fr) minmax(220px,2fr) 150px;grid-template-areas:"a bar c" "m m m";gap:4px 14px;align-items:center;padding:9px 6px;border-bottom:1px solid #16212c}
+.o12a{grid-area:a;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.o12nm{font-size:18px;font-weight:800;color:#fff;cursor:pointer;text-decoration:underline dotted #5b6b7a;text-underline-offset:4px}.o12nm:hover{color:#7fd3ff}
+.o12lg{font-size:13px;color:#8e9ba8}
+.o12st{font-size:13px;padding:2px 8px;border:1px solid;border-radius:999px;white-space:nowrap}
+.o12bar{grid-area:bar;position:relative;height:30px;background:#121c26;border-radius:7px;overflow:hidden}
+.o12bar i{position:absolute;left:0;top:0;bottom:0;border-radius:7px;opacity:.9}
+.o12pc{position:absolute;left:10px;top:4px;font-size:18px;font-weight:800;color:#fff;text-shadow:0 1px 3px #000}
+.o12bn{position:absolute;right:8px;top:4px;padding:1px 8px;border-radius:6px;background:rgba(4,8,12,.6);font-size:14px;font-weight:600;color:#e8eef4;text-shadow:0 1px 3px #000}
+.o12c{grid-area:c;font-size:14px;color:#c9d4de;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.o12c b{font-size:17px;color:#fff}
+.o12d{font-weight:700;color:#8e9ba8}.o12d.up{color:#2ee88a}.o12d.dn{color:#ff6b6b}.o12alt{font-size:12.5px;color:#8e9ba8}
+.o12m{grid-area:m;font-size:14.5px;color:#d7dee5}.o12m .g{color:#2ee88a}
+.o12r.b-uzk .o12m{color:#9aa6b2}
+.o12empty{padding:40px;text-align:center;font-size:17px;color:#9aa6b2}
+.o12rd{position:relative;height:100%;min-height:360px}.o12rn{text-align:center;font-size:14px;color:#aab6c2;padding-top:4px}
+#tbOk12.on{display:none}
+@media (max-width:700px){.o12r{grid-template-columns:1fr;grid-template-areas:"a" "bar" "c" "m";padding:10px 4px}.o12vw{margin-left:0}.o12tt{width:100%}.o12h{margin-left:0}.o12tabs button,.o12vw button{padding:7px 10px;font-size:14px}}
 </style>
 <script src="/qx-direct.js?v=130"></script>
 </head><body>
