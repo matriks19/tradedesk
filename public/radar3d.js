@@ -77,7 +77,7 @@ export function create(host,opt){
     const t0=A.tpos.length/3;S.syms.forEach((d,k)=>{for(let j=0;j<TL;j++){const th=-Math.PI/2+(j/(TL-1))*Math.PI*2*0.92,rr=TOR+TUBE*Math.cos(th);push(new THREE.Vector3(Math.cos(d.a)*rr,TUBE*Math.sin(th),Math.sin(d.a)*rr),Z,new THREE.Color(0.2,0.2,0.2),-1,j===TL-1?4.6:2.2,Math.random(),0,0.4);S.torusMap.push([k,j]);}});
     S.torusStart=t0;S.TL=TL;const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(A.tpos,3));
     for(const k of ['tpos','offs','tcol'])g.setAttribute(k,new THREE.Float32BufferAttribute(A[k],3));for(const k of ['cid','size','phase','spinm','tb'])g.setAttribute(k,new THREE.Float32BufferAttribute(A[k],1));
-    g.attributes.tcol.setUsage(THREE.DynamicDrawUsage);g.attributes.tb.setUsage(THREE.DynamicDrawUsage);S.geo=g;const pts=new THREE.Points(g,mat);pts.frustumCulled=false;dyn.add(pts);S.count=A.size.length;
+    g.attributes.tcol.setUsage(THREE.DynamicDrawUsage);g.attributes.tb.setUsage(THREE.DynamicDrawUsage);S.geo=g;S.base=null;const pts=new THREE.Points(g,mat);pts.frustumCulled=false;dyn.add(pts);S.count=A.size.length;applyScl();
     // yükseklik sapları
     const sg=new THREE.BufferGeometry();sg.setAttribute('position',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));sg.setAttribute('color',new THREE.Float32BufferAttribute(new Float32Array(S.n*6),3));
     S.stems=new THREE.LineSegments(sg,new THREE.LineBasicMaterial({vertexColors:true,transparent:true,opacity:0.3}));S.stems.frustumCulled=false;dyn.add(S.stems);
@@ -186,7 +186,12 @@ export function create(host,opt){
   function loop(){renderer.setAnimationLoop(S.running&&!S.paused&&!opt.capture?frame:null);}loop();
   function pause(v){S.paused=!!v;loop();}
   document.addEventListener('visibilitychange',()=>{S.running=!document.hidden;loop();});
+  /* v11: seçili düğüm ölçeği — cid'e göre parçacık boyutu ve küme yayılımı çarpılır (veri değişmez) */
+  function applyScl(){const g=S.geo;if(!g)return;const sz=g.attributes.size,of=g.attributes.offs,cid=g.attributes.cid.array;if(!S.base||S.base.s.length!==sz.array.length)S.base={s:Float32Array.from(sz.array),o:Float32Array.from(of.array)};const M=S.scl||{};let ch=false;
+    for(let i=0;i<cid.length;i++){const m=cid[i]>=0?(M[cid[i]]||1):1,ns=S.base.s[i]*m;if(sz.array[i]!==ns){sz.array[i]=ns;ch=true;}for(let q=0;q<3;q++){const no=S.base.o[i*3+q]*m;if(of.array[i*3+q]!==no){of.array[i*3+q]=no;ch=true;}}}
+    if(ch){sz.needsUpdate=true;of.needsUpdate=true;}}
+  function setScale(map){S.scl={};Object.keys(map||{}).forEach(k=>{const v=+map[k];if(isFinite(v)&&v>0&&v!==1)S.scl[k]=Math.min(4,Math.max(0.3,v));});applyScl();}
   function setOpts(o){S.opt=Object.assign({},S.opt,o||{});}
-  return {setData,setFrame,setOpts,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,setSession,pause,paused:()=>!!S.paused,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
+  return {setData,setFrame,setOpts,setScale,fire,focus,unfocus,redrawHolo,state:S,frame,setPerf,setSession,pause,paused:()=>!!S.paused,perfInfo:()=>({mode:S.perf.mode,lvl:S.perf.lvl,name:PLV[S.perf.lvl].n,dens:PLV[S.perf.lvl].d,fps:S.fps,hist:S.perf.hist.slice()}),
     orbit(az){const r=Math.hypot(cam.position.x-ctl.target.x,cam.position.z-ctl.target.z);cam.position.x=ctl.target.x+Math.sin(az)*r;cam.position.z=ctl.target.z+Math.cos(az)*r;},
     dispose(){renderer.setAnimationLoop(null);renderer.dispose();host.removeChild(renderer.domElement);host.removeChild(lab);}};}
