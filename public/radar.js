@@ -112,7 +112,7 @@ var LS_NEW11=(function(){try{for(var i=0;i<localStorage.length;i++){var k=localS
 var LSG=(function(){var bad=[],isO=function(v){return v&&typeof v==='object'&&!Array.isArray(v);},num=function(x){return typeof x==='number'&&isFinite(x);};
   var CHK={radar_alarm_v1:function(v){return isO(v)&&(v.seen==null||isO(v.seen))&&(v.log==null||Array.isArray(v.log))&&(v.types==null||isO(v.types))&&(v.prox==null||isO(v.prox));},
     radar_watch_v1:function(v){return Array.isArray(v);},
-    radar_settings_v1:function(v){return isO(v)&&['N','rho','al','nmin'].every(function(k){return v[k]==null||num(v[k]);})&&(v.N==null||[30,50,80].indexOf(v.N)>=0)&&['perf','lp'].every(function(k){return v[k]==null||typeof v[k]==='string';})&&(v.ntfy==null||(isO(v.ntfy)&&(v.ntfy.topic==null||typeof v.ntfy.topic==='string')&&(v.ntfy.srv==null||typeof v.ntfy.srv==='string')))&&(v.evren==null||v.evren==='top50'||v.evren==='lab37')&&(v.dsum==null||(isO(v.dsum)&&(v.dsum.hour==null||(num(v.dsum.hour)&&v.dsum.hour>=0&&v.dsum.hour<=23))&&(v.dsum.last==null||typeof v.dsum.last==='string')));},
+    radar_settings_v1:function(v){return isO(v)&&['N','rho','al','nmin'].every(function(k){return v[k]==null||num(v[k]);})&&(v.N==null||[30,50,80,100,200].indexOf(v.N)>=0)&&['perf','lp'].every(function(k){return v[k]==null||typeof v[k]==='string';})&&(v.ntfy==null||(isO(v.ntfy)&&(v.ntfy.topic==null||typeof v.ntfy.topic==='string')&&(v.ntfy.srv==null||typeof v.ntfy.srv==='string')))&&(v.evren==null||v.evren==='top50'||v.evren==='lab37')&&(v.dsum==null||(isO(v.dsum)&&(v.dsum.hour==null||(num(v.dsum.hour)&&v.dsum.hour>=0&&v.dsum.hour<=23))&&(v.dsum.last==null||typeof v.dsum.last==='string')));},
     radar_ui_v1:function(v){return isO(v)&&(v.col==null||isO(v.col))&&(v.ns==null||(isO(v.ns)&&Object.keys(v.ns).every(function(k){return num(v.ns[k]);})))&&(v.vw==null||v.vw==='basit'||v.vw==='gelismis')&&(v.ok12==null||isO(v.ok12))&&(v.gw==null||(isO(v.gw)&&(v.gw.pos==null||isO(v.gw.pos))&&(v.gw.open==null||Array.isArray(v.gw.open))));},
     radar_sim_v1:function(v){return isO(v)&&Array.isArray(v.pos)&&v.pos.every(function(p){return isO(p)&&typeof p.id==='string'&&num(p.e)&&num(p.ti);});}};
   try{var ks=[];for(var i=0;i<localStorage.length;i++){var k=localStorage.key(i);if(k&&k.indexOf('radar_')===0)ks.push(k);}
@@ -140,6 +140,12 @@ function f1(x){return isFinite(x)?x.toFixed(1):'—';}function f0(x){return isFi
 /* v10: evren seçimi — top50 (varsayılan, hacme göre ilk N) veya lab37 (lab sepeti; hacim sırası korunur) */
 function evrenMode(){var m=/[?&]evren=(lab37|top50)/.exec(location.search);return m?m[1]:(CFG.evren==='lab37'?'lab37':'top50');}
 function evrenSel(u,N){if(evrenMode()==='lab37'&&typeof LAB37!=='undefined'){var s={};LAB37.forEach(function(x){s[x]=1;});return u.filter(function(x){return s[x.symbol];});}return u.slice(0,N);}
+/* v132: mum önbelleği (bellekte) — ikinci taramadan itibaren yalnız son mumlar istenir */
+var KC132={};
+async function kGet(s,iv,lim,tf,old,ft){if(old&&old.length>50&&ft&&Math.floor(Date.now()/tf)===Math.floor(ft/tf))return {raw:old,inc:true,skip:true};/* yeni kapanmış mum yok → istek yok */
+  if(old&&old.length>50){var n=Math.min(lim,Math.ceil((Date.now()-old[old.length-1][0])/tf)+3);if(n<=60){var r=await getJSON('/api/fapi/v1/klines?symbol='+s+'&interval='+iv+'&limit='+n);
+    if(Array.isArray(r)&&r.length&&+r[0][0]<=+old[old.length-1][0]){var f=+r[0][0],a=old.filter(function(q){return +q[0]<f;}).concat(r);return {raw:a.slice(-lim),inc:true};}}}
+  return {raw:await getJSON('/api/fapi/v1/klines?symbol='+s+'&interval='+iv+'&limit='+lim),inc:false};}
 async function scanCoins(N){
   status('Binance 24s özet alınıyor…');
   var tk=await getJSON('/api/fapi/v1/ticker/24hr');
@@ -147,12 +153,14 @@ async function scanCoins(N){
   var info=null;try{info=await getJSON('/api/fapi/v1/exchangeInfo');}catch(e){}
   if(info&&info.symbols){var ok={};info.symbols.forEach(function(s){if(s.status==='TRADING'&&s.contractType==='PERPETUAL')ok[s.symbol]=1;});u=u.filter(function(x){return ok[x.symbol];});}
   u=evrenSel(u,N);if(!u.length)throw new Error('coin listesi boş geldi (ticker '+(tk&&tk.length||0)+' satır) — veri kaynağı yanıtı beklenen biçimde değil');var out=[],done=0;
-  await pool(u,4,async function(x){var s=x.symbol;
-    var r4=await getJSON('/api/fapi/v1/klines?symbol='+s+'&interval=4h&limit=500');
-    var r1=await getJSON('/api/fapi/v1/klines?symbol='+s+'&interval=1h&limit=1500');
-    out.push({sym:s,b:s.replace(/USDT$/,''),qv:+x.quoteVolume,ch:+x.priceChangePercent,k4:kl(r4,H4),k1:kl(r1,H1)});
-    done++;status('Coin mumları: '+done+'/'+u.length+' ('+ST.req+' istek, ≤4/sn)');});
-  out=out.filter(function(c){return c.k4.c.length>120&&c.k1.c.length>300;});
+  var prog=!ST.coins.length,t0=Date.now(),inc=0;
+  await pool(u,4,async function(x){var s=x.symbol,C=KC132[s];
+    var r4=await kGet(s,'4h',500,H4,C&&C.r4,C&&C.t4),r1=await kGet(s,'1h',1500,H1,C&&C.r1,C&&C.t1);if(C&&r4.inc&&r1.inc)inc++;
+    KC132[s]={r4:r4.raw,r1:r1.raw,t4:r4.skip?C.t4:Date.now(),t1:r1.skip?C.t1:Date.now()};
+    out.push({sym:s,b:s.replace(/USDT$/,''),qv:+x.quoteVolume,ch:+x.priceChangePercent,k4:kl(r4.raw,H4),k1:kl(r1.raw,H1)});
+    done++;status('Taranıyor '+done+'/'+u.length+' coin · '+ST.req+' istek (≤4/sn)'+(inc?' · '+inc+' artımlı':''));
+    if(prog&&done%40===0&&done<u.length){try{var part=out.filter(function(c){return c.k4.c.length>120&&c.k1.c.length>300;});postCoins(part);renderAll();}catch(e){console.warn('kısmi',e);}}});
+  out=out.filter(function(c){return c.k4.c.length>120&&c.k1.c.length>300;});ST.scan132={n:out.length,N:u.length,ms:Date.now()-t0,inc:inc};window.QX_V132={scan:function(){return ST.scan132;},cache:function(){return Object.keys(KC132).length;}};
   postCoins(out);}
 /* v6: tarama sonrası türetme — canlı akışta kapanan mumdan sonra da aynı yol (kesinleşti) */
 function postCoins(out){
@@ -244,8 +252,8 @@ function pfTxt(o){return !o?'—':o.pf==null?'∞':o.pf.toFixed(2);}
 /* ---------- BENZERİ KAHİN: geçmiş analog anlar → ileri 12 mum getiri konisi ---------- */
 var ANH=12;
 /* ayarlar (radar_settings_v1; yalnız radar_* anahtarı) */
-var CFG={N:50,rho:0.8,al:0.45,nmin:15,perf:'auto',lp:'auto',ntfy:{on:false,topic:'',srv:'https://ntfy.sh'},dsum:{on:false,hour:20,last:''},evren:'top50'};
-(function(){try{var v=JSON.parse(localStorage.getItem('radar_settings_v1')||'null');if(v&&typeof v==='object')for(var k in CFG)if(k in v)CFG[k]=v[k];}catch(e){}})();
+var CFG={N:100,n132:0,rho:0.8,al:0.45,nmin:15,perf:'auto',lp:'auto',ntfy:{on:false,topic:'',srv:'https://ntfy.sh'},dsum:{on:false,hour:20,last:''},evren:'top50'};
+(function(){try{var v=JSON.parse(localStorage.getItem('radar_settings_v1')||'null');if(v&&typeof v==='object')for(var k in CFG)if(k in v)CFG[k]=v[k];}catch(e){}if(!CFG.n132){if(CFG.N===50||CFG.N===80)CFG.N=100;else if(CFG.N===30)CFG.N=50;CFG.n132=1;}if([50,100,200].indexOf(CFG.N)<0)CFG.N=100;})();
 function featCoin(c,B){var k=c.k4,n=k.c.length,F={st:new Array(n),r:new Array(n),fl:c.T.fl,lrv:new Array(n),s:new Array(n)};
   for(var i=0;i<n;i++){if(i<60){F.st[i]=null;continue;}var j=idxAt(c.k1.t,k.t[i]+H4,H1),P=proxCoin(c,i,j);F.st[i]=P.st;F.r[i]=P.r;F.lrv[i]=Math.log(Math.max(0.05,j>=0?c.rv1[j]:1));F.s[i]=stressOf(B.mr[k.t[i]],B.br[k.t[i]]);}c.F=F;}
 function featBist(c,B){var k=c.k1,n=k.c.length,F={st:new Array(n),r:new Array(n),z:c.Z,fl:c.flowSer,lrv:new Array(n),s:new Array(n)};
@@ -325,7 +333,7 @@ function fmtT(t){return new Date(t).toLocaleString('tr-TR',{timeZone:'Europe/Ist
 function pct(x,d){return isFinite(x)?(x>=0?'+':'')+(x*100).toFixed(d==null?1:d)+'%':'—';}
 function usd(x){return isFinite(x)?(x>=0?'+$':'−$')+Math.abs(x).toFixed(1):'—';}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function chartUrlS(mode,sym){return '/quantex.html?v=131#ac='+mode+':'+encodeURIComponent(sym);}
+function chartUrlS(mode,sym){return '/quantex.html?v=132#ac='+mode+':'+encodeURIComponent(sym);}
 function chartUrl(c){return chartUrlS(ST.mode==='bist'?'bist':'coin',c.sym);}
 function cur(){return ST.mode==='bist'?ST.bist:ST.coins;}
 function hidpi(cv){var dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}var g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);return {g:g,w:w,h:h};}
@@ -366,7 +374,7 @@ function webglOK(){try{var c=document.createElement('canvas');return !!(c.getCon
 function lowPower(){var n=navigator,c=n.connection||{};return !!(c.saveData||(n.deviceMemory&&n.deviceMemory<=2)||(n.hardwareConcurrency&&n.hardwareConcurrency<=2));}
 async function heroInit(){var host=$('hero3d'),use3d=G.want==='3d'||(G.want==='auto'&&webglOK()&&!lowPower());
   if(G.api&&G.mode==='3d'&&use3d){heroData();return;}if(G.api&&!use3d){G.api.dispose();G.api=null;}
-  if(use3d){try{status2('3D motor yükleniyor (three.js)…');var M=await import('/radar3d.js?v=131');
+  if(use3d){try{status2('3D motor yükleniyor (three.js)…');var M=await import('/radar3d.js?v=132');
       G.api=M.create(host,{lite:innerWidth<700,capture:CLK.cap,clock:function(){return CLK.now();},onHover:hoverTip,onPick:function(k){focusOn(k);var d=LAY.dots[k];if(d)symChart(d.c);},drawHolo:function(g,w,h,k){drawMini(g,w,h,k,true);}});
       G.mode='3d';$('hero2d').style.display='none';window.RD3=G.api;if(G.api.setOpts)G.api.setOpts(VIEW);heroData();return;}catch(e){console.warn('3D yüklenemedi, 2D radar',e);G.reason='WebGL/three.js yüklenemedi';}}
   else G.reason=webglOK()?'düşük güç':'WebGL yok';G.mode='2d';$('hero2d').style.display='block';R2.start();heroData();}
@@ -542,7 +550,7 @@ function status2(t){var e=$('rdStatus');if(e)e.textContent=t;}
 status=function(t){status2(t);var m=/(\d+)\/(\d+)/.exec(t);if(m)$('tProg').style.width=(100*m[1]/m[2])+'%';};
 function renderAll(){heroData();renderPort();riverData();renderRobot();}
 async function refresh(){if(ST.busy)return;ST.busy=true;ST.err=[];$('rdBtn').disabled=true;$('tScan').classList.add('on');var t0=Date.now();
-  try{if(ST.mode==='coin'||!ST.coins.length)await scanCoins(+($('rdN').value)||50);renderAll();try{await scanBist();}catch(e){ST.err.push('BIST: '+(e.message||e));}
+  try{if(ST.mode==='coin'||!ST.coins.length)await scanCoins(+CFG.N||+($('rdN').value)||100);renderAll();try{await scanBist();}catch(e){ST.err.push('BIST: '+(e.message||e));}
     renderAll();ST.lastAt=Date.now();try{alarmCheck();}catch(e){console.warn('alarm',e);}status2('Güncellendi '+fmtT(ST.lastAt)+' · '+((Date.now()-t0)/1000).toFixed(0)+' sn · '+ST.req+' istek'+(ST.err.length?' · '+ST.err.length+' hata':''));$('tProg').style.width='100%';if(ST.err.length)console.warn('radar hatalar',ST.err);}
   catch(e){status2('Hata: '+(e.message||e));console.error(e);}ST.busy=false;$('rdBtn').disabled=false;$('tScan').classList.remove('on');window.QX_RADAR_READY=true;}
 function setMode(m){if(ST.mode===m)return;unfocus();ST.replay=null;$('rp').classList.remove('on');$('score').classList.remove('mob');$('rpLog').innerHTML='';ST.mode=m;document.querySelectorAll('[data-mode]').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-mode')===m);});if(cur().length)heroData();}
@@ -843,7 +851,7 @@ window.addEventListener('keydown',function(e){var tg=e.target,typing=tg&&(tg.tag
 /* ---------- ayarlar (radar_settings_v1) + performans modu ---------- */
 function setSave(){try{localStorage.setItem('radar_settings_v1',JSON.stringify(CFG));}catch(e){}}
 function setOpen(){var el=$('setBody');function sel(id,lbl,opts,v,note){return '<div class="kv"><span>'+lbl+(note?'<br><small class="mut">'+note+'</small>':'')+'</span><b><select data-set="'+id+'">'+opts.map(function(o){return '<option value="'+o[0]+'"'+(String(o[0])===String(v)?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></b></div>';}
-  el.innerHTML=sel('N','Coin evreni',[[30,'ilk 30'],[50,'ilk 50'],[80,'ilk 80']],CFG.N,'değişince yeniden tarar (≤4 istek/sn)')+sel('rho','Korelasyon eşiği ρ',[[0.7,'0.70'],[0.75,'0.75'],[0.8,'0.80'],[0.85,'0.85'],[0.9,'0.90']],CFG.rho,'takımyıldız, çift-risk, puan çeşitlendirme')+
+  el.innerHTML=sel('N','Coin evreni',[[50,'Top50'],[100,'Top100'],[200,'Top200']],CFG.N,'değişince yeniden tarar (≤4 istek/sn)')+sel('rho','Korelasyon eşiği ρ',[[0.7,'0.70'],[0.75,'0.75'],[0.8,'0.80'],[0.85,'0.85'],[0.9,'0.90']],CFG.rho,'takımyıldız, çift-risk, puan çeşitlendirme')+
    sel('al','1s+4s hiza eşiği',[[0.35,'yakınlık ≥0.65'],[0.4,'≥0.60'],[0.45,'≥0.55'],[0.5,'≥0.50'],[0.55,'≥0.45']],CFG.al)+sel('nmin','Kâhin asgari örnek',[[10,'10'],[15,'15'],[20,'20'],[30,'30']],CFG.nmin,'altında koni gösterilmez')+
    sel('perf','3B performans',[['auto','otomatik (fps)'],['high','yüksek'],['low','düşük']],perfMode(),'otomatik: 2 sn’de bir ölçülen fps &lt;30 → düşür, &gt;55 → yükselt')+'<div class="kv"><span>Ölçülen</span><b id="setPerf">—</b></div>'+
    '<div class="mut sm">Yalnız <code>radar_settings_v1</code> anahtarına yazılır. Lab sonuçları (PF, n, geri test) sabittir; eşikler yalnız canlı görünümü etkiler.</div>';
@@ -852,7 +860,7 @@ function setOpen(){var el=$('setBody');function sel(id,lbl,opts,v,note){return '
   $('set').classList.add('on');renderPerf();}
 function perfMode(){var m=/[?&]perf=(auto|high|low)/.exec(location.search);return m?m[1]:CFG.perf;}
 function renderPerf(){if(G.api&&G.api.setPerf&&!G.api._pf){G.api._pf=1;G.api.setPerf(perfMode());}var el=$('setPerf'),pi=G.api&&G.api.perfInfo?G.api.perfInfo():null,t=G.mode!=='3d'||!pi?'2D çizim · perf modu yok':pi.mode+' · seviye '+pi.name+' · yoğunluk %'+Math.round(100*pi.dens)+' · '+pi.fps.toFixed(0)+' fps';if(el)el.textContent=t;var b=$('hPerf');if(b)b.textContent=G.mode==='3d'&&pi?'⚡ '+pi.name+' · '+pi.fps.toFixed(0)+' fps':'';}
-window.addEventListener('DOMContentLoaded',function(){$('rdN').value=String(CFG.N);$('rdN').addEventListener('change',function(){CFG.N=+this.value;setSave();});
+window.addEventListener('DOMContentLoaded',function(){$('rdN').value=String(CFG.N);$('rdN').addEventListener('change',function(){CFG.N=+this.value;setSave();try{evBtnSync();}catch(e){}});
   $('palQ').addEventListener('input',function(){PAL.sel=0;palRender();});$('pal').addEventListener('click',function(e){if(e.target.id==='pal')palClose();});
   ['help','plan','set'].forEach(function(id){$(id).addEventListener('click',function(e){if(e.target.id===id)$(id).classList.remove('on');});});
   $('kBtn').onclick=palOpen;$('setBtn').onclick=setOpen;$('hlpBtn').onclick=helpOpen;$('setX').onclick=function(){$('set').classList.remove('on');};$('hlpX').onclick=function(){$('help').classList.remove('on');};
@@ -862,11 +870,11 @@ window.QX_V5={scoreOf:scoreOf,planOpen:planOpen,planTxt:function(){return PLAN.t
 /* ================= v6: canlı akış (WS) · kontraryan keşif · senaryo stres testi · seans halkası · sadeleştirme ================= */
 /* ---------- 1) CANLI AKIŞ: Binance USDⓈ-M /market birleşik akış (kline 1s+4s, BTC markPrice@1s) ---------- */
 var WSS={conns:[],map:{},syms:'',tot:0,win:[],rate:0,last:0,reconn:0,closed:0,log:[],stopped:false,confT:null,gap:false,btc:NaN,btcT:0,provN:0,provMs:0};
-var WS_BASE='wss://fstream.binance.com/market/stream?streams=',WS_CHUNK=100;
+var WS_BASE='wss://fstream.binance.com/market/stream?streams=',WS_CHUNK=190;
 function wsWanted(){return !/[?&]ws=0/.test(location.search)&&typeof WebSocket!=='undefined';}
 function wsLive(){return WSS.conns.length>0&&WSS.conns.every(function(c){return c.state==='açık';})&&Date.now()-WSS.last<20000;}
 function wsLog(t){WSS.log.unshift({t:Date.now(),x:t});WSS.log=WSS.log.slice(0,12);}
-function wsStart(){if(!wsWanted()||CLK.cap&&!/[?&]ws=1/.test(location.search))return;var list=ST.coins.slice(0,80).map(function(c){return c.sym.toLowerCase();}),key=list.join(',');
+function wsStart(){if(!wsWanted()||CLK.cap&&!/[?&]ws=1/.test(location.search))return;var list=ST.coins.slice(0,200).map(function(c){return c.sym.toLowerCase();}),key=list.join(',');
   WSS.map={};ST.coins.forEach(function(c){WSS.map[c.sym]=c;});if(key===WSS.syms&&WSS.conns.length)return;wsStop();WSS.stopped=false;WSS.syms=key;
   var st=['btcusdt@markPrice@1s'];list.forEach(function(s){st.push(s+'@kline_1h',s+'@kline_4h');});
   var nc=Math.ceil(st.length/WS_CHUNK),cs=Math.ceil(st.length/nc);for(var i=0;i<st.length;i+=cs)WSS.conns.push({id:WSS.conns.length,streams:st.slice(i,i+cs),state:'bekliyor',att:0,ws:null,n:0});
@@ -1402,8 +1410,8 @@ function f2x(x){return x==null?'—':x>=99?'∞':isFinite(x)?x.toFixed(2):'—';
 var MTR=['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'];function mLbl(m){return MTR[+m.slice(5,7)-1]+' '+m.slice(2,4);}
 
 /* ---------- 1) Evren ---------- */
-function evBtnSync(){var b=$('evBtn');if(!b)return;var m=evrenMode();b.innerHTML='evren: <b>'+(m==='lab37'?'Lab37':'Top50')+'</b>';b.classList.toggle('on',m==='lab37');var n=$('rdN');if(n)n.disabled=m==='lab37';var t=$('rdNl');if(t)t.title=m==='lab37'?'Lab37 modunda N kullanılmaz (lab’daki 37 coin taranır)':'';}
-function evSet(m){if(evrenMode()===m)return;if(/[?&]evren=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('evren');history.replaceState(null,'',u.pathname+u.search+location.hash);}CFG.evren=m;setSave();evBtnSync();rtoast('Evren: '+(m==='lab37'?'Lab37 (lab’daki 37 coin)':'Top50 (hacme göre ilk N)')+' — yeniden taranıyor…');unfocus();
+function evBtnSync(){var b=$('evBtn');if(!b)return;var m=evrenMode();b.innerHTML='evren: <b>'+(m==='lab37'?'Lab37':'Top'+CFG.N)+'</b>';b.classList.toggle('on',m==='lab37');var n=$('rdN');if(n)n.disabled=m==='lab37';var t=$('rdNl');if(t)t.title=m==='lab37'?'Lab37 modunda N kullanılmaz (lab’daki 37 coin taranır)':'';}
+function evSet(m){if(evrenMode()===m)return;if(/[?&]evren=/.test(location.search)){var u=new URL(location.href);u.searchParams.delete('evren');history.replaceState(null,'',u.pathname+u.search+location.hash);}CFG.evren=m;setSave();evBtnSync();rtoast('Evren: '+(m==='lab37'?'Lab37 (lab’daki 37 coin)':'Top'+CFG.N+' (24s hacme göre ilk '+CFG.N+')')+' — yeniden taranıyor…');unfocus();
   var p=refresh(true);Promise.resolve(p).then(function(){try{wsStart();}catch(e){}try{renderEvr();}catch(e){}});}
 function renderEvr(){var el=$('evBody');if(!el||!EVR)return;var G=EVR.g,Tt=EVR.t,gs=['Lab37','Top50','Top50 ∩ Lab37','Top50 yeni'],m=evrenMode();
   var tb=function(leg){return '<table class="ot9"><tr><th>'+(leg==='yo6'?'YO6 MA (4s)':'Loxx + z&gt;0 (1s)')+'</th><th>coin</th><th>n</th><th>PF</th><th>kazanma</th><th>en kötü</th><th>IS PF <span class="mut">(n)</span></th><th>OOS PF <span class="mut">(n)</span></th><th>toplam</th></tr>'+gs.map(function(g){var o=G[leg][g];return '<tr'+(g==='Top50 yeni'?' class="hl10"':'')+'><td>'+g+'</td><td>'+o.coins+'</td><td>'+o.ALL.n+'</td><td><b>'+f2x(o.ALL.pf)+'</b></td><td>'+pc(o.ALL.win,0)+'</td><td>'+pc(o.ALL.worst)+'</td><td>'+f2x(o.IS.pf)+' <span class="mut">('+o.IS.n+')</span></td><td>'+f2x(o.OOS.pf)+' <span class="mut">('+o.OOS.n+')</span></td><td>'+usd(o.ALL.usd)+'</td></tr>';}).join('')+'</table>'+
@@ -1758,12 +1766,12 @@ function ok12Head(){var tabs=[['all','Tümü'],['yo6','YO6 MA'],['loxx','Loxx'],
   return '<div class="o12top"><b class="o12tt">Sinyale hazırlık</b><div class="o12tabs">'+tabs.map(function(t){return '<button data-o12t="'+t[0]+'" class="'+(OK12.tab===t[0]?'on':'')+'">'+t[1]+'</button>';}).join('')+'</div>'+
   '<div class="o12vw"><button data-o12v="list" class="'+(OK12.vw==='list'?'on':'')+'">☰ Tablo</button><button data-o12v="radar" class="'+(OK12.vw==='radar'?'on':'')+'">◎ 2D radar</button><button id="o12to3" title="Eski 3D galaksiye geç">3D görünüm</button></div></div>'+
   '<div class="o12leg">Hazırlık % = motor yakınlığı ile tamamlanan koşul oranının ortalaması · '+OK12B.slice().reverse().map(function(b){return '<span><i style="background:'+b.col+'"></i>'+(b.lo===100?'100':b.lo+'–'+(b.lo===70?99:b.lo===40?70:40))+' '+b.nm+'</span>';}).join('')+'<span class="o12h">isme tıkla → grafik</span></div>';}
-function ok12List(R){if(!R.length)return '<div class="o12empty">Veri bekleniyor… (tarama bitince liste dolar)</div>';
+function ok12List(R0){if(!R0.length)return '<div class="o12empty">Veri bekleniyor… (tarama bitince liste dolar)</div>';var lim=OK12.lim||40,R=R0.slice(0,lim);
   return R.map(function(r){var b=ok12Band(r.p),S=ST11[r.s]||ST11[4],d=r.d>0?'<span class="o12d up" title="son mumdan beri hazırlık arttı">↑ '+r.d+'</span>':r.d<0?'<span class="o12d dn" title="son mumdan beri hazırlık azaldı">↓ '+(-r.d)+'</span>':'<span class="o12d" title="son mumdan beri değişmedi">=</span>';
-    return '<div class="o12r b-'+b.id+'"><div class="o12a"><span class="qsym o12nm" data-qs="'+esc(r.key)+'" title="Grafiği aç">'+esc(r.nm)+'</span><span class="o12lg">'+esc(r.lg)+' · '+r.tf+'</span><span class="o12st" style="border-color:'+S.col+';color:'+S.col+'" title="'+esc(S.ne)+'">'+esc(S.nm)+'</span></div>'+
+    return '<div class="o12r b-'+b.id+'"><div class="o12a"><span class="qsym o12nm" data-qs="'+esc(r.key)+'" title="Grafiği aç">'+esc(r.nm)+'</span>'+(!r.bist&&typeof LAB37!=='undefined'&&LAB37.indexOf(r.c.sym)<0?'<span class="o12nt" title="Lab37 dışında: bu coin geri testte yoktu; YO6 yeni coinlerde belirgin zayıftı. Filtre değişmedi.">test edilmemiş</span>':'')+'<span class="o12lg">'+esc(r.lg)+' · '+r.tf+'</span><span class="o12st" style="border-color:'+S.col+';color:'+S.col+'" title="'+esc(S.ne)+'">'+esc(S.nm)+'</span></div>'+
       '<div class="o12bar" title="'+esc(r.C.map(function(x){return (x.ok?'✓ ':'✗ ')+x.n;}).join('\n'))+'"><i style="width:'+Math.max(2,r.p)+'%;background:'+b.col+'"></i><span class="o12pc">%'+r.p+'</span><span class="o12bn">'+b.nm+'</span></div>'+
       '<div class="o12c"><b>'+r.X+'/'+r.Y+'</b> koşul tamam '+d+(r.alt?'<span class="o12alt">'+esc(r.alt)+'</span>':'')+'</div>'+
-      '<div class="o12m">'+(r.p>=100?'<b class="g">tüm koşullar tamam · giriş sonraki mum</b>':'eksik: '+esc(r.miss.join(' · ')||'—'))+'</div></div>';}).join('');}
+      '<div class="o12m">'+(r.p>=100?'<b class="g">tüm koşullar tamam · giriş sonraki mum</b>':'eksik: '+esc(r.miss.join(' · ')||'—'))+'</div></div>';}).join('')+(R0.length>lim?'<button class="o12more" id="o12more">Daha fazla göster (+40) · '+lim+'/'+R0.length+'</button>':'<div class="o12empty" style="padding:12px">'+R0.length+' satırın tamamı gösteriliyor</div>');}
 function ok12Radar(R){return '<div class="o12rd"><canvas id="o12cv"></canvas><div class="o12rn">Merkez = SİNYAL (%100) · halkalar %70 / %40 · dışarı = uzak · en hazır 15 isim yazılı</div></div>';}
 function ok12Draw(R){var cv=$('o12cv');if(!cv)return;var W=cv.parentNode.clientWidth,H=Math.max(320,cv.parentNode.clientHeight-30),dpr=Math.min(2,devicePixelRatio||1);cv.width=W*dpr;cv.height=H*dpr;cv.style.width=W+'px';cv.style.height=H+'px';
   var x=cv.getContext('2d');x.setTransform(dpr,0,0,dpr,0,0);x.clearRect(0,0,W,H);var cx=W/2,cy=H/2,Rr=Math.min(W,H)/2-26;
@@ -1779,8 +1787,8 @@ function ok12Draw(R){var cv=$('o12cv');if(!cv)return;var W=cv.parentNode.clientW
 function ok12Render(force){var el=$('ok12');if(!el||!OK12.on)return;var now=Date.now();if(!force&&now-OK12.last<1500)return;OK12.last=now;
   var R=ok12Rows(OK12.tab),sc=$('o12body')?$('o12body').scrollTop:0;OK12.R=R;
   var H=ok12Head()+'<div id="o12body" class="'+OK12.vw+'">'+(OK12.vw==='radar'?ok12Radar(R):ok12List(R))+'</div>';if(H===OK12.html&&!force)return;if(H===OK12.html&&OK12.vw!=='radar')return;OK12.html=H;el.innerHTML=H;var bd=$('o12body');if(bd)bd.scrollTop=sc;
-  el.querySelectorAll('[data-o12t]').forEach(function(b){b.onclick=function(){OK12.tab=b.getAttribute('data-o12t');ok12Save();ok12Render(true);};});
-  el.querySelectorAll('[data-o12v]').forEach(function(b){b.onclick=function(){OK12.vw=b.getAttribute('data-o12v');ok12Save();ok12Render(true);};});
+  el.querySelectorAll('[data-o12t]').forEach(function(b){b.onclick=function(){OK12.tab=b.getAttribute('data-o12t');OK12.lim=40;ok12Save();ok12Render(true);};});
+  el.querySelectorAll('[data-o12v]').forEach(function(b){b.onclick=function(){OK12.vw=b.getAttribute('data-o12v');ok12Save();ok12Render(true);};});var mo=$('o12more');if(mo)mo.onclick=function(){OK12.lim=(OK12.lim||40)+40;ok12Render(true);};
   var t3=$('o12to3');if(t3)t3.onclick=function(){ok12Set(false,true);};
   if(OK12.vw==='radar'){ok12Draw(R);var cv=$('o12cv');if(cv){var hit=function(e){var b=cv.getBoundingClientRect(),mx=e.clientX-b.left,my=e.clientY-b.top,best=null,bd=1e9;(OK12.pts||[]).forEach(function(p){var l=p.lb;if(l&&mx>=l[0]&&mx<=l[0]+l[2]&&my>=l[1]&&my<=l[1]+l[3]){best=p;bd=-1;return;}var d=(p.x-mx)*(p.x-mx)+(p.y-my)*(p.y-my);if(d<bd&&d<196){bd=d;best=p;}});return best;};
     cv.onclick=function(e){var p=hit(e);if(p){var c=gwFind(p.r.key);if(c)symChart(c);}};cv.onmousemove=function(e){var p=hit(e);cv.style.cursor=p?'pointer':'default';cv.title=p?p.r.nm+' · '+p.r.lg+' %'+p.r.p+' · '+p.r.X+'/'+p.r.Y+' koşul'+(p.r.p<100&&p.r.miss.length?' · eksik: '+p.r.miss.join(' · '):''):'';};}}}
