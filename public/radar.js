@@ -333,7 +333,7 @@ function fmtT(t){return new Date(t).toLocaleString('tr-TR',{timeZone:'Europe/Ist
 function pct(x,d){return isFinite(x)?(x>=0?'+':'')+(x*100).toFixed(d==null?1:d)+'%':'—';}
 function usd(x){return isFinite(x)?(x>=0?'+$':'−$')+Math.abs(x).toFixed(1):'—';}
 function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
-function chartUrlS(mode,sym){return '/quantex.html?v=132#ac='+mode+':'+encodeURIComponent(sym);}
+function chartUrlS(mode,sym){return '/quantex.html?v=133#ac='+mode+':'+encodeURIComponent(sym);}
 function chartUrl(c){return chartUrlS(ST.mode==='bist'?'bist':'coin',c.sym);}
 function cur(){return ST.mode==='bist'?ST.bist:ST.coins;}
 function hidpi(cv){var dpr=Math.min(2,window.devicePixelRatio||1),w=cv.clientWidth,h=cv.clientHeight;if(cv.width!==Math.round(w*dpr)||cv.height!==Math.round(h*dpr)){cv.width=Math.round(w*dpr);cv.height=Math.round(h*dpr);}var g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);return {g:g,w:w,h:h};}
@@ -374,7 +374,7 @@ function webglOK(){try{var c=document.createElement('canvas');return !!(c.getCon
 function lowPower(){var n=navigator,c=n.connection||{};return !!(c.saveData||(n.deviceMemory&&n.deviceMemory<=2)||(n.hardwareConcurrency&&n.hardwareConcurrency<=2));}
 async function heroInit(){var host=$('hero3d'),use3d=G.want==='3d'||(G.want==='auto'&&webglOK()&&!lowPower());
   if(G.api&&G.mode==='3d'&&use3d){heroData();return;}if(G.api&&!use3d){G.api.dispose();G.api=null;}
-  if(use3d){try{status2('3D motor yükleniyor (three.js)…');var M=await import('/radar3d.js?v=132');
+  if(use3d){try{status2('3D motor yükleniyor (three.js)…');var M=await import('/radar3d.js?v=133');
       G.api=M.create(host,{lite:innerWidth<700,capture:CLK.cap,clock:function(){return CLK.now();},onHover:hoverTip,onPick:function(k){focusOn(k);var d=LAY.dots[k];if(d)symChart(d.c);},drawHolo:function(g,w,h,k){drawMini(g,w,h,k,true);}});
       G.mode='3d';$('hero2d').style.display='none';window.RD3=G.api;if(G.api.setOpts)G.api.setOpts(VIEW);heroData();return;}catch(e){console.warn('3D yüklenemedi, 2D radar',e);G.reason='WebGL/three.js yüklenemedi';}}
   else G.reason=webglOK()?'düşük güç':'WebGL yok';G.mode='2d';$('hero2d').style.display='block';R2.start();heroData();}
@@ -1751,18 +1751,24 @@ function ok12Bi(c){if(!c.Z||!c.cr)return null;var L=c.Z.length-1,P=proxBist(c,L)
   var C=[{n:'z200 −2’nin altına indi'},{n:'z200 −2’nin üstünde kapattı'}];
   if(fired){C[0].ok=C[1].ok=true;}else{C[0].ok=z<=-2;C[0].m='z200 '+ok12n(z)+' · önce −2 altına inmeli';C[1].ok=false;C[1].m=z<=-2?'z200 '+ok12n(z)+' · −2 üstüne kapanış bekleniyor':'−2 üstüne dönüş (önce −2 altı)';}
   return {leg:'bist',lg:'BIST z−2',tf:'1s',p:ok12Pct(P.r,fired),pp:ok12Pct(Pp.r,Pp.st==='bf'),C:C,st:P.st};}
+/* PST (1s) — Loxx/JFKPS pst × pss yukarı kesişim (yeşil üçgen) + z200 > 0; ayrı sekme, diğer hazırlık % değişmez */
+function ok12Pst(c){var J=c.J,k=c.k1;if(!J||!k)return null;var j=J.pst.length-1;if(j<2||j<J.need)return null;
+  var pst=J.pst[j],pss=J.pss[j],z=c.Z[j],x=!!(J.ev.long[j]||J.ev.long[j-1]),zp=z>0,C=[{n:'pst, pss’i yukarı kesti (son 2 mum)'},{n:'z200 > 0'}];
+  C[0].ok=x;C[0].m=pst<pss?'pst '+ok12n(pst,0)+' < pss '+ok12n(pss,0)+' · yukarı kesişim bekleniyor':'pst zaten pss üstünde (yeni kesişim yok)';C[1].ok=zp;C[1].m='z200 '+ok12n(z)+', gereken > 0';
+  var r=function(i){var a=J.pst[i],b=J.pss[i];if(!isFinite(a)||!isFinite(b))return 1;return a<b?0.05+0.9*Math.min(1,(b-a)/20):0.6;},fired=x&&zp,fp=!!(J.ev.long[j-1]||J.ev.long[j-2])&&c.Z[j-1]>0;
+  return {leg:'pst',lg:x&&!zp?'PST AL':'PST Z>0',tf:'1s',p:ok12Pct(r(j),fired),pp:ok12Pct(r(j-1),fp),C:C,st:fired?'pstf':'far'};}
 function ok12Row(c,bist,L){var X=L.C.filter(function(x){return x.ok;}).length,ms=L.C.filter(function(x){return !x.ok&&x.m;}).slice(0,2).map(function(x){return x.m;});
   var ser=bist?c.k1:c.k4,S=null;try{S=st11(ser&&ser.c,ser?ser.c.length-1:null);}catch(e){}
   var bl=function(q){return q>=100?100:Math.min(99,Math.round((q+100*X/L.C.length)/2));},P=bl(L.p),PP=bl(L.pp);
   return {c:c,bist:bist,key:(bist?'bist:':'coin:')+c.sym,nm:bist?c.sym:(c.b||c.sym.replace(/USDT$/,'')),leg:L.leg,lg:L.lg,tf:L.tf,p:P,pr:L.p,d:P-PP,X:X,Y:L.C.length,miss:ms,C:L.C,s:S?S.s:4};}
 function ok12Rows(tab){var R=[];
   if(tab!=='bist')(ST.coins||[]).forEach(function(c){var a=null,b=null;try{a=ok12Yo6(c);}catch(e){}try{b=ok12Lx(c);}catch(e){}
-    if(tab==='yo6'){if(a)R.push(ok12Row(c,false,a));}else if(tab==='loxx'){if(b)R.push(ok12Row(c,false,b));}
+    if(tab==='yo6'){if(a)R.push(ok12Row(c,false,a));}else if(tab==='loxx'){if(b)R.push(ok12Row(c,false,b));}else if(tab==='pst'){var q=null;try{q=ok12Pst(c);}catch(e){}if(q)R.push(ok12Row(c,false,q));}
     else{var best=a&&b?(b.p>a.p?b:a):(a||b);if(best){var r=ok12Row(c,false,best),o=best===a?b:a;if(o)r.alt=o.lg+' %'+o.p;R.push(r);}}});
   if(tab==='all'||tab==='bist')(ST.bist||[]).forEach(function(c){var a=null;try{a=ok12Bi(c);}catch(e){}if(a)R.push(ok12Row(c,true,a));});
   R.sort(function(a,b){return b.p-a.p||b.X/b.Y-a.X/a.Y||a.nm.localeCompare(b.nm);});return R;}
 function ok12Save(){var s=uiLoad();s.ok12={on:OK12.on,tab:OK12.tab,vw:OK12.vw};uiSave();}
-function ok12Head(){var tabs=[['all','Tümü'],['yo6','YO6 MA'],['loxx','Loxx'],['bist','BIST z−2']];
+function ok12Head(){var tabs=[['all','Tümü'],['yo6','YO6 MA'],['loxx','Loxx'],['pst','PST'],['bist','BIST z−2']];
   return '<div class="o12top"><b class="o12tt">Sinyale hazırlık</b><div class="o12tabs">'+tabs.map(function(t){return '<button data-o12t="'+t[0]+'" class="'+(OK12.tab===t[0]?'on':'')+'">'+t[1]+'</button>';}).join('')+'</div>'+
   '<div class="o12vw"><button data-o12v="list" class="'+(OK12.vw==='list'?'on':'')+'">☰ Tablo</button><button data-o12v="radar" class="'+(OK12.vw==='radar'?'on':'')+'">◎ 2D radar</button><button id="o12to3" title="Eski 3D galaksiye geç">3D görünüm</button></div></div>'+
   '<div class="o12leg">Hazırlık % = motor yakınlığı ile tamamlanan koşul oranının ortalaması · '+OK12B.slice().reverse().map(function(b){return '<span><i style="background:'+b.col+'"></i>'+(b.lo===100?'100':b.lo+'–'+(b.lo===70?99:b.lo===40?70:40))+' '+b.nm+'</span>';}).join('')+'<span class="o12h">isme tıkla → grafik</span></div>';}
@@ -1795,7 +1801,7 @@ function ok12Render(force){var el=$('ok12');if(!el||!OK12.on)return;var now=Date
 function ok12Set(on,save){OK12.on=!!on;var hero=$('hero');if(hero)hero.classList.toggle('ok12on',OK12.on);var b=$('tbOk12');if(b)b.classList.toggle('on',OK12.on);
   try{if(G.api&&G.api.pause)G.api.pause(OK12.on);}catch(e){}if(save)ok12Save();if(OK12.on)ok12Render(true);}
 var _pf12=pushFrame;pushFrame=function(){_pf12.apply(this,arguments);if(OK12.on){try{if(G.api&&G.api.pause&&!G.api.paused())G.api.pause(true);}catch(e){}ok12Render();}};
-function init12(){if(init12.done)return;init12.done=1;var s=uiLoad(),o=s.ok12;if(o&&typeof o==='object'){OK12.on=o.on!==false;if(/^(all|yo6|loxx|bist)$/.test(o.tab))OK12.tab=o.tab;if(o.vw==='radar'||o.vw==='list')OK12.vw=o.vw;}
+function init12(){if(init12.done)return;init12.done=1;var s=uiLoad(),o=s.ok12;if(o&&typeof o==='object'){OK12.on=o.on!==false;if(/^(all|yo6|loxx|pst|bist)$/.test(o.tab))OK12.tab=o.tab;if(o.vw==='radar'||o.vw==='list')OK12.vw=o.vw;}
   var m=/[?&]gorunum=(tablo|radar|3d)/.exec(location.search);if(m){if(m[1]==='3d')OK12.on=false;else{OK12.on=true;OK12.vw=m[1]==='radar'?'radar':'list';}}
   var hero=$('hero');if(hero&&!$('ok12')){var d=document.createElement('div');d.id='ok12';d.className='noqs';hero.appendChild(d);}
   var tl=$('hTools');if(tl&&!$('tbOk12')){var b=document.createElement('button');b.className='btn hot';b.id='tbOk12';b.title='Sinyale hazırlık tablosuna dön (Y)';b.textContent='▤ Hazırlık tablosu';b.onclick=function(){ok12Set(true,true);};tl.insertBefore(b,tl.firstChild);}
