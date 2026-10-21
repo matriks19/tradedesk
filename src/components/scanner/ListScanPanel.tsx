@@ -169,6 +169,15 @@ const TFS: Timeframe[] = [
   "3d",
 ];
 
+import HAM_EV from "@/lib/hamEv.json";
+// [ev136] HAM EV: gerçek hamJurikTpo koduyla offline backtest (TP10/SL5, 48 mum, %0,1 komisyon). n<30, EV≤0 veya test EV≤0 → işlem yok.
+function hamEvTag(id: string, tf: string): string {
+  const E = HAM_EV as Record<string, { n: number; ev: number; oos: number | null }>;
+  const g = E[`ham:${id}|coin|${tf === "4h" ? "4h" : "1h"}`];
+  if (!g) return " · EV yok";
+  const ok = g.n >= 30 && g.ev > 0 && (g.oos ?? 0) > 0;
+  return ` · ${ok ? "🟢" : "⚪"} EV ${g.ev > 0 ? "+" : ""}${g.ev.toFixed(2)}`;
+}
 const HAM_CHIPS: { id: HamCond; label: string }[] = [
   { id: "raw_up", label: "Raw↑" },
   { id: "raw_dn", label: "Raw↓" },
@@ -3002,7 +3011,7 @@ export function ListScanPanel() {
             <Chip
               key={c.id}
               active={hamConds.includes(c.id)}
-              label={c.label}
+              label={c.label + hamEvTag(c.id, tf)}
               onClick={() => {
                 if (!hamOn) {
                   bumpMatchModeOnSecondKind(false, [
