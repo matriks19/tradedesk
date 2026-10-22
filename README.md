@@ -95,3 +95,8 @@ Script tab → **Kütüphane**: browse/search curated TD ports (RSI Divergence, 
 - Attribution: *Inspired by Loxx Jurik/Kase concepts / BigBeluga SMC concepts — community reconstructions, not affiliated.*
 - **JMA (community)** = widely circulated 3-stage adaptive filter reconstruction (phase, length, power/volty) — not commercial Jurik Research software.
 - Pattern overlay also draws OB / FVG / premium-discount sketches via advanced liquidity detectors.
+
+
+## TradingView (Pine) dışa aktarım
+- **PLI± Yönlü Oran** → [`docs/pine/pli-yonlu-oran.pine`](docs/pine/pli-yonlu-oran.pine) (Pine v5, tek dosya: bantlar+Hull ana panelde, histogram alt panelde, TradeDesk ile aynı tarama id'leriyle alarm)
+- Kurulum/parametre tablosu: [`docs/pine/pli-yonlu-oran.md`](docs/pine/pli-yonlu-oran.md)

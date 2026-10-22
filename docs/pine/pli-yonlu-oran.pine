@@ -1,0 +1,159 @@
+//@version=5
+// ═══════════════════════════════════════════════════════════════════════════
+//  PLI± Yönlü Oran  ·  TradeDesk portu
+//  Kaynak (TS): src/lib/indicators/median.ts → pliDir()  [satır ~498]
+//               src/lib/indicators/registry.ts → "pliDir" [satır 532 / 3466]
+//
+//  Formüller (TradeDesk ile birebir):
+//    upper  = ta.percentile_linear_interpolation(src, len, 100 - x)
+//    lower  = ta.percentile_linear_interpolation(src, len, x)
+//    med    = ta.percentile_linear_interpolation(src, len, 50)
+//    oran   = upper / lower - 1
+//    upMove = upper / upper[k] - 1
+//    dnMove = lower[k] / lower - 1
+//    d      = upMove - dnMove
+//    yön    = d > 0 ? +1 : d < 0 ? -1 : (src >= med ? +1 : -1)
+//    yönlü  = oran * yön
+//
+//  Sıkışma (S):
+//    gate    = PLI(oran, sqLookback, sqPct)          // oran'ın kendi dağılımı
+//    sıkışma = oran <= gate
+//    S       = son sqMemory mumda sıkışma görüldü (bu mum dahil)
+//
+//  Hull MA (TV ile aynı): wma(2*wma(src, n/2) - wma(src, n), sqrt(n))
+//  Bant kesişimleri (kesen çizgi = Hull veya fiyat):
+//    A↑ alt bandı yukarı · Ü↑ üst bandı yukarı · O↑ medyanı yukarı · O↓ medyanı aşağı
+//
+//  Kullanım: TradingView → Pine Editor → tümünü yapıştır → Kaydet → Grafiğe ekle.
+//  Grafik: bantlar + Hull ana panelde (force_overlay), histogram kendi panelinde.
+// ═══════════════════════════════════════════════════════════════════════════
+
+indicator("PLI± Yönlü Oran (TradeDesk)", "PLI±", overlay = false, max_labels_count = 500)
+
+// ── Girdiler ───────────────────────────────────────────────────────────────
+gPLI = "PLI kanal"
+pliLen = input.int(50, "Uzunluk", minval = 2, maxval = 500, group = gPLI)
+xPct  = input.float(5.0, "Percentil X", minval = 0, maxval = 50, step = 0.5, group = gPLI)
+kBack = input.int(5, "Yön geriye bakış k", minval = 0, maxval = 100, group = gPLI)
+src   = input.source(close, "Kaynak", group = gPLI)
+
+gSQ = "Sıkışma"
+sqLen    = input.int(50, "Sıkışma lookback", minval = 5, maxval = 500, group = gSQ)
+sqPct    = input.float(25.0, "Sıkışma %", minval = 1, maxval = 50, step = 1, group = gSQ)
+sqMemory = input.int(5, "Sıkışma bellek (mum)", minval = 1, maxval = 50, group = gSQ)
+
+gTL = "Hull / kesişim"
+hullLen  = input.int(55, "Hull MA uzunluğu", minval = 2, maxval = 500, group = gTL)
+crossSrc = input.string("Hull", "Bant kesen çizgi", options = ["Hull", "Fiyat (kaynak)"], group = gTL)
+
+gMK = "İşaretler"
+markAll  = input.bool(true,  "Tüm işaretler (ana anahtar)", group = gMK)
+sigUp    = input.bool(true,  "Yönlü 0↑ (PLI↑)", group = gMK)
+sigDn    = input.bool(true,  "Yönlü 0↓ (PLI↓)", group = gMK)
+sigSq    = input.bool(false, "Sıkışma çıkışı vurgusu (S)", group = gMK)
+sigLoUp  = input.bool(true,  "Alt band↑ (A↑)", group = gMK)
+sigHiUp  = input.bool(true,  "Üst band↑ (Ü↑)", group = gMK)
+sigMidUp = input.bool(false, "Orta band↑ (O↑)", group = gMK)
+sigMidDn = input.bool(false, "Orta band↓ (O↓)", group = gMK)
+
+gLN = "Çizgiler"
+showUpper = input.bool(true, "Üst kanal (kırmızı)", group = gLN)
+showLower = input.bool(true, "Alt kanal (turkuaz)", group = gLN)
+showMed   = input.bool(true, "Medyan (gri)", group = gLN)
+showZero  = input.bool(true, "0 çizgisi", group = gLN)
+showHull  = input.bool(true, "Hull MA", group = gLN)
+hullSlope = input.bool(true, "Hull eğim rengi (yeşil↑ / kırmızı↓)", group = gLN)
+
+// ── Renkler (TradeDesk paleti) ─────────────────────────────────────────────
+cUpper = #ef5350
+cLower = #26a69a
+cMed   = #9e9e9e
+cHull  = #ab47bc
+cSq    = #7c3aed
+cHiUp  = #00c853
+cMidUp = #66bb6a
+cMidDn = #ff7043
+
+// ── PLI bantları ───────────────────────────────────────────────────────────
+upper = ta.percentile_linear_interpolation(src, pliLen, 100.0 - xPct)
+lower = ta.percentile_linear_interpolation(src, pliLen, xPct)
+med   = ta.percentile_linear_interpolation(src, pliLen, 50.0)
+
+// ── Oran · yön · yönlü ─────────────────────────────────────────────────────
+oran   = na(lower) or lower == 0 ? na : upper / lower - 1
+upMove = na(upper[kBack]) or upper[kBack] == 0 ? na : upper / upper[kBack] - 1
+dnMove = na(lower[kBack]) or na(lower) or lower == 0 ? na : lower[kBack] / lower - 1
+dv     = na(upMove) or na(dnMove) ? na : upMove - dnMove
+
+medBias = na(med) ? -1 : (src >= med ? 1 : -1)
+dirSign = na(oran) ? na : (na(dv) ? medBias : (dv > 0 ? 1 : (dv < 0 ? -1 : medBias)))
+yonlu   = oran * dirSign
+
+// ── Sıkışma ────────────────────────────────────────────────────────────────
+sqGateRaw = ta.percentile_linear_interpolation(oran, sqLen, sqPct)
+// TS ile aynı: oran penceresi tamamen dolmadan (len-1 + sqLen-1 mum) kapı yok
+sqGate    = bar_index < (pliLen - 1) + (sqLen - 1) ? na : sqGateRaw
+squeeze   = not na(oran) and not na(sqGate) and oran <= sqGate
+barsSq   = ta.barssince(squeeze)
+sqRecent = not na(barsSq) and barsSq < sqMemory
+
+// ── Hull MA (TV formülü) ───────────────────────────────────────────────────
+hmaHalf = ta.wma(src, math.floor(hullLen / 2))
+hmaFull = ta.wma(src, hullLen)
+hmaRaw  = 2 * hmaHalf - hmaFull
+hmaVal  = ta.wma(hmaRaw, math.floor(math.sqrt(hullLen)))
+hmaCol  = not hullSlope ? cHull : (hmaVal > hmaVal[1] ? cLower : (hmaVal < hmaVal[1] ? cUpper : cHull))
+
+// ── Yönlü 0 kesişimleri ────────────────────────────────────────────────────
+xUp = ta.crossover(yonlu, 0)
+xDn = ta.crossunder(yonlu, 0)
+
+// ── Bant kesişimleri (kesen çizgi: Hull veya fiyat) ────────────────────────
+xs    = crossSrc == "Hull" ? hmaVal : src
+loUp  = ta.crossover(xs, lower)
+hiUp  = ta.crossover(xs, upper)
+midUp = ta.crossover(xs, med)
+midDn = ta.crossunder(xs, med)
+
+// ── Ana panel: bantlar + Hull (force_overlay) ──────────────────────────────
+plot(upper, "PLI Üst", color = showUpper ? cUpper : na, linewidth = 1, force_overlay = true)
+plot(lower, "PLI Alt", color = showLower ? cLower : na, linewidth = 1, force_overlay = true)
+plot(med,   "PLI Medyan", color = showMed ? cMed : na, linewidth = 1, force_overlay = true)
+plot(hmaVal, "Hull MA", color = showHull ? hmaCol : na, linewidth = 2, force_overlay = true)
+
+// ── Alt panel: yönlü histogram (oran·yön) + 0 çizgisi ──────────────────────
+plot(yonlu, "PLI± (oran·yön)", style = plot.style_columns, color = yonlu >= 0 ? cLower : cUpper)
+plot(0, "0", color = showZero ? color.new(color.gray, 60) : na, linewidth = 1)
+
+// ── Veri penceresi (tanı için) ─────────────────────────────────────────────
+plot(oran, "oran", display = display.data_window)
+plot(dirSign, "yön", display = display.data_window)
+plot(dv, "d", display = display.data_window)
+plot(sqRecent ? 1 : 0, "S (sıkışma)", display = display.data_window)
+
+// ── İşaretler: yönlü 0 kesişimi ────────────────────────────────────────────
+upSq    = markAll and sigSq and sqRecent
+upArrow = markAll and sigUp and not upSq
+dnSq    = markAll and sigSq and sqRecent
+dnArrow = markAll and sigDn and not dnSq
+
+plotshape(xUp and upArrow, "PLI↑", style = shape.triangleup, location = location.belowBar, color = cLower, text = "PLI↑", textcolor = cLower, size = size.tiny, force_overlay = true)
+plotshape(xUp and upSq,    "PLI↑ S", style = shape.circle,    location = location.belowBar, color = cSq,    text = "PLI↑ S", textcolor = cSq,   size = size.tiny, force_overlay = true)
+plotshape(xDn and dnArrow, "PLI↓", style = shape.triangledown, location = location.aboveBar, color = cUpper, text = "PLI↓", textcolor = cUpper, size = size.tiny, force_overlay = true)
+plotshape(xDn and dnSq,    "PLI↓ S", style = shape.circle,    location = location.aboveBar, color = cSq,    text = "PLI↓ S", textcolor = cSq,   size = size.tiny, force_overlay = true)
+
+// ── İşaretler: bant kesişimleri ────────────────────────────────────────────
+plotshape(markAll and sigLoUp and loUp,  "A↑", style = shape.triangleup, location = location.belowBar, color = cLower, text = "A↑", textcolor = cLower, size = size.tiny, force_overlay = true)
+plotshape(markAll and sigHiUp and hiUp,  "Ü↑", style = shape.triangleup, location = location.belowBar, color = cHiUp,  text = "Ü↑", textcolor = cHiUp,  size = size.tiny, force_overlay = true)
+plotshape(markAll and sigMidUp and midUp, "O↑", style = shape.circle,    location = location.belowBar, color = cMidUp, text = "O↑", textcolor = cMidUp, size = size.tiny, force_overlay = true)
+plotshape(markAll and sigMidDn and midDn, "O↓", style = shape.circle,    location = location.aboveBar, color = cMidDn, text = "O↓", textcolor = cMidDn, size = size.tiny, force_overlay = true)
+
+// ── Alarmlar (ListScan koşullarıyla aynı isimler) ──────────────────────────
+alertcondition(xUp,                      "pli_up",      "PLI± yükseliş: yönlü oran 0'ı yukarı kesti ({{ticker}} {{interval}})")
+alertcondition(xDn,                      "pli_dn",      "PLI± düşüş: yönlü oran 0'ı aşağı kesti ({{ticker}} {{interval}})")
+alertcondition(xUp and sqRecent,         "pli_up_sq",   "PLI± yükseliş + sıkışma çıkışı ({{ticker}} {{interval}})")
+alertcondition(xDn and sqRecent,         "pli_dn_sq",   "PLI± düşüş + sıkışma çıkışı ({{ticker}} {{interval}})")
+alertcondition(loUp,                     "pli_lo_up",   "PLI alt band↑ ({{ticker}} {{interval}})")
+alertcondition(hiUp,                     "pli_hi_up",   "PLI üst band↑ ({{ticker}} {{interval}})")
+alertcondition(midUp,                    "pli_mid_up",  "PLI orta band↑ ({{ticker}} {{interval}})")
+alertcondition(midDn,                    "pli_mid_dn",  "PLI orta band↓ ({{ticker}} {{interval}})")
