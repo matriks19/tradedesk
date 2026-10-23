@@ -8,6 +8,7 @@ const nextConfig = {
       { source: "/quantex.html", headers: nc },
       { source: "/radar.html", headers: nc },
       { source: "/qx-direct.js", headers: nc },
+      { source: "/qx-nav.js", headers: nc },
     ];
   },
   webpack: (config) => {

@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { useDeskStore } from "@/store/desk";
 import { WatchlistPanel } from "@/components/watchlist/WatchlistPanel";
 import clsx from "clsx";
+import { useEffect } from "react";
 
 const StrategiesPanel = dynamic(
   () =>
@@ -82,6 +83,9 @@ const TABS = [
 
 export function Sidebar() {
   const { sidebarTab, setSidebarTab } = useDeskStore();
+  useEffect(() => { // [bridge138] üst menü: /?tab=list
+    try { if (new URLSearchParams(location.search).get("tab") === "list") setSidebarTab("list" as typeof sidebarTab); } catch {}
+  }, [setSidebarTab]);
 
   return (
     <aside className="w-[320px] shrink-0 border-r border-desk-border bg-desk-panel flex flex-col min-h-0">

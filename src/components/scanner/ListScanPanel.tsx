@@ -170,6 +170,8 @@ const TFS: Timeframe[] = [
 ];
 
 import HAM_EV from "@/lib/hamEv.json";
+import { publish as busPublish, getLinks as busLinks } from "@/lib/signalBus";
+import { RobotBridge } from "./RobotBridge";
 // [ev136] HAM EV: gerçek hamJurikTpo koduyla offline backtest (TP10/SL5, 48 mum, %0,1 komisyon). n<30, EV≤0 veya test EV≤0 → işlem yok.
 function hamEvTag(id: string, tf: string): string {
   const E = HAM_EV as Record<string, { n: number; ev: number; oos: number | null }>;
@@ -1860,6 +1862,13 @@ export function ListScanPanel() {
       );
       setHits(out);
       const cfgDone = buildConfig();
+      try { // [bridge138] taze sinyal (≤1 mum) → robot yolu
+        const L = busLinks();
+        busPublish(out.filter((h) => L.includes(h.kind) && h.barsAgo <= 1 && h.bias !== "neutral").map((h) => ({
+          src: h.kind, cond: h.cond, symbol: h.symbol, market: String(h.exchange).toLowerCase().includes("bist") ? "bist" as const : "coin" as const,
+          tf, side: h.bias === "bull" ? "LONG" as const : "SHORT" as const, barsAgo: h.barsAgo, note: h.note,
+        })));
+      } catch { /* yol yazılamadı */ }
       const byKind: string[] = [];
       if (cfgDone.gold?.enabled) {
         const n = out.filter((h) => h.kind === "gold").length;
@@ -4301,6 +4310,7 @@ export function ListScanPanel() {
       )}
       </div>
 
+      <RobotBridge kinds={Object.entries(buildConfig() as Record<string, unknown>).filter(([, v]) => !!v && typeof v === "object" && (v as { enabled?: boolean }).enabled).map(([k]) => k)} />
       <div className="flex-1 min-h-0 overflow-y-auto border border-desk-border/40 rounded">
         {hits.length ? hits.map((h, i) => (
             <button
