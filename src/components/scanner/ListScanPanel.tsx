@@ -170,7 +170,7 @@ const TFS: Timeframe[] = [
 ];
 
 import HAM_EV from "@/lib/hamEv.json";
-import { publish as busPublish, getLinks as busLinks } from "@/lib/signalBus";
+import { publish as busPublish, getLinks as busLinks, paramsOf, hashOf, baseHash, userEv, saveUserEv, evStats, LAB37, type EvRow } from "@/lib/signalBus";
 import { RobotBridge } from "./RobotBridge";
 // [ev136] HAM EV: gerçek hamJurikTpo koduyla offline backtest (TP10/SL5, 48 mum, %0,1 komisyon). n<30, EV≤0 veya test EV≤0 → işlem yok.
 function hamEvTag(id: string, tf: string): string {
@@ -1194,6 +1194,40 @@ export function ListScanPanel() {
   const [progress, setProgress] = useState("");
   const [status, setStatus] = useState("");
   const [hits, setHits] = useState<ResultRow[]>([]);
+  // [kombin140] "Bu ayarla test et": Lab37'den 20 coin, sunucu mum yolu (/api/klines, Binance'e tarayıcıdan gitmez), istekler arası 400 ms
+  const testKind = useCallback(async (kind: string, onProg: (m: string) => void): Promise<Record<string, EvRow>> => {
+    const full = buildConfig() as Record<string, unknown>;
+    const c1: Record<string, unknown> = { matchMode: "any", [kind]: full[kind] };
+    const p = paramsOf(full[kind]); const ph = hashOf(p);
+    const R: Record<string, { r: number; late: boolean }[]> = {};
+    const syms = LAB37.slice(0, 20);
+    for (let si = 0; si < syms.length; si++) {
+      onProg(`${si + 1}/${syms.length} ${syms[si]}`);
+      try {
+        const kr = await fetch(`/api/klines?symbol=${syms[si]}&exchange=binance&timeframe=${tf}&limit=1000`);
+        const cs: Candle[] = (await kr.json()).candles ?? [];
+        const W = 300, mid = W + (cs.length - W) / 2;
+        for (let i = W; i < cs.length - 1; i++) {
+          if (i % 40 === 0) await new Promise((r) => setTimeout(r, 0));
+          let hs: ListScanHit[] = []; try { hs = scanSymbol(cs.slice(i - W, i + 1), c1 as ListScanConfig, 0); } catch { continue; }
+          for (const h of hs) { if (h.barsAgo !== 0 || h.bias === "neutral") continue;
+            const sh = h.bias === "bear", e = cs[i + 1].open; let r: number | null = null;
+            for (let j = i + 1; j < Math.min(cs.length, i + 49); j++) { const c = cs[j];
+              const lo = sh ? (e - c.high) / e : (c.low - e) / e, hi = sh ? (e - c.low) / e : (c.high - e) / e;
+              if (lo <= -0.05) { r = -0.05; break; } if (hi >= 0.1) { r = 0.1; break; } }
+            if (r === null) { const j = Math.min(cs.length - 1, i + 48); r = sh ? (e - cs[j].close) / e : (cs[j].close - e) / e; }
+            (R[h.cond] ||= []).push({ r: r - 0.002, late: i >= mid }); }
+        }
+      } catch { /* atla */ }
+      await new Promise((r) => setTimeout(r, 400));
+    }
+    const out: Record<string, EvRow> = {};
+    for (const [cond, xs] of Object.entries(R)) { const a = [...xs.filter((x) => !x.late), ...xs.filter((x) => x.late)];
+      out[`${kind}:${cond}|coin|${tf}|${ph}`] = evStats(a.map((x) => x.r), xs.filter((x) => !x.late).length); }
+    saveUserEv(out); onProg("bitti");
+    return out;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tf]);
 
   const buildConfig = useCallback((): ListScanConfig => {
     return {
@@ -1864,10 +1898,14 @@ export function ListScanPanel() {
       const cfgDone = buildConfig();
       try { // [bridge138] taze sinyal (≤1 mum) → robot yolu
         const L = busLinks();
-        busPublish(out.filter((h) => L.includes(h.kind) && h.barsAgo <= 1 && h.bias !== "neutral").map((h) => ({
+        const UE = userEv(); const cfgB = buildConfig() as Record<string, unknown>;
+        busPublish(out.filter((h) => L.includes(h.kind) && h.barsAgo <= 1 && h.bias !== "neutral").map((h) => {
+          const p = paramsOf(cfgB[h.kind]); const ph = hashOf(p); const pchg = ph !== baseHash(h.kind, ph);
+          const u = UE[`${h.kind}:${h.cond}|coin|${tf}|${ph}`];
+          return { ph, pchg, params: p, uev: u ? { ok: u.n >= 30 && u.ev > 0 && u.oos > 0, ev: u.ev, oos: u.oos, n: u.n } : null,
           src: h.kind, cond: h.cond, symbol: h.symbol, market: String(h.exchange).toLowerCase().includes("bist") ? "bist" as const : "coin" as const,
           tf, side: h.bias === "bull" ? "LONG" as const : "SHORT" as const, barsAgo: h.barsAgo, note: h.note,
-        })));
+        }; }));
       } catch { /* yol yazılamadı */ }
       const byKind: string[] = [];
       if (cfgDone.gold?.enabled) {
@@ -4310,7 +4348,7 @@ export function ListScanPanel() {
       )}
       </div>
 
-      <RobotBridge kinds={Object.entries(buildConfig() as Record<string, unknown>).filter(([, v]) => !!v && typeof v === "object" && (v as { enabled?: boolean }).enabled).map(([k]) => k)} />
+      <RobotBridge tf={tf} cfg={buildConfig() as Record<string, unknown>} onTest={testKind} onAuto={runScan} running={running} kinds={Object.entries(buildConfig() as Record<string, unknown>).filter(([, v]) => !!v && typeof v === "object" && (v as { enabled?: boolean }).enabled).map(([k]) => k)} />
       <div className="flex-1 min-h-0 overflow-y-auto border border-desk-border/40 rounded">
         {hits.length ? hits.map((h, i) => (
             <button
