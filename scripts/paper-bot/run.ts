@@ -8,22 +8,27 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Candle } from "../../src/lib/types";
 import { scanSymbol, type ListScanConfig } from "../../src/lib/scanner/listScan";
+import { tpcCalc } from "./tpc";
 
+type Src = { id: string; label: string; type: "list" | "tpc"; tf: string; on: boolean; ev: boolean;
+  scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
 type Cfg = {
-  timeframe: string; universeTop: number; extraSymbols: string[]; maxBarsAgo: number;
-  scan: ListScanConfig; allowShort: boolean; equity: number; leverage: number; riskPct: number;
-  tp: number; sl: number; maxSlots: number; maxNew: number; feePct: number;
+  universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
+  riskPct: number; tp: number; sl: number; maxSlots: number; maxNew: number; feePct: number; evGlobal: boolean; sources: Src[];
 };
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
-  notional: number; qty: number; t: number; checked: number; pxSrc: string };
-type Closed = Pos & { exit: number; why: string; r: number; pnl: number; closedAt: number };
+  notional: number; qty: number; t: number; checked: number; pxSrc: string;
+  sid?: string; tpPct?: number; exit?: string; maxH?: number; tf?: string; sigT?: number };
+type Closed = Pos & { exit2?: string; exitPx: number; why: string; r: number; pnl: number; closedAt: number };
 type State = { v: 1; equity: number; pnl: number; open: Pos[]; closed: Closed[]; log: string[];
-  lastRun?: number; runs: number; dataSrc?: string };
+  lastRun?: number; runs: number; dataSrc?: string; seen?: Record<string, number>; srcOff?: Record<string, string> };
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const cfg: Cfg = JSON.parse(fs.readFileSync(path.join(DIR, "config.json"), "utf8"));
 const STATE_FILE = process.env.STATE_FILE || path.join(DIR, "state.json");
 const DRY = process.env.PAPER_DRY === "1";
+const EV_TD: Record<string, { n: number; ev: number; oos: number }> = JSON.parse(fs.readFileSync(path.join(DIR, "ev_td.json"), "utf8"));
+const TF_MS: Record<string, number> = { "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5, "4h": 144e5 };
 
 // ---------- Binance: 4 req/s queue + 418/429 back-off + endpoint fallback ----------
 let lastReq = 0, banUntil = 0, reqCount = 0;
@@ -88,13 +93,24 @@ function closePos(i: number, why: string, px: number) {
   const p = st.open[i]; p.last = px;
   const r = pr(p), pnl = r * p.notional - fee(p);
   st.pnl += pnl; st.equity = +(st.equity + pnl).toFixed(4);
-  st.closed.push({ ...p, exit: px, why, r, pnl, closedAt: Date.now() });
+  st.closed.push({ ...p, exitPx: px, why, r, pnl, closedAt: Date.now() });
   st.open.splice(i, 1);
   const m = `🤖 PAPER ${why} kapattı: ${p.sym} ${p.side} ${(r * 100).toFixed(2)}% (${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT net) · bakiye ${st.equity.toFixed(2)}`;
   log(m); alerts.push(m);
 }
 
-// ---------- TP/SL (1m iğne, önce SL) ----------
+const tpOf = (p: Pos) => (p.tpPct && p.tpPct > 0 ? p.tpPct : cfg.tp) / 100; // kaynak TP'si yoksa global TP
+
+// ---------- mum önbelleği (yalnız kapanmış mumlar → lookahead/repaint yok) ----------
+const KC: Record<string, Candle[] | null> = {};
+async function closed(sym: string, tf: string, limit = 1000): Promise<Candle[] | null> {
+  const key = sym + "|" + tf; if (key in KC) return KC[key];
+  const k = await klines(sym, tf, limit); const ms = TF_MS[tf];
+  KC[key] = k ? k.filter((b) => +b[0] + ms <= Date.now()).map((b) => ({ time: Math.floor(+b[0] / 1000), open: +b[1], high: +b[2], low: +b[3], close: +b[4], volume: +b[5] })) : null;
+  return KC[key];
+}
+
+// ---------- TP/SL (1m iğne, önce SL) + kaynak çıkışı / süre limiti ----------
 async function manage() {
   for (let i = st.open.length - 1; i >= 0; i--) {
     const p = st.open[i];
@@ -103,8 +119,8 @@ async function manage() {
     const k = await klines(p.sym, "1m", lim, since);
     if (!k || !k.length) { log(`⚠ ${p.sym}: fiyat yok — SL bu tur kontrol edilemedi`); continue; }
     const slv = p.side === "LONG" ? p.entry * (1 - cfg.sl / 100) : p.entry * (1 + cfg.sl / 100);
-    const tpv = p.side === "LONG" ? p.entry * (1 + cfg.tp / 100) : p.entry * (1 - cfg.tp / 100);
-    const closedBars = k.slice(0, -1);
+    const tpv = p.side === "LONG" ? p.entry * (1 + tpOf(p)) : p.entry * (1 - tpOf(p));
+    const closedBars = k.filter((b) => +b[0] + 60000 <= Date.now());
     let hit: [string, number] | null = null;
     for (const b of closedBars) {
       const h = +b[2], l = +b[3];
@@ -117,44 +133,89 @@ async function manage() {
     if (Math.abs(last / p.entry - 1) > 0.5) { log(`⚠ ${p.sym} şüpheli fiyat ${fmt(last)} atlandı`); continue; }
     p.last = last;
     const r = pr(p);
-    if (r >= cfg.tp / 100) closePos(i, "TP", last); else if (r <= -cfg.sl / 100) closePos(i, "SL", last);
+    if (r >= tpOf(p)) { closePos(i, "TP", last); continue; }
+    if (r <= -cfg.sl / 100) { closePos(i, "SL", last); continue; }
+    // süre limiti (maxH mum, kaynak TF'sinde)
+    const ms = p.tf ? TF_MS[p.tf] : 0;
+    if (p.maxH && ms && Date.now() - p.t >= p.maxH * ms) { log(`Süre limiti (${p.maxH} mum): ${p.sym} [${p.src}]`); closePos(i, "SÜRE", last); continue; }
+    // kaynak çıkışı (ör. Fisher üst bant ↓) — son kapanmış mumda, giriş sonrası
+    if (p.exit && p.tf) {
+      const c = await closed(p.sym, p.tf);
+      if (c && c.length >= 520) {
+        const R = tpcCalc({ c: c.map((x) => x.close) }) as unknown as Record<string, boolean[]>;
+        const j = c.length - 1;
+        if (R[p.exit]?.[j] && c[j].time * 1000 + ms > p.t) { log(`Kaynak çıkışı (${p.exit}): ${p.sym} [${p.src}]`); closePos(i, "ÇIKIŞ", last); }
+      }
+    }
   }
+}
+
+// ---------- EV: backtest kapısı (QX_EV_TD) + canlı EV (kaynak başı son 30 işlem) ----------
+const evOn = (s: Src) => cfg.evGlobal && s.ev;
+function liveBad(s: Src): string {
+  const a = st.closed.filter((x) => x.sid === s.id).slice(-30);
+  if (a.length < 30) return "";
+  const ev = a.reduce((x, y) => x + y.r * 100, 0) / a.length;
+  return ev < 0 ? `canlı EV ${ev.toFixed(2)}% (son 30) < 0 — kaynak otomatik kapalı` : "";
+}
+function btGate(s: Src, hitKeys: string[]): string {
+  for (const k of hitKeys) { const e = EV_TD[`${k}|coin|${s.tf}`]; if (e && !(e.n >= 30 && e.ev > 0 && e.oos > 0)) return `backtest EV ${k} ${s.tf}: n ${e.n} EV ${e.ev} OOS ${e.oos}`; }
+  return "";
 }
 
 // ---------- tarama + giriş ----------
 async function scanAndOpen() {
   const syms = await universe();
-  let nNew = 0, scanned = 0, hits = 0, fail = 0;
-  const TF_MS: Record<string, number> = { "15m": 9e5, "30m": 18e5, "1h": 36e5, "4h": 144e5 };
-  const tfMs = TF_MS[cfg.timeframe] || 9e5;
-  for (const sym of syms) {
-    const k = await klines(sym, cfg.timeframe, 300);
-    if (!k || k.length < 120) { fail++; continue; }
-    // yalnız kapanmış mumlar
-    const candles: Candle[] = k.filter((b) => +b[0] + tfMs <= Date.now()).map((b) => ({ time: Math.floor(+b[0] / 1000), open: +b[1], high: +b[2], low: +b[3], close: +b[4], volume: +b[5] }));
-    scanned++;
-    let res;
-    try { res = scanSymbol(candles, cfg.scan, cfg.maxBarsAgo); } catch (e) { fail++; continue; }
-    const bull = res.filter((h) => h.bias === "bull"), bear = res.filter((h) => h.bias === "bear");
-    const side: "LONG" | "SHORT" | null = bull.length && !bear.length ? "LONG" : bear.length && !bull.length && cfg.allowShort ? "SHORT" : null;
-    if (!side) continue;
-    hits++;
-    const src = (side === "LONG" ? bull : bear).map((h) => `${h.kind}:${h.cond}`).join("+");
-    const msg = `📡 Sinyal ${sym} ${side} [${src}] ${cfg.timeframe}`;
-    if (st.open.some((p) => p.sym === sym)) { log(msg + " — atlandı: açık pozisyon var"); continue; }
-    if (nNew >= cfg.maxNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${cfg.maxNew})`); continue; }
-    if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
-    const margin = st.equity * cfg.riskPct / 100;
-    const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
-    if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
-    const price = candles[candles.length - 1].close;
-    const notional = margin * cfg.leverage;
-    const p: Pos = { sym, side, entry: price, last: price, src, lev: cfg.leverage, notional, qty: notional / price, t: Date.now(), checked: Date.now(), pxSrc: dataSrc() };
-    st.open.push(p); nNew++;
-    const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${src}] marjin ${margin.toFixed(2)} · TP %${cfg.tp} / SL %${cfg.sl}`;
-    log(m); alerts.push(m);
+  st.seen = st.seen || {}; st.srcOff = st.srcOff || {};
+  let nNew = 0;
+  const per: string[] = [];
+  for (const s of cfg.sources.filter((x) => x.on)) {
+    const bad = liveBad(s);
+    if (bad && evOn(s)) { if (st.srcOff[s.id] !== bad) { st.srcOff[s.id] = bad; const m = `⛔ ${s.label}: ${bad}`; log(m); alerts.push(m); } per.push(`${s.label}: kapalı (canlı EV)`); continue; }
+    delete st.srcOff[s.id];
+    let scanned = 0, hits = 0, fail = 0, opened = 0;
+    for (const sym of syms) {
+      const c = await closed(sym, s.tf);
+      if (!c || c.length < (s.type === "tpc" ? 520 : 120)) { fail++; continue; }
+      scanned++;
+      let side: "LONG" | "SHORT" | null = null, tag = "", keys: string[] = [], age = 0, sk = "", bt = 0;
+      if (s.type === "list") {
+        let res; try { res = scanSymbol(c, s.scan!, cfg.maxAge); } catch { fail++; continue; }
+        const bull = res.filter((h) => h.bias === "bull"), bear = res.filter((h) => h.bias === "bear");
+        side = bull.length && !bear.length ? "LONG" : bear.length && !bull.length && cfg.allowShort ? "SHORT" : null;
+        if (!side) continue;
+        const hs = side === "LONG" ? bull : bear;
+        keys = hs.map((h) => `${h.kind}:${h.cond}`); tag = keys.join("+"); age = Math.min(...hs.map((h) => h.barsAgo));
+      } else {
+        const R = tpcCalc({ c: c.map((x) => x.close) }) as unknown as Record<string, boolean[]>;
+        const arr = R[s.sig!]; const n = c.length;
+        // kombin girişi: yalnız SON kapanmış mum(lar) — maxAge kadar geriye (Actions gecikmesi için), aynı mum bir kez
+        let j = -1; for (let a = 0; a <= cfg.maxAge; a++) if (arr?.[n - 1 - a]) { j = n - 1 - a; break; }
+        if (j < 0) continue;
+        side = "LONG"; tag = s.sig!; age = n - 1 - j;
+        bt = c[j].time; sk = `${s.id}|${sym}`;
+        if (st.seen[sk] === bt) continue; // aynı mum sinyali bir kez işlenir
+      }
+      hits++;
+      const msg = `📡 ${sym} ${side} [${s.label}: ${tag}] ${s.tf} (yaş ${age})`;
+      if (evOn(s)) { const g = btGate(s, keys); if (g) { log(msg + " — atlandı: " + g); continue; } }
+      if (st.open.some((p) => p.sym === sym)) { log(msg + " — atlandı: açık pozisyon var"); continue; }
+      if (nNew >= cfg.maxNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${cfg.maxNew})`); continue; }
+      if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
+      const margin = st.equity * cfg.riskPct / 100;
+      const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+      if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
+      const price = c[c.length - 1].close;
+      const notional = margin * cfg.leverage;
+      const p: Pos = { sym, side, entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
+        t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, tpPct: s.tp, exit: s.exit, maxH: s.maxH, tf: s.tf };
+      st.open.push(p); nNew++; opened++; if (sk) st.seen[sk] = bt;
+      const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre " + s.maxH + " mum" : ""} / SL %${cfg.sl}`;
+      log(m); alerts.push(m);
+    }
+    per.push(`${s.label}: ${scanned}/${syms.length} sembol, ${hits} sinyal, ${opened} giriş, ${fail} veri eksik · EV ${evOn(s) ? "açık" : "kapalı"}`);
   }
-  log(`Tarama: ${scanned}/${syms.length} sembol, ${hits} sinyal, ${nNew} yeni giriş, ${fail} veri hatası · kaynak ${dataSrc()}`);
+  log(`Tarama (${dataSrc()}): ` + per.join(" | "));
 }
 
 // ---------- alerts (yalnız Secrets'tan) ----------
@@ -190,8 +251,8 @@ async function main() {
     `## QUANTEX Paper Bot — ${trT()} (TSİ)`,
     `Veri: **${dataSrc()}** · Binance istek: ${reqCount} · ${reach.join(" | ")}`,
     `Bakiye: **${st.equity.toFixed(2)} USDT** · gerçekleşen PnL ${st.pnl.toFixed(2)} · açık K/Z ${unreal.toFixed(2)} · açık ${st.open.length}/${cfg.maxSlots}`,
-    "", "| Sembol | Yön | Giriş | Son | K/Z % | Kaynak |", "|---|---|---|---|---|---|",
-    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${p.src} |`),
+    "", "| Sembol | Yön | Giriş | Son | K/Z % | TP % | Kaynak |", "|---|---|---|---|---|---|---|",
+    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${(tpOf(p) * 100).toFixed(0)} | ${p.src} |`),
     "", "### Bu tur", ...(alerts.length ? alerts.map((a) => "- " + a) : ["- işlem yok"]),
   ].join("\n");
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n");
