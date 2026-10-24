@@ -71,7 +71,7 @@ async function universe(): Promise<string[]> {
   const u = futHost ? `${futHost}/fapi/v1/ticker/24hr` : `${SPOT_FALLBACK}/api/v3/ticker/24hr`;
   const r = await bget(u);
   const rows = Array.isArray(r.json) ? (r.json as { symbol: string; quoteVolume: string }[]) : [];
-  const top = rows.filter((x) => /^[A-Z0-9]{2,15}USDT$/.test(x.symbol) && !/^(USDC|FDUSD|TUSD|BUSD|USDP|DAI)USDT$/.test(x.symbol))
+  const top = rows.filter((x) => /^[A-Z0-9]{2,15}USDT$/.test(x.symbol) && !/^(USDC|FDUSD|TUSD|BUSD|USDP|DAI|RLUSD|USD1|USDE|PYUSD)USDT$/.test(x.symbol))
     .sort((a, b) => +b.quoteVolume - +a.quoteVolume).slice(0, cfg.universeTop).map((x) => x.symbol);
   return Array.from(new Set([...cfg.extraSymbols, ...top]));
 }

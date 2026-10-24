@@ -99,6 +99,112 @@
    }
   },
   {
+   "id": "gold2-div-4h",
+   "label": "Gold2 div_bull 4s",
+   "type": "list",
+   "tf": "4h",
+   "on": true,
+   "ev": true,
+   "scan": {
+    "matchMode": "any",
+    "gold2": {
+     "enabled": true,
+     "conds": [
+      "div_bull"
+     ]
+    }
+   }
+  },
+  {
+   "id": "gold-div-4h",
+   "label": "Gold div_bull 4s",
+   "type": "list",
+   "tf": "4h",
+   "on": true,
+   "ev": true,
+   "scan": {
+    "matchMode": "any",
+    "gold": {
+     "enabled": true,
+     "conds": [
+      "div_bull"
+     ]
+    }
+   }
+  },
+  {
+   "id": "pdt-ddiv-4h",
+   "label": "PLI DT div 4s",
+   "type": "list",
+   "tf": "4h",
+   "on": true,
+   "ev": true,
+   "scan": {
+    "matchMode": "any",
+    "pliDtDiv": {
+     "enabled": true,
+     "conds": [
+      "pdt_d_div"
+     ]
+    }
+   }
+  },
+  {
+   "id": "div-obv-4h",
+   "label": "OBV reg_bull 4s",
+   "type": "list",
+   "tf": "4h",
+   "on": true,
+   "ev": true,
+   "scan": {
+    "matchMode": "any",
+    "divScan": {
+     "enabled": true,
+     "oscillators": [
+      "obv"
+     ],
+     "types": [
+      "reg_bull"
+     ]
+    }
+   }
+  },
+  {
+   "id": "hull-c50200-4h",
+   "label": "Hull c50_200 4s",
+   "type": "list",
+   "tf": "4h",
+   "on": true,
+   "ev": true,
+   "scan": {
+    "matchMode": "any",
+    "hull": {
+     "enabled": true,
+     "conds": [
+      "c50_200"
+     ],
+     "tf": "4h"
+    }
+   }
+  },
+  {
+   "id": "ma-50200-1h",
+   "label": "MA x_50_200 1s",
+   "type": "list",
+   "tf": "1h",
+   "on": true,
+   "ev": true,
+   "scan": {
+    "matchMode": "any",
+    "maSimple": {
+     "enabled": true,
+     "conds": [
+      "x_50_200"
+     ]
+    }
+   }
+  },
+  {
    "id": "ham-macd-15m",
    "label": "HAM/MACD 15m",
    "type": "list",
