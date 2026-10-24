@@ -1,0 +1,67 @@
+{
+ "v": 1,
+ "equity": 1000,
+ "pnl": 0,
+ "open": [
+  {
+   "sym": "ZECUSDT",
+   "side": "LONG",
+   "entry": 1186.15,
+   "last": 1186.15,
+   "src": "ham:raw_dual_up",
+   "lev": 5,
+   "notional": 250,
+   "qty": 0.21076592336551025,
+   "t": 1792869857858,
+   "checked": 1792869857858,
+   "pxSrc": "spot-mirror"
+  },
+  {
+   "sym": "WLDUSDT",
+   "side": "LONG",
+   "entry": 0.465,
+   "last": 0.465,
+   "src": "ham:raw_dual_up",
+   "lev": 5,
+   "notional": 250,
+   "qty": 537.6344086021505,
+   "t": 1792869858857,
+   "checked": 1792869858857,
+   "pxSrc": "spot-mirror"
+  },
+  {
+   "sym": "ERAUSDT",
+   "side": "LONG",
+   "entry": 0.0848,
+   "last": 0.0848,
+   "src": "ham:raw_dual_up",
+   "lev": 5,
+   "notional": 250,
+   "qty": 2948.1132075471696,
+   "t": 1792869861110,
+   "checked": 1792869861110,
+   "pxSrc": "spot-mirror"
+  }
+ ],
+ "closed": [],
+ "log": [
+  "24.10.2026 22:24:17 🤖 PAPER AL: ZECUSDT 5x @1186.15 [ham:raw_dual_up] marjin 50.00 · TP %10 / SL %5",
+  "24.10.2026 22:24:18 🤖 PAPER AL: WLDUSDT 5x @0.465000 [ham:raw_dual_up] marjin 50.00 · TP %10 / SL %5",
+  "24.10.2026 22:24:21 🤖 PAPER AL: ERAUSDT 5x @0.0848000 [ham:raw_dual_up] marjin 50.00 · TP %10 / SL %5",
+  "24.10.2026 22:24:22 📡 Sinyal SNDKBUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:24 📡 Sinyal PUMPUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:25 📡 Sinyal ARBUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:26 📡 Sinyal ONDOUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:26 📡 Sinyal FETUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:27 📡 Sinyal PAXGUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:28 📡 Sinyal TRUMPUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:29 📡 Sinyal INJUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:29 📡 Sinyal TONUSDT LONG [macd:cross_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:29 📡 Sinyal QNTUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:31 📡 Sinyal MUBUSDT LONG [ham:raw_dual_up] 15m — atlandı: tur başı yeni giriş sınırı (3)",
+  "24.10.2026 22:24:31 Tarama: 60/60 sembol, 14 sinyal, 3 yeni giriş, 0 veri hatası · kaynak spot-mirror"
+ ],
+ "runs": 1,
+ "lastRun": 1792869853228,
+ "dataSrc": "spot-mirror"
+}
