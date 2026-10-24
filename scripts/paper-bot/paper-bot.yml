@@ -1,0 +1,49 @@
+name: paper-bot
+# QUANTEX paper bot — PAPER ONLY (gerçek emir yok). Her 15 dk tarar, TP/SL yönetir, durumu
+# `paper-bot-state` dalındaki state.json'a yazar. Uyarılar: TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID, NTFY_URL (Secrets).
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: paper-bot
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Load state branch
+        run: |
+          git config user.name "matriks19"
+          git config user.email "matriks1919@gmail.com"
+          if git fetch origin paper-bot-state 2>/dev/null; then
+            git worktree add state origin/paper-bot-state
+            (cd state && git checkout -B paper-bot-state)
+          else
+            git worktree add --detach state
+            (cd state && git checkout --orphan paper-bot-state && git rm -rfq . && echo '# QUANTEX paper bot state (auto)' > README.md)
+          fi
+      - name: Run paper bot
+        env:
+          STATE_FILE: ${{ github.workspace }}/state/state.json
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          NTFY_URL: ${{ secrets.NTFY_URL }}
+        run: npx tsx scripts/paper-bot/run.ts
+      - name: Save state
+        run: |
+          cd state
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -qm "paper-bot state $(date -u +%FT%TZ)"
+          for i in 1 2 3; do git push origin paper-bot-state && exit 0; sleep 5; git pull --rebase -q origin paper-bot-state || true; done
+          exit 1
