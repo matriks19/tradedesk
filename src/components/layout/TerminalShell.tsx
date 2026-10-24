@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import EngineHost from '@/components/robot/EngineHost';
 import { useEffect, useRef, useState } from "react";
 import { TopBar } from "./TopBar";
 import { Sidebar } from "./Sidebar";
@@ -146,6 +147,7 @@ export function TerminalShell() {
   return (
     <div className="h-screen w-screen flex flex-col bg-desk-bg">
       <AlertWatcher />
+      <EngineHost />
       <TopBar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />
