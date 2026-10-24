@@ -1,0 +1,21 @@
+{
+  "_note": "GitHub Actions paper bot ayarları (PAPER ONLY — gerçek emir yok). Değiştirmek için bu dosyayı düzenle.",
+  "timeframe": "15m",
+  "universeTop": 60,
+  "extraSymbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+  "maxBarsAgo": 1,
+  "scan": {
+    "matchMode": "any",
+    "ham": { "enabled": true, "conds": ["raw_dual_up"] },
+    "macd": { "enabled": true, "conds": ["cross_up"] }
+  },
+  "allowShort": true,
+  "equity": 1000,
+  "leverage": 5,
+  "riskPct": 5,
+  "tp": 10,
+  "sl": 5,
+  "maxSlots": 20,
+  "maxNew": 3,
+  "feePct": 0.05
+}
