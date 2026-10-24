@@ -88,7 +88,7 @@ export function Sidebar() {
   }, [setSidebarTab]);
 
   return (
-    <aside className="w-[320px] shrink-0 border-r border-desk-border bg-desk-panel flex flex-col min-h-0">
+    <aside className="w-full md:w-[320px] max-h-[48vh] md:max-h-none overflow-y-auto shrink-0 border-b md:border-b-0 md:border-r border-desk-border bg-desk-panel flex flex-col min-h-0">
       <div className="flex flex-wrap border-b border-desk-border px-1">
         {TABS.map((t) => (
           <button
