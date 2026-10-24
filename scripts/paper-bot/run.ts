@@ -21,7 +21,9 @@ type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; s
   sid?: string; tpPct?: number; exit?: string; maxH?: number; tf?: string; sigT?: number };
 type Closed = Pos & { exit2?: string; exitPx: number; why: string; r: number; pnl: number; closedAt: number };
 type State = { v: 1; equity: number; pnl: number; open: Pos[]; closed: Closed[]; log: string[];
-  lastRun?: number; runs: number; dataSrc?: string; seen?: Record<string, number>; srcOff?: Record<string, string> };
+  lastRun?: number; runs: number; dataSrc?: string; seen?: Record<string, number>; srcOff?: Record<string, string>; stats?: Stats };
+type Stats = { since: number; peak: number; peakT: number; trough: number; maxDd: number; maxDdPct: number; maxDdT?: number;
+  maxUp: number; maxUpPct: number; maxUpT?: number; low: number };
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const cfg: Cfg = JSON.parse(fs.readFileSync(path.join(DIR, "config.json"), "utf8"));
@@ -233,6 +235,48 @@ async function notify(text: string) {
   console.log("alerts → " + out.join(", "));
 }
 
+// ---------- istatistik (state.stats + STATS.md) ----------
+const n2 = (v: number) => (v >= 0 ? "+" : "") + v.toFixed(2);
+function updateStats(): string {
+  const unreal = st.open.reduce((a, p) => a + pr(p) * p.notional - fee(p), 0);
+  const eq = st.equity + unreal, now = Date.now();
+  const S: Stats = st.stats || { since: now, peak: eq, peakT: now, trough: eq, maxDd: 0, maxDdPct: 0, maxUp: 0, maxUpPct: 0, low: eq };
+  if (S.low === undefined) S.low = eq;
+  if (eq > S.peak) { S.peak = eq; S.peakT = now; }
+  if (eq < S.low) S.low = eq;
+  const dd = S.peak - eq, ddPct = S.peak > 0 ? dd / S.peak * 100 : 0;
+  if (dd > S.maxDd) { S.maxDd = dd; S.maxDdPct = ddPct; S.maxDdT = now; }
+  const up = eq - S.low, upPct = S.low > 0 ? up / S.low * 100 : 0;
+  if (up > S.maxUp) { S.maxUp = up; S.maxUpPct = upPct; S.maxUpT = now; }
+  S.trough = Math.min(S.trough ?? eq, eq);
+  st.stats = S;
+  const cl = st.closed, wins = cl.filter((x) => x.pnl > 0), loss = cl.filter((x) => x.pnl <= 0);
+  const avg = (a: Closed[]) => (a.length ? a.reduce((x, y) => x + y.pnl, 0) / a.length : 0);
+  const best = cl.reduce<Closed | null>((a, x) => (!a || x.pnl > a.pnl ? x : a), null);
+  const worst = cl.reduce<Closed | null>((a, x) => (!a || x.pnl < a.pnl ? x : a), null);
+  const tr = (x: Closed | null) => (x ? `${x.sym} ${x.side} ${n2(x.pnl)} USDT (${(x.r * 100).toFixed(2)}%) [${x.src}]` : "—");
+  const tT = (t?: number) => (t ? new Date(t).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : "—");
+  const by: Record<string, { n: number; w: number; pnl: number }> = {};
+  for (const x of cl) { const k = cfg.sources.find((s) => s.id === x.sid)?.label || x.sid || x.src; const b = (by[k] ||= { n: 0, w: 0, pnl: 0 }); b.n++; if (x.pnl > 0) b.w++; b.pnl += x.pnl; }
+  const pct = (a: number, b: number) => (b ? (a / b * 100).toFixed(1) + "%" : "—");
+  return [
+    `# QUANTEX Paper Bot — İstatistikler`, ``, `Güncelleme: **${trT()} (TSİ)** · tur ${st.runs} · veri ${st.dataSrc || "?"} · izleme başlangıcı ${tT(S.since)}`, ``,
+    `## Özet`, `| Metrik | Değer |`, `|---|---|`,
+    `| Bakiye (gerçekleşen) | ${st.equity.toFixed(2)} USDT |`, `| Özsermaye (açık K/Z dahil) | ${eq.toFixed(2)} USDT |`,
+    `| Başlangıç bakiyesi | ${cfg.equity.toFixed(2)} USDT |`, `| Toplam gerçekleşen PnL | ${n2(st.pnl)} USDT |`, `| Açık K/Z | ${n2(unreal)} USDT |`,
+    `| Zirve özsermaye | ${S.peak.toFixed(2)} USDT (${tT(S.peakT)}) |`, `| Şu anki düşüş (zirveden) | ${dd.toFixed(2)} USDT (${ddPct.toFixed(2)}%) |`,
+    `| En kötü düşüş (max drawdown) | ${S.maxDd.toFixed(2)} USDT (${S.maxDdPct.toFixed(2)}%) · ${tT(S.maxDdT)} |`,
+    `| En yüksek yükseliş (dipten) | ${S.maxUp.toFixed(2)} USDT (${S.maxUpPct.toFixed(2)}%) · ${tT(S.maxUpT)} |`,
+    `| İşlem sayısı | ${cl.length} (${wins.length} kazanç / ${loss.length} kayıp) |`, `| Kazanma oranı | ${pct(wins.length, cl.length)} |`,
+    `| Ort. kazanç / kayıp | ${n2(avg(wins))} / ${n2(avg(loss))} USDT |`, `| En iyi işlem | ${tr(best)} |`, `| En kötü işlem | ${tr(worst)} |`, ``,
+    `## Taramalara göre`, `| Kaynak | İşlem | Kazanma | PnL (USDT) |`, `|---|---|---|---|`,
+    ...(Object.keys(by).length ? Object.entries(by).sort((a, b) => b[1].pnl - a[1].pnl).map(([k, b]) => `| ${k} | ${b.n} | ${pct(b.w, b.n)} | ${n2(b.pnl)} |`) : ["| — | 0 | — | 0 |"]), ``,
+    `## Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})`, `| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | Kaynak | Açılış |`, `|---|---|---|---|---|---|---|---|---|`,
+    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${n2(pr(p) * p.notional - fee(p))} | ${(tpOf(p) * 100).toFixed(0)} | ${p.src} | ${tT(p.t)} |`),
+    ``, `_Not: Zirve/düşüş/yükseliş tur başı (15 dk) özsermaye ile ölçülür; izleme başlangıcından itibaren geçerlidir. İşlem istatistikleri state'teki son 1000 kapanan işlemden hesaplanır._`, ``,
+  ].join("\n");
+}
+
 async function main() {
   st.runs++; st.lastRun = Date.now();
   try {
@@ -244,8 +288,9 @@ async function main() {
   } catch (e) {
     log(`⚠ Tur yarıda kaldı: ${(e as Error).message}`);
   }
+  const statsMd = updateStats();
   st.log = st.log.slice(-500); st.closed = st.closed.slice(-1000);
-  if (!DRY) fs.writeFileSync(STATE_FILE, JSON.stringify(st, null, 1));
+  if (!DRY) { fs.writeFileSync(STATE_FILE, JSON.stringify(st, null, 1)); fs.writeFileSync(path.join(path.dirname(STATE_FILE), "STATS.md"), statsMd); }
   const unreal = st.open.reduce((a, p) => a + pr(p) * p.notional - fee(p), 0);
   const sum = [
     `## QUANTEX Paper Bot — ${trT()} (TSİ)`,
@@ -255,7 +300,7 @@ async function main() {
     ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${(tpOf(p) * 100).toFixed(0)} | ${p.src} |`),
     "", "### Bu tur", ...(alerts.length ? alerts.map((a) => "- " + a) : ["- işlem yok"]),
   ].join("\n");
-  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n");
+  if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n\n" + statsMd + "\n");
   console.log(sum);
   if (alerts.length) await notify(alerts.join("\n") + `\nBakiye ${st.equity.toFixed(2)} USDT · açık ${st.open.length}`);
 }
