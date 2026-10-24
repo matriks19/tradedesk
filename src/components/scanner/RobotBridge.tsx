@@ -80,7 +80,7 @@ export function RobotBridge({ kinds, tf, cfg, onTest, onAuto, running }: {
     <div className="border border-desk-border/40 rounded p-2 mb-1 space-y-2 text-sm leading-snug">
       {/* Robot durumu */}
       <div className={big}>
-        🤖 Robot: <b>{s.running ? "🟢 çalışıyor (KÂĞIT)" : "🔴 durdu"}</b> · açık {s.open.length} · sinyal yolu {s.bus.length}
+        🤖 Robot: <b>{s.running ? "🟢 çalışıyor (KÂĞIT)" : "🔴 durdu"}</b> · açık {s.open.length} · sinyal yolu {s.bus.length} · motor: <b>{(() => { try { const L = JSON.parse(localStorage.getItem('qx_engine_lock_v1') || 'null'); return L && Date.now() - L.ts < 30000 ? '🟢 ' + (L.where || 'aktif') : '⚪ yok'; } catch { return '—'; } })()}</b>
         {!qxOpen && <div className="text-desk-down">QUANTEX sekmesi kapalı — sinyaller o sekme açılınca işlenir.</div>}
         {" "}<a className="underline" href="/quantex.html#robot" target="_blank" rel="noreferrer">Robotu aç</a>
       </div>
