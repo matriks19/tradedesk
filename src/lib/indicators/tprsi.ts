@@ -92,3 +92,22 @@ export function tprsiScan(candles: Candle[], conds: TprsiCond[], maxBarsAgo: num
       out.push({ cond, barsAgo: last - i, note: `TP RSI ${TPRSI_COND_LABEL[cond]} · puan ${sc}/5 · osc ${R.osc[i]!.toFixed(1)}` }); break; } }
   return out;
 }
+
+/** [t145] TP RSI bulut/TSI modu (quantlab tpcloud.py ile birebir): TSI(25,13)→0-100, Inverse Fisher RSI(14,WMA9), BB(50,2),
+ * bulutlar osilatör üstünde C1=EMA21/48, C3=EMA103/149, C5=EMA206/499. Robotta public/quantex.html tpcCalc ile aynı hesap. */
+export type TpCloudResult = { tsi: number[]; ift: number[]; tsiMid: number[]; iftUp: number[]; c1: number[]; c3: number[]; c5: number[]; ev: { tsiMid: boolean[]; cloudX: boolean[]; fishTop: boolean[] } };
+export function computeTpCloud(cs: Candle[]): TpCloudResult {
+  const c = cs.map((x) => x.close), n = c.length, pc = c.map((v, i) => (i ? v - c[i - 1]! : 0));
+  const num = ema(ema(pc, 25), 13), den = ema(ema(pc.map(Math.abs), 25), 13), tsi = num.map((v, i) => (den[i] ? ((100 * v) / den[i]! + 100) / 2 : NaN));
+  const up = new Array<number>(n).fill(NaN), dn = up.slice(); let pu = NaN, pd = NaN;
+  for (let i = 0; i < n; i++) { if (i === 14) { let a = 0, b = 0; for (let j = 1; j <= 14; j++) { a += Math.max(pc[j]!, 0); b += Math.max(-pc[j]!, 0); } pu = a / 14; pd = b / 14; } else if (i > 14) { pu = (pu * 13 + Math.max(pc[i]!, 0)) / 14; pd = (pd * 13 + Math.max(-pc[i]!, 0)) / 14; } up[i] = pu; dn[i] = pd; }
+  const v1 = up.map((u, i) => { const r = 100 - 100 / (1 + u / (dn[i] === 0 ? 1e-12 : dn[i]!)); return Number.isFinite(r) ? 0.1 * (r - 50) : 0; }), ift = new Array<number>(n).fill(NaN);
+  for (let i = 14; i < n; i++) { let s = 0; for (let j = 0; j < 9; j++) s += (9 - j) * v1[i - j]!; ift[i] = (Math.tanh(s / 45) + 1) * 50; }
+  const bb = (o: number[]) => { const m = new Array<number>(n).fill(NaN), u = m.slice(); for (let i = 49; i < n; i++) { let s = 0, q = 0, ok = true; for (let j = i - 49; j <= i; j++) { if (!Number.isFinite(o[j]!)) { ok = false; break; } s += o[j]!; q += o[j]! * o[j]!; } if (!ok) continue; const mu = s / 50; m[i] = mu; u[i] = mu + 2 * Math.sqrt(Math.max(q / 50 - mu * mu, 0)); } return { m, u }; };
+  const avg = (a: number[], b: number[]) => a.map((v, i) => (v + b[i]!) / 2), T = bb(tsi), F = bb(ift);
+  const c1 = avg(ema(tsi, 21), ema(tsi, 48)), c3 = avg(ema(tsi, 103), ema(tsi, 149)), c5 = avg(ema(tsi, 206), ema(tsi, 499));
+  const X = (a: number[], b: number[], i: number) => i > 0 && a[i]! > b[i]! && a[i - 1]! <= b[i - 1]!, U = (a: number[], b: number[], i: number) => i > 0 && a[i]! < b[i]! && a[i - 1]! >= b[i - 1]!;
+  const ev = { tsiMid: new Array<boolean>(n).fill(false), cloudX: new Array<boolean>(n).fill(false), fishTop: new Array<boolean>(n).fill(false) }; let arm = -1e9;
+  for (let i = 1; i < n; i++) { if (X(c1, c3, i) && c1[i]! < T.m[i]!) arm = i; if (i - arm <= 5 && i > arm && X(tsi, T.m, i)) { ev.tsiMid[i] = true; arm = -1e9; } ev.cloudX[i] = X(c1, c5, i); ev.fishTop[i] = U(ift, F.u, i); }
+  return { tsi, ift, tsiMid: T.m, iftUp: F.u, c1, c3, c5, ev };
+}
