@@ -29,28 +29,6 @@
    "tp": 25
   },
   {
-   "id": "t145-tsi-1h",
-   "label": "KOMBİN: TP RSI TSI 1s",
-   "type": "tpc",
-   "sig": "tsiMid",
-   "tf": "1h",
-   "on": true,
-   "ev": false,
-   "exit": "fishTop",
-   "maxH": 48
-  },
-  {
-   "id": "t145-bulut-2h",
-   "label": "KOMBİN: TP RSI Bulut 2s",
-   "type": "tpc",
-   "sig": "cloudX",
-   "tf": "2h",
-   "on": true,
-   "ev": false,
-   "exit": "fishTop",
-   "maxH": 48
-  },
-  {
    "id": "t145-tsi-4h",
    "label": "KOMBİN: TP RSI TSI 4s",
    "type": "tpc",
@@ -59,44 +37,6 @@
    "on": true,
    "ev": false,
    "tp": 25
-  },
-  {
-   "id": "t145-bulut-15m",
-   "label": "KOMBİN: TP RSI Bulut 15m",
-   "type": "tpc",
-   "sig": "cloudX",
-   "tf": "15m",
-   "on": true,
-   "ev": false,
-   "tp": 3
-  },
-  {
-   "id": "t145-bulut-30m",
-   "label": "KOMBİN: TP RSI Bulut 30m",
-   "type": "tpc",
-   "sig": "cloudX",
-   "tf": "30m",
-   "on": true,
-   "ev": false,
-   "tp": 3
-  },
-  {
-   "id": "pli-dir-1h",
-   "label": "PLI Yön 1s (alt/üst bant ↑)",
-   "type": "list",
-   "tf": "1h",
-   "on": true,
-   "ev": true,
-   "scan": {
-    "matchMode": "any",
-    "pliDir": {
-     "enabled": true,
-     "conds": [
-      "pli_lo_up",
-      "pli_hi_up"
-     ]
-    }
-   }
   },
   {
    "id": "gold2-div-4h",
@@ -188,6 +128,46 @@
    }
   },
   {
+   "id": "t145-bulut-2h",
+   "label": "KOMBİN: TP RSI Bulut 2s",
+   "type": "tpc",
+   "sig": "cloudX",
+   "tf": "2h",
+   "on": true,
+   "ev": false,
+   "exit": "fishTop",
+   "maxH": 48
+  },
+  {
+   "id": "t145-tsi-1h",
+   "label": "KOMBİN: TP RSI TSI 1s",
+   "type": "tpc",
+   "sig": "tsiMid",
+   "tf": "1h",
+   "on": true,
+   "ev": false,
+   "exit": "fishTop",
+   "maxH": 48
+  },
+  {
+   "id": "pli-dir-1h",
+   "label": "PLI Yön 1s (alt/üst bant ↑)",
+   "type": "list",
+   "tf": "1h",
+   "on": true,
+   "ev": true,
+   "scan": {
+    "matchMode": "any",
+    "pliDir": {
+     "enabled": true,
+     "conds": [
+      "pli_lo_up",
+      "pli_hi_up"
+     ]
+    }
+   }
+  },
+  {
    "id": "ma-50200-1h",
    "label": "MA x_50_200 1s",
    "type": "list",
@@ -203,6 +183,26 @@
      ]
     }
    }
+  },
+  {
+   "id": "t145-bulut-30m",
+   "label": "KOMBİN: TP RSI Bulut 30m",
+   "type": "tpc",
+   "sig": "cloudX",
+   "tf": "30m",
+   "on": true,
+   "ev": false,
+   "tp": 3
+  },
+  {
+   "id": "t145-bulut-15m",
+   "label": "KOMBİN: TP RSI Bulut 15m",
+   "type": "tpc",
+   "sig": "cloudX",
+   "tf": "15m",
+   "on": true,
+   "ev": false,
+   "tp": 3
   },
   {
    "id": "ham-macd-15m",
