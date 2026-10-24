@@ -86,6 +86,7 @@ import {
   type JfkpsCond,
   type JfkpsParams,
 } from "@/lib/indicators/jfkps";
+import { tprsiScan, DEFAULT_TPRSI_CONDS, TPRSI_BEAR_CONDS, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
 export { DEFAULT_MDO_CONDS, ALL_MDO_CONDS, MDO_COND_LABEL, MDO_DEFAULTS, mdoMinBars, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
 import { mdoScan, DEFAULT_MDO_CONDS, MDO_BEAR_CONDS, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
 import {
@@ -575,6 +576,7 @@ export type ListScanKind =
   | "ema30Band"
   | "fractal8"
   | "jfkps"
+  | "tprsi"
   | "mdo"
   | "pine";
 
@@ -933,6 +935,8 @@ export type ListScanConfig = {
   };
   /** T30 FRACTAL 8 Ribbons (kullanıcının Pine v4 göstergesi) — seviye kesişimleri, kapanmış mum. */
   /** T31 JFKPS (Loxx) — L/S kesişimleri + trend durumu, kapanmış mum. */
+  /** T45 TP RSI (TrendlineProject) — Laguerre RSI + BB re-entry motoru, kapanmış mum. */
+  tprsi?: { enabled: boolean; conds: TprsiCond[]; params?: TprsiParams };
   jfkps?: {
     enabled: boolean;
     conds: JfkpsCond[];
@@ -2501,6 +2505,14 @@ function scanMdo(candles: Candle[], cfg: NonNullable<ListScanConfig["mdo"]>, max
   }));
 }
 
+function scanTprsi(candles: Candle[], cfg: NonNullable<ListScanConfig["tprsi"]>, maxBarsAgo: number): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_TPRSI_CONDS;
+  return tprsiScan(candles, conds, maxBarsAgo, cfg.params ?? {}).map((h) => ({
+    kind: "tprsi" as const, cond: h.cond, bias: TPRSI_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const), barsAgo: h.barsAgo, note: h.note,
+  }));
+}
+
 function scanJfkps(candles: Candle[], cfg: NonNullable<ListScanConfig["jfkps"]>, maxBarsAgo: number): ListScanHit[] {
   if (!cfg.enabled) return [];
   const conds = cfg.conds.length ? cfg.conds : DEFAULT_JFKPS_CONDS;
@@ -2575,6 +2587,7 @@ export function scanSymbol(
   if (cfg.ema30Band?.enabled) enabledKinds.push("ema30Band");
   if (cfg.fractal8?.enabled) enabledKinds.push("fractal8");
   if (cfg.jfkps?.enabled) enabledKinds.push("jfkps");
+  if (cfg.tprsi?.enabled) enabledKinds.push("tprsi");
   if (cfg.mdo?.enabled) enabledKinds.push("mdo");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
@@ -2604,6 +2617,7 @@ export function scanSymbol(
     ema30Band: cfg.ema30Band ? scanEma30Band(candles, cfg.ema30Band, maxBarsAgo) : [],
     fractal8: cfg.fractal8 ? scanFractal8(candles, cfg.fractal8, maxBarsAgo) : [],
     jfkps: cfg.jfkps ? scanJfkps(candles, cfg.jfkps, maxBarsAgo) : [],
+    tprsi: cfg.tprsi ? scanTprsi(candles, cfg.tprsi, maxBarsAgo) : [],
     mdo: cfg.mdo ? scanMdo(candles, cfg.mdo, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
@@ -3041,7 +3055,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo">,
+  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi">,
   | "hamJurikTpo"
   | "diagonalSr"
   | "macd"
@@ -3207,3 +3221,5 @@ export {
   type JfkpsCond,
   type JfkpsParams,
 } from "@/lib/indicators/jfkps";
+
+export { DEFAULT_TPRSI_CONDS, ALL_TPRSI_CONDS, TPRSI_COND_LABEL, TPRSI_DEFAULTS, tprsiMinBars, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
