@@ -19257,7 +19257,7 @@ function anyIn(f,a,b){for(let x=Math.max(0,a);x<=b;x++)if(f(x))return true;retur
 function needBtcK(cb){const t=id=>/^t36:/.test(String(id||''));return (cb.conds||[]).some(c=>c&&((c.t==='chip'&&t(c.scan))||(c.t==='seq'&&(t(c.a)||t(c.b)))));}
 // Koşulun j. mumdaki doğruluk fonksiyonunu döndürür (j: kapanmış mum dizini)
 // [t145] TP RSI bulut / TSI (quantlab tpcloud.py ile birebir): TSI(25,13) 0-100, Inverse Fisher RSI(14, WMA9), BB(50,2); bulutlar EMA21/48 (C1), 103/149 (C3), 206/499 (C5)
-const TPC_SIG={tsiMid:'TSI orta bant ↑ (C1↑C3 alt bölge ≤5 mum)',cloudX:'Hızlı bulut ↑ yavaş bulut (C1↑C5)',fishTop:'Fisher üst bant ↓ (TP çıkışı)'};
+const TPC_SIG={tsiMid:'TSI orta bant ↑ (C1↑C3 alt bölge ≤5 mum)',cloudX:'Hızlı bulut ↑ yavaş bulut (C1↑C5)',fishTop:'Fisher üst bant ↓ (TP çıkışı)',tsiSlow:'TSI ↑ yavaş bulut (alt bant yakını, ≤5 mum)'};
 const tpcC=new WeakMap();
 function tpcCalc(k){let R=tpcC.get(k);if(R)return R;const c=k.c,n=c.length;
   const em=(a,p)=>{const o=new Array(n).fill(NaN),al=2/(p+1);let q=NaN,s=0,m=0;for(let i=0;i<n;i++){const v=a[i];if(!isFinite(v))continue;if(!isFinite(q)){s+=v;m++;if(m===p){q=s/p;o[i]=q;}continue;}q=al*v+(1-al)*q;o[i]=q;}return o;};
@@ -19268,9 +19268,9 @@ function tpcCalc(k){let R=tpcC.get(k);if(R)return R;const c=k.c,n=c.length;
   for(let i=Math.max(8,14);i<n;i++){let s=0;for(let j=0;j<9;j++)s+=(9-j)*v1[i-j];ift[i]=(Math.tanh(s/45)+1)*50;}
   const T=bands(tsi),F=bands(ift),e=p=>em(tsi,p),e21=e(21),e48=e(48),c1=e21.map((v,i)=>(v+e48[i])/2),c3=e(103).map((v,i,a)=>(v+0)/1),e149=e(149),c3m=c3.map((v,i)=>(v+e149[i])/2),e206=e(206),c5=e(499).map((v,i)=>(v+e206[i])/2);
   const X=(a,b,i)=>i>0&&a[i]>b[i]&&a[i-1]<=b[i-1],U=(a,b,i)=>i>0&&a[i]<b[i]&&a[i-1]>=b[i-1];
-  const tsiMid=new Array(n).fill(false),cloudX=tsiMid.slice(),fishTop=tsiMid.slice();let arm=-1e9;
-  for(let i=1;i<n;i++){if(X(c1,c3m,i)&&c1[i]<T.m[i])arm=i;if(i-arm<=5&&i>arm&&X(tsi,T.m,i)){tsiMid[i]=true;arm=-1e9;}cloudX[i]=X(c1,c5,i);fishTop[i]=U(ift,F.u,i);}
-  R={tsiMid,cloudX,fishTop,need:520};tpcC.set(k,R);return R;}
+  const tsiMid=new Array(n).fill(false),cloudX=tsiMid.slice(),fishTop=tsiMid.slice(),tsiSlow=tsiMid.slice();let arm=-1e9;
+  for(let i=1;i<n;i++){if(X(c1,c3m,i)&&c1[i]<T.m[i])arm=i;if(i-arm<=5&&i>arm&&X(tsi,T.m,i)){tsiMid[i]=true;arm=-1e9;}cloudX[i]=X(c1,c5,i);fishTop[i]=U(ift,F.u,i);if(X(tsi,c5,i)){for(let j=Math.max(0,i-5);j<=i;j++)if(tsi[j]<T.l[j]+0.5*(T.m[j]-T.l[j])){tsiSlow[i]=true;break;}}}
+  R={tsiMid,cloudX,fishTop,tsiSlow,need:520};tpcC.set(k,R);return R;}
 function condFn(w,d,k,cd){
   const n=k.c.length, inR=(v)=>isFinite(v)&&v>=+cd.min&&v<=+cd.max, P=Math.max(2,+cd.p||14);
   switch(cd.t){
@@ -19433,6 +19433,7 @@ function addPresetG10(){let add=0;const ch=(scan,bars)=>({t:'chip',scan,dir:'any
 function addPresetTPC(){let add=0;const P=[
   {preset:'t145-tsi-1h',name:'TP RSI TSI 1s',tf:'1h',conds:[{t:'tpc',sig:'tsiMid'}],exit:{t:'tpc',sig:'fishTop'},maxH:48},
   {preset:'t145-bulut-2h',name:'TP RSI Bulut 2s',tf:'2h',conds:[{t:'tpc',sig:'cloudX'}],exit:{t:'tpc',sig:'fishTop'},maxH:48},
+  {preset:'t145-tsi-4h',name:'TP RSI TSI 4s',tf:'4h',conds:[{t:'tpc',sig:'tsiSlow'}],exit:{t:'tpc',sig:'fishTop'},maxH:48},
   {preset:'t145-bulut-15m',name:'TP RSI Bulut 15m',tf:'15m',conds:[{t:'tpc',sig:'cloudX'}],tpRange:true,tpv:'3'},
   {preset:'t145-bulut-30m',name:'TP RSI Bulut 30m',tf:'30m',conds:[{t:'tpc',sig:'cloudX'}],tpRange:true,tpv:'3'}];
   for(const p of P){let cb=cfg.combos.find(c=>c.preset===p.preset);
