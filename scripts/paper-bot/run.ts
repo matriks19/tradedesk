@@ -14,7 +14,7 @@ type Src = { id: string; label: string; type: "list" | "tpc"; tf: string; on: bo
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
-  riskPct: number; tp: number; sl: number; maxSlots: number; maxNew: number; feePct: number; evGlobal: boolean; sources: Src[];
+  riskPct: number; tp: number; sl: number; maxSlots: number; marginUsd?: number; maxNew: number; feePct: number; evGlobal: boolean; sources: Src[];
 };
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
@@ -204,7 +204,7 @@ async function scanAndOpen() {
       if (st.open.some((p) => p.sym === sym)) { log(msg + " — atlandı: açık pozisyon var"); continue; }
       if (nNew >= cfg.maxNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${cfg.maxNew})`); continue; }
       if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
-      const margin = st.equity * cfg.riskPct / 100;
+      const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
       const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
       if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
       const price = c[c.length - 1].close;
