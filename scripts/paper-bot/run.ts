@@ -137,9 +137,9 @@ async function manage() {
     const r = pr(p);
     if (r >= tpOf(p)) { closePos(i, "TP", last); continue; }
     if (cfg.sl > 0 && r <= -cfg.sl / 100) { closePos(i, "SL", last); continue; }
-    // süre limiti (maxH mum, kaynak TF'sinde)
+    // süre limiti KALDIRILDI (maxH yalnızca bilgi amaçlı)
     const ms = p.tf ? TF_MS[p.tf] : 0;
-    if (p.maxH && ms && Date.now() - p.t >= p.maxH * ms) { log(`Süre limiti (${p.maxH} mum): ${p.sym} [${p.src}]`); closePos(i, "SÜRE", last); continue; }
+    void ms; // süre limiti kapatmıyor; sadece raporda kalan süre gösterilir
     // kaynak çıkışı (ör. Fisher üst bant ↓) — son kapanmış mumda, giriş sonrası
     if (p.exit && p.tf) {
       const c = await closed(p.sym, p.tf);
@@ -212,7 +212,7 @@ async function scanAndOpen() {
       const p: Pos = { sym, side, entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
         t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, tpPct: s.tp, exit: s.exit, maxH: s.maxH, tf: s.tf };
       st.open.push(p); nNew++; opened++; if (sk) st.seen[sk] = bt;
-      const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre " + s.maxH + " mum" : ""} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
+      const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre bilgisi " + s.maxH + " mum (kapatmaz)" : ""} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
       log(m); alerts.push(m);
     }
     per.push(`${s.label}: ${scanned}/${syms.length} sembol, ${hits} sinyal, ${opened} giriş, ${fail} veri eksik · EV ${evOn(s) ? "açık" : "kapalı"}`);
@@ -255,6 +255,7 @@ function updateStats(): string {
   const best = cl.reduce<Closed | null>((a, x) => (!a || x.pnl > a.pnl ? x : a), null);
   const worst = cl.reduce<Closed | null>((a, x) => (!a || x.pnl < a.pnl ? x : a), null);
   const tr = (x: Closed | null) => (x ? `${x.sym} ${x.side} ${n2(x.pnl)} USDT (${(x.r * 100).toFixed(2)}%) [${x.src}]` : "—");
+  const left = (p: Pos) => { const ms = p.tf ? TF_MS[p.tf] : 0; if (!p.maxH || !ms) return "—"; const r = p.t + p.maxH * ms - Date.now(); const a = Math.abs(r), d = Math.floor(a / 864e5), h = Math.floor((a % 864e5) / 36e5); return (r < 0 ? "doldu, +" : "") + `${d}g ${h}s`; };
   const tT = (t?: number) => (t ? new Date(t).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : "—");
   const by: Record<string, { n: number; w: number; pnl: number }> = {};
   for (const x of cl) { const k = cfg.sources.find((s) => s.id === x.sid)?.label || x.sid || x.src; const b = (by[k] ||= { n: 0, w: 0, pnl: 0 }); b.n++; if (x.pnl > 0) b.w++; b.pnl += x.pnl; }
@@ -271,8 +272,8 @@ function updateStats(): string {
     `| Ort. kazanç / kayıp | ${n2(avg(wins))} / ${n2(avg(loss))} USDT |`, `| En iyi işlem | ${tr(best)} |`, `| En kötü işlem | ${tr(worst)} |`, ``,
     `## Taramalara göre`, `| Kaynak | İşlem | Kazanma | PnL (USDT) |`, `|---|---|---|---|`,
     ...(Object.keys(by).length ? Object.entries(by).sort((a, b) => b[1].pnl - a[1].pnl).map(([k, b]) => `| ${k} | ${b.n} | ${pct(b.w, b.n)} | ${n2(b.pnl)} |`) : ["| — | 0 | — | 0 |"]), ``,
-    `## Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})`, `| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | Kaynak | Açılış |`, `|---|---|---|---|---|---|---|---|---|`,
-    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${n2(pr(p) * p.notional - fee(p))} | ${(tpOf(p) * 100).toFixed(0)} | ${p.src} | ${tT(p.t)} |`),
+    `## Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})`, `| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | Kaynak | Açılış | Süreye kalan |`, `|---|---|---|---|---|---|---|---|---|---|`,
+    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${n2(pr(p) * p.notional - fee(p))} | ${(tpOf(p) * 100).toFixed(0)} | ${p.src} | ${tT(p.t)} | ${left(p)} |`),
     ``, `_Not: Zirve/düşüş/yükseliş tur başı (15 dk) özsermaye ile ölçülür; izleme başlangıcından itibaren geçerlidir. İşlem istatistikleri state'teki son 1000 kapanan işlemden hesaplanır._`, ``,
   ].join("\n");
 }
