@@ -126,7 +126,7 @@ async function manage() {
     let hit: [string, number] | null = null;
     for (const b of closedBars) {
       const h = +b[2], l = +b[3];
-      if (p.side === "LONG" ? l <= slv : h >= slv) { hit = ["SL", slv]; break; }
+      if (cfg.sl > 0 && (p.side === "LONG" ? l <= slv : h >= slv)) { hit = ["SL", slv]; break; }
       if (p.side === "LONG" ? h >= tpv : l <= tpv) { hit = ["TP", tpv]; break; }
     }
     const last = +k[k.length - 1][4];
@@ -136,7 +136,7 @@ async function manage() {
     p.last = last;
     const r = pr(p);
     if (r >= tpOf(p)) { closePos(i, "TP", last); continue; }
-    if (r <= -cfg.sl / 100) { closePos(i, "SL", last); continue; }
+    if (cfg.sl > 0 && r <= -cfg.sl / 100) { closePos(i, "SL", last); continue; }
     // süre limiti (maxH mum, kaynak TF'sinde)
     const ms = p.tf ? TF_MS[p.tf] : 0;
     if (p.maxH && ms && Date.now() - p.t >= p.maxH * ms) { log(`Süre limiti (${p.maxH} mum): ${p.sym} [${p.src}]`); closePos(i, "SÜRE", last); continue; }
@@ -212,7 +212,7 @@ async function scanAndOpen() {
       const p: Pos = { sym, side, entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
         t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, tpPct: s.tp, exit: s.exit, maxH: s.maxH, tf: s.tf };
       st.open.push(p); nNew++; opened++; if (sk) st.seen[sk] = bt;
-      const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre " + s.maxH + " mum" : ""} / SL %${cfg.sl}`;
+      const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre " + s.maxH + " mum" : ""} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
       log(m); alerts.push(m);
     }
     per.push(`${s.label}: ${scanned}/${syms.length} sembol, ${hits} sinyal, ${opened} giriş, ${fail} veri eksik · EV ${evOn(s) ? "açık" : "kapalı"}`);

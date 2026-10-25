@@ -13,7 +13,7 @@
  "riskPct": 5,
  "marginUsd": 10,
  "tp": 10,
- "sl": 5,
+ "sl": 0,
  "maxSlots": 500,
  "maxNew": 3,
  "feePct": 0.05,
