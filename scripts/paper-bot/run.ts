@@ -14,7 +14,7 @@ type Src = { id: string; label: string; type: "list" | "tpc"; tf: string; on: bo
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
-  riskPct: number; tp: number; sl: number; maxSlots: number; marginUsd?: number; maxNew: number; perSymSig?: number; feePct: number; evGlobal: boolean; sources: Src[];
+  riskPct: number; tp: number; sl: number; maxSlots: number; marginUsd?: number; maxNew: number; maxNewFirst?: number; perSymSig?: number; feePct: number; evGlobal: boolean; sources: Src[];
 };
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
@@ -204,7 +204,8 @@ async function scanAndOpen() {
       const perCap = cfg.perSymSig ?? 1;
       const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
       if (nSame >= perCap) { log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); continue; }
-      if (nNew >= cfg.maxNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${cfg.maxNew})`); continue; }
+      const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
+      if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
       if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
       const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
       const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
@@ -293,6 +294,7 @@ async function main() {
   }
   const statsMd = updateStats();
   st.log = st.log.slice(-500); st.closed = st.closed.slice(-1000);
+  (st as any).firstScanDone = true;
   if (!DRY) { fs.writeFileSync(STATE_FILE, JSON.stringify(st, null, 1)); fs.writeFileSync(path.join(path.dirname(STATE_FILE), "STATS.md"), statsMd); }
   const unreal = st.open.reduce((a, p) => a + pr(p) * p.notional - fee(p), 0);
   const sum = [
