@@ -14,7 +14,7 @@ type Src = { id: string; label: string; type: "list" | "tpc"; tf: string; on: bo
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
-  riskPct: number; tp: number; sl: number; maxSlots: number; marginUsd?: number; maxNew: number; feePct: number; evGlobal: boolean; sources: Src[];
+  riskPct: number; tp: number; sl: number; maxSlots: number; marginUsd?: number; maxNew: number; perSymSig?: number; feePct: number; evGlobal: boolean; sources: Src[];
 };
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
@@ -201,7 +201,9 @@ async function scanAndOpen() {
       hits++;
       const msg = `📡 ${sym} ${side} [${s.label}: ${tag}] ${s.tf} (yaş ${age})`;
       if (evOn(s)) { const g = btGate(s, keys); if (g) { log(msg + " — atlandı: " + g); continue; } }
-      if (st.open.some((p) => p.sym === sym)) { log(msg + " — atlandı: açık pozisyon var"); continue; }
+      const perCap = cfg.perSymSig ?? 1;
+      const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
+      if (nSame >= perCap) { log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); continue; }
       if (nNew >= cfg.maxNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${cfg.maxNew})`); continue; }
       if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
       const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;

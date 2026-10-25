@@ -14,8 +14,9 @@
  "marginUsd": 10,
  "tp": 10,
  "sl": 0,
- "maxSlots": 500,
- "maxNew": 3,
+ "maxSlots": 25,
+ "maxNew": 25,
+ "perSymSig": 10,
  "feePct": 0.05,
  "evGlobal": true,
  "sources": [
