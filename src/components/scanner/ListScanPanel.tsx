@@ -956,6 +956,8 @@ export function ListScanPanel() {
   const [fgOb, setFgOb] = useState<number>(FEAR_GREED_DEFAULTS.ob);
   const [fgOs, setFgOs] = useState<number>(FEAR_GREED_DEFAULTS.os);
   const [fgTol, setFgTol] = useState<number>(FEAR_GREED_DEFAULTS.tol);
+  const [fgRtol, setFgRtol] = useState<number>(FEAR_GREED_DEFAULTS.rtol);
+  const [fgCw, setFgCw] = useState<number>(FEAR_GREED_DEFAULTS.cw);
   const [mdoConds, setMdoConds] = useState<MdoCond[]>([...DEFAULT_MDO_CONDS]);
   const [mdoLen, setMdoLen] = useState<number>(MDO_DEFAULTS.len);
   const [mdoMom, setMdoMom] = useState<number>(MDO_DEFAULTS.mom);
@@ -1410,7 +1412,7 @@ export function ListScanPanel() {
       fearGreed: {
         enabled: fgOn,
         conds: fgConds,
-        params: { rsi: Number(fgRsi) || 14, trd: Number(fgTrd) || 50, flow: Number(fgFlow) || 20, ob: Number(fgOb) || 70, os: Number(fgOs) || 30, tol: Number(fgTol) || 8 },
+        params: { rsi: Number(fgRsi) || 14, trd: Number(fgTrd) || 50, flow: Number(fgFlow) || 20, ob: Number(fgOb) || 70, os: Number(fgOs) || 30, tol: Number(fgTol) || 8, rtol: Number.isFinite(Number(fgRtol)) && Number(fgRtol) >= 0 ? Number(fgRtol) : 3, cw: Number(fgCw) || 10 },
       },
       tprsi: { enabled: tpOn, conds: tpConds, params: { gamma: Math.max(0.05, Math.min(0.95, Number(tpGamma) || 0.5)), minScore: Math.max(0, Math.min(5, Math.round(Number(tpMin)))), cool: Math.max(0, Math.round(Number(tpCool) || 0)), bb: Math.max(2, Math.round(Number(tpBb) || 50)) } },
       jfkps: {
@@ -1639,6 +1641,8 @@ export function ListScanPanel() {
     fgOb,
     fgOs,
     fgTol,
+    fgRtol,
+    fgCw,
     jfLen,
     jfX,
     jfSm,
@@ -4157,6 +4161,8 @@ export function ListScanPanel() {
           <NumInput label="Aşırı açgözlülük" value={fgOb} onChange={setFgOb} hint="Overbought (70)" />
           <NumInput label="Aşırı korku" value={fgOs} onChange={setFgOs} hint="Oversold (30)" />
           <NumInput label="Dip toleransı" value={fgTol} onChange={setFgTol} hint="İkili/üçlü dip FG seviye farkı (8)" />
+          <NumInput label="RSI-FG toleransı" value={fgRtol} onChange={setFgRtol} hint="AL: RSI 30↑ ve FG ≤ 30+tol; SAT: RSI 70↓ ve FG ≥ 70−tol (3)" />
+          <NumInput label="Kombo penceresi" value={fgCw} onChange={setFgCw} hint="Korku+RSI ile ikili/üçlü yapı arası en fazla mum (10)" />
         </div>
         <div className="flex flex-wrap gap-1">
           {ALL_FEAR_GREED_CONDS.map((id) => (
