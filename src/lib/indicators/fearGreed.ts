@@ -8,10 +8,10 @@ import { lastClosedIndex } from "./eliziLdr4";
 
 export type FearGreedParams = { rsi?: number; trd?: number; flow?: number; ob?: number; os?: number; tol?: number };
 export const FEAR_GREED_DEFAULTS = { rsi: 14, trd: 50, flow: 20, ob: 70, os: 30, tol: 8 };
-export type FearGreedCond = "fg_pd" | "fg_nd" | "fg_d2" | "fg_d3" | "fg_t2" | "fg_t3" | "fg_xf" | "fg_xg" | "fg_d2bb" | "fg_t2bb";
-export const ALL_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_t2bb", "fg_xf", "fg_xg"];
-export const DEFAULT_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb"];
-export const FEAR_GREED_BEAR_CONDS = new Set<FearGreedCond>(["fg_nd", "fg_t2", "fg_t3", "fg_t2bb", "fg_xg"]);
+export type FearGreedCond = "fg_pd" | "fg_nd" | "fg_d2" | "fg_d3" | "fg_t2" | "fg_t3" | "fg_xf" | "fg_xg" | "fg_d2bb" | "fg_t2bb" | "fg_d3bb" | "fg_t3bb";
+export const ALL_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_t2bb", "fg_d3bb", "fg_t3bb", "fg_xf", "fg_xg"];
+export const DEFAULT_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_d3bb"];
+export const FEAR_GREED_BEAR_CONDS = new Set<FearGreedCond>(["fg_nd", "fg_t2", "fg_t3", "fg_t2bb", "fg_t3bb", "fg_xg"]);
 export const FEAR_GREED_COND_LABEL: Record<FearGreedCond, string> = {
   fg_pd: "Pozitif uyumsuzluk",
   fg_nd: "Negatif uyumsuzluk",
@@ -21,6 +21,8 @@ export const FEAR_GREED_COND_LABEL: Record<FearGreedCond, string> = {
   fg_t3: "Üçlü tepe",
   fg_d2bb: "İkili dip + 2. BB alt dokunuş",
   fg_t2bb: "İkili tepe + 2. BB üst dokunuş",
+  fg_d3bb: "Üçlü dip + 3. BB alt dokunuş",
+  fg_t3bb: "Üçlü tepe + 3. BB üst dokunuş",
   fg_xf: "Aşırı Korku 30↓",
   fg_xg: "Aşırı Açgözlülük 70↑",
 };
@@ -39,7 +41,7 @@ export function fearGreedMinBars(p?: FearGreedParams | null): number {
   return Math.max(o.trd, o.flow, o.rsi + 1) + PV * 2 + 2;
 }
 
-export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null) {
+export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null, opt: { noDedupe?: boolean } = {}) {
   const o = opts(p), n = candles.length;
   const C = candles.map((k) => k.close), O = candles.map((k) => k.open), H = candles.map((k) => k.high), Lw = candles.map((k) => k.low);
   const V = candles.map((k) => Number(k.volume) || 0);
@@ -68,12 +70,16 @@ export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null) 
   }
   const tch = (x: number, low: boolean) => (low ? Lw[x]! <= bL[x]! : H[x]! >= bU[x]!);
   const near = (x: number, low: boolean, hiLim: number) => { for (let y = Math.max(0, x - PV); y <= Math.min(hiLim, x + PV); y++) if (tch(y, low)) return y; return -1; };
-  /** 1. dip civarında dokunuş, araya dokunmayan mum, 2. dip civarında yeni dokunuş (tepe: üst bant). */
-  const bb2 = (f0: number, pv: number, c: number, low: boolean) => {
-    const a = near(f0, low, pv - 1), b = near(pv, low, c);
-    if (a < 0 || b < 0 || b <= a) return false;
-    for (let y = a + 1; y < b; y++) if (!tch(y, low)) return true;
-    return false;
+  /** Her pivot civarında ayrı BB dokunuşu; ardışık dokunuşlar arasında banda değmeyen en az bir mum (tepe: üst bant). */
+  const bbN = (piv: number[], c: number, low: boolean) => {
+    let prevT = -1;
+    for (let z = 0; z < piv.length; z++) {
+      const lim = z + 1 < piv.length ? piv[z + 1]! - 1 : c, t = near(piv[z]!, low, lim);
+      if (t < 0 || t <= prevT) return false;
+      if (prevT >= 0) { let gap = false; for (let y = prevT + 1; y < t; y++) if (!tch(y, low)) { gap = true; break; } if (!gap) return false; }
+      prevT = t;
+    }
+    return true;
   };
   let lastG = -99, lastF = -99;
   for (let i = 1; i < n; i++) {
@@ -94,7 +100,23 @@ export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null) 
     if (isL) pl.push(j);
     if (isH) ph.push(j);
   }
+  // Tekrar önleme: her chip yapı başına 1 kez; FG bölgeden çıkınca (dip >45 / tepe <55) veya fiyat yapının ucunu kırınca yeniden kurulur.
+  const dd = !opt.noDedupe;
   const walk = (P: number[], low: boolean) => {
+    const arm: Partial<Record<FearGreedCond, boolean>> = {}, ext: Partial<Record<FearGreedCond, number>> = {}, lastC: Partial<Record<FearGreedCond, number>> = {};
+    const fire = (key: FearGreedCond, c: number, pivs: number[]) => {
+      if (dd) {
+        if (arm[key] === false) {
+          for (let y = lastC[key]! + 1; y <= c; y++) {
+            if (low ? fg[y]! > 45 || Lw[y]! < ext[key]! : fg[y]! < 55 || H[y]! > ext[key]!) { arm[key] = true; break; }
+          }
+          if (arm[key] === false) return;
+        }
+        arm[key] = false; lastC[key] = c;
+        ext[key] = low ? Math.min(...pivs.map((x) => Lw[x]!)) : Math.max(...pivs.map((x) => H[x]!));
+      }
+      ev[key][c] = true;
+    };
     for (let q = 0; q < P.length; q++) {
       const pv = P[q]!, c = pv + PV;
       if (c >= n) continue;
@@ -112,9 +134,12 @@ export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null) 
       const lvl = low ? fg[pv]! >= fg[f0]! - 1 : fg[pv]! <= fg[f0]! + 1;
       const pc = low ? C[c]! > C[pv]! : C[c]! < C[pv]!;
       if (!lvl || !pc) continue;
-      if (bb2(f0, pv, c, low)) ev[low ? "fg_d2bb" : "fg_t2bb"][c] = true;
-      if (m.length >= 2) ev[low ? "fg_d3" : "fg_t3"][c] = true;
-      else ev[low ? "fg_d2" : "fg_t2"][c] = true;
+      if (m.length >= 2) {
+        const p3 = [m[m.length - 2]!, f0, pv];
+        fire(low ? "fg_d3" : "fg_t3", c, p3);
+        if (bbN(p3, c, low)) fire(low ? "fg_d3bb" : "fg_t3bb", c, p3);
+      } else fire(low ? "fg_d2" : "fg_t2", c, [f0, pv]);
+      if (bbN([f0, pv], c, low)) fire(low ? "fg_d2bb" : "fg_t2bb", c, [f0, pv]);
     }
   };
   walk(pl, true);
