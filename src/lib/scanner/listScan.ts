@@ -88,6 +88,8 @@ import {
 } from "@/lib/indicators/jfkps";
 import { tprsiScan, DEFAULT_TPRSI_CONDS, TPRSI_BEAR_CONDS, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
 export { DEFAULT_MDO_CONDS, ALL_MDO_CONDS, MDO_COND_LABEL, MDO_DEFAULTS, mdoMinBars, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
+export { DEFAULT_FEAR_GREED_CONDS, ALL_FEAR_GREED_CONDS, FEAR_GREED_COND_LABEL, FEAR_GREED_DEFAULTS, fearGreedMinBars, type FearGreedCond, type FearGreedParams } from "@/lib/indicators/fearGreed";
+import { fearGreedScan, DEFAULT_FEAR_GREED_CONDS, FEAR_GREED_BEAR_CONDS, type FearGreedCond, type FearGreedParams } from "@/lib/indicators/fearGreed";
 import { mdoScan, DEFAULT_MDO_CONDS, MDO_BEAR_CONDS, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
 import {
   fractal8Scan,
@@ -578,6 +580,7 @@ export type ListScanKind =
   | "jfkps"
   | "tprsi"
   | "mdo"
+  | "fearGreed"
   | "pine";
 
 export type PineCond =
@@ -947,6 +950,12 @@ export type ListScanConfig = {
     enabled: boolean;
     conds: MdoCond[];
     params?: MdoParams;
+  };
+  /** T47 Fear & Greed [BigBeluga] — uyumsuzluk + ikili/üçlü dip/tepe + aşırı bölge, kapanmış mum. */
+  fearGreed?: {
+    enabled: boolean;
+    conds: FearGreedCond[];
+    params?: FearGreedParams;
   };
   fractal8?: {
     enabled: boolean;
@@ -2505,6 +2514,18 @@ function scanMdo(candles: Candle[], cfg: NonNullable<ListScanConfig["mdo"]>, max
   }));
 }
 
+function scanFearGreed(candles: Candle[], cfg: NonNullable<ListScanConfig["fearGreed"]>, maxBarsAgo: number): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_FEAR_GREED_CONDS;
+  return fearGreedScan(candles, conds, maxBarsAgo, cfg.params ?? {}).map((h) => ({
+    kind: "fearGreed" as const,
+    cond: h.cond,
+    bias: FEAR_GREED_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const),
+    barsAgo: h.barsAgo,
+    note: h.note,
+  }));
+}
+
 function scanTprsi(candles: Candle[], cfg: NonNullable<ListScanConfig["tprsi"]>, maxBarsAgo: number): ListScanHit[] {
   if (!cfg.enabled) return [];
   const conds = cfg.conds.length ? cfg.conds : DEFAULT_TPRSI_CONDS;
@@ -2589,6 +2610,7 @@ export function scanSymbol(
   if (cfg.jfkps?.enabled) enabledKinds.push("jfkps");
   if (cfg.tprsi?.enabled) enabledKinds.push("tprsi");
   if (cfg.mdo?.enabled) enabledKinds.push("mdo");
+  if (cfg.fearGreed?.enabled) enabledKinds.push("fearGreed");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
   if (!enabledKinds.length) return [];
 
@@ -2619,6 +2641,7 @@ export function scanSymbol(
     jfkps: cfg.jfkps ? scanJfkps(candles, cfg.jfkps, maxBarsAgo) : [],
     tprsi: cfg.tprsi ? scanTprsi(candles, cfg.tprsi, maxBarsAgo) : [],
     mdo: cfg.mdo ? scanMdo(candles, cfg.mdo, maxBarsAgo) : [],
+    fearGreed: cfg.fearGreed ? scanFearGreed(candles, cfg.fearGreed, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
   };
 
@@ -3055,7 +3078,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi">,
+  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "fearGreed">,
   | "hamJurikTpo"
   | "diagonalSr"
   | "macd"
