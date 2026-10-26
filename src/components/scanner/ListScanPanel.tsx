@@ -4161,8 +4161,7 @@ export function ListScanPanel() {
           <NumInput label="Aşırı açgözlülük" value={fgOb} onChange={setFgOb} hint="Overbought (70)" />
           <NumInput label="Aşırı korku" value={fgOs} onChange={setFgOs} hint="Oversold (30)" />
           <NumInput label="Dip toleransı" value={fgTol} onChange={setFgTol} hint="İkili/üçlü dip FG seviye farkı (8)" />
-          <NumInput label="RSI-FG toleransı" value={fgRtol} onChange={setFgRtol} hint="AL: RSI 30↑ ve FG ≤ 30+tol; SAT: RSI 70↓ ve FG ≥ 70−tol (3)" />
-          <NumInput label="Kombo penceresi" value={fgCw} onChange={setFgCw} hint="Korku+RSI ile ikili/üçlü yapı arası en fazla mum (10)" />
+          <NumInput label="Kombo penceresi" value={fgCw} onChange={setFgCw} hint="RSI 30↑/70↓ ile ikili/üçlü yapı arası en fazla mum (10)" />
         </div>
         <div className="flex flex-wrap gap-1">
           {ALL_FEAR_GREED_CONDS.map((id) => (
