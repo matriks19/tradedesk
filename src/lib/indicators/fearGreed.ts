@@ -25,12 +25,12 @@ export const FEAR_GREED_COND_LABEL: Record<FearGreedCond, string> = {
   fg_t3bb: "Üçlü tepe + 3. BB üst dokunuş",
   fg_xf: "Aşırı Korku 30↓",
   fg_xg: "Aşırı Açgözlülük 70↑",
-  fg_ra: "Korku≤30 → RSI 30↑",
-  fg_rs: "Açgözlülük≥70 → RSI 70↓",
-  fg_rad: "Korku+RSI + İkili/Üçlü dip",
-  fg_rst: "Açgözlülük+RSI + İkili/Üçlü tepe",
-  fg_radb: "Korku+RSI + dip BB dokunuş",
-  fg_rstb: "Açgözlülük+RSI + tepe BB dokunuş",
+  fg_ra: "RSI 30↑ AL",
+  fg_rs: "RSI 70↓ SAT",
+  fg_rad: "RSI 30↑ + İkili/Üçlü dip",
+  fg_rst: "RSI 70↓ + İkili/Üçlü tepe",
+  fg_radb: "RSI 30↑ + dip BB dokunuş",
+  fg_rstb: "RSI 70↓ + tepe BB dokunuş",
 };
 const PV = 5;
 const RANGE_UPPER = 60;
@@ -151,17 +151,17 @@ export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null, 
   };
   walk(pl, true);
   walk(ph, false);
-  // RSI(14) kesişimi + FG bölgesi (FG ≤ os+rtol / ≥ ob−rtol); kombolar: son cw mumda ikili/üçlü yapı (veya BB versiyonu)
+  // RSI(14) 30↑ AL / 70↓ SAT (FG şartı yok); kombolar: son cw mumda ikili/üçlü yapı (veya BB versiyonu)
   const anyIn = (keys: FearGreedCond[], i: number) => { for (let y = Math.max(0, i - o.cw); y <= i; y++) for (const k of keys) if (ev[k][y]) return true; return false; };
   for (let i = 1; i < n; i++) {
-    const r0 = rsi[i - 1]!, r1 = rsi[i]!, f = fg[i]!;
-    if (!Number.isFinite(r0) || !Number.isFinite(r1) || !Number.isFinite(f)) continue;
-    if (r0 < 30 && r1 >= 30 && f <= o.os + o.rtol) {
+    const r0 = rsi[i - 1]!, r1 = rsi[i]!;
+    if (!Number.isFinite(r0) || !Number.isFinite(r1)) continue;
+    if (r0 < 30 && r1 >= 30) {
       ev.fg_ra[i] = true;
       if (anyIn(["fg_d2", "fg_d3"], i)) ev.fg_rad[i] = true;
       if (anyIn(["fg_d2bb", "fg_d3bb"], i)) ev.fg_radb[i] = true;
     }
-    if (r0 > 70 && r1 <= 70 && f >= o.ob - o.rtol) {
+    if (r0 > 70 && r1 <= 70) {
       ev.fg_rs[i] = true;
       if (anyIn(["fg_t2", "fg_t3"], i)) ev.fg_rst[i] = true;
       if (anyIn(["fg_t2bb", "fg_t3bb"], i)) ev.fg_rstb[i] = true;
