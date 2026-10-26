@@ -8,10 +8,10 @@ import { lastClosedIndex } from "./eliziLdr4";
 
 export type FearGreedParams = { rsi?: number; trd?: number; flow?: number; ob?: number; os?: number; tol?: number };
 export const FEAR_GREED_DEFAULTS = { rsi: 14, trd: 50, flow: 20, ob: 70, os: 30, tol: 8 };
-export type FearGreedCond = "fg_pd" | "fg_nd" | "fg_d2" | "fg_d3" | "fg_t2" | "fg_t3" | "fg_xf" | "fg_xg";
-export const ALL_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_xf", "fg_xg"];
-export const DEFAULT_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3"];
-export const FEAR_GREED_BEAR_CONDS = new Set<FearGreedCond>(["fg_nd", "fg_t2", "fg_t3", "fg_xg"]);
+export type FearGreedCond = "fg_pd" | "fg_nd" | "fg_d2" | "fg_d3" | "fg_t2" | "fg_t3" | "fg_xf" | "fg_xg" | "fg_d2bb" | "fg_t2bb";
+export const ALL_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_t2bb", "fg_xf", "fg_xg"];
+export const DEFAULT_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb"];
+export const FEAR_GREED_BEAR_CONDS = new Set<FearGreedCond>(["fg_nd", "fg_t2", "fg_t3", "fg_t2bb", "fg_xg"]);
 export const FEAR_GREED_COND_LABEL: Record<FearGreedCond, string> = {
   fg_pd: "Pozitif uyumsuzluk",
   fg_nd: "Negatif uyumsuzluk",
@@ -19,6 +19,8 @@ export const FEAR_GREED_COND_LABEL: Record<FearGreedCond, string> = {
   fg_d3: "Üçlü dip",
   fg_t2: "İkili tepe",
   fg_t3: "Üçlü tepe",
+  fg_d2bb: "İkili dip + 2. BB alt dokunuş",
+  fg_t2bb: "İkili tepe + 2. BB üst dokunuş",
   fg_xf: "Aşırı Korku 30↓",
   fg_xg: "Aşırı Açgözlülük 70↑",
 };
@@ -58,6 +60,21 @@ export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null) 
   }
   const ev: Record<FearGreedCond, boolean[]> = {} as Record<FearGreedCond, boolean[]>;
   for (const c of ALL_FEAR_GREED_CONDS) ev[c] = new Array<boolean>(n).fill(false);
+  // BB(20,2) fiyat bantları — 2. dokunuş epizodu için
+  const bU = new Array<number>(n).fill(NaN), bL = new Array<number>(n).fill(NaN);
+  for (let i = 19; i < n; i++) {
+    let s0 = 0, q0 = 0; for (let j = i - 19; j <= i; j++) { s0 += C[j]!; q0 += C[j]! * C[j]!; }
+    const m0 = s0 / 20, sd0 = Math.sqrt(Math.max(q0 / 20 - m0 * m0, 0)); bU[i] = m0 + 2 * sd0; bL[i] = m0 - 2 * sd0;
+  }
+  const tch = (x: number, low: boolean) => (low ? Lw[x]! <= bL[x]! : H[x]! >= bU[x]!);
+  const near = (x: number, low: boolean, hiLim: number) => { for (let y = Math.max(0, x - PV); y <= Math.min(hiLim, x + PV); y++) if (tch(y, low)) return y; return -1; };
+  /** 1. dip civarında dokunuş, araya dokunmayan mum, 2. dip civarında yeni dokunuş (tepe: üst bant). */
+  const bb2 = (f0: number, pv: number, c: number, low: boolean) => {
+    const a = near(f0, low, pv - 1), b = near(pv, low, c);
+    if (a < 0 || b < 0 || b <= a) return false;
+    for (let y = a + 1; y < b; y++) if (!tch(y, low)) return true;
+    return false;
+  };
   let lastG = -99, lastF = -99;
   for (let i = 1; i < n; i++) {
     if (!Number.isFinite(fg[i]!) || !Number.isFinite(fg[i - 1]!)) continue;
@@ -95,6 +112,7 @@ export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null) 
       const lvl = low ? fg[pv]! >= fg[f0]! - 1 : fg[pv]! <= fg[f0]! + 1;
       const pc = low ? C[c]! > C[pv]! : C[c]! < C[pv]!;
       if (!lvl || !pc) continue;
+      if (bb2(f0, pv, c, low)) ev[low ? "fg_d2bb" : "fg_t2bb"][c] = true;
       if (m.length >= 2) ev[low ? "fg_d3" : "fg_t3"][c] = true;
       else ev[low ? "fg_d2" : "fg_t2"][c] = true;
     }
