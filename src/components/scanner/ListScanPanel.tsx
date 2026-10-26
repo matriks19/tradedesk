@@ -140,6 +140,12 @@ import {
   jfkpsMinBars,
   DEFAULT_MDO_CONDS,
   ALL_MDO_CONDS,
+  DEFAULT_FEAR_GREED_CONDS,
+  ALL_FEAR_GREED_CONDS,
+  FEAR_GREED_COND_LABEL,
+  FEAR_GREED_DEFAULTS,
+  fearGreedMinBars,
+  type FearGreedCond,
   MDO_COND_LABEL,
   MDO_DEFAULTS,
   mdoMinBars,
@@ -942,6 +948,14 @@ export function ListScanPanel() {
   const [tpCool, setTpCool] = useState<number>(TPRSI_DEFAULTS.cool);
   const [tpBb, setTpBb] = useState<number>(TPRSI_DEFAULTS.bb);
   const [mdoOn, setMdoOn] = useState(false);
+  const [fgOn, setFgOn] = useState(false);
+  const [fgConds, setFgConds] = useState<FearGreedCond[]>([...DEFAULT_FEAR_GREED_CONDS]);
+  const [fgRsi, setFgRsi] = useState<number>(FEAR_GREED_DEFAULTS.rsi);
+  const [fgTrd, setFgTrd] = useState<number>(FEAR_GREED_DEFAULTS.trd);
+  const [fgFlow, setFgFlow] = useState<number>(FEAR_GREED_DEFAULTS.flow);
+  const [fgOb, setFgOb] = useState<number>(FEAR_GREED_DEFAULTS.ob);
+  const [fgOs, setFgOs] = useState<number>(FEAR_GREED_DEFAULTS.os);
+  const [fgTol, setFgTol] = useState<number>(FEAR_GREED_DEFAULTS.tol);
   const [mdoConds, setMdoConds] = useState<MdoCond[]>([...DEFAULT_MDO_CONDS]);
   const [mdoLen, setMdoLen] = useState<number>(MDO_DEFAULTS.len);
   const [mdoMom, setMdoMom] = useState<number>(MDO_DEFAULTS.mom);
@@ -1393,6 +1407,11 @@ export function ListScanPanel() {
         conds: mdoConds,
         params: { len: Number(mdoLen) || 100, mom: Number(mdoMom) || 70, bb: Number(mdoBb) || 100, mult: Number(mdoMult) || 1, st: Number(mdoSt) || 27, x: Number(mdoX) || 15, jl: Number(mdoJl) || 9, phase: Number(mdoPh) || 0 },
       },
+      fearGreed: {
+        enabled: fgOn,
+        conds: fgConds,
+        params: { rsi: Number(fgRsi) || 14, trd: Number(fgTrd) || 50, flow: Number(fgFlow) || 20, ob: Number(fgOb) || 70, os: Number(fgOs) || 30, tol: Number(fgTol) || 8 },
+      },
       tprsi: { enabled: tpOn, conds: tpConds, params: { gamma: Math.max(0.05, Math.min(0.95, Number(tpGamma) || 0.5)), minScore: Math.max(0, Math.min(5, Math.round(Number(tpMin)))), cool: Math.max(0, Math.round(Number(tpCool) || 0)), bb: Math.max(2, Math.round(Number(tpBb) || 50)) } },
       jfkps: {
         enabled: jfOn,
@@ -1612,6 +1631,14 @@ export function ListScanPanel() {
     mdoX,
     mdoJl,
     mdoPh,
+    fgOn,
+    fgConds,
+    fgRsi,
+    fgTrd,
+    fgFlow,
+    fgOb,
+    fgOs,
+    fgTol,
     jfLen,
     jfX,
     jfSm,
@@ -1675,7 +1702,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1834,7 +1861,9 @@ export function ListScanPanel() {
             const minBars2 = useE3 ? Math.max(minBars1, ema30BandMinBars(cfg.ema30Band?.params)) : minBars1;
             const minBars3a = cfg.jfkps?.enabled ? Math.max(minBars2, jfkpsMinBars(cfg.jfkps?.params)) : minBars2;
             const minBars3 = cfg.tprsi?.enabled ? Math.max(minBars3a, tprsiMinBars(cfg.tprsi?.params)) : minBars3a;
-            const minBars = cfg.mdo?.enabled ? Math.max(minBars3, mdoMinBars(cfg.mdo?.params)) : minBars3;
+            const minBars4 = cfg.mdo?.enabled ? Math.max(minBars3, mdoMinBars(cfg.mdo?.params)) : minBars3;
+            // Fear & Greed: uyumsuzluk/ikili-üçlü dip için ≥50 mum geçmiş
+            const minBars = cfg.fearGreed?.enabled ? Math.max(minBars4, fearGreedMinBars(cfg.fearGreed?.params) + 50) : minBars4;
             const klineLimitE0 = useEld ? Math.max(klineLimit, eliziLdr4FetchLimit(cfg.eliziLdr4?.params)) : klineLimit;
             // EMA30 Band: durum makinesi geçmişe bağlı → 1000 mum
             const klineLimitE1 = useE3 ? Math.max(klineLimitE0, EMA30_BAND_FETCH_LIMIT) : klineLimitE0;
@@ -1984,6 +2013,7 @@ export function ListScanPanel() {
         const n = out.filter((h) => h.kind === "mdo").length;
         byKind.push(`mdo ${n}`);
       }
+      if (cfgDone.fearGreed?.enabled) byKind.push(`fearGreed ${out.filter((h) => h.kind === "fearGreed").length}`);
       if (cfgDone.tprsi?.enabled) byKind.push(`tprsi ${out.filter((h) => h.kind === "tprsi").length}`);
       if (cfgDone.jfkps?.enabled) {
         const n = out.filter((h) => h.kind === "jfkps").length;
@@ -2033,6 +2063,7 @@ export function ListScanPanel() {
         cfgDone.jfkps?.enabled,
         cfgDone.tprsi?.enabled,
         cfgDone.mdo?.enabled,
+        cfgDone.fearGreed?.enabled,
         cfgDone.pine?.enabled,
       ].filter(Boolean).length;
       const hepsiWarn =
@@ -2065,7 +2096,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "fearGreed">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -2129,10 +2160,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !jfOn && !tpOn && !mdoOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !jfOn && !tpOn && !mdoOn && !fgOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, mdoOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, mdoOn, fgOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -2206,7 +2237,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2484,6 +2515,24 @@ export function ListScanPanel() {
           expiresAt: Date.now() + 24 * 3600_000,
           intervalMin: 15,
           scanPrimed: false,
+        });
+        continue;
+      }
+      if (h.kind === "fearGreed") {
+        const c = cfg.fearGreed;
+        items.push({
+          symbol: h.symbol,
+          exchange: h.exchange,
+          condition: "cross_above",
+          price: 0,
+          note: h.note,
+          kind: "scan",
+          group: "Fear & Greed",
+          scanKey: "list_scan",
+          scanPayload: { matchMode: "any", fearGreed: { enabled: true, conds: [h.cond as FearGreedCond], params: { ...(c?.params ?? {}) } } },
+          timeframe: tf,
+          repeat: "once",
+          expiresAt: Date.now() + 24 * 3600_000,
         });
         continue;
       }
@@ -2922,10 +2971,11 @@ export function ListScanPanel() {
     if (jfOn) names.push("JFKPS");
     if (tpOn) names.push("TP RSI");
     if (mdoOn) names.push("MDO");
+    if (fgOn) names.push("Fear & Greed");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, mdoOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -4083,6 +4133,41 @@ export function ListScanPanel() {
               onClick={() => {
                 if (!mdoOn) { setMdoOn(true); setMatchMode("any"); setMdoConds((a) => ensureCond(a, id)); }
                 else setMdoConds((a) => toggleCondKeepOne(a, id));
+              }}
+            />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="T47 · Fear & Greed (BigBeluga)"
+        enabled={fgOn}
+        onToggle={() => { if (fgOn) setFgOn(false); else { setFgOn(true); setMatchMode("any"); } }}
+        open={openCard === "fearGreed"}
+        onOpen={() => setOpenCard((c) => (c === "fearGreed" ? null : "fearGreed"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          FG = (RSI + Trend(SMA uzaklığı×4) + Hacim akışı)/3 · 70 aşırı açgözlülük · 55 · 45 · 30 aşırı korku · uyumsuzluk pivot 5/5 (5–60 mum) ·
+          ikili/üçlü dip: korku bölgesinde (≤45) benzer seviyede FG dipleri + fiyat teyidi (tepe tersi) · kapanmış mum · ≥{fearGreedMinBars({ rsi: fgRsi, trd: fgTrd, flow: fgFlow }) + 50} mum · QUANTEX T47 ile aynı matematik
+        </p>
+        <div className="grid grid-cols-3 gap-1">
+          <NumInput label="RSI" value={fgRsi} onChange={setFgRsi} hint="Momentum (RSI) uzunluğu (14)" />
+          <NumInput label="Trend SMA" value={fgTrd} onChange={setFgTrd} hint="Trend (SMA) uzunluğu (50)" />
+          <NumInput label="Hacim akışı" value={fgFlow} onChange={setFgFlow} hint="Hacim akışı uzunluğu (20)" />
+          <NumInput label="Aşırı açgözlülük" value={fgOb} onChange={setFgOb} hint="Overbought (70)" />
+          <NumInput label="Aşırı korku" value={fgOs} onChange={setFgOs} hint="Oversold (30)" />
+          <NumInput label="Dip toleransı" value={fgTol} onChange={setFgTol} hint="İkili/üçlü dip FG seviye farkı (8)" />
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {ALL_FEAR_GREED_CONDS.map((id) => (
+            <Chip
+              key={id}
+              title={FEAR_GREED_COND_LABEL[id]}
+              active={fgConds.includes(id)}
+              label={FEAR_GREED_COND_LABEL[id]}
+              onClick={() => {
+                if (!fgOn) { setFgOn(true); setMatchMode("any"); setFgConds((a) => ensureCond(a, id)); }
+                else setFgConds((a) => toggleCondKeepOne(a, id));
               }}
             />
           ))}
