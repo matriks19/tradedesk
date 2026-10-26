@@ -6,12 +6,12 @@
 import type { Candle } from "@/lib/types";
 import { lastClosedIndex } from "./eliziLdr4";
 
-export type FearGreedParams = { rsi?: number; trd?: number; flow?: number; ob?: number; os?: number; tol?: number };
-export const FEAR_GREED_DEFAULTS = { rsi: 14, trd: 50, flow: 20, ob: 70, os: 30, tol: 8 };
-export type FearGreedCond = "fg_pd" | "fg_nd" | "fg_d2" | "fg_d3" | "fg_t2" | "fg_t3" | "fg_xf" | "fg_xg" | "fg_d2bb" | "fg_t2bb" | "fg_d3bb" | "fg_t3bb";
-export const ALL_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_t2bb", "fg_d3bb", "fg_t3bb", "fg_xf", "fg_xg"];
-export const DEFAULT_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_d3bb"];
-export const FEAR_GREED_BEAR_CONDS = new Set<FearGreedCond>(["fg_nd", "fg_t2", "fg_t3", "fg_t2bb", "fg_t3bb", "fg_xg"]);
+export type FearGreedParams = { rsi?: number; trd?: number; flow?: number; ob?: number; os?: number; tol?: number; rtol?: number; cw?: number };
+export const FEAR_GREED_DEFAULTS = { rsi: 14, trd: 50, flow: 20, ob: 70, os: 30, tol: 8, rtol: 3, cw: 10 };
+export type FearGreedCond = "fg_pd" | "fg_nd" | "fg_d2" | "fg_d3" | "fg_t2" | "fg_t3" | "fg_xf" | "fg_xg" | "fg_d2bb" | "fg_t2bb" | "fg_d3bb" | "fg_t3bb" | "fg_ra" | "fg_rs" | "fg_rad" | "fg_rst" | "fg_radb" | "fg_rstb";
+export const ALL_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_t2bb", "fg_d3bb", "fg_t3bb", "fg_xf", "fg_xg", "fg_ra", "fg_rs", "fg_rad", "fg_rst", "fg_radb", "fg_rstb"];
+export const DEFAULT_FEAR_GREED_CONDS: FearGreedCond[] = ["fg_pd", "fg_nd", "fg_d2", "fg_d3", "fg_t2", "fg_t3", "fg_d2bb", "fg_d3bb", "fg_ra", "fg_rad", "fg_radb"];
+export const FEAR_GREED_BEAR_CONDS = new Set<FearGreedCond>(["fg_nd", "fg_t2", "fg_t3", "fg_t2bb", "fg_t3bb", "fg_xg", "fg_rs", "fg_rst", "fg_rstb"]);
 export const FEAR_GREED_COND_LABEL: Record<FearGreedCond, string> = {
   fg_pd: "Pozitif uyumsuzluk",
   fg_nd: "Negatif uyumsuzluk",
@@ -25,6 +25,12 @@ export const FEAR_GREED_COND_LABEL: Record<FearGreedCond, string> = {
   fg_t3bb: "Üçlü tepe + 3. BB üst dokunuş",
   fg_xf: "Aşırı Korku 30↓",
   fg_xg: "Aşırı Açgözlülük 70↑",
+  fg_ra: "Korku≤30 → RSI 30↑",
+  fg_rs: "Açgözlülük≥70 → RSI 70↓",
+  fg_rad: "Korku+RSI + İkili/Üçlü dip",
+  fg_rst: "Açgözlülük+RSI + İkili/Üçlü tepe",
+  fg_radb: "Korku+RSI + dip BB dokunuş",
+  fg_rstb: "Açgözlülük+RSI + tepe BB dokunuş",
 };
 const PV = 5;
 const RANGE_UPPER = 60;
@@ -34,6 +40,7 @@ function opts(p?: FearGreedParams | null) {
   return {
     rsi: Math.round(g(p?.rsi, 14)), trd: Math.round(g(p?.trd, 50)), flow: Math.round(g(p?.flow, 20)),
     ob: g(p?.ob, 70), os: g(p?.os, 30), tol: g(p?.tol, 8),
+    rtol: Number.isFinite(Number(p?.rtol)) && Number(p?.rtol) >= 0 ? Number(p?.rtol) : 3, cw: Math.round(g(p?.cw, 10)),
   };
 }
 export function fearGreedMinBars(p?: FearGreedParams | null): number {
@@ -144,6 +151,22 @@ export function computeFearGreed(candles: Candle[], p?: FearGreedParams | null, 
   };
   walk(pl, true);
   walk(ph, false);
+  // RSI(14) kesişimi + FG bölgesi (FG ≤ os+rtol / ≥ ob−rtol); kombolar: son cw mumda ikili/üçlü yapı (veya BB versiyonu)
+  const anyIn = (keys: FearGreedCond[], i: number) => { for (let y = Math.max(0, i - o.cw); y <= i; y++) for (const k of keys) if (ev[k][y]) return true; return false; };
+  for (let i = 1; i < n; i++) {
+    const r0 = rsi[i - 1]!, r1 = rsi[i]!, f = fg[i]!;
+    if (!Number.isFinite(r0) || !Number.isFinite(r1) || !Number.isFinite(f)) continue;
+    if (r0 < 30 && r1 >= 30 && f <= o.os + o.rtol) {
+      ev.fg_ra[i] = true;
+      if (anyIn(["fg_d2", "fg_d3"], i)) ev.fg_rad[i] = true;
+      if (anyIn(["fg_d2bb", "fg_d3bb"], i)) ev.fg_radb[i] = true;
+    }
+    if (r0 > 70 && r1 <= 70 && f >= o.ob - o.rtol) {
+      ev.fg_rs[i] = true;
+      if (anyIn(["fg_t2", "fg_t3"], i)) ev.fg_rst[i] = true;
+      if (anyIn(["fg_t2bb", "fg_t3bb"], i)) ev.fg_rstb[i] = true;
+    }
+  }
   return { n, need: fearGreedMinBars(p), fg, ob: o.ob, os: o.os, ev };
 }
 
