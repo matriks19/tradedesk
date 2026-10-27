@@ -30,7 +30,7 @@ const cfg: Cfg = JSON.parse(fs.readFileSync(path.join(DIR, "config.json"), "utf8
 const STATE_FILE = process.env.STATE_FILE || path.join(DIR, "state.json");
 const DRY = process.env.PAPER_DRY === "1";
 const EV_TD: Record<string, { n: number; ev: number; oos: number }> = JSON.parse(fs.readFileSync(path.join(DIR, "ev_td.json"), "utf8"));
-const TF_MS: Record<string, number> = { "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5, "4h": 144e5 };
+const TF_MS: Record<string, number> = { "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5, "4h": 144e5, "1d": 864e5 };
 
 // ---------- Binance: 4 req/s queue + 418/429 back-off + endpoint fallback ----------
 let lastReq = 0, banUntil = 0, reqCount = 0;
