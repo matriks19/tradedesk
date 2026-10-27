@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
-// fapi.binance.com ABD bölgelerinden 451 döner → Frankfurt'ta çalıştır.
-export const preferredRegion = ["fra1"];
+// fapi.binance.com ABD bölgelerinden 451 döner. Node fonksiyonları (Hobby) iad1'de kalıyor →
+// Edge runtime + bölge sabitleme (fra1/arn1) ile Avrupa'dan çağır.
+export const runtime = "edge";
+export const preferredRegion = ["fra1", "arn1", "cdg1"];
 
 /** Binance top-trader L/S POSITION oranı proxy'si (salt okunur, anahtar yok).
  *  GET /api/lsratio?symbol=BTCUSDT&period=4h → Binance /futures/data/topLongShortPositionRatio biçimi. */
@@ -21,8 +23,9 @@ export async function GET(req: NextRequest) {
       const r = await fetch(`${h}/futures/data/topLongShortPositionRatio?symbol=${sym}&period=${period}&limit=${lim}`, { cache: "no-store", signal: AbortSignal.timeout(8000) });
       if (r.ok) return NextResponse.json(await r.json(), { headers: { "cache-control": "s-maxage=300", "x-qx-src": h } });
       errs.push(`${h} ${r.status}`);
+      if (r.status === 451) continue;
       if (r.status === 400) break; // sembol yok
     } catch (e) { errs.push(`${h} ${(e as Error).message}`); }
   }
-  return NextResponse.json({ error: "lsratio-unavailable", detail: errs }, { status: 503, headers: { "cache-control": "no-store" } });
+  return NextResponse.json({ error: "lsratio-unavailable", detail: errs, region: process.env.VERCEL_REGION || "?" }, { status: 503, headers: { "cache-control": "no-store" } });
 }
