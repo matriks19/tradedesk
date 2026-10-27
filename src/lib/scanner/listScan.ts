@@ -86,6 +86,7 @@ import {
   type JfkpsCond,
   type JfkpsParams,
 } from "@/lib/indicators/jfkps";
+import { kalHibritScan, DEFAULT_KAL_HIBRIT_CONDS, KAL_HIBRIT_BEAR_CONDS, type KalHibritCond } from "@/lib/indicators/kalHibrit";
 import { tprsiScan, DEFAULT_TPRSI_CONDS, TPRSI_BEAR_CONDS, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
 export { DEFAULT_MDO_CONDS, ALL_MDO_CONDS, MDO_COND_LABEL, MDO_DEFAULTS, mdoMinBars, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
 export { DEFAULT_FEAR_GREED_CONDS, ALL_FEAR_GREED_CONDS, FEAR_GREED_COND_LABEL, FEAR_GREED_DEFAULTS, fearGreedMinBars, type FearGreedCond, type FearGreedParams } from "@/lib/indicators/fearGreed";
@@ -579,6 +580,7 @@ export type ListScanKind =
   | "fractal8"
   | "jfkps"
   | "tprsi"
+  | "kalHibrit"
   | "mdo"
   | "fearGreed"
   | "pine";
@@ -940,6 +942,7 @@ export type ListScanConfig = {
   /** T31 JFKPS (Loxx) — L/S kesişimleri + trend durumu, kapanmış mum. */
   /** T45 TP RSI (TrendlineProject) — Laguerre RSI + BB re-entry motoru, kapanmış mum. */
   tprsi?: { enabled: boolean; conds: TprsiCond[]; params?: TprsiParams };
+  kalHibrit?: { enabled: boolean; conds: KalHibritCond[]; tf?: string };
   jfkps?: {
     enabled: boolean;
     conds: JfkpsCond[];
@@ -2526,6 +2529,14 @@ function scanFearGreed(candles: Candle[], cfg: NonNullable<ListScanConfig["fearG
   }));
 }
 
+function scanKalHibrit(candles: Candle[], cfg: NonNullable<ListScanConfig["kalHibrit"]>, maxBarsAgo: number): ListScanHit[] {
+  if (!cfg.enabled) return [];
+  const conds = cfg.conds.length ? cfg.conds : DEFAULT_KAL_HIBRIT_CONDS;
+  return kalHibritScan(candles, conds, maxBarsAgo).map((h) => ({
+    kind: "kalHibrit" as const, cond: h.cond, bias: KAL_HIBRIT_BEAR_CONDS.has(h.cond) ? ("bear" as const) : ("bull" as const), barsAgo: h.barsAgo, note: h.note,
+  }));
+}
+
 function scanTprsi(candles: Candle[], cfg: NonNullable<ListScanConfig["tprsi"]>, maxBarsAgo: number): ListScanHit[] {
   if (!cfg.enabled) return [];
   const conds = cfg.conds.length ? cfg.conds : DEFAULT_TPRSI_CONDS;
@@ -2609,6 +2620,7 @@ export function scanSymbol(
   if (cfg.fractal8?.enabled) enabledKinds.push("fractal8");
   if (cfg.jfkps?.enabled) enabledKinds.push("jfkps");
   if (cfg.tprsi?.enabled) enabledKinds.push("tprsi");
+  if (cfg.kalHibrit?.enabled) enabledKinds.push("kalHibrit");
   if (cfg.mdo?.enabled) enabledKinds.push("mdo");
   if (cfg.fearGreed?.enabled) enabledKinds.push("fearGreed");
   if (cfg.pine?.enabled && cfg.pine.scripts.length) enabledKinds.push("pine");
@@ -2640,6 +2652,7 @@ export function scanSymbol(
     fractal8: cfg.fractal8 ? scanFractal8(candles, cfg.fractal8, maxBarsAgo) : [],
     jfkps: cfg.jfkps ? scanJfkps(candles, cfg.jfkps, maxBarsAgo) : [],
     tprsi: cfg.tprsi ? scanTprsi(candles, cfg.tprsi, maxBarsAgo) : [],
+    kalHibrit: cfg.kalHibrit ? scanKalHibrit(candles, cfg.kalHibrit, maxBarsAgo) : [],
     mdo: cfg.mdo ? scanMdo(candles, cfg.mdo, maxBarsAgo) : [],
     fearGreed: cfg.fearGreed ? scanFearGreed(candles, cfg.fearGreed, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
@@ -3078,7 +3091,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "fearGreed">,
+  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "fearGreed">,
   | "hamJurikTpo"
   | "diagonalSr"
   | "macd"
@@ -3246,3 +3259,4 @@ export {
 } from "@/lib/indicators/jfkps";
 
 export { DEFAULT_TPRSI_CONDS, ALL_TPRSI_CONDS, TPRSI_COND_LABEL, TPRSI_DEFAULTS, tprsiMinBars, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
+export { DEFAULT_KAL_HIBRIT_CONDS, ALL_KAL_HIBRIT_CONDS, KAL_HIBRIT_COND_LABEL, KAL_HIBRIT_MIN_BARS, KAL_HIBRIT_FETCH_LIMIT, type KalHibritCond } from "@/lib/indicators/kalHibrit";

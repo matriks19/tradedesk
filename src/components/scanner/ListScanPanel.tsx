@@ -131,6 +131,12 @@ import {
   ALL_JFKPS_CONDS,
   JFKPS_COND_LABEL,
   ALL_TPRSI_CONDS,
+  ALL_KAL_HIBRIT_CONDS,
+  DEFAULT_KAL_HIBRIT_CONDS,
+  KAL_HIBRIT_COND_LABEL,
+  KAL_HIBRIT_MIN_BARS,
+  KAL_HIBRIT_FETCH_LIMIT,
+  type KalHibritCond,
   DEFAULT_TPRSI_CONDS,
   TPRSI_COND_LABEL,
   TPRSI_DEFAULTS,
@@ -942,6 +948,9 @@ export function ListScanPanel() {
   const [fr8On, setFr8On] = useState(false);
   const [jfOn, setJfOn] = useState(false);
   const [tpOn, setTpOn] = useState(false);
+  const [kalOn, setKalOn] = useState(false);
+  const [kalConds, setKalConds] = useState<KalHibritCond[]>([...DEFAULT_KAL_HIBRIT_CONDS]);
+  const [kalTf, setKalTf] = useState<Timeframe>("1d");
   const [tpConds, setTpConds] = useState<TprsiCond[]>([...DEFAULT_TPRSI_CONDS]);
   const [tpGamma, setTpGamma] = useState<number>(TPRSI_DEFAULTS.gamma);
   const [tpMin, setTpMin] = useState<number>(TPRSI_DEFAULTS.minScore);
@@ -1414,6 +1423,7 @@ export function ListScanPanel() {
         conds: fgConds,
         params: { rsi: Number(fgRsi) || 14, trd: Number(fgTrd) || 50, flow: Number(fgFlow) || 20, ob: Number(fgOb) || 70, os: Number(fgOs) || 30, tol: Number(fgTol) || 8, rtol: Number.isFinite(Number(fgRtol)) && Number(fgRtol) >= 0 ? Number(fgRtol) : 3, cw: Number(fgCw) || 10 },
       },
+      kalHibrit: { enabled: kalOn, conds: kalConds, tf: kalTf },
       tprsi: { enabled: tpOn, conds: tpConds, params: { gamma: Math.max(0.05, Math.min(0.95, Number(tpGamma) || 0.5)), minScore: Math.max(0, Math.min(5, Math.round(Number(tpMin)))), cool: Math.max(0, Math.round(Number(tpCool) || 0)), bb: Math.max(2, Math.round(Number(tpBb) || 50)) } },
       jfkps: {
         enabled: jfOn,
@@ -1618,6 +1628,9 @@ export function ListScanPanel() {
     jfOn,
     jfConds,
     tpOn,
+    kalOn,
+    kalConds,
+    kalTf,
     tpConds,
     tpGamma,
     tpMin,
@@ -1706,7 +1719,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1796,7 +1809,9 @@ export function ListScanPanel() {
               ? String(cfg.hull.tf)
               : useMultiDip && cfg.multiDip?.tf
                 ? String(cfg.multiDip.tf)
-                : tf;
+                : cfg.kalHibrit?.enabled && cfg.kalHibrit.tf
+                  ? String(cfg.kalHibrit.tf)
+                  : tf;
             // Warmup via klineLimit/minBars; edge lookback stays UI maxBars (default 2)
             const klineLimit = useHull
               ? DOKTOR_HULL_FETCH_LIMIT
@@ -1864,7 +1879,8 @@ export function ListScanPanel() {
             const minBars1 = useEld ? Math.max(minBars0, eliziLdr4MinBars(cfg.eliziLdr4?.params) + 1) : minBars0;
             const minBars2 = useE3 ? Math.max(minBars1, ema30BandMinBars(cfg.ema30Band?.params)) : minBars1;
             const minBars3a = cfg.jfkps?.enabled ? Math.max(minBars2, jfkpsMinBars(cfg.jfkps?.params)) : minBars2;
-            const minBars3 = cfg.tprsi?.enabled ? Math.max(minBars3a, tprsiMinBars(cfg.tprsi?.params)) : minBars3a;
+            const minBars3b = cfg.tprsi?.enabled ? Math.max(minBars3a, tprsiMinBars(cfg.tprsi?.params)) : minBars3a;
+            const minBars3 = cfg.kalHibrit?.enabled ? Math.max(minBars3b, KAL_HIBRIT_MIN_BARS) : minBars3b;
             const minBars4 = cfg.mdo?.enabled ? Math.max(minBars3, mdoMinBars(cfg.mdo?.params)) : minBars3;
             // Fear & Greed: uyumsuzluk/ikili-üçlü dip için ≥50 mum geçmiş
             const minBars = cfg.fearGreed?.enabled ? Math.max(minBars4, fearGreedMinBars(cfg.fearGreed?.params) + 50) : minBars4;
@@ -1872,7 +1888,8 @@ export function ListScanPanel() {
             // EMA30 Band: durum makinesi geçmişe bağlı → 1000 mum
             const klineLimitE1 = useE3 ? Math.max(klineLimitE0, EMA30_BAND_FETCH_LIMIT) : klineLimitE0;
             // FRACTAL 8: uzun ısınma → 1000 mum
-            const klineLimitE = cfg.fractal8?.enabled || cfg.tprsi?.enabled ? Math.max(klineLimitE1, FRACTAL8_FETCH_LIMIT) : klineLimitE1;
+            const klineLimitE2 = cfg.fractal8?.enabled || cfg.tprsi?.enabled ? Math.max(klineLimitE1, FRACTAL8_FETCH_LIMIT) : klineLimitE1;
+            const klineLimitE = cfg.kalHibrit?.enabled ? Math.max(klineLimitE2, KAL_HIBRIT_FETCH_LIMIT) : klineLimitE2;
             // Trend filtresi: yalnız kripto; periyot tarama TF'sine göre (4s EMA200 eşdeğeri)
             const trendApplies = trendOn && trendFilterApplies(q.symbol, q.exchange, livePerpsRef.current?.tradfi);
             const trendPeriod = trendEmaPeriod(scanTf);
@@ -2018,6 +2035,7 @@ export function ListScanPanel() {
         byKind.push(`mdo ${n}`);
       }
       if (cfgDone.fearGreed?.enabled) byKind.push(`fearGreed ${out.filter((h) => h.kind === "fearGreed").length}`);
+      if (cfgDone.kalHibrit?.enabled) byKind.push(`kal ${out.filter((h) => h.kind === "kalHibrit").length}`);
       if (cfgDone.tprsi?.enabled) byKind.push(`tprsi ${out.filter((h) => h.kind === "tprsi").length}`);
       if (cfgDone.jfkps?.enabled) {
         const n = out.filter((h) => h.kind === "jfkps").length;
@@ -2066,6 +2084,7 @@ export function ListScanPanel() {
         cfgDone.fractal8?.enabled,
         cfgDone.jfkps?.enabled,
         cfgDone.tprsi?.enabled,
+        cfgDone.kalHibrit?.enabled,
         cfgDone.mdo?.enabled,
         cfgDone.fearGreed?.enabled,
         cfgDone.pine?.enabled,
@@ -2100,7 +2119,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "fearGreed">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "fearGreed">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -2164,10 +2183,10 @@ export function ListScanPanel() {
   );
 
   useEffect(() => {
-    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !jfOn && !tpOn && !mdoOn && !fgOn && !pineIds.length) return;
+    if (!hamOn && !diagOn && !macdOn && !stochOn && !diOn && !hullOn && !hamAoOn && !goldOn && !gold2On && !divScanOn && !multiDipOn && !bbDivLgOn && !obFallOn && !maSimpleOn && !kijunBbOn && !cmoOn && !pliDirOn && !pliDmiOn && !pliDtOn && !ppoDzOn && !eldOn && !e3On && !fr8On && !jfOn && !tpOn && !kalOn && !mdoOn && !fgOn && !pineIds.length) return;
     upsertIndicators(buildConfig());
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, mdoOn, fgOn, pineIds.join("|"), pane?.id]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, mdoOn, fgOn, pineIds.join("|"), pane?.id]);
 
   const onHitClick = useCallback(
     (row: ResultRow) => {
@@ -2241,7 +2260,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2557,6 +2576,12 @@ export function ListScanPanel() {
           expiresAt: Date.now() + 24 * 3600_000,
           intervalMin: 15,
         });
+        continue;
+      }
+      if (h.kind === "kalHibrit") {
+        items.push({ symbol: h.symbol, exchange: h.exchange, condition: "cross_above", price: 0, note: h.note, kind: "scan", group: "KAL Hibrit", scanKey: "list_scan",
+          scanPayload: { matchMode: "any", kalHibrit: { enabled: true, conds: [h.cond as KalHibritCond], tf: cfg.kalHibrit?.tf ?? kalTf } },
+          timeframe: (cfg.kalHibrit?.tf as Timeframe) || kalTf || tf, repeat: "once", expiresAt: Date.now() + 24 * 3600_000, intervalMin: 15, scanPrimed: false });
         continue;
       }
       if (h.kind === "tprsi") {
@@ -2974,12 +2999,13 @@ export function ListScanPanel() {
     if (fr8On) names.push("FRACTAL 8");
     if (jfOn) names.push("JFKPS");
     if (tpOn) names.push("TP RSI");
+    if (kalOn) names.push("KAL Hibrit");
     if (mdoOn) names.push("MDO");
     if (fgOn) names.push("Fear & Greed");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -4175,6 +4201,31 @@ export function ListScanPanel() {
                 else setFgConds((a) => toggleCondKeepOne(a, id));
               }}
             />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="KAL Hibrit (Korelasyon + EMA9 + Bant)"
+        enabled={kalOn}
+        onToggle={() => { if (kalOn) setKalOn(false); else { setKalOn(true); setMatchMode("any"); } }}
+        open={openCard === "kalHibrit"}
+        onOpen={() => setOpenCard((c) => (c === "kalHibrit" ? null : "kalHibrit"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          KAL = 0.7·corr(log fiyat, zaman, 14) + 0.3·corr(getiri, getiri[1], 14) → 0-100, EMA3 · sinyal EMA9 · histogram KAL−EMA9 · bant ort(50) ± 1.5σ ·
+          LONG alt bant ↑, SHORT üst bant ↓ · Bant Taşıma AL = alt banttan giriş, üst banda ulaşmamış aktif · Uyumsuzluk: fiyat düşük dip + KAL yüksek dip (≤50 mum) · ≥{KAL_HIBRIT_MIN_BARS} mum
+        </p>
+        <label className="text-2xs text-desk-muted flex flex-col gap-0.5">
+          Scanner TF
+          <select className="input text-2xs py-0.5" value={kalTf} onChange={(e) => setKalTf(e.target.value as Timeframe)}>
+            {TFS.map((t) => (<option key={t} value={t}>{t}</option>))}
+          </select>
+        </label>
+        <div className="flex flex-wrap gap-1">
+          {ALL_KAL_HIBRIT_CONDS.map((id) => (
+            <Chip key={id} title={KAL_HIBRIT_COND_LABEL[id]} active={kalConds.includes(id)} label={KAL_HIBRIT_COND_LABEL[id]}
+              onClick={() => { if (!kalOn) { setKalOn(true); setMatchMode("any"); setKalConds((a) => ensureCond(a, id)); } else setKalConds((a) => toggleCondKeepOne(a, id)); }} />
           ))}
         </div>
       </SectionCard>
