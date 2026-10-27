@@ -60,6 +60,15 @@
    "tp": 25
   },
   {
+   "id": "rsi-macd-1h",
+   "label": "RSI + MACD 1s",
+   "type": "rsimacd",
+   "tf": "1h",
+   "on": true,
+   "ev": false,
+   "exit": "sar"
+  },
+  {
    "id": "t150-pli-c3-4h",
    "label": "KOMBİN: PLI↑ + Bulut3− 4s",
    "type": "tpc",
