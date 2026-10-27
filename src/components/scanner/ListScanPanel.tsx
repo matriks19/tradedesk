@@ -136,6 +136,12 @@ import {
   DEFAULT_LS_DIV_MACD_CONDS,
   LS_DIV_MACD_COND_LABEL,
   lsDivMacdEval,
+  ALL_LS_BOT_CONDS,
+  DEFAULT_LS_BOT_CONDS,
+  LS_BOT_COND_LABEL,
+  LS_BOT_COND_TF,
+  lsBottomEval,
+  type LsBotCond,
   fetchLsRatio,
   type LsDivMacdCond,
   DEFAULT_KAL_HIBRIT_CONDS,
@@ -957,6 +963,8 @@ export function ListScanPanel() {
   const [kalOn, setKalOn] = useState(false);
   const [lsOn, setLsOn] = useState(false);
   const [lsConds, setLsConds] = useState<LsDivMacdCond[]>([...DEFAULT_LS_DIV_MACD_CONDS]);
+  const [lsbOn, setLsbOn] = useState(false);
+  const [lsbConds, setLsbConds] = useState<LsBotCond[]>([...DEFAULT_LS_BOT_CONDS]);
   const [kalConds, setKalConds] = useState<KalHibritCond[]>([...DEFAULT_KAL_HIBRIT_CONDS]);
   const [kalTf, setKalTf] = useState<Timeframe>("1d");
   const [tpConds, setTpConds] = useState<TprsiCond[]>([...DEFAULT_TPRSI_CONDS]);
@@ -1433,6 +1441,7 @@ export function ListScanPanel() {
       },
       kalHibrit: { enabled: kalOn, conds: kalConds, tf: kalTf },
       lsDiv: { enabled: lsOn, conds: lsConds },
+      lsBot: { enabled: lsbOn, conds: lsbConds },
       tprsi: { enabled: tpOn, conds: tpConds, params: { gamma: Math.max(0.05, Math.min(0.95, Number(tpGamma) || 0.5)), minScore: Math.max(0, Math.min(5, Math.round(Number(tpMin)))), cool: Math.max(0, Math.round(Number(tpCool) || 0)), bb: Math.max(2, Math.round(Number(tpBb) || 50)) } },
       jfkps: {
         enabled: jfOn,
@@ -1642,6 +1651,8 @@ export function ListScanPanel() {
     kalTf,
     lsOn,
     lsConds,
+    lsbOn,
+    lsbConds,
     tpConds,
     tpGamma,
     tpMin,
@@ -1730,7 +1741,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.lsBot?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1802,8 +1813,8 @@ export function ListScanPanel() {
                 ? AbortSignal.any([ac.signal, AbortSignal.timeout(klineMs)])
                 : ac.signal;
             // LS Uyumsuzluk + MACD: 4s perp + top-trader L/S POSITION (fapi, CORS açık; olmazsa /api/lsratio) + 1s perp
-            if (cfg.lsDiv?.enabled && q.exchange !== "bist") {
-              try {
+            if ((cfg.lsDiv?.enabled || cfg.lsBot?.enabled) && q.exchange !== "bist") {
+              if (cfg.lsDiv?.enabled) try {
                 const lsConds0 = cfg.lsDiv.conds.length ? cfg.lsDiv.conds : DEFAULT_LS_DIV_MACD_CONDS;
                 const ratio = await fetchLsRatio(q.symbol, async (u) => {
                   const url = u.startsWith("LOCAL") ? "/api/lsratio?" + u.split("?")[1] : u; // fapi engelliyse Vercel fra1 proxy
@@ -1822,7 +1833,7 @@ export function ListScanPanel() {
                   const seen = new Set<string>();
                   for (const e of evs) {
                     const fmtT = (t: number) => new Date(t * 1000).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
-                    const base = `${e.k === 3 ? "üçlü" : "ikili"} 4s L/S uyumsuzluk onay ${fmtT(e.confClose)} · dipler ${e.priceLows.map((x) => +x.toPrecision(6)).join(">")} · L/S ${e.ratioLows.map((x) => x.toFixed(3)).join("<")}`;
+                    const base = `${e.k === 3 ? "üçlü" : "ikili"} 4s L/S uyumsuzluk onay ${fmtT(e.confClose)} · fiyat dipleri ${e.pivots.map((t, i) => `${fmtT(t)} ${+e.priceLows[i].toPrecision(6)}`).join(" → ")} (alçalan) · L/S ${e.ratioLows.map((x) => x.toFixed(3)).join(" → ")} (yükselen)`;
                     let cond: LsDivMacdCond | null = null, ago = 0, note = "";
                     if (e.crossOpen !== null && e.crossAgo! <= lim) { cond = e.k === 3 ? "ls3_macd" : "ls2_macd"; ago = e.crossAgo!; note = `${base} · 1s MACD(50,100,200)↑ ${fmtT(e.crossOpen + 3600)} → LONG`; }
                     else if (e.k === 3 && e.crossOpen === null && !e.macdAbove) { cond = "ls3_wait"; ago = Math.round((Date.now() / 1000 - e.confClose) / 3600); note = `${base} · MACD sinyalin altında, kesişim bekleniyor (≤48s)`; }
@@ -1832,8 +1843,27 @@ export function ListScanPanel() {
                   }
                 }
               } catch { if (ac.signal.aborted) return null; /* L/S verisi yok → sembol atlanır */ }
+              // LS Dip Uyumsuzluğu (bottom.py BOT_RULES): 2s/4s perp + aynı periyotta L/S POSITION; onay son 2 kapanmış mumda
+              if (cfg.lsBot?.enabled) for (const cond of (cfg.lsBot.conds.length ? cfg.lsBot.conds : DEFAULT_LS_BOT_CONDS)) {
+                try {
+                  const tf = LS_BOT_COND_TF[cond], ms = tf === "4h" ? 144e5 : 72e5;
+                  const ratio = await fetchLsRatio(q.symbol, async (u) => {
+                    const url = u.startsWith("LOCAL") ? "/api/lsratio?" + u.split("?")[1] : u;
+                    const r = await fetch(url, { signal: fetchSignal }); return r.ok ? r.json() : null;
+                  }, ["https://fapi.binance.com", "LOCAL"], tf);
+                  if (!ratio) continue;
+                  const r = await fetch(`/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${tf}&limit=1000`, { signal: fetchSignal });
+                  const b = (((await r.json()).candles ?? []) as Candle[]).filter((x) => x.time * 1000 + ms <= Date.now()).map((x) => ({ time: x.time, high: x.high, low: x.low, close: x.close }));
+                  const hs = lsBottomEval(b, ratio, Math.max(maxBars, 2));
+                  if (!hs.length) continue;
+                  const h = hs[0];
+                  const fmtT = (t: number) => new Date(t * 1000).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+                  const note = `${h.k === 3 ? "üçlü" : "ikili"} dip uyumsuzluk ${tf === "4h" ? "4s" : "2s"} ${h.rules.join(",")} · onay ${fmtT(h.confOpen + ms / 1000)} · fiyat dipleri ${h.pivotTimes.map((t, i) => `${fmtT(t)} ${+h.priceLows[i].toPrecision(6)}`).join(" → ")} (alçalan) · L/S ${h.ratioLows.map((x) => x.toFixed(3)).join(" → ")} (yükselen) → LONG`;
+                  out.push({ kind: "lsBot", cond, bias: "bull", barsAgo: h.barsAgo, note, symbol: q.symbol, exchange: q.exchange });
+                } catch { if (ac.signal.aborted) return null; }
+              }
               if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.mdo?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) return null;
-            } else if (cfg.lsDiv?.enabled && !cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.mdo?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) return null;
+            } else if ((cfg.lsDiv?.enabled || cfg.lsBot?.enabled) && !cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.mdo?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) return null;
             const useHull = !!cfg.hull?.enabled;
             const useGold = !!cfg.gold?.enabled;
             const useGold2 = !!cfg.gold2?.enabled;
@@ -2081,6 +2111,7 @@ export function ListScanPanel() {
       if (cfgDone.fearGreed?.enabled) byKind.push(`fearGreed ${out.filter((h) => h.kind === "fearGreed").length}`);
       if (cfgDone.kalHibrit?.enabled) byKind.push(`kal ${out.filter((h) => h.kind === "kalHibrit").length}`);
       if (cfgDone.lsDiv?.enabled) byKind.push(`lsDiv ${out.filter((h) => h.kind === "lsDiv").length}`);
+      if (cfgDone.lsBot?.enabled) byKind.push(`lsBot ${out.filter((h) => h.kind === "lsBot").length}`);
       if (cfgDone.tprsi?.enabled) byKind.push(`tprsi ${out.filter((h) => h.kind === "tprsi").length}`);
       if (cfgDone.jfkps?.enabled) {
         const n = out.filter((h) => h.kind === "jfkps").length;
@@ -2164,7 +2195,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "fearGreed">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "lsBot" | "fearGreed">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -2305,7 +2336,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.lsBot?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2351,7 +2382,7 @@ export function ListScanPanel() {
     const scanCandidates: ResultRow[] = [];
 
     for (const h of hits) {
-      if (h.kind === "lsDiv") continue; // ek veri (L/S + 1s) gerektirir → alarm yerine paper bot kaynağı (ls-div3-macd / ls-div2-macd)
+      if (h.kind === "lsDiv" || h.kind === "lsBot") continue; // ek veri (L/S + 1s) gerektirir → alarm yerine paper bot kaynağı (ls-div3-macd / ls-div2-macd)
       let scanKey: AlertScanKey | null = null;
       if (h.kind === "ham") scanKey = hamCondToScanKey(h.cond);
       if (h.kind === "diag") scanKey = diagCondToScanKey(h.cond);
@@ -3047,12 +3078,13 @@ export function ListScanPanel() {
     if (tpOn) names.push("TP RSI");
     if (kalOn) names.push("KAL Hibrit");
     if (lsOn) names.push("LS Uyumsuzluk+MACD");
+    if (lsbOn) names.push("LS Dip Uyumsuzluk");
     if (mdoOn) names.push("MDO");
     if (fgOn) names.push("Fear & Greed");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, lsOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, lsOn, lsbOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -4268,6 +4300,27 @@ export function ListScanPanel() {
           {ALL_LS_DIV_MACD_CONDS.map((id) => (
             <Chip key={id} title={LS_DIV_MACD_COND_LABEL[id]} active={lsConds.includes(id)} label={LS_DIV_MACD_COND_LABEL[id]}
               onClick={() => { if (!lsOn) { setLsOn(true); setMatchMode("any"); setLsConds((a) => ensureCond(a, id)); } else setLsConds((a) => toggleCondKeepOne(a, id)); }} />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="LS Dip Uyumsuzluk (L/S Position, dibe yakın — 2s/4s)"
+        enabled={lsbOn}
+        onToggle={() => { if (lsbOn) setLsbOn(false); else { setLsbOn(true); setMatchMode("any"); } }}
+        open={openCard === "lsBot"}
+        onOpen={() => setOpenCard((c) => (c === "lsBot" ? null : "lsBot"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          Fiyat DAHA DÜŞÜK dip yaparken Binance top-trader L/S POSITION oranı DAHA YÜKSEK dip (aynı periyot) ve son dip dibe yakın:
+          ikili atr2-200 (kapanış 200 mum dibinin 2×ATR14 içinde) · ikili lowest200 · üçlü lowest336 (son pivot N mumun en düşüğü) ·
+          bdiv96 ikili/üçlü (son pivot 96 mumun en düşüğü, önceki dip 6-96 mum önceki en düşük pivot) · pivot sol/sağ 2, onay son pivot+2 (repaint yok) ·
+          yalnız Binance vadeli (L/S son 30 gün) · TF seçiminden bağımsız · paper bot: ls-bot-2h / ls-bot-4h (TP %25, SL yok, zarardaysa eşit ekleme)
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {ALL_LS_BOT_CONDS.map((id) => (
+            <Chip key={id} title={LS_BOT_COND_LABEL[id]} active={lsbConds.includes(id)} label={LS_BOT_COND_LABEL[id]}
+              onClick={() => { if (!lsbOn) { setLsbOn(true); setMatchMode("any"); setLsbConds((a) => ensureCond(a, id)); } else setLsbConds((a) => toggleCondKeepOne(a, id)); }} />
           ))}
         </div>
       </SectionCard>

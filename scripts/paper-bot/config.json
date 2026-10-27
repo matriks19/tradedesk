@@ -42,6 +42,24 @@
    "tp": 3.5
   },
   {
+   "id": "ls-bot-2h",
+   "label": "LS Dip Uyumsuzluk 2s",
+   "type": "lsbot",
+   "tf": "2h",
+   "on": true,
+   "ev": false,
+   "tp": 25
+  },
+  {
+   "id": "ls-bot-4h",
+   "label": "LS Dip Uyumsuzluk 4s",
+   "type": "lsbot",
+   "tf": "4h",
+   "on": true,
+   "ev": false,
+   "tp": 25
+  },
+  {
    "id": "t150-pli-c3-4h",
    "label": "KOMBİN: PLI↑ + Bulut3− 4s",
    "type": "tpc",
