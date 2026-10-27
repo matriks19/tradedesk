@@ -89,6 +89,7 @@ import {
 import { kalHibritScan, DEFAULT_KAL_HIBRIT_CONDS, KAL_HIBRIT_BEAR_CONDS, type KalHibritCond } from "@/lib/indicators/kalHibrit";
 import type { LsDivMacdCond } from "@/lib/indicators/lsDivMacd";
 import type { LsBotCond } from "@/lib/indicators/lsBottom";
+import type { RsiMacdCond } from "@/lib/indicators/rsiMacd";
 import { tprsiScan, DEFAULT_TPRSI_CONDS, TPRSI_BEAR_CONDS, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
 export { DEFAULT_MDO_CONDS, ALL_MDO_CONDS, MDO_COND_LABEL, MDO_DEFAULTS, mdoMinBars, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
 export { DEFAULT_FEAR_GREED_CONDS, ALL_FEAR_GREED_CONDS, FEAR_GREED_COND_LABEL, FEAR_GREED_DEFAULTS, fearGreedMinBars, type FearGreedCond, type FearGreedParams } from "@/lib/indicators/fearGreed";
@@ -585,6 +586,7 @@ export type ListScanKind =
   | "kalHibrit"
   | "lsDiv"
   | "lsBot"
+  | "rsiMacd"
   | "mdo"
   | "fearGreed"
   | "pine";
@@ -951,6 +953,8 @@ export type ListScanConfig = {
    *  scanSymbol değil ListScanPanel hesaplar (yalnız Binance vadeli). */
   lsDiv?: { enabled: boolean; conds: LsDivMacdCond[] };
   lsBot?: { enabled: boolean; conds: LsBotCond[] };
+  /** RSI + MACD 1s: 1s MACD(50,100,200)↑ şart + RSI 30↑ / RSI uyumsuzluk (1s/4s). 1s+4s mum gerektirir → ListScanPanel hesaplar. */
+  rsiMacd?: { enabled: boolean; conds: RsiMacdCond[] };
   jfkps?: {
     enabled: boolean;
     conds: JfkpsCond[];
@@ -2663,6 +2667,7 @@ export function scanSymbol(
     kalHibrit: cfg.kalHibrit ? scanKalHibrit(candles, cfg.kalHibrit, maxBarsAgo) : [],
     lsDiv: [],
     lsBot: [],
+    rsiMacd: [],
     mdo: cfg.mdo ? scanMdo(candles, cfg.mdo, maxBarsAgo) : [],
     fearGreed: cfg.fearGreed ? scanFearGreed(candles, cfg.fearGreed, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
@@ -3101,7 +3106,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "lsBot" | "fearGreed">,
+  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "lsBot" | "rsiMacd" | "fearGreed">,
   | "hamJurikTpo"
   | "diagonalSr"
   | "macd"
@@ -3272,3 +3277,4 @@ export { DEFAULT_TPRSI_CONDS, ALL_TPRSI_CONDS, TPRSI_COND_LABEL, TPRSI_DEFAULTS,
 export { DEFAULT_KAL_HIBRIT_CONDS, ALL_KAL_HIBRIT_CONDS, KAL_HIBRIT_COND_LABEL, KAL_HIBRIT_MIN_BARS, KAL_HIBRIT_FETCH_LIMIT, type KalHibritCond } from "@/lib/indicators/kalHibrit";
 export { ALL_LS_DIV_MACD_CONDS, DEFAULT_LS_DIV_MACD_CONDS, LS_DIV_MACD_COND_LABEL, lsDivMacdEval, fetchLsRatio, type LsDivMacdCond } from "@/lib/indicators/lsDivMacd";
 export { ALL_LS_BOT_CONDS, DEFAULT_LS_BOT_CONDS, LS_BOT_COND_LABEL, LS_BOT_COND_TF, LS_BOT_RULES, lsBottomEval, type LsBotCond } from "@/lib/indicators/lsBottom";
+export { ALL_RSI_MACD_CONDS, DEFAULT_RSI_MACD_CONDS, RSI_MACD_COND_LABEL, rsiMacdSetups, rsiMacdTag, type RsiMacdCond } from "@/lib/indicators/rsiMacd";

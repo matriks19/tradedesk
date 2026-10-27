@@ -11,8 +11,10 @@ import { scanSymbol, type ListScanConfig } from "../../src/lib/scanner/listScan"
 import { tpcCalc } from "./tpc";
 import { lsDivMacdEval, fetchLsRatio, multiDiv, type LsBar } from "../../src/lib/indicators/lsDivMacd";
 import { lsBottomEval, type LsBotBar } from "../../src/lib/indicators/lsBottom";
+import { rsiMacdSetups, rsiMacdTag, psarState, RSI_MACD } from "../../src/lib/indicators/rsiMacd";
+import { macdLine } from "../../src/lib/indicators/lsDivMacd";
 
-type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot"; tf: string; k?: number; on: boolean; ev: boolean;
+type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd"; tf: string; k?: number; on: boolean; ev: boolean;
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
@@ -20,7 +22,7 @@ type Cfg = {
 };
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
-  sid?: string; tpPct?: number; exit?: string; maxH?: number; tf?: string; sigT?: number;
+  sid?: string; tpPct?: number; /** true → TP yok (yalnız kaynak çıkışı, ör. SAR) */ noTp?: boolean; exit?: string; maxH?: number; tf?: string; sigT?: number;
   /** ekleme (yalnız lsbot): kaç kez eklendi, ilk giriş, ortalama giriş (= entry) */ adds?: number; firstEntry?: number; avgEntry?: number };
 type Closed = Pos & { exit2?: string; exitPx: number; why: string; r: number; pnl: number; closedAt: number };
 type State = { v: 1; equity: number; pnl: number; open: Pos[]; closed: Closed[]; log: string[];
@@ -104,7 +106,8 @@ function closePos(i: number, why: string, px: number) {
   log(m); alerts.push(m);
 }
 
-const tpOf = (p: Pos) => (p.tpPct && p.tpPct > 0 ? p.tpPct : cfg.tp) / 100; // kaynak TP'si yoksa global TP
+const tpOf = (p: Pos) => (p.noTp ? Infinity : (p.tpPct && p.tpPct > 0 ? p.tpPct : cfg.tp) / 100); // kaynak TP'si yoksa global TP; noTp → TP yok
+const tpTxt = (p: Pos) => (p.noTp ? "yok" : (tpOf(p) * 100).toFixed(0));
 
 // ---------- mum önbelleği (yalnız kapanmış mumlar → lookahead/repaint yok) ----------
 const KC: Record<string, Candle[] | null> = {};
@@ -205,6 +208,22 @@ async function manage() {
     const ms = p.tf ? TF_MS[p.tf] : 0;
     void ms; // süre limiti kapatmıyor; sadece raporda kalan süre gösterilir
     // kaynak çıkışı (ör. Fisher üst bant ↓) — son kapanmış mumda, giriş sonrası
+    if (p.exit === "sar" && p.tf) {
+      // 1s Parabolic SAR (0.02/0.02/0.2) satışa döndü mü — girişten SONRA kapanan mumlarda ilk alış→satış dönüşü (kaçırılan turlar dahil)
+      const c = await closed(p.sym, p.tf);
+      if (c && c.length >= 50) {
+        const { sar, bull } = psarState(c);
+        for (let j = 1; j < c.length; j++) {
+          if ((c[j].time * 1000 + ms) <= p.t || !(bull[j - 1] && !bull[j])) continue;
+          const m = `SAR STOP: ${p.sym} [${p.src}] — 1s SAR satışa döndü ${tTR(c[j].time + ms / 1000)} (kapanış ${fmt(c[j].close)} < SAR ${fmt(sar[j])})`;
+          log(m);
+          const rs = ((st as any).rmStop ||= {}) as Record<string, number>; rs[`${p.sid}|${p.sym}`] = c[j].time + ms / 1000;
+          closePos(i, "SAR STOP", c[j].close);
+          break;
+        }
+      }
+      continue;
+    }
     if (p.exit && p.tf) {
       const c = await closed(p.sym, p.tf);
       if (c && c.length >= 520) {
@@ -247,9 +266,58 @@ async function scanAndOpen() {
     // LS Dip kaynakları kendi mum periyodunda bir kez taranır (yeni 2s/4s mum kapandıktan sonra)
     const lsbBar = (st as any).lsbBar || ((st as any).lsbBar = {});
     const barNow = Math.floor(Date.now() / (TF_MS[s.tf] || 36e5));
-    if (s.type === "lsbot" && lsbBar[s.id] === barNow) { per.push(`${s.label}: bu mum tarandı`); continue; }
-    if (s.type === "lsbot") lsbBar[s.id] = barNow;
+    if ((s.type === "lsbot" || s.type === "rsimacd") && lsbBar[s.id] === barNow) { per.push(`${s.label}: bu mum tarandı`); continue; }
+    if (s.type === "lsbot" || s.type === "rsimacd") lsbBar[s.id] = barNow;
     for (const sym of syms) {
+      if (s.type === "rsimacd") {
+        // RSI + MACD 1s: ŞART 1s MACD(50,100,200)↑ (son 2 kapanmış mum) + (RSI 30↑ ≤12 mum ya da RSI boğa uyumsuzluğu 1s/4s ≤48s) → LONG.
+        // TP yok; çıkış 1s SAR satışa dönünce (manage). SAR stop sonrası SAR alışa dönerse ve kurulum hâlâ geçerliyse yeniden giriş.
+        const b1 = await closed(sym, "1h", 1000);
+        if (!b1 || b1.length < 600) { fail++; continue; }
+        const b4 = (await closed(sym, "4h", 500)) || [];
+        scanned++;
+        const n1 = b1.length, sk = `${s.id}|${sym}`;
+        let tag = "", bt = 0, kind = "";
+        const fresh = rsiMacdSetups(b1, b4, cfg.maxAge);
+        if (fresh.length) {
+          const e0 = fresh[0]; bt = e0.crossOpen;
+          if (st.seen[sk] === bt) continue; // aynı kesişim bir kez
+          tag = `${rsiMacdTag(e0)} [tetikleyen: ${e0.conds.join(",")}]`; kind = "giriş";
+        } else {
+          // yeniden giriş: bu kaynakta SAR STOP olmuş + SAR son 2 mumda alışa döndü + MACD > sinyal + son ≤72 mumda geçerli kurulum
+          const stopT = ((st as any).rmStop || {})[sk] as number | undefined;
+          if (!stopT) continue;
+          const { bull } = psarState(b1);
+          let fj = -1; for (let a = 0; a <= cfg.maxAge; a++) { const j = n1 - 1 - a; if (bull[j] && !bull[j - 1]) { fj = j; break; } }
+          if (fj < 0 || b1[fj].time + 3600 <= stopT) continue;
+          const { m, g } = macdLine(b1.map((x) => x.close));
+          if (!(m[n1 - 1] > g[n1 - 1])) continue;
+          const old = rsiMacdSetups(b1, b4, RSI_MACD.reentryBars).filter((e) => e.crossIdx <= fj);
+          if (!old.length) continue;
+          bt = b1[fj].time;
+          if (st.seen[sk + "|re"] === bt) continue;
+          tag = `SAR yeniden giriş (1s SAR alışa döndü ${tTR(bt + 3600)}, MACD sinyal üstünde; kurulum: ${rsiMacdTag(old[0])} [tetikleyen: ${old[0].conds.join(",")}])`; kind = "yeniden";
+        }
+        hits++;
+        const markSeen = () => { const sn = (st.seen ||= {}); if (kind === "yeniden") sn[sk + "|re"] = bt; else sn[sk] = bt; };
+        const msg = `📡 ${sym} LONG [${s.label}: ${tag}] ${s.tf}`;
+        const perCap = cfg.perSymSig ?? 1;
+        const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
+        if (nSame >= perCap) { log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); markSeen(); continue; }
+        const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
+        if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
+        if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
+        const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
+        const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+        if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
+        const price = b1[n1 - 1].close, notional = margin * cfg.leverage;
+        st.open.push({ sym, side: "LONG", entry: price, last: price, src: `${s.label} ${kind === "yeniden" ? "SAR yeniden giriş" : "MACD↑+" + tag.split("[tetikleyen: ")[1]?.replace("]", "")}`, lev: cfg.leverage, notional, qty: notional / price,
+          t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, noTp: true, exit: "sar", tf: s.tf, sigT: bt * 1000 });
+        nNew++; opened++; markSeen();
+        const m = `🤖 PAPER AL: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag}] marjin ${margin.toFixed(2)} · TP yok · çıkış: 1s SAR satışa dönünce (SAR STOP) / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
+        log(m); alerts.push(m);
+        continue;
+      }
       if (s.type === "lsbot") {
         // dibe yakın L/S POSITION uyumsuzluğu (bottom.py BOT_RULES) → LONG; TP s.tp, SL yok; zarardaki pozisyona eşit büyüklükte EKLEME
         let d; try { d = await lsbData(sym, s.tf); } catch (e) { if (e instanceof Banned) throw e; d = null; }
@@ -422,7 +490,7 @@ function updateStats(): string {
     `## Taramalara göre`, `| Kaynak | İşlem | Kazanma | PnL (USDT) |`, `|---|---|---|---|`,
     ...(Object.keys(by).length ? Object.entries(by).sort((a, b) => b[1].pnl - a[1].pnl).map(([k, b]) => `| ${k} | ${b.n} | ${pct(b.w, b.n)} | ${n2(b.pnl)} |`) : ["| — | 0 | — | 0 |"]), ``,
     `## Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})`, `| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | Kaynak | Açılış | Süreye kalan |`, `|---|---|---|---|---|---|---|---|---|---|`,
-    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${n2(pr(p) * p.notional - fee(p))} | ${(tpOf(p) * 100).toFixed(0)} | ${p.src} | ${tT(p.t)} | ${left(p)} |`),
+    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${n2(pr(p) * p.notional - fee(p))} | ${tpTxt(p)} | ${p.src} | ${tT(p.t)} | ${left(p)} |`),
     ``, `_Not: Zirve/düşüş/yükseliş tur başı (15 dk) özsermaye ile ölçülür; izleme başlangıcından itibaren geçerlidir. İşlem istatistikleri state'teki son 1000 kapanan işlemden hesaplanır._`, ``,
   ].join("\n");
 }
@@ -448,7 +516,7 @@ async function main() {
     `Veri: **${dataSrc()}** · Binance istek: ${reqCount} · ${reach.join(" | ")}`,
     `Bakiye: **${st.equity.toFixed(2)} USDT** · gerçekleşen PnL ${st.pnl.toFixed(2)} · açık K/Z ${unreal.toFixed(2)} · açık ${st.open.length}/${cfg.maxSlots}`,
     "", "| Sembol | Yön | Giriş | Son | K/Z % | TP % | Kaynak |", "|---|---|---|---|---|---|---|",
-    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${(tpOf(p) * 100).toFixed(0)} | ${p.src} |`),
+    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${tpTxt(p)} | ${p.src} |`),
     "", "### Bu tur", ...(alerts.length ? alerts.map((a) => "- " + a) : ["- işlem yok"]),
   ].join("\n");
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n\n" + statsMd + "\n");

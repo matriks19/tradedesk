@@ -142,6 +142,12 @@ import {
   LS_BOT_COND_TF,
   lsBottomEval,
   type LsBotCond,
+  ALL_RSI_MACD_CONDS,
+  DEFAULT_RSI_MACD_CONDS,
+  RSI_MACD_COND_LABEL,
+  rsiMacdSetups,
+  rsiMacdTag,
+  type RsiMacdCond,
   fetchLsRatio,
   type LsDivMacdCond,
   DEFAULT_KAL_HIBRIT_CONDS,
@@ -965,6 +971,8 @@ export function ListScanPanel() {
   const [lsConds, setLsConds] = useState<LsDivMacdCond[]>([...DEFAULT_LS_DIV_MACD_CONDS]);
   const [lsbOn, setLsbOn] = useState(false);
   const [lsbConds, setLsbConds] = useState<LsBotCond[]>([...DEFAULT_LS_BOT_CONDS]);
+  const [rmOn, setRmOn] = useState(false);
+  const [rmConds, setRmConds] = useState<RsiMacdCond[]>([...DEFAULT_RSI_MACD_CONDS]);
   const [kalConds, setKalConds] = useState<KalHibritCond[]>([...DEFAULT_KAL_HIBRIT_CONDS]);
   const [kalTf, setKalTf] = useState<Timeframe>("1d");
   const [tpConds, setTpConds] = useState<TprsiCond[]>([...DEFAULT_TPRSI_CONDS]);
@@ -1442,6 +1450,7 @@ export function ListScanPanel() {
       kalHibrit: { enabled: kalOn, conds: kalConds, tf: kalTf },
       lsDiv: { enabled: lsOn, conds: lsConds },
       lsBot: { enabled: lsbOn, conds: lsbConds },
+      rsiMacd: { enabled: rmOn, conds: rmConds },
       tprsi: { enabled: tpOn, conds: tpConds, params: { gamma: Math.max(0.05, Math.min(0.95, Number(tpGamma) || 0.5)), minScore: Math.max(0, Math.min(5, Math.round(Number(tpMin)))), cool: Math.max(0, Math.round(Number(tpCool) || 0)), bb: Math.max(2, Math.round(Number(tpBb) || 50)) } },
       jfkps: {
         enabled: jfOn,
@@ -1653,6 +1662,8 @@ export function ListScanPanel() {
     lsConds,
     lsbOn,
     lsbConds,
+    rmOn,
+    rmConds,
     tpConds,
     tpGamma,
     tpMin,
@@ -1741,7 +1752,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.lsBot?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.lsBot?.enabled && !cfg.rsiMacd?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1812,6 +1823,27 @@ export function ListScanPanel() {
               typeof AbortSignal.timeout === "function"
                 ? AbortSignal.any([ac.signal, AbortSignal.timeout(klineMs)])
                 : ac.signal;
+            // RSI + MACD 1s: 1s MACD(50,100,200)↑ ŞART + RSI 30↑ (≤12 mum) veya RSI boğa uyumsuzluğu 1s/4s (≤48s); yalnız mum verisi (her borsa)
+            if (cfg.rsiMacd?.enabled) {
+              try {
+                const kl = async (t: string, n: number) => {
+                  const r = await fetch(`/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${t}&limit=${n}`, { signal: fetchSignal });
+                  const ms = t === "4h" ? 144e5 : 36e5;
+                  return (((await r.json()).candles ?? []) as Candle[]).filter((b) => b.time * 1000 + ms <= Date.now()).map((b) => ({ time: b.time, high: b.high, low: b.low, close: b.close }));
+                };
+                const b1 = await kl("1h", 1000);
+                if (b1.length >= 300) {
+                  const sel = cfg.rsiMacd.conds.length ? cfg.rsiMacd.conds : DEFAULT_RSI_MACD_CONDS;
+                  const b4 = sel.includes("rm_div4h") ? await kl("4h", 500) : [];
+                  const hs = rsiMacdSetups(b1, b4, Math.max(maxBars, 2) - 1, sel);
+                  if (hs.length) {
+                    const h = hs[0];
+                    out.push({ kind: "rsiMacd", cond: h.conds[0], bias: "bull", barsAgo: h.crossAgo, note: `${rsiMacdTag(h)} → LONG (tetikleyen: ${h.conds.map((c) => RSI_MACD_COND_LABEL[c]).join(", ")}) · paper bot: rsi-macd-1h (TP yok, 1s SAR stop)`, symbol: q.symbol, exchange: q.exchange });
+                  }
+                }
+              } catch { if (ac.signal.aborted) return null; }
+              if (!cfg.lsDiv?.enabled && !cfg.lsBot?.enabled && !cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.mdo?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) return null;
+            }
             // LS Uyumsuzluk + MACD: 4s perp + top-trader L/S POSITION (fapi, CORS açık; olmazsa /api/lsratio) + 1s perp
             if ((cfg.lsDiv?.enabled || cfg.lsBot?.enabled) && q.exchange !== "bist") {
               if (cfg.lsDiv?.enabled) try {
@@ -2112,6 +2144,7 @@ export function ListScanPanel() {
       if (cfgDone.kalHibrit?.enabled) byKind.push(`kal ${out.filter((h) => h.kind === "kalHibrit").length}`);
       if (cfgDone.lsDiv?.enabled) byKind.push(`lsDiv ${out.filter((h) => h.kind === "lsDiv").length}`);
       if (cfgDone.lsBot?.enabled) byKind.push(`lsBot ${out.filter((h) => h.kind === "lsBot").length}`);
+      if (cfgDone.rsiMacd?.enabled) byKind.push(`rsiMacd ${out.filter((h) => h.kind === "rsiMacd").length}`);
       if (cfgDone.tprsi?.enabled) byKind.push(`tprsi ${out.filter((h) => h.kind === "tprsi").length}`);
       if (cfgDone.jfkps?.enabled) {
         const n = out.filter((h) => h.kind === "jfkps").length;
@@ -2195,7 +2228,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "lsBot" | "fearGreed">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "lsBot" | "rsiMacd" | "fearGreed">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -2336,7 +2369,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.lsBot?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.lsBot?.enabled && !cfg.rsiMacd?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2382,7 +2415,7 @@ export function ListScanPanel() {
     const scanCandidates: ResultRow[] = [];
 
     for (const h of hits) {
-      if (h.kind === "lsDiv" || h.kind === "lsBot") continue; // ek veri (L/S + 1s) gerektirir → alarm yerine paper bot kaynağı (ls-div3-macd / ls-div2-macd)
+      if (h.kind === "lsDiv" || h.kind === "lsBot" || h.kind === "rsiMacd") continue; // ek veri (L/S + 1s) gerektirir → alarm yerine paper bot kaynağı (ls-div3-macd / ls-div2-macd)
       let scanKey: AlertScanKey | null = null;
       if (h.kind === "ham") scanKey = hamCondToScanKey(h.cond);
       if (h.kind === "diag") scanKey = diagCondToScanKey(h.cond);
@@ -3079,12 +3112,13 @@ export function ListScanPanel() {
     if (kalOn) names.push("KAL Hibrit");
     if (lsOn) names.push("LS Uyumsuzluk+MACD");
     if (lsbOn) names.push("LS Dip Uyumsuzluk");
+    if (rmOn) names.push("RSI + MACD 1s");
     if (mdoOn) names.push("MDO");
     if (fgOn) names.push("Fear & Greed");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, lsOn, lsbOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, lsOn, lsbOn, rmOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -4321,6 +4355,26 @@ export function ListScanPanel() {
           {ALL_LS_BOT_CONDS.map((id) => (
             <Chip key={id} title={LS_BOT_COND_LABEL[id]} active={lsbConds.includes(id)} label={LS_BOT_COND_LABEL[id]}
               onClick={() => { if (!lsbOn) { setLsbOn(true); setMatchMode("any"); setLsbConds((a) => ensureCond(a, id)); } else setLsbConds((a) => toggleCondKeepOne(a, id)); }} />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="RSI + MACD 1s (MACD 50/100/200 kesişim şart + RSI 30↑ / RSI uyumsuzluk)"
+        enabled={rmOn}
+        onToggle={() => { if (rmOn) setRmOn(false); else { setRmOn(true); setMatchMode("any"); } }}
+        open={openCard === "rsiMacd"}
+        onOpen={() => setOpenCard((c) => (c === "rsiMacd" ? null : "rsiMacd"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          ŞART: 1s MACD(50,100,200) çizgisi sinyali yukarı keser (son kapanmış mumlar). ARTI en az biri: RSI14 30&apos;u yukarı keser (kesişimden önceki ≤12 mum) ·
+          RSI boğa uyumsuzluğu 1s veya 4s (fiyat alçalan dip, RSI yükselen dip; pivot 2/2, onay kesişimden önceki ≤48s). TF seçiminden bağımsız ·
+          %40 pump araştırması (4s RSI uyumsuzluk + 1s MACD en ayırt edici ikili) · paper bot: rsi-macd-1h (TP yok, çıkış 1s SAR satışa dönünce, SAR alışa dönerse yeniden giriş)
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {ALL_RSI_MACD_CONDS.map((id) => (
+            <Chip key={id} title={RSI_MACD_COND_LABEL[id]} active={rmConds.includes(id)} label={RSI_MACD_COND_LABEL[id]}
+              onClick={() => { if (!rmOn) { setRmOn(true); setMatchMode("any"); setRmConds((a) => ensureCond(a, id)); } else setRmConds((a) => toggleCondKeepOne(a, id)); }} />
           ))}
         </div>
       </SectionCard>
