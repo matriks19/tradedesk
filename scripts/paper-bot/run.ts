@@ -274,7 +274,7 @@ async function scanAndOpen() {
         // TP yok; çıkış 1s SAR satışa dönünce (manage). SAR stop sonrası SAR alışa dönerse ve kurulum hâlâ geçerliyse yeniden giriş.
         const b1 = await closed(sym, "1h", 1000);
         if (!b1 || b1.length < 600) { fail++; continue; }
-        const b4 = (await closed(sym, "4h", 500)) || [];
+        const b4 = (await closed(sym, "4h")) || []; // varsayılan 1000: önbellek ortak, KOMBİN 4s ≥520 mum ister
         scanned++;
         const n1 = b1.length, sk = `${s.id}|${sym}`;
         let tag = "", bt = 0, kind = "";
