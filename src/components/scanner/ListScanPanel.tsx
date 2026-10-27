@@ -132,6 +132,12 @@ import {
   JFKPS_COND_LABEL,
   ALL_TPRSI_CONDS,
   ALL_KAL_HIBRIT_CONDS,
+  ALL_LS_DIV_MACD_CONDS,
+  DEFAULT_LS_DIV_MACD_CONDS,
+  LS_DIV_MACD_COND_LABEL,
+  lsDivMacdEval,
+  fetchLsRatio,
+  type LsDivMacdCond,
   DEFAULT_KAL_HIBRIT_CONDS,
   KAL_HIBRIT_COND_LABEL,
   KAL_HIBRIT_MIN_BARS,
@@ -949,6 +955,8 @@ export function ListScanPanel() {
   const [jfOn, setJfOn] = useState(false);
   const [tpOn, setTpOn] = useState(false);
   const [kalOn, setKalOn] = useState(false);
+  const [lsOn, setLsOn] = useState(false);
+  const [lsConds, setLsConds] = useState<LsDivMacdCond[]>([...DEFAULT_LS_DIV_MACD_CONDS]);
   const [kalConds, setKalConds] = useState<KalHibritCond[]>([...DEFAULT_KAL_HIBRIT_CONDS]);
   const [kalTf, setKalTf] = useState<Timeframe>("1d");
   const [tpConds, setTpConds] = useState<TprsiCond[]>([...DEFAULT_TPRSI_CONDS]);
@@ -1424,6 +1432,7 @@ export function ListScanPanel() {
         params: { rsi: Number(fgRsi) || 14, trd: Number(fgTrd) || 50, flow: Number(fgFlow) || 20, ob: Number(fgOb) || 70, os: Number(fgOs) || 30, tol: Number(fgTol) || 8, rtol: Number.isFinite(Number(fgRtol)) && Number(fgRtol) >= 0 ? Number(fgRtol) : 3, cw: Number(fgCw) || 10 },
       },
       kalHibrit: { enabled: kalOn, conds: kalConds, tf: kalTf },
+      lsDiv: { enabled: lsOn, conds: lsConds },
       tprsi: { enabled: tpOn, conds: tpConds, params: { gamma: Math.max(0.05, Math.min(0.95, Number(tpGamma) || 0.5)), minScore: Math.max(0, Math.min(5, Math.round(Number(tpMin)))), cool: Math.max(0, Math.round(Number(tpCool) || 0)), bb: Math.max(2, Math.round(Number(tpBb) || 50)) } },
       jfkps: {
         enabled: jfOn,
@@ -1631,6 +1640,8 @@ export function ListScanPanel() {
     kalOn,
     kalConds,
     kalTf,
+    lsOn,
+    lsConds,
     tpConds,
     tpGamma,
     tpMin,
@@ -1719,7 +1730,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -1790,6 +1801,39 @@ export function ListScanPanel() {
               typeof AbortSignal.timeout === "function"
                 ? AbortSignal.any([ac.signal, AbortSignal.timeout(klineMs)])
                 : ac.signal;
+            // LS Uyumsuzluk + MACD: 4s perp + top-trader L/S POSITION (fapi, CORS açık; olmazsa /api/lsratio) + 1s perp
+            if (cfg.lsDiv?.enabled && q.exchange !== "bist") {
+              try {
+                const lsConds0 = cfg.lsDiv.conds.length ? cfg.lsDiv.conds : DEFAULT_LS_DIV_MACD_CONDS;
+                const ratio = await fetchLsRatio(q.symbol, async (u) => {
+                  const url = u.startsWith("LOCAL") ? "/api/lsratio?" + u.split("?")[1] : u; // fapi engelliyse Vercel fra1 proxy
+                  const r = await fetch(url, { signal: fetchSignal }); return r.ok ? r.json() : null;
+                }, ["https://fapi.binance.com", "LOCAL"]);
+                if (ratio) {
+                  const kl = async (t: string, n: number) => {
+                    const r = await fetch(`/api/klines?symbol=${encodeURIComponent(q.symbol)}&exchange=${q.exchange}&timeframe=${t}&limit=${n}`, { signal: fetchSignal });
+                    const ms = t === "4h" ? 144e5 : 36e5;
+                    return (((await r.json()).candles ?? []) as Candle[]).filter((b) => b.time * 1000 + ms <= Date.now()).map((b) => ({ time: b.time, low: b.low, close: b.close }));
+                  };
+                  const b4 = await kl("4h", 300);
+                  const b1 = b4.length >= 60 ? await kl("1h", 1500) : [];
+                  const evs = lsDivMacdEval(b4, ratio, b1);
+                  const lim = Math.max(maxBars, 2) * 4; // 1s mum cinsinden taze kesişim penceresi
+                  const seen = new Set<string>();
+                  for (const e of evs) {
+                    const fmtT = (t: number) => new Date(t * 1000).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+                    const base = `${e.k === 3 ? "üçlü" : "ikili"} 4s L/S uyumsuzluk onay ${fmtT(e.confClose)} · dipler ${e.priceLows.map((x) => +x.toPrecision(6)).join(">")} · L/S ${e.ratioLows.map((x) => x.toFixed(3)).join("<")}`;
+                    let cond: LsDivMacdCond | null = null, ago = 0, note = "";
+                    if (e.crossOpen !== null && e.crossAgo! <= lim) { cond = e.k === 3 ? "ls3_macd" : "ls2_macd"; ago = e.crossAgo!; note = `${base} · 1s MACD(50,100,200)↑ ${fmtT(e.crossOpen + 3600)} → LONG`; }
+                    else if (e.k === 3 && e.crossOpen === null && !e.macdAbove) { cond = "ls3_wait"; ago = Math.round((Date.now() / 1000 - e.confClose) / 3600); note = `${base} · MACD sinyalin altında, kesişim bekleniyor (≤48s)`; }
+                    if (!cond || !lsConds0.includes(cond) || seen.has(cond)) continue;
+                    seen.add(cond);
+                    out.push({ kind: "lsDiv", cond, bias: cond === "ls3_wait" ? "neutral" : "bull", barsAgo: ago, note, symbol: q.symbol, exchange: q.exchange });
+                  }
+                }
+              } catch { if (ac.signal.aborted) return null; /* L/S verisi yok → sembol atlanır */ }
+              if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.mdo?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) return null;
+            } else if (cfg.lsDiv?.enabled && !cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.mdo?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) return null;
             const useHull = !!cfg.hull?.enabled;
             const useGold = !!cfg.gold?.enabled;
             const useGold2 = !!cfg.gold2?.enabled;
@@ -2036,6 +2080,7 @@ export function ListScanPanel() {
       }
       if (cfgDone.fearGreed?.enabled) byKind.push(`fearGreed ${out.filter((h) => h.kind === "fearGreed").length}`);
       if (cfgDone.kalHibrit?.enabled) byKind.push(`kal ${out.filter((h) => h.kind === "kalHibrit").length}`);
+      if (cfgDone.lsDiv?.enabled) byKind.push(`lsDiv ${out.filter((h) => h.kind === "lsDiv").length}`);
       if (cfgDone.tprsi?.enabled) byKind.push(`tprsi ${out.filter((h) => h.kind === "tprsi").length}`);
       if (cfgDone.jfkps?.enabled) {
         const n = out.filter((h) => h.kind === "jfkps").length;
@@ -2119,7 +2164,7 @@ export function ListScanPanel() {
         st.panes[0] ??
         pane;
       if (!live) return;
-      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "fearGreed">[] = [];
+      const kinds: Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "fearGreed">[] = [];
       if (cfg.ham?.enabled) kinds.push("ham");
       if (cfg.diag?.enabled) kinds.push("diag");
       if (cfg.macd?.enabled) kinds.push("macd");
@@ -2260,7 +2305,7 @@ export function ListScanPanel() {
       return;
     }
     const cfg = buildConfig();
-    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
+    if (!cfg.ham?.enabled && !cfg.diag?.enabled && !cfg.macd?.enabled && !cfg.stoch?.enabled && !cfg.di?.enabled && !cfg.hull?.enabled && !cfg.hamAo?.enabled && !cfg.gold?.enabled && !cfg.gold2?.enabled && !cfg.divScan?.enabled && !cfg.multiDip?.enabled && !cfg.bbDivLg?.enabled && !cfg.obFall?.enabled && !cfg.maSimple?.enabled && !cfg.kijunBb?.enabled && !cfg.cmo?.enabled && !cfg.pliDir?.enabled && !cfg.pliDmi?.enabled && !cfg.pliDtDiv?.enabled && !cfg.ppoDsiZ?.enabled && !cfg.eliziLdr4?.enabled && !cfg.ema30Band?.enabled && !cfg.fractal8?.enabled && !cfg.jfkps?.enabled && !cfg.tprsi?.enabled && !cfg.kalHibrit?.enabled && !cfg.lsDiv?.enabled && !cfg.fearGreed?.enabled && !cfg.pine?.enabled) {
       setStatus("En az bir gösterge seçin");
       return;
     }
@@ -2306,6 +2351,7 @@ export function ListScanPanel() {
     const scanCandidates: ResultRow[] = [];
 
     for (const h of hits) {
+      if (h.kind === "lsDiv") continue; // ek veri (L/S + 1s) gerektirir → alarm yerine paper bot kaynağı (ls-div3-macd / ls-div2-macd)
       let scanKey: AlertScanKey | null = null;
       if (h.kind === "ham") scanKey = hamCondToScanKey(h.cond);
       if (h.kind === "diag") scanKey = diagCondToScanKey(h.cond);
@@ -3000,12 +3046,13 @@ export function ListScanPanel() {
     if (jfOn) names.push("JFKPS");
     if (tpOn) names.push("TP RSI");
     if (kalOn) names.push("KAL Hibrit");
+    if (lsOn) names.push("LS Uyumsuzluk+MACD");
     if (mdoOn) names.push("MDO");
     if (fgOn) names.push("Fear & Greed");
     if (extraIds.length) names.push("Özel");
     if (pineIds.length) names.push("Pine");
     return names.length ? names.join(" · ") : "—";
-  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
+  }, [hamOn, diagOn, macdOn, stochOn, diOn, hullOn, hamAoOn, goldOn, gold2On, divScanOn, multiDipOn, bbDivLgOn, obFallOn, maSimpleOn, kijunBbOn, cmoOn, pliDirOn, pliDmiOn, pliDtOn, ppoDzOn, eldOn, e3On, fr8On, jfOn, tpOn, kalOn, lsOn, mdoOn, fgOn, extraIds.length, pineIds.length]);
 
   return (
     <div className="flex flex-col h-full min-h-0 p-2 gap-2 text-xs overflow-x-hidden">
@@ -4201,6 +4248,26 @@ export function ListScanPanel() {
                 else setFgConds((a) => toggleCondKeepOne(a, id));
               }}
             />
+          ))}
+        </div>
+      </SectionCard>
+
+      <SectionCard
+        title="LS Uyumsuzluk + MACD (L/S Position 4s + MACD 1s)"
+        enabled={lsOn}
+        onToggle={() => { if (lsOn) setLsOn(false); else { setLsOn(true); setMatchMode("any"); } }}
+        open={openCard === "lsDiv"}
+        onOpen={() => setOpenCard((c) => (c === "lsDiv" ? null : "lsDiv"))}
+      >
+        <p className="text-2xs text-desk-muted">
+          4s: fiyat art arda 2/3 alçalan pivot dip (sol/sağ 2, aralık 3-20 mum, ≤40 mum) yaparken Binance top-trader L/S POSITION oranı aynı diplerde yükselen dip →
+          onay son pivot+2 mum (repaint yok) · ardından ≤48 saat içinde 1s MACD(50,100,200) sinyali yukarı keser → LONG · yalnız Binance vadeli (L/S son 30 gün) ·
+          TF seçiminden bağımsız (4s+1s) · backtest küçük (üçlü 34 işlem) · paper bot: ls-div3-macd / ls-div2-macd (TP %3.5, SL yok)
+        </p>
+        <div className="flex flex-wrap gap-1">
+          {ALL_LS_DIV_MACD_CONDS.map((id) => (
+            <Chip key={id} title={LS_DIV_MACD_COND_LABEL[id]} active={lsConds.includes(id)} label={LS_DIV_MACD_COND_LABEL[id]}
+              onClick={() => { if (!lsOn) { setLsOn(true); setMatchMode("any"); setLsConds((a) => ensureCond(a, id)); } else setLsConds((a) => toggleCondKeepOne(a, id)); }} />
           ))}
         </div>
       </SectionCard>
