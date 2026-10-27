@@ -10,8 +10,9 @@ import type { Candle } from "../../src/lib/types";
 import { scanSymbol, type ListScanConfig } from "../../src/lib/scanner/listScan";
 import { tpcCalc } from "./tpc";
 import { lsDivMacdEval, fetchLsRatio, multiDiv, type LsBar } from "../../src/lib/indicators/lsDivMacd";
+import { lsBottomEval, type LsBotBar } from "../../src/lib/indicators/lsBottom";
 
-type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv"; tf: string; k?: number; on: boolean; ev: boolean;
+type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot"; tf: string; k?: number; on: boolean; ev: boolean;
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
@@ -19,7 +20,8 @@ type Cfg = {
 };
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
-  sid?: string; tpPct?: number; exit?: string; maxH?: number; tf?: string; sigT?: number };
+  sid?: string; tpPct?: number; exit?: string; maxH?: number; tf?: string; sigT?: number;
+  /** ekleme (yalnız lsbot): kaç kez eklendi, ilk giriş, ortalama giriş (= entry) */ adds?: number; firstEntry?: number; avgEntry?: number };
 type Closed = Pos & { exit2?: string; exitPx: number; why: string; r: number; pnl: number; closedAt: number };
 type State = { v: 1; equity: number; pnl: number; open: Pos[]; closed: Closed[]; log: string[];
   lastRun?: number; runs: number; dataSrc?: string; seen?: Record<string, number>; srcOff?: Record<string, string>; stats?: Stats };
@@ -117,35 +119,62 @@ async function closed(sym: string, tf: string, limit = 1000): Promise<Candle[] |
 // Actions IP'leri fapi'ye 451 alırsa: L/S oranı Vercel fra1 proxy'sinden, mumlar Vercel futures proxy'sinden (spot'a düşmez).
 const QX_PROXY = (process.env.QX_PROXY || "https://tradedesk-ochre.vercel.app").replace(/\/$/, "");
 const LSC: Record<string, Promise<{ b4: LsBar[]; b1: LsBar[]; ratio: Map<number, number> } | null>> = {};
+const LRC: Record<string, Promise<{ ratio: Map<number, number>; psym: string; scale: number } | null>> = {};
+const LBC: Record<string, Promise<{ b: LsBotBar[]; ratio: Map<number, number>; psym: string } | null>> = {};
 let lsProxyFail = 0;
-async function perpBars(sym: string, tf: string, limit: number): Promise<LsBar[] | null> {
-  const q = `symbol=${sym}&interval=${tf}&limit=${limit}`;
-  const u = futHost ? `${futHost}/fapi/v1/klines?${q}` : `${QX_PROXY}/api/fapi/v1/klines?${q}`;
-  const r = await bget(u);
-  if (r.status !== 200 || !Array.isArray(r.json)) return null;
+const okArr = (r: { status: number; json: unknown }) => r.status === 200 && Array.isArray(r.json) && (r.json as unknown[]).length > 0;
+/** Perp mumları: fapi doğrudan → Vercel Edge fra1 (/api/fklines) → eski futures proxy. scale: 1000PEPE gibi sözleşmelerde fiyat bölücü. */
+async function perpBars(psym: string, tf: string, limit: number, scale = 1): Promise<LsBotBar[] | null> {
+  const q = `symbol=${psym}&interval=${tf}&limit=${limit}`;
+  const urls = futHost ? [`${futHost}/fapi/v1/klines?${q}`] : [`${QX_PROXY}/api/fklines?${q}`, `${QX_PROXY}/api/fapi/v1/klines?${q}`];
+  let r: { status: number; json: unknown } | null = null;
+  for (const u of urls) { try { r = await bget(u); } catch (e) { if (e instanceof Banned) throw e; r = null; } if (r && okArr(r)) break; }
+  if (!r || !okArr(r)) return null;
   const ms = TF_MS[tf];
-  return (r.json as number[][]).filter((b) => +b[0] + ms <= Date.now()).map((b) => ({ time: Math.floor(+b[0] / 1000), low: +b[3], close: +b[4] }));
+  return (r.json as number[][]).filter((b) => +b[0] + ms <= Date.now()).map((b) => ({ time: Math.floor(+b[0] / 1000), high: +b[2] / scale, low: +b[3] / scale, close: +b[4] / scale }));
+}
+/** Top-trader L/S POSITION oranı; spot sembolün perp karşılığı yoksa 1000xxx sözleşmesi denenir (PEPE → 1000PEPEUSDT). */
+function lsRatio(sym: string, period: string) {
+  return (LRC[sym + "|" + period] ||= (async () => {
+    const cands: [string, number][] = [[sym, 1]]; if (!sym.startsWith("1000")) cands.push(["1000" + sym, 1000]);
+    for (const [psym, scale] of cands) {
+      let ratio = await fetchLsRatio(psym, async (u) => { const r = await bget(u); return r.status === 200 ? r.json : null; }, futHost ? [futHost] : [], period);
+      if (!ratio && lsProxyFail < 5) {
+        try { const r = await bget(`${QX_PROXY}/api/lsratio?symbol=${psym}&period=${period}&limit=500`);
+          if (okArr(r)) { ratio = new Map((r.json as { timestamp: number; longShortRatio: string }[]).map((x) => [+x.timestamp, +x.longShortRatio])); lsProxyFail = 0; }
+          else if (r.status !== 200) lsProxyFail++;
+        } catch (e) { if (e instanceof Banned) throw e; lsProxyFail++; }
+      }
+      if (ratio) return { ratio, psym, scale };
+    }
+    return null;
+  })().catch((e) => { if (e instanceof Banned) throw e; return null; }));
 }
 function lsData(sym: string) {
   return (LSC[sym] ||= (async () => {
-    const hosts = futHost ? [futHost] : [];
-    let ratio = await fetchLsRatio(sym, async (u) => { const r = await bget(u); return r.status === 200 ? r.json : null; }, hosts);
-    if (!ratio && lsProxyFail < 5) {
-      try { const r = await bget(`${QX_PROXY}/api/lsratio?symbol=${sym}&period=4h&limit=500`);
-        if (r.status === 200 && Array.isArray(r.json) && r.json.length) { ratio = new Map((r.json as { timestamp: number; longShortRatio: string }[]).map((x) => [+x.timestamp, +x.longShortRatio])); lsProxyFail = 0; }
-        else if (r.status !== 200 && r.status !== 503) lsProxyFail++; else if (r.status === 503) lsProxyFail++;
-      } catch (e) { if (e instanceof Banned) throw e; lsProxyFail++; }
-    }
-    if (!ratio) return null;
-    const b4 = await perpBars(sym, "4h", 300); if (!b4 || b4.length < 60) return null;
+    const lr = await lsRatio(sym, "4h"); if (!lr) return null;
+    const { ratio, psym, scale } = lr;
+    const b4 = await perpBars(psym, "4h", 300, scale); if (!b4 || b4.length < 60) return null;
     // 1s mumları yalnız son ~52 saatte onaylanmış (ikili/üçlü) uyumsuzluk varsa çek (istek tasarrufu)
-    const j4 = b4.filter((b) => ratio!.has(b.time * 1000));
-    const recent = multiDiv(j4.map((b) => b.low), j4.map((b) => ratio!.get(b.time * 1000)!), 2).some((e) => Date.now() / 1000 - (j4[e.conf].time + 4 * 3600) <= 52 * 3600);
+    const j4 = b4.filter((b) => ratio.has(b.time * 1000));
+    const recent = multiDiv(j4.map((b) => b.low), j4.map((b) => ratio.get(b.time * 1000)!), 2).some((e) => Date.now() / 1000 - (j4[e.conf].time + 4 * 3600) <= 52 * 3600);
     if (!recent) return { b4, b1: [] as LsBar[], ratio };
-    const b1 = await perpBars(sym, "1h", 1500); if (!b1 || b1.length < 500) return null;
+    const b1 = await perpBars(psym, "1h", 1500, scale); if (!b1 || b1.length < 500) return null;
     return { b4, b1, ratio };
   })().catch((e) => { if (e instanceof Banned) throw e; return null; }));
 }
+/** LS Dip Uyumsuzluğu verisi: tf (2h/4h) perp mum (1000; TRI-lowest336 için ≥336 mum geçmiş) + aynı periyotta L/S POSITION. */
+function lsbData(sym: string, tf: string) {
+  return (LBC[sym + "|" + tf] ||= (async () => {
+    const lr = await lsRatio(sym, tf); if (!lr) return null;
+    const b = await perpBars(lr.psym, tf, 1000, lr.scale); if (!b || b.length < 120) return null;
+    return { b, ratio: lr.ratio, psym: lr.psym };
+  })().catch((e) => { if (e instanceof Banned) throw e; return null; }));
+}
+const tTR = (sec: number) => new Date(sec * 1000).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+/** pivotları ESKİ→YENİ sırayla yaz: fiyat dibi alçalıyor (LL), L/S dibi yükseliyor (HL). */
+const pivTag = (times: number[], pl: number[], rl: number[]) =>
+  `fiyat dipleri ${times.map((t, i) => `${tTR(t)} ${fmt(pl[i])}`).join(" → ")} (alçalan) · L/S dipleri ${rl.map((x) => x.toFixed(3)).join(" → ")} (yükselen)`;
 
 // ---------- TP/SL (1m iğne, önce SL) + kaynak çıkışı / süre limiti ----------
 async function manage() {
@@ -215,7 +244,55 @@ async function scanAndOpen() {
     const hourNow = Math.floor(Date.now() / 36e5);
     if (s.type === "lsdiv" && (st as any).lsHour === hourNow) { per.push(`${s.label}: bu saat tarandı`); continue; }
     if (s.type === "lsdiv") lsRan = true;
+    // LS Dip kaynakları kendi mum periyodunda bir kez taranır (yeni 2s/4s mum kapandıktan sonra)
+    const lsbBar = (st as any).lsbBar || ((st as any).lsbBar = {});
+    const barNow = Math.floor(Date.now() / (TF_MS[s.tf] || 36e5));
+    if (s.type === "lsbot" && lsbBar[s.id] === barNow) { per.push(`${s.label}: bu mum tarandı`); continue; }
+    if (s.type === "lsbot") lsbBar[s.id] = barNow;
     for (const sym of syms) {
+      if (s.type === "lsbot") {
+        // dibe yakın L/S POSITION uyumsuzluğu (bottom.py BOT_RULES) → LONG; TP s.tp, SL yok; zarardaki pozisyona eşit büyüklükte EKLEME
+        let d; try { d = await lsbData(sym, s.tf); } catch (e) { if (e instanceof Banned) throw e; d = null; }
+        if (!d) { fail++; continue; }
+        scanned++;
+        const hs = lsBottomEval(d.b, d.ratio, 2);
+        if (!hs.length) continue;
+        const h0 = hs[0], sk = `${s.id}|${sym}`, bt = h0.confOpen;
+        if (st.seen[sk] === bt) continue; // aynı onay mumu bir kez (açıldı/eklendi/kârda atlandı)
+        const tag = `${h0.k === 3 ? "üçlü" : "ikili"} dip uyumsuzluk ${h0.rules.join(",")} (${pivTag(h0.pivotTimes, h0.priceLows, h0.ratioLows)})${d.psym !== sym ? " [" + d.psym + "]" : ""}`;
+        hits++;
+        const price = d.b[d.b.length - 1].close;
+        const msg = `📡 ${sym} LONG [${s.label}: ${tag}] ${s.tf} (yaş ${h0.barsAgo})`;
+        const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
+        const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+        const ex = st.open.filter((p) => p.sym === sym && p.sid === s.id).pop();
+        if (ex) {
+          const rNow = price / ex.entry - 1;
+          if (rNow >= 0) { log(msg + ` — atlandı: mevcut pozisyon kârda (${(rNow * 100).toFixed(2)}%), ekleme yok`); st.seen[sk] = bt; continue; }
+          const addNot = ex.notional, addMargin = addNot / ex.lev;
+          if (nNew >= capNew) { log(msg + ` — EKLEME atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
+          if (used + addMargin > st.equity + 1e-9) { log(msg + ` — EKLEME atlandı: toplam marjin sınırı (gerekli ${addMargin.toFixed(2)})`); continue; }
+          const old = ex.entry, addQty = addNot / price;
+          ex.firstEntry ??= ex.entry;
+          ex.qty += addQty; ex.notional += addNot; ex.entry = ex.notional / ex.qty; ex.avgEntry = ex.entry; ex.last = price;
+          ex.adds = (ex.adds || 0) + 1; ex.sigT = bt * 1000;
+          nNew++; opened++; st.seen[sk] = bt;
+          const m = `➕ PAPER EKLEME: ${sym} ${ex.lev}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] — neden: aynı kaynakta yeni dip uyumsuzluğu ve pozisyon zararda (${(rNow * 100).toFixed(2)}%) → mevcut büyüklük kadar ekleme (marjin +${addMargin.toFixed(2)}, nominal ${(ex.notional - addNot).toFixed(2)}→${ex.notional.toFixed(2)}) · ort. giriş ${fmt(old)}→${fmt(ex.entry)} · TP %${tpOf(ex) * 100} → ${fmt(ex.entry * (1 + tpOf(ex)))} · ekleme #${ex.adds} / SL yok`;
+          log(m); alerts.push(m);
+          continue;
+        }
+        if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
+        if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
+        const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
+        if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
+        const notional = margin * cfg.leverage;
+        st.open.push({ sym, side: "LONG", entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
+          t: Date.now(), checked: Date.now(), pxSrc: futHost ? "perp" : "perp-proxy", sid: s.id, tpPct: s.tp, tf: s.tf, sigT: bt * 1000 });
+        nNew++; opened++; st.seen[sk] = bt;
+        const m = `🤖 PAPER AL: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
+        log(m); alerts.push(m);
+        continue;
+      }
       if (s.type === "lsdiv") {
         // LS Uyumsuzluk (4s, k=3 üçlü / k=2 ikili) + 1s MACD(50,100,200) yukarı kesişim ≤48s → LONG. Veri yoksa sembol atlanır.
         let d; try { d = await lsData(sym); } catch (e) { if (e instanceof Banned) throw e; d = null; }
@@ -225,7 +302,7 @@ async function scanAndOpen() {
         if (!ev.length) continue;
         const e0 = ev[0], sk = `${s.id}|${sym}`, bt = e0.crossOpen!;
         if (st.seen[sk] === bt) continue; // aynı kesişim bir kez
-        const tag = `${s.k === 2 ? "ikili" : "üçlü"} div (dipler ${e0.priceLows.map(fmt).join(">")}, L/S ${e0.ratioLows.map((x) => x.toFixed(3)).join("<")}) + MACD↑`;
+        const tag = `${s.k === 2 ? "ikili" : "üçlü"} div (${pivTag(e0.pivots, e0.priceLows, e0.ratioLows)}) + MACD↑`;
         hits++;
         const msg = `📡 ${sym} LONG [${s.label}: ${tag}] (yaş ${e0.crossAgo})`;
         const perCap = cfg.perSymSig ?? 1;

@@ -95,10 +95,10 @@ export function lsDivMacdEval(b4: LsBar[], ratio: Map<number, number>, b1: LsBar
 }
 
 /** Binance top-trader L/S POSITION oranı (4s; uç nokta yalnız son 30 günü verir). */
-export async function fetchLsRatio(sym: string, get: (url: string) => Promise<unknown>, hosts: string[]): Promise<Map<number, number> | null> {
+export async function fetchLsRatio(sym: string, get: (url: string) => Promise<unknown>, hosts: string[], period = "4h"): Promise<Map<number, number> | null> {
   for (const h of hosts) {
     try {
-      const j = await get(`${h}/futures/data/topLongShortPositionRatio?symbol=${encodeURIComponent(sym)}&period=4h&limit=500`);
+      const j = await get(`${h}/futures/data/topLongShortPositionRatio?symbol=${encodeURIComponent(sym)}&period=${period}&limit=500`);
       if (Array.isArray(j) && j.length) {
         const mp = new Map<number, number>();
         for (const x of j as { timestamp: number; longShortRatio: string }[]) mp.set(+x.timestamp, +x.longShortRatio);
