@@ -14,9 +14,9 @@
  "marginUsd": 10,
  "tp": 10,
  "sl": 0,
- "maxSlots": 500,
- "maxNew": 10,
- "maxNewFirst": 25,
+ "maxSlots": 600,
+ "maxNew": 50,
+ "maxNewFirst": 50,
  "perSymSig": 10,
  "feePct": 0.05,
  "evGlobal": true,
@@ -227,6 +227,90 @@
      "conds": [
       "cross_up"
      ]
+    }
+   }
+  },
+  {
+   "id": "kal-hibrit-1h",
+   "label": "KAL Hibrit AL 1s",
+   "type": "list",
+   "tf": "1h",
+   "on": true,
+   "ev": false,
+   "scan": {
+    "matchMode": "any",
+    "kalHibrit": {
+     "enabled": true,
+     "conds": [
+      "kal_long",
+      "kal_ema_up",
+      "kal_hist_div",
+      "kal_band_carry"
+     ],
+     "tf": "1h"
+    }
+   }
+  },
+  {
+   "id": "kal-hibrit-2h",
+   "label": "KAL Hibrit AL 2s",
+   "type": "list",
+   "tf": "2h",
+   "on": true,
+   "ev": false,
+   "scan": {
+    "matchMode": "any",
+    "kalHibrit": {
+     "enabled": true,
+     "conds": [
+      "kal_long",
+      "kal_ema_up",
+      "kal_hist_div",
+      "kal_band_carry"
+     ],
+     "tf": "2h"
+    }
+   }
+  },
+  {
+   "id": "kal-hibrit-4h",
+   "label": "KAL Hibrit AL 4s",
+   "type": "list",
+   "tf": "4h",
+   "on": true,
+   "ev": false,
+   "scan": {
+    "matchMode": "any",
+    "kalHibrit": {
+     "enabled": true,
+     "conds": [
+      "kal_long",
+      "kal_ema_up",
+      "kal_hist_div",
+      "kal_band_carry"
+     ],
+     "tf": "4h"
+    }
+   }
+  },
+  {
+   "id": "kal-hibrit-1d",
+   "label": "KAL Hibrit AL 1g",
+   "type": "list",
+   "tf": "1d",
+   "on": true,
+   "ev": false,
+   "scan": {
+    "matchMode": "any",
+    "kalHibrit": {
+     "enabled": true,
+     "conds": [
+      "kal_long",
+      "kal_ema_up",
+      "kal_hist_div",
+      "kal_band_carry"
+     ],
+     "tf": "1d"
     }
    }
   }
