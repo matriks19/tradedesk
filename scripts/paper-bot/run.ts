@@ -9,8 +9,9 @@ import path from "node:path";
 import type { Candle } from "../../src/lib/types";
 import { scanSymbol, type ListScanConfig } from "../../src/lib/scanner/listScan";
 import { tpcCalc } from "./tpc";
+import { lsDivMacdEval, fetchLsRatio, multiDiv, type LsBar } from "../../src/lib/indicators/lsDivMacd";
 
-type Src = { id: string; label: string; type: "list" | "tpc"; tf: string; on: boolean; ev: boolean;
+type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv"; tf: string; k?: number; on: boolean; ev: boolean;
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
@@ -112,6 +113,40 @@ async function closed(sym: string, tf: string, limit = 1000): Promise<Candle[] |
   return KC[key];
 }
 
+// ---------- LS Uyumsuzluk + MACD verisi (4s perp mum + top-trader L/S POSITION + 1s perp mum) ----------
+// Actions IP'leri fapi'ye 451 alırsa: L/S oranı Vercel fra1 proxy'sinden, mumlar Vercel futures proxy'sinden (spot'a düşmez).
+const QX_PROXY = (process.env.QX_PROXY || "https://tradedesk-ochre.vercel.app").replace(/\/$/, "");
+const LSC: Record<string, Promise<{ b4: LsBar[]; b1: LsBar[]; ratio: Map<number, number> } | null>> = {};
+let lsProxyFail = 0;
+async function perpBars(sym: string, tf: string, limit: number): Promise<LsBar[] | null> {
+  const q = `symbol=${sym}&interval=${tf}&limit=${limit}`;
+  const u = futHost ? `${futHost}/fapi/v1/klines?${q}` : `${QX_PROXY}/api/fapi/v1/klines?${q}`;
+  const r = await bget(u);
+  if (r.status !== 200 || !Array.isArray(r.json)) return null;
+  const ms = TF_MS[tf];
+  return (r.json as number[][]).filter((b) => +b[0] + ms <= Date.now()).map((b) => ({ time: Math.floor(+b[0] / 1000), low: +b[3], close: +b[4] }));
+}
+function lsData(sym: string) {
+  return (LSC[sym] ||= (async () => {
+    const hosts = futHost ? [futHost] : [];
+    let ratio = await fetchLsRatio(sym, async (u) => { const r = await bget(u); return r.status === 200 ? r.json : null; }, hosts);
+    if (!ratio && lsProxyFail < 5) {
+      try { const r = await bget(`${QX_PROXY}/api/lsratio?symbol=${sym}&period=4h&limit=500`);
+        if (r.status === 200 && Array.isArray(r.json) && r.json.length) { ratio = new Map((r.json as { timestamp: number; longShortRatio: string }[]).map((x) => [+x.timestamp, +x.longShortRatio])); lsProxyFail = 0; }
+        else if (r.status !== 200 && r.status !== 503) lsProxyFail++; else if (r.status === 503) lsProxyFail++;
+      } catch (e) { if (e instanceof Banned) throw e; lsProxyFail++; }
+    }
+    if (!ratio) return null;
+    const b4 = await perpBars(sym, "4h", 300); if (!b4 || b4.length < 60) return null;
+    // 1s mumları yalnız son ~52 saatte onaylanmış (ikili/üçlü) uyumsuzluk varsa çek (istek tasarrufu)
+    const j4 = b4.filter((b) => ratio!.has(b.time * 1000));
+    const recent = multiDiv(j4.map((b) => b.low), j4.map((b) => ratio!.get(b.time * 1000)!), 2).some((e) => Date.now() / 1000 - (j4[e.conf].time + 4 * 3600) <= 52 * 3600);
+    if (!recent) return { b4, b1: [] as LsBar[], ratio };
+    const b1 = await perpBars(sym, "1h", 1500); if (!b1 || b1.length < 500) return null;
+    return { b4, b1, ratio };
+  })().catch((e) => { if (e instanceof Banned) throw e; return null; }));
+}
+
 // ---------- TP/SL (1m iğne, önce SL) + kaynak çıkışı / süre limiti ----------
 async function manage() {
   for (let i = st.open.length - 1; i >= 0; i--) {
@@ -169,14 +204,47 @@ function btGate(s: Src, hitKeys: string[]): string {
 async function scanAndOpen() {
   const syms = await universe();
   st.seen = st.seen || {}; st.srcOff = st.srcOff || {};
-  let nNew = 0;
+  let nNew = 0, lsRan = false;
   const per: string[] = [];
   for (const s of cfg.sources.filter((x) => x.on)) {
     const bad = liveBad(s);
     if (bad && evOn(s)) { if (st.srcOff[s.id] !== bad) { st.srcOff[s.id] = bad; const m = `⛔ ${s.label}: ${bad}`; log(m); alerts.push(m); } per.push(`${s.label}: kapalı (canlı EV)`); continue; }
     delete st.srcOff[s.id];
     let scanned = 0, hits = 0, fail = 0, opened = 0;
+    // LS kaynakları saatte bir taranır (1s kesişim; 4s oran 4 saatte bir değişir) → Binance/Vercel istek tasarrufu
+    const hourNow = Math.floor(Date.now() / 36e5);
+    if (s.type === "lsdiv" && (st as any).lsHour === hourNow) { per.push(`${s.label}: bu saat tarandı`); continue; }
+    if (s.type === "lsdiv") lsRan = true;
     for (const sym of syms) {
+      if (s.type === "lsdiv") {
+        // LS Uyumsuzluk (4s, k=3 üçlü / k=2 ikili) + 1s MACD(50,100,200) yukarı kesişim ≤48s → LONG. Veri yoksa sembol atlanır.
+        let d; try { d = await lsData(sym); } catch (e) { if (e instanceof Banned) throw e; d = null; }
+        if (!d) { fail++; continue; }
+        scanned++;
+        const ev = lsDivMacdEval(d.b4, d.ratio, d.b1, [s.k ?? 3]).filter((e) => e.crossOpen !== null && e.crossAgo! <= cfg.maxAge);
+        if (!ev.length) continue;
+        const e0 = ev[0], sk = `${s.id}|${sym}`, bt = e0.crossOpen!;
+        if (st.seen[sk] === bt) continue; // aynı kesişim bir kez
+        const tag = `${s.k === 2 ? "ikili" : "üçlü"} div (dipler ${e0.priceLows.map(fmt).join(">")}, L/S ${e0.ratioLows.map((x) => x.toFixed(3)).join("<")}) + MACD↑`;
+        hits++;
+        const msg = `📡 ${sym} LONG [${s.label}: ${tag}] (yaş ${e0.crossAgo})`;
+        const perCap = cfg.perSymSig ?? 1;
+        const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
+        if (nSame >= perCap) { log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); continue; }
+        const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
+        if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
+        if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
+        const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
+        const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+        if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
+        const price = d.b1[d.b1.length - 1].close, notional = margin * cfg.leverage;
+        st.open.push({ sym, side: "LONG", entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
+          t: Date.now(), checked: Date.now(), pxSrc: futHost ? "perp" : "perp-proxy", sid: s.id, tpPct: s.tp, tf: s.tf, sigT: bt * 1000 });
+        nNew++; opened++; st.seen[sk] = bt;
+        const m = `🤖 PAPER AL: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
+        log(m); alerts.push(m);
+        continue;
+      }
       const c = await closed(sym, s.tf);
       if (!c || c.length < (s.type === "tpc" ? 520 : 120)) { fail++; continue; }
       scanned++;
@@ -220,6 +288,7 @@ async function scanAndOpen() {
     }
     per.push(`${s.label}: ${scanned}/${syms.length} sembol, ${hits} sinyal, ${opened} giriş, ${fail} veri eksik · EV ${evOn(s) ? "açık" : "kapalı"}`);
   }
+  if (lsRan) (st as any).lsHour = Math.floor(Date.now() / 36e5);
   log(`Tarama (${dataSrc()}): ` + per.join(" | "));
 }
 

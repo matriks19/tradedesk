@@ -87,6 +87,7 @@ import {
   type JfkpsParams,
 } from "@/lib/indicators/jfkps";
 import { kalHibritScan, DEFAULT_KAL_HIBRIT_CONDS, KAL_HIBRIT_BEAR_CONDS, type KalHibritCond } from "@/lib/indicators/kalHibrit";
+import type { LsDivMacdCond } from "@/lib/indicators/lsDivMacd";
 import { tprsiScan, DEFAULT_TPRSI_CONDS, TPRSI_BEAR_CONDS, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
 export { DEFAULT_MDO_CONDS, ALL_MDO_CONDS, MDO_COND_LABEL, MDO_DEFAULTS, mdoMinBars, type MdoCond, type MdoParams } from "@/lib/indicators/mdo";
 export { DEFAULT_FEAR_GREED_CONDS, ALL_FEAR_GREED_CONDS, FEAR_GREED_COND_LABEL, FEAR_GREED_DEFAULTS, fearGreedMinBars, type FearGreedCond, type FearGreedParams } from "@/lib/indicators/fearGreed";
@@ -581,6 +582,7 @@ export type ListScanKind =
   | "jfkps"
   | "tprsi"
   | "kalHibrit"
+  | "lsDiv"
   | "mdo"
   | "fearGreed"
   | "pine";
@@ -943,6 +945,9 @@ export type ListScanConfig = {
   /** T45 TP RSI (TrendlineProject) — Laguerre RSI + BB re-entry motoru, kapanmış mum. */
   tprsi?: { enabled: boolean; conds: TprsiCond[]; params?: TprsiParams };
   kalHibrit?: { enabled: boolean; conds: KalHibritCond[]; tf?: string };
+  /** LS Uyumsuzluk (4s top-trader L/S POSITION ikili/üçlü) + 1s MACD(50,100,200) kesişim ≤48s. Ek veri (L/S + 1s) gerektirir →
+   *  scanSymbol değil ListScanPanel hesaplar (yalnız Binance vadeli). */
+  lsDiv?: { enabled: boolean; conds: LsDivMacdCond[] };
   jfkps?: {
     enabled: boolean;
     conds: JfkpsCond[];
@@ -2653,6 +2658,7 @@ export function scanSymbol(
     jfkps: cfg.jfkps ? scanJfkps(candles, cfg.jfkps, maxBarsAgo) : [],
     tprsi: cfg.tprsi ? scanTprsi(candles, cfg.tprsi, maxBarsAgo) : [],
     kalHibrit: cfg.kalHibrit ? scanKalHibrit(candles, cfg.kalHibrit, maxBarsAgo) : [],
+    lsDiv: [],
     mdo: cfg.mdo ? scanMdo(candles, cfg.mdo, maxBarsAgo) : [],
     fearGreed: cfg.fearGreed ? scanFearGreed(candles, cfg.fearGreed, maxBarsAgo) : [],
     pine: cfg.pine ? scanPine(candles, cfg.pine, maxBarsAgo) : [],
@@ -3091,7 +3097,7 @@ export function indicatorParamsFromConfig(
 }
 
 export const KIND_TO_INDICATOR: Record<
-  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "fearGreed">,
+  Exclude<ListScanKind, "pine" | "fractal8" | "jfkps" | "mdo" | "tprsi" | "kalHibrit" | "lsDiv" | "fearGreed">,
   | "hamJurikTpo"
   | "diagonalSr"
   | "macd"
@@ -3260,3 +3266,4 @@ export {
 
 export { DEFAULT_TPRSI_CONDS, ALL_TPRSI_CONDS, TPRSI_COND_LABEL, TPRSI_DEFAULTS, tprsiMinBars, type TprsiCond, type TprsiParams } from "@/lib/indicators/tprsi";
 export { DEFAULT_KAL_HIBRIT_CONDS, ALL_KAL_HIBRIT_CONDS, KAL_HIBRIT_COND_LABEL, KAL_HIBRIT_MIN_BARS, KAL_HIBRIT_FETCH_LIMIT, type KalHibritCond } from "@/lib/indicators/kalHibrit";
+export { ALL_LS_DIV_MACD_CONDS, DEFAULT_LS_DIV_MACD_CONDS, LS_DIV_MACD_COND_LABEL, lsDivMacdEval, fetchLsRatio, type LsDivMacdCond } from "@/lib/indicators/lsDivMacd";

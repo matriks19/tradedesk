@@ -22,6 +22,26 @@
  "evGlobal": true,
  "sources": [
   {
+   "id": "ls-div3-macd",
+   "label": "LS Üçlü Uyumsuzluk + MACD",
+   "type": "lsdiv",
+   "k": 3,
+   "tf": "1h",
+   "on": true,
+   "ev": false,
+   "tp": 3.5
+  },
+  {
+   "id": "ls-div2-macd",
+   "label": "LS İkili Uyumsuzluk + MACD",
+   "type": "lsdiv",
+   "k": 2,
+   "tf": "1h",
+   "on": true,
+   "ev": false,
+   "tp": 3.5
+  },
+  {
    "id": "t150-pli-c3-4h",
    "label": "KOMBİN: PLI↑ + Bulut3− 4s",
    "type": "tpc",
