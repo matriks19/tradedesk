@@ -97,6 +97,25 @@ const alerts: string[] = [];
 const trT = () => new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
 function log(m: string) { const l = trT() + " " + m; st.log.push(l); console.log(l); }
 const fmt = (v: number) => (+v).toPrecision(6);
+// ---------- Elizi ntfy: yalnız seçili kaynaklar (Gold2 uyumsuzluk, PLI DT uyumsuzluk, KAL Hibrit 2s) — mevcut kanallardan ayrı, hata ölümcül değil ----------
+const ELIZI_URL = process.env.ELIZI_NTFY_URL || "https://ntfy.sh/elizi94trhan";
+const ELIZI_SIDS = new Set(["gold2-div-4h", "pdt-ddiv-4h", "kal-hibrit-2h"]);
+const isElizi = (sid?: string) => !!sid && (ELIZI_SIDS.has(sid) || /^pdt-ddiv-/.test(sid) || /^gold2-div-/.test(sid));
+const eliziQ: string[] = [];
+function elizi(kind: string, sid: string | undefined, sym: string, side: string, price: number, extra = "") {
+  if (!isElizi(sid)) return;
+  const lbl = cfg.sources.find((s) => s.id === sid)?.label || sid;
+  eliziQ.push(`${kind} · ${lbl}\n${sym} ${side} @${fmt(price)}${extra ? " · " + extra : ""}\n${trT()} (TSİ)`);
+}
+async function eliziFlush() {
+  if (!eliziQ.length) return;
+  for (const body of eliziQ) {
+    try {
+      const r = await fetch(ELIZI_URL, { method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8", Title: "QUANTEX Elizi" }, body });
+      console.log("elizi ntfy " + r.status);
+    } catch { console.log("elizi ntfy hata (atlandı)"); }
+  }
+}
 const pr = (p: Pos) => (p.side === "LONG" ? p.last / p.entry - 1 : 1 - p.last / p.entry);
 const fee = (p: Pos) => p.notional * (1 + p.last / p.entry) * (cfg.feePct / 100);
 
@@ -108,6 +127,7 @@ function closePos(i: number, why: string, px: number) {
   st.open.splice(i, 1);
   const m = `🤖 PAPER ${why} kapattı: ${p.sym} ${p.side} ${(r * 100).toFixed(2)}% (${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT net) · bakiye ${st.equity.toFixed(2)}`;
   log(m); alerts.push(m);
+  elizi("🔴 ÇIKIŞ", p.sid, p.sym, p.side, px, `${why} ${(r * 100).toFixed(2)}%`);
 }
 
 // ---------- MFE / MAE (pozisyon başı en iyi / en kötü nokta) ----------
@@ -473,6 +493,7 @@ async function scanAndOpen() {
       const p: Pos = { sym, side, entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
         t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, tpPct: s.tp, exit: s.exit, maxH: s.maxH, tf: s.tf };
       st.open.push(p); nNew++; opened++; if (sk) st.seen[sk] = bt;
+      elizi("🟢 GİRİŞ", s.id, sym, side, price, s.tf);
       const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre bilgisi " + s.maxH + " mum (kapatmaz)" : ""} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
       log(m); alerts.push(m);
     }
@@ -588,5 +609,6 @@ async function main() {
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n\n" + statsMd + "\n");
   console.log(sum);
   if (alerts.length) await notify(alerts.join("\n") + `\nBakiye ${st.equity.toFixed(2)} USDT · açık ${st.open.length}`);
+  try { await eliziFlush(); } catch { /* ölümcül değil */ }
 }
 main();
