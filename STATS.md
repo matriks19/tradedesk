@@ -1,17 +1,17 @@
 # QUANTEX Paper Bot — İstatistikler
 
-Güncelleme: **28.10.2026 08:28:34 (TSİ)** · tur 33 · veri spot-mirror · izleme başlangıcı 24.10.2026 23:12:45
+Güncelleme: **28.10.2026 08:48:53 (TSİ)** · tur 34 · veri spot-mirror · izleme başlangıcı 24.10.2026 23:12:45
 
 ## Özet
 | Metrik | Değer |
 |---|---|
 | Bakiye (gerçekleşen) | 10238.21 USDT |
-| Özsermaye (açık K/Z dahil) | 10389.27 USDT |
+| Özsermaye (açık K/Z dahil) | 10360.19 USDT |
 | Başlangıç bakiyesi | 10000.00 USDT |
 | Toplam gerçekleşen PnL | +238.21 USDT |
-| Açık K/Z | +151.07 USDT |
+| Açık K/Z | +121.98 USDT |
 | Zirve özsermaye | 10389.27 USDT (28.10.2026 08:28:34) |
-| Şu anki düşüş (zirveden) | 0.00 USDT (0.00%) |
+| Şu anki düşüş (zirveden) | 29.08 USDT (0.28%) |
 | En kötü düşüş (max drawdown) | 72.81 USDT (0.73%) · 25.10.2026 17:30:58 |
 | En yüksek yükseliş (dipten) | 449.10 USDT (4.52%) · 28.10.2026 08:28:34 |
 | İşlem sayısı | 63 (56 kazanç / 7 kayıp) |
@@ -36,554 +36,631 @@ Güncelleme: **28.10.2026 08:28:34 (TSİ)** · tur 33 · veri spot-mirror · izl
 | MA x_50_200 1s | 1 | 100.0% | +4.95 |
 | ham:raw_dual_up | 3 | 33.3% | -0.75 |
 
-## Açık pozisyonlar (546/600)
-| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | Kaynak | Açılış | Süreye kalan |
-|---|---|---|---|---|---|---|---|---|---|
-| TRXUSDT | LONG | 0.329100 | 0.331200 | 0.64 | +1.34 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 24.10.2026 22:51:07 | — |
-| RLUSDUSDT | LONG | 1.00130 | 1.00140 | 0.01 | -0.23 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 24.10.2026 22:51:50 | — |
-| LTCUSDT | LONG | 56.6600 | 57.6100 | 1.68 | +3.94 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 24.10.2026 23:05:54 | — |
-| EURUSDT | LONG | 1.12060 | 1.11390 | -0.60 | -1.74 | 10 | Gold div_bull 4s gold:div_bull | 24.10.2026 23:08:30 | — |
-| BNBUSDT | LONG | 730.160 | 745.820 | 2.14 | +5.11 | 10 | HAM/MACD 15m ham:raw_dual_up | 24.10.2026 23:09:32 | — |
-| TAOUSDT | LONG | 249.100 | 258.100 | 3.61 | +8.78 | 10 | HAM/MACD 15m ham:raw_dual_up | 24.10.2026 23:12:45 | — |
-| AAVEUSDT | LONG | 136.500 | 134.660 | -1.35 | -3.62 | 10 | HAM/MACD 15m ham:raw_dual_up | 24.10.2026 23:12:45 | — |
-| DASHUSDT | LONG | 52.4200 | 54.6700 | 4.29 | +10.34 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 02:46:15 | — |
-| XAUTUSDT | LONG | 3993.80 | 4031.73 | 0.95 | +2.10 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 02:46:20 | — |
-| INJUSDT | LONG | 7.71800 | 7.98500 | 3.46 | +8.18 | 10 | Gold div_bull 4s gold:div_bull | 25.10.2026 05:50:43 | — |
-| GTCUSDT | LONG | 0.263280 | 0.240360 | -8.71 | -4.40 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 17:22:39 | — |
-| GTCUSDT | LONG | 0.263280 | 0.240360 | -8.71 | -4.40 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 17:29:55 | — |
-| GTCUSDT | LONG | 0.263280 | 0.240360 | -8.71 | -4.40 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 18:18:21 | — |
-| BNBUSDT | LONG | 737.330 | 745.820 | 1.15 | +0.53 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 25.10.2026 18:18:23 | 1g 9s |
-| DOTUSDT | LONG | 1.03700 | 1.00700 | -2.89 | -1.50 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 18:19:17 | — |
-| ZECUSDT | LONG | 1214.55 | 1314.97 | 8.27 | +4.08 | 10 | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
-| BNBUSDT | LONG | 741.480 | 745.810 | 0.58 | +0.24 | 10 | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
-| SUIUSDT | LONG | 0.917500 | 0.938700 | 2.31 | +1.10 | 10 | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
-| LTCUSDT | LONG | 56.7600 | 57.6000 | 1.48 | +0.69 | 10 | HAM/MACD 15m ham:raw_dual_up | 25.10.2026 18:19:22 | — |
-| ADAUSDT | LONG | 0.205200 | 0.206700 | 0.73 | +0.32 | 10 | HAM/MACD 15m ham:raw_dual_up | 25.10.2026 18:19:22 | — |
-| AAVEUSDT | LONG | 136.520 | 134.630 | -1.38 | -0.74 | 10 | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
-| MSTRBUSDT | LONG | 144.950 | 142.340 | -1.80 | -0.95 | 10 | HAM/MACD 15m ham:raw_dual_up | 25.10.2026 18:19:22 | — |
-| PUMPUSDT | LONG | 0.00426700 | 0.00436000 | 2.18 | +1.04 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 25.10.2026 18:19:22 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
-| CRCLBUSDT | LONG | 85.0500 | 81.4000 | -4.29 | -2.19 | 10 | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
-| STRKUSDT | LONG | 0.0453100 | 0.0466100 | 2.87 | +1.38 | 10 | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:23 | — |
-| GTCUSDT | LONG | 0.250790 | 0.240360 | -4.16 | -2.13 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 20:03:59 | — |
-| NEARUSDT | LONG | 4.66700 | 4.68900 | 0.47 | +0.19 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 20:04:29 | — |
-| TRUMPUSDT | LONG | 1.66900 | 1.71700 | 2.88 | +1.39 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 20:04:30 | — |
-| CRCLBUSDT | LONG | 85.6000 | 81.3900 | -4.92 | -2.51 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 20:04:42 | — |
-| ETHUSDT | LONG | 2357.01 | 2356.34 | -0.03 | -0.06 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 20:04:46 | — |
-| SUIUSDT | LONG | 0.930500 | 0.938500 | 0.86 | +0.38 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 20:04:48 | — |
-| ADAUSDT | LONG | 0.206700 | 0.206700 | 0.00 | -0.05 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 20:04:52 | — |
-| GTCUSDT | LONG | 0.250790 | 0.240360 | -4.16 | -2.13 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 22:36:11 | — |
-| SUIUSDT | LONG | 0.930600 | 0.938500 | 0.85 | +0.37 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:41 | — |
-| TRXUSDT | LONG | 0.330400 | 0.331200 | 0.24 | +0.07 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:41 | — |
-| ARBUSDT | LONG | 0.169600 | 0.169800 | 0.12 | +0.01 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:42 | — |
-| FILUSDT | LONG | 0.928700 | 0.914400 | -1.54 | -0.82 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:42 | — |
-| ADAUSDT | LONG | 0.205500 | 0.206700 | 0.58 | +0.24 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:48 | — |
-| XLMUSDT | LONG | 0.168800 | 0.171900 | 1.84 | +0.87 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:54 | — |
-| MSTRBUSDT | LONG | 145.030 | 142.340 | -1.85 | -0.98 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:55 | — |
-| APTUSDT | LONG | 0.703800 | 0.696500 | -1.04 | -0.57 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:57 | — |
-| AAVEUSDT | LONG | 135.920 | 134.640 | -0.94 | -0.52 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 26.10.2026 01:04:18 | — |
-| DOTUSDT | LONG | 1.02400 | 1.00700 | -1.66 | -0.88 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 26.10.2026 01:04:18 | — |
-| TRXUSDT | LONG | 0.330500 | 0.331200 | 0.21 | +0.06 | 10 | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 01:04:48 | — |
-| HYPEUSDT | LONG | 76.4100 | 81.6100 | 6.81 | +3.35 | 10 | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 01:04:48 | — |
-| ZECUSDT | LONG | 1213.76 | 1314.66 | 8.31 | +4.10 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 26.10.2026 03:22:00 | — |
-| BTCUSDT | LONG | 80108.4 | 80960.0 | 1.06 | +0.48 | 10 | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 03:22:31 | — |
-| NEARUSDT | LONG | 4.60400 | 4.68800 | 1.82 | +0.86 | 10 | HAM/MACD 15m macd:cross_up | 26.10.2026 03:22:31 | — |
-| SUIUSDT | LONG | 0.921500 | 0.938500 | 1.84 | +0.87 | 10 | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 03:22:31 | — |
-| XAUTUSDT | LONG | 3991.36 | 4031.54 | 1.01 | +0.45 | 10 | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 03:22:31 | — |
-| GTCUSDT | LONG | 0.246410 | 0.240200 | -2.52 | -1.31 | 10 | HAM/MACD 15m macd:cross_up | 26.10.2026 03:22:31 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 26.10.2026 03:22:31 | — |
-| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | Gold div_bull 4s gold:div_bull | 26.10.2026 08:07:11 | — |
-| ENAUSDT | LONG | 0.203100 | 0.205700 | 1.28 | +0.59 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 26.10.2026 08:07:14 | 1g 23s |
-| EURUSDT | LONG | 1.12370 | 1.11400 | -0.86 | -0.48 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 26.10.2026 08:07:19 | 1g 23s |
-| SOLUSDT | LONG | 101.310 | 102.040 | 0.72 | +0.31 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 26.10.2026 08:08:13 | — |
-| XRPUSDT | LONG | 1.28830 | 1.32910 | 3.17 | +1.53 | 10 | HAM/MACD 15m macd:cross_up | 26.10.2026 08:08:13 | — |
-| NEARUSDT | LONG | 4.51300 | 4.68800 | 3.88 | +1.89 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 26.10.2026 08:08:13 | — |
-| ENAUSDT | LONG | 0.207700 | 0.205700 | -0.96 | -0.53 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 26.10.2026 08:08:13 | — |
-| FETUSDT | LONG | 0.172900 | 0.181100 | 4.74 | +2.32 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 26.10.2026 14:05:22 | — |
-| TRXUSDT | LONG | 0.330400 | 0.331300 | 0.27 | +0.09 | 10 | Gold div_bull 4s gold:div_bull | 26.10.2026 14:05:25 | — |
-| BEAMXUSDT | LONG | 0.00324800 | 0.00335600 | 3.33 | +1.61 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 26.10.2026 14:05:25 | — |
-| TRXUSDT | LONG | 0.331600 | 0.331300 | -0.09 | -0.10 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 26.10.2026 14:05:29 | 2g 5s |
-| KATUSDT | LONG | 0.00477000 | 0.00453000 | -5.03 | -2.56 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 26.10.2026 14:05:55 | — |
-| ADAUSDT | LONG | 0.204300 | 0.206700 | 1.17 | +0.54 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 26.10.2026 14:06:02 | — |
-| TRXUSDT | LONG | 0.331000 | 0.331300 | 0.09 | -0.00 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 26.10.2026 20:22:18 | — |
-| XUSDUSDT | LONG | 1.00130 | 1.00120 | -0.01 | -0.05 | 10 | Gold2 div_bull 4s gold2:div_bull | 26.10.2026 20:22:29 | — |
-| TRUMPUSDT | LONG | 1.69100 | 1.71700 | 1.54 | +0.72 | 10 | Gold div_bull 4s gold:div_bull | 26.10.2026 20:22:29 | — |
-| QNTUSDT | LONG | 210.460 | 199.670 | -5.13 | -2.61 | 10 | Hull c50_200 4s hull:c50_200 | 26.10.2026 20:22:30 | — |
-| UNIUSDT | LONG | 7.06600 | 7.18900 | 1.74 | +0.82 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 00:45:18 | — |
-| CHIPUSDT | LONG | 0.0529400 | 0.0542400 | 2.46 | +1.18 | 10 | Gold2 div_bull 4s gold2:div_bull | 27.10.2026 00:45:29 | — |
-| XUSDUSDT | LONG | 1.00130 | 1.00120 | -0.01 | -0.05 | 10 | Gold2 div_bull 4s gold2:div_bull | 27.10.2026 00:45:29 | — |
-| TRUMPUSDT | LONG | 1.70100 | 1.71700 | 0.94 | +0.42 | 10 | Gold div_bull 4s gold:div_bull | 27.10.2026 00:45:30 | — |
-| SKHYBUSDT | LONG | 142.790 | 156.490 | 9.59 | +4.74 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 27.10.2026 00:45:30 | — |
-| CHIPUSDT | LONG | 0.0529400 | 0.0542400 | 2.46 | +1.18 | 10 | Hull c50_200 4s hull:c50_200 | 27.10.2026 00:45:30 | — |
-| NVDABUSDT | LONG | 216.280 | 218.800 | 1.17 | +0.53 | 10 | Hull c50_200 4s hull:c50_200 | 27.10.2026 00:45:30 | — |
-| ZECUSDT | LONG | 1228.30 | 1314.95 | 7.05 | +3.48 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 00:45:31 | 2g 16s |
-| SNDKBUSDT | LONG | 1257.22 | 1364.52 | 8.53 | +4.22 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 00:45:33 | 2g 16s |
-| NVDABUSDT | LONG | 216.280 | 218.790 | 1.16 | +0.53 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 00:45:42 | 2g 16s |
-| NVDABUSDT | LONG | 216.910 | 218.790 | 0.87 | +0.38 | 10 | Hull c50_200 4s hull:c50_200 | 27.10.2026 03:53:27 | — |
-| BCHUSDT | LONG | 281.200 | 298.900 | 6.29 | +3.10 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 03:53:37 | 2g 19s |
-| PAXGUSDT | LONG | 4017.66 | 4041.84 | 0.60 | +0.25 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 27.10.2026 03:53:55 | — |
-| BTCUSDT | LONG | 80275.0 | 80960.0 | 0.85 | +0.38 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:10 | — |
-| ETHUSDT | LONG | 2327.73 | 2356.07 | 1.22 | +0.56 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:10 | — |
-| PUMPUSDT | LONG | 0.00430300 | 0.00436300 | 1.39 | +0.65 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:16 | — |
-| AVAXUSDT | LONG | 8.95900 | 9.02500 | 0.74 | +0.32 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:19 | — |
-| XLMUSDT | LONG | 0.169500 | 0.171800 | 1.36 | +0.63 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:22 | — |
-| SOLUSDT | LONG | 100.170 | 102.020 | 1.85 | +0.87 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:29 | — |
-| ZROUSDT | LONG | 1.61300 | 1.72100 | 6.70 | +3.30 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:37 | — |
-| INTCBUSDT | LONG | 90.8100 | 95.3900 | 5.04 | +2.47 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:39 | — |
-| NVDABUSDT | LONG | 216.470 | 218.790 | 1.07 | +0.49 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:43 | — |
-| DASHUSDT | LONG | 53.8100 | 54.6600 | 1.58 | +0.74 | 10 | Gold div_bull 4s gold:div_bull | 27.10.2026 08:54:44 | — |
-| GRAMUSDT | LONG | 1.20000 | 1.24000 | 3.33 | +1.62 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 27.10.2026 08:55:14 | — |
-| UNIUSDT | LONG | 7.03800 | 7.18900 | 2.15 | +1.02 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 08:55:44 | — |
-| AAVEUSDT | LONG | 132.210 | 134.590 | 1.80 | +0.85 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 08:55:44 | — |
-| ZROUSDT | LONG | 1.61500 | 1.72000 | 6.50 | +3.20 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 08:55:44 | — |
-| SOXLBUSDT | LONG | 88.2600 | 103.990 | 17.82 | +8.86 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 14:28:23 | — |
-| SYNUSDT | LONG | 0.195350 | 0.180470 | -7.62 | -3.86 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 14:28:34 | — |
-| BANKUSDT | LONG | 0.0278000 | 0.0291000 | 4.68 | +2.29 | 25 | KOMBİN: TP RSI TSI 4s tsiG | 27.10.2026 14:28:34 | — |
-| SPCXBUSDT | LONG | 147.220 | 150.060 | 1.93 | +0.91 | 10 | Hull c50_200 4s hull:c50_200 | 27.10.2026 14:28:35 | — |
-| XRPUSDT | LONG | 1.29680 | 1.32890 | 2.48 | +1.19 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 14:28:36 | 3g 6s |
-| XAUTUSDT | LONG | 4004.96 | 4032.53 | 0.69 | +0.29 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 14:28:40 | 3g 6s |
-| SPCXBUSDT | LONG | 148.800 | 150.060 | 0.85 | +0.37 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 14:29:22 | — |
-| XRPUSDT | LONG | 1.30460 | 1.32890 | 1.86 | +0.88 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 14:29:34 | — |
-| ZROUSDT | LONG | 1.64700 | 1.72000 | 4.43 | +2.17 | 10 | Gold div_bull 4s gold:div_bull | 27.10.2026 16:20:11 | — |
-| SPCXBUSDT | LONG | 148.710 | 150.060 | 0.91 | +0.40 | 10 | Hull c50_200 4s hull:c50_200 | 27.10.2026 16:20:11 | — |
-| WLDUSDT | LONG | 0.435600 | 0.436800 | 0.28 | +0.09 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 27.10.2026 16:20:39 | — |
-| MSTRBUSDT | LONG | 141.350 | 142.260 | 0.64 | +0.27 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 16:21:05 | — |
-| XLMUSDT | LONG | 0.168100 | 0.171800 | 2.20 | +1.05 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 16:21:05 | — |
-| NEARUSDT | LONG | 4.54800 | 4.67800 | 2.86 | +1.38 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:09 | — |
-| SUIUSDT | LONG | 0.918400 | 0.937900 | 2.12 | +1.01 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:09 | — |
-| LINKUSDT | LONG | 11.3450 | 11.7560 | 3.62 | +1.76 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:09 | — |
-| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:10 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 16:21:10 | — |
-| BTCUSDT | LONG | 80365.7 | 80940.4 | 0.72 | +0.31 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
-| ETHUSDT | LONG | 2335.22 | 2355.60 | 0.87 | +0.39 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
-| SOLUSDT | LONG | 100.910 | 102.000 | 1.08 | +0.49 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
-| ZECUSDT | LONG | 1268.05 | 1315.30 | 3.73 | +1.81 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| NEARUSDT | LONG | 4.56900 | 4.67900 | 2.41 | +1.15 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| BNBUSDT | LONG | 742.930 | 745.840 | 0.39 | +0.15 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_long+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| ENAUSDT | LONG | 0.207000 | 0.205600 | -0.68 | -0.39 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| SOXLBUSDT | LONG | 95.6300 | 103.980 | 8.73 | +4.31 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| CRCLBUSDT | LONG | 80.5400 | 81.3800 | 1.04 | +0.47 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
-| SUIUSDT | LONG | 0.921500 | 0.937900 | 1.78 | +0.84 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
-| QNTUSDT | LONG | 202.060 | 199.230 | -1.40 | -0.75 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| SNDKBUSDT | LONG | 1282.24 | 1364.34 | 6.40 | +3.15 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 16:21:10 | — |
-| HYPEUSDT | LONG | 78.7600 | 81.6100 | 3.62 | +1.76 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 16:21:10 | — |
-| NILUSDT | LONG | 0.0947500 | 0.0842300 | -11.10 | -5.60 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| TRXUSDT | LONG | 0.328600 | 0.331300 | 0.82 | +0.36 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| AAVEUSDT | LONG | 132.450 | 134.580 | 1.61 | +0.75 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
-| XAUTUSDT | LONG | 4023.92 | 4032.53 | 0.21 | +0.06 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| CHIPUSDT | LONG | 0.0532900 | 0.0542400 | 1.78 | +0.84 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| MUBUSDT | LONG | 926.570 | 969.290 | 4.61 | +2.25 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| TAOUSDT | LONG | 250.900 | 257.800 | 2.75 | +1.32 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| EURUSDT | LONG | 1.11710 | 1.11400 | -0.28 | -0.19 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| GOOGLBUSDT | LONG | 318.800 | 325.120 | 1.98 | +0.94 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| INJUSDT | LONG | 8.03800 | 7.97900 | -0.73 | -0.42 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| MSTRBUSDT | LONG | 142.170 | 142.260 | 0.06 | -0.02 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| ONDOUSDT | LONG | 0.413900 | 0.418100 | 1.01 | +0.46 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| INTCBUSDT | LONG | 92.5000 | 95.3900 | 3.12 | +1.51 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 16:21:10 | — |
-| SYNUSDT | LONG | 0.177320 | 0.180470 | 1.78 | +0.84 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| NVDABUSDT | LONG | 218.500 | 218.790 | 0.13 | +0.02 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| BTCUSDT | LONG | 79910.0 | 80940.4 | 1.29 | +0.59 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| ETHUSDT | LONG | 2316.04 | 2355.60 | 1.71 | +0.80 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| SOLUSDT | LONG | 100.130 | 102.000 | 1.87 | +0.88 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| ZECUSDT | LONG | 1249.48 | 1315.33 | 5.27 | +2.58 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| XRPUSDT | LONG | 1.30290 | 1.32890 | 2.00 | +0.95 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| BNBUSDT | LONG | 740.360 | 745.840 | 0.74 | +0.32 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| ENAUSDT | LONG | 0.201000 | 0.205700 | 2.34 | +1.12 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| CRCLBUSDT | LONG | 80.0500 | 81.3800 | 1.66 | +0.78 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
-| SPCXBUSDT | LONG | 150.170 | 150.060 | -0.07 | -0.09 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 19:49:02 | — |
-| INJUSDT | LONG | 8.19900 | 7.97900 | -2.68 | -1.39 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 19:49:08 | — |
-| UNIUSDT | LONG | 7.16100 | 7.18700 | 0.36 | +0.13 | 25 | KOMBİN: TP RSI TSI 4s tsiG | 27.10.2026 19:49:12 | — |
-| SYNUSDT | LONG | 0.181640 | 0.180470 | -0.64 | -0.37 | 25 | KOMBİN: TP RSI TSI 4s tsiG | 27.10.2026 19:49:12 | — |
-| ZROUSDT | LONG | 1.68700 | 1.72000 | 1.96 | +0.93 | 10 | Gold div_bull 4s gold:div_bull | 27.10.2026 19:49:12 | — |
-| GRAMUSDT | LONG | 1.21500 | 1.23900 | 1.98 | +0.94 | 10 | Gold div_bull 4s gold:div_bull | 27.10.2026 19:49:12 | — |
-| SOXLBUSDT | LONG | 99.8400 | 103.920 | 4.09 | +1.99 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 27.10.2026 19:49:12 | — |
-| XLMUSDT | LONG | 0.169200 | 0.171700 | 1.48 | +0.69 | 10 | Hull c50_200 4s hull:c50_200 | 27.10.2026 19:49:13 | — |
-| MUBUSDT | LONG | 932.190 | 969.290 | 3.98 | +1.94 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 27.10.2026 19:49:41 | — |
-| BCHUSDT | LONG | 287.600 | 299.100 | 4.00 | +1.95 | 10 | MA x_50_200 1s maSimple:x_50_200 | 27.10.2026 19:49:42 | — |
-| BNBUSDT | LONG | 751.100 | 745.830 | -0.70 | -0.40 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:43 | — |
-| WLDUSDT | LONG | 0.439200 | 0.436800 | -0.55 | -0.32 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:45 | — |
-| PUMPUSDT | LONG | 0.00431500 | 0.00435600 | 0.95 | +0.42 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:47 | — |
-| TAOUSDT | LONG | 252.500 | 257.800 | 2.10 | +1.00 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:50 | — |
-| ARBUSDT | LONG | 0.168800 | 0.169600 | 0.47 | +0.19 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:56 | — |
-| ENAUSDT | LONG | 0.213600 | 0.205700 | -3.70 | -1.90 | 3 | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 19:49:58 | — |
-| CRCLBUSDT | LONG | 80.3400 | 81.3800 | 1.29 | +0.60 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 19:50:13 | — |
-| NILUSDT | LONG | 0.0915300 | 0.0840500 | -8.17 | -4.13 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
-| QNTUSDT | LONG | 199.720 | 199.350 | -0.19 | -0.14 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
-| XUSDUSDT | LONG | 1.00110 | 1.00120 | 0.01 | -0.05 | 10 | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 19:50:13 | — |
-| DASHUSDT | LONG | 54.8100 | 54.7000 | -0.20 | -0.15 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
-| MSTRBUSDT | LONG | 140.490 | 142.260 | 1.26 | +0.58 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
-| GRAMUSDT | LONG | 1.21900 | 1.23900 | 1.64 | +0.77 | 10 | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
-| ZECUSDT | LONG | 1293.51 | 1315.17 | 1.67 | +0.79 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| NEARUSDT | LONG | 4.56300 | 4.67700 | 2.50 | +1.20 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| BNBUSDT | LONG | 750.100 | 745.840 | -0.57 | -0.33 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| ENAUSDT | LONG | 0.212800 | 0.205700 | -3.34 | -1.72 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| SOXLBUSDT | LONG | 99.8400 | 103.980 | 4.15 | +2.02 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| XAUTUSDT | LONG | 4063.20 | 4032.53 | -0.75 | -0.43 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| TRXUSDT | LONG | 0.328300 | 0.331300 | 0.91 | +0.41 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| NILUSDT | LONG | 0.0928100 | 0.0840500 | -9.44 | -4.77 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| UNIUSDT | LONG | 7.16100 | 7.18600 | 0.35 | +0.12 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| QNTUSDT | LONG | 198.160 | 199.340 | 0.60 | +0.25 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| PUMPUSDT | LONG | 0.00428700 | 0.00435600 | 1.61 | +0.75 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 19:50:13 | — |
-| DOGEUSDT | LONG | 0.0781700 | 0.0797200 | 1.98 | +0.94 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 19:50:13 | — |
-| CHIPUSDT | LONG | 0.0541000 | 0.0542400 | 0.26 | +0.08 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| LTCUSDT | LONG | 56.6800 | 57.5700 | 1.57 | +0.73 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 19:50:13 | — |
-| ADAUSDT | LONG | 0.205600 | 0.206700 | 0.54 | +0.22 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 19:50:13 | — |
-| GOOGLBUSDT | LONG | 320.950 | 325.120 | 1.30 | +0.60 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| TAOUSDT | LONG | 251.400 | 257.800 | 2.55 | +1.22 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| MUBUSDT | LONG | 932.190 | 969.120 | 3.96 | +1.93 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| EURUSDT | LONG | 1.11610 | 1.11400 | -0.19 | -0.14 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| BCHUSDT | LONG | 287.600 | 299.100 | 4.00 | +1.95 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 19:50:13 | — |
-| RWUSDUSDT | LONG | 0.999800 | 0.999900 | 0.01 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
-| XLMUSDT | LONG | 0.169200 | 0.171700 | 1.48 | +0.69 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 19:50:13 | — |
-| HUMAUSDT | LONG | 0.0266300 | 0.0267600 | 0.49 | +0.19 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 00:06:43 | — |
-| ZROUSDT | LONG | 1.68300 | 1.72000 | 2.20 | +1.05 | 10 | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 00:06:51 | — |
-| GRAMUSDT | LONG | 1.21300 | 1.23900 | 2.14 | +1.02 | 10 | Gold div_bull 4s gold:div_bull | 28.10.2026 00:06:51 | — |
-| SOXLBUSDT | LONG | 101.020 | 104.000 | 2.95 | +1.42 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 00:06:52 | — |
-| SOLUSDT | LONG | 101.160 | 101.980 | 0.81 | +0.36 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 00:06:52 | — |
-| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 00:06:52 | — |
-| XLMUSDT | LONG | 0.170000 | 0.171700 | 1.00 | +0.45 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 00:06:52 | — |
-| CELOUSDT | LONG | 0.0818600 | 0.0806500 | -1.48 | -0.79 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 00:06:52 | — |
-| DOGEUSDT | LONG | 0.0784000 | 0.0797200 | 1.68 | +0.79 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:06:56 | 3g 15s |
-| SPCXBUSDT | LONG | 148.860 | 150.060 | 0.81 | +0.35 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:06:56 | 3g 15s |
-| INJUSDT | LONG | 8.10600 | 7.97500 | -1.62 | -0.86 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:07:01 | 3g 15s |
-| TRUMPUSDT | LONG | 1.69600 | 1.71700 | 1.24 | +0.57 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:07:03 | 3g 15s |
-| TRXUSDT | LONG | 0.331400 | 0.331300 | -0.03 | -0.07 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 00:07:20 | — |
-| MUBUSDT | LONG | 926.840 | 969.120 | 4.56 | +2.23 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 00:07:20 | — |
-| MSTRBUSDT | LONG | 140.360 | 142.260 | 1.35 | +0.63 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 00:07:21 | — |
-| AAVEUSDT | LONG | 132.480 | 134.570 | 1.58 | +0.74 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 28.10.2026 00:07:27 | — |
-| TRXUSDT | LONG | 0.331400 | 0.331300 | -0.03 | -0.07 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
-| XAUTUSDT | LONG | 4058.60 | 4032.53 | -0.64 | -0.37 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
-| PUMPUSDT | LONG | 0.00429500 | 0.00435600 | 1.42 | +0.66 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
-| SPCXBUSDT | LONG | 149.400 | 150.060 | 0.44 | +0.17 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
-| SKHYBUSDT | LONG | 145.200 | 156.520 | 7.80 | +3.85 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 00:07:51 | — |
-| REZUSDT | LONG | 0.00534200 | 0.00513100 | -3.95 | -2.02 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 00:07:51 | — |
-| ZECUSDT | LONG | 1297.22 | 1313.62 | 1.26 | +0.58 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| NEARUSDT | LONG | 4.62200 | 4.67500 | 1.15 | +0.52 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| SOXLBUSDT | LONG | 98.8000 | 104.020 | 5.28 | +2.59 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| ENAUSDT | LONG | 0.209000 | 0.205900 | -1.48 | -0.79 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| TRXUSDT | LONG | 0.331400 | 0.331300 | -0.03 | -0.07 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| XAUTUSDT | LONG | 4058.60 | 4032.53 | -0.64 | -0.37 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| NILUSDT | LONG | 0.0939400 | 0.0839700 | -10.61 | -5.35 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| UNIUSDT | LONG | 7.06600 | 7.18800 | 1.73 | +0.81 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| QNTUSDT | LONG | 199.530 | 199.430 | -0.05 | -0.08 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| TAOUSDT | LONG | 253.200 | 257.800 | 1.82 | +0.86 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| BMTUSDT | LONG | 0.0276200 | 0.0273900 | -0.83 | -0.47 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 00:07:51 | — |
-| MUBUSDT | LONG | 926.840 | 969.120 | 4.56 | +2.23 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| INJUSDT | LONG | 8.08500 | 7.97400 | -1.37 | -0.74 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| EURUSDT | LONG | 1.11450 | 1.11400 | -0.04 | -0.07 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| MSTRBUSDT | LONG | 140.360 | 142.260 | 1.35 | +0.63 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| PAXGUSDT | LONG | 4065.27 | 4042.26 | -0.57 | -0.33 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| CHIPUSDT | LONG | 0.0546500 | 0.0542400 | -0.75 | -0.42 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| SYNUSDT | LONG | 0.181030 | 0.180280 | -0.41 | -0.26 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| ONDOUSDT | LONG | 0.415900 | 0.418200 | 0.55 | +0.23 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| NVDABUSDT | LONG | 217.960 | 218.750 | 0.36 | +0.13 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| ARBUSDT | LONG | 0.167000 | 0.169600 | 1.56 | +0.73 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| BTCUSDT | LONG | 80817.8 | 80940.4 | 0.15 | +0.03 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| SOLUSDT | LONG | 101.160 | 101.990 | 0.82 | +0.36 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| XRPUSDT | LONG | 1.32450 | 1.32890 | 0.33 | +0.12 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| BNBUSDT | LONG | 749.110 | 745.840 | -0.44 | -0.27 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
-| ETHUSDT | LONG | 2349.95 | 2355.18 | 0.22 | +0.06 | 4 | LS İkili Uyumsuzluk + MACD ikili div (dipler 2316.00>2291.72, L/S 1.686<1.722) + MACD↑ | 28.10.2026 01:02:35 | — |
-| TRXUSDT | LONG | 0.331410 | 0.331300 | -0.03 | -0.07 | 4 | LS İkili Uyumsuzluk + MACD ikili div (dipler 0.328370>0.327020, L/S 0.572<0.579) + MACD↑ | 28.10.2026 01:02:35 | — |
-| SUIUSDT | LONG | 0.928000 | 0.937900 | 1.07 | +0.48 | 4 | LS İkili Uyumsuzluk + MACD ikili div (dipler 0.903800>0.900000, L/S 2.008<2.063) + MACD↑ | 28.10.2026 01:02:35 | — |
-| LINKUSDT | LONG | 11.5290 | 11.7550 | 1.96 | +0.93 | 4 | LS İkili Uyumsuzluk + MACD ikili div (dipler 11.2580>11.2440, L/S 2.160<2.284) + MACD↑ | 28.10.2026 01:02:35 | — |
-| ZROUSDT | LONG | 1.68300 | 1.71800 | 2.08 | +0.99 | 10 | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 01:02:51 | — |
-| GRAMUSDT | LONG | 1.21300 | 1.24000 | 2.23 | +1.06 | 10 | Gold div_bull 4s gold:div_bull | 28.10.2026 01:02:51 | — |
-| SOXLBUSDT | LONG | 101.020 | 103.980 | 2.93 | +1.41 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 01:02:51 | — |
-| SOLUSDT | LONG | 101.160 | 101.980 | 0.81 | +0.36 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:02:52 | — |
-| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:02:52 | — |
-| XLMUSDT | LONG | 0.170000 | 0.171700 | 1.00 | +0.45 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:02:52 | — |
-| CELOUSDT | LONG | 0.0818600 | 0.0806500 | -1.48 | -0.79 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:02:52 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:03:18 | — |
-| MUBUSDT | LONG | 927.870 | 969.120 | 4.45 | +2.17 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 01:03:19 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:03:19 | — |
-| SYNUSDT | LONG | 0.180050 | 0.180290 | 0.13 | +0.02 | 10 | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 01:03:19 | — |
-| ETHUSDT | LONG | 2350.97 | 2355.18 | 0.18 | +0.04 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
-| SOLUSDT | LONG | 101.380 | 101.990 | 0.60 | +0.25 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| PUMPUSDT | LONG | 0.00432000 | 0.00435500 | 0.81 | +0.35 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
-| AAVEUSDT | LONG | 132.650 | 134.580 | 1.45 | +0.68 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| QNTUSDT | LONG | 200.660 | 199.270 | -0.69 | -0.40 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| LINKUSDT | LONG | 11.5380 | 11.7550 | 1.88 | +0.89 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 01:03:49 | — |
-| ADAUSDT | LONG | 0.205700 | 0.206800 | 0.53 | +0.22 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| LTCUSDT | LONG | 56.8400 | 57.5600 | 1.27 | +0.58 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| TAOUSDT | LONG | 254.400 | 257.900 | 1.38 | +0.64 | 10 | HAM/MACD 15m macd:cross_up+ham:raw_dual_up | 28.10.2026 01:03:49 | — |
-| ERAUSDT | LONG | 0.0820000 | 0.0799000 | -2.56 | -1.33 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| AVAXUSDT | LONG | 8.91500 | 9.02000 | 1.18 | +0.54 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| GOOGLBUSDT | LONG | 322.460 | 325.120 | 0.82 | +0.36 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
-| EURUSDT | LONG | 1.11480 | 1.11410 | -0.06 | -0.08 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| HBARUSDT | LONG | 0.0761800 | 0.0765100 | 0.43 | +0.17 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| GRAMUSDT | LONG | 1.22300 | 1.24000 | 1.39 | +0.64 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
-| REZUSDT | LONG | 0.00540400 | 0.00513100 | -5.05 | -2.57 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
-| ZECUSDT | LONG | 1307.61 | 1313.63 | 0.46 | +0.18 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| NEARUSDT | LONG | 4.67700 | 4.67500 | -0.04 | -0.07 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| SOXLBUSDT | LONG | 99.1800 | 103.970 | 4.83 | +2.36 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| ENAUSDT | LONG | 0.211200 | 0.205900 | -2.51 | -1.30 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| XAUTUSDT | LONG | 4060.18 | 4032.53 | -0.68 | -0.39 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| NILUSDT | LONG | 0.0925700 | 0.0839200 | -9.34 | -4.72 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| UNIUSDT | LONG | 7.08900 | 7.18700 | 1.38 | +0.64 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| QNTUSDT | LONG | 200.660 | 199.300 | -0.68 | -0.39 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| DASHUSDT | LONG | 55.3000 | 54.6800 | -1.12 | -0.61 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 01:03:49 | — |
-| TAOUSDT | LONG | 254.400 | 257.900 | 1.38 | +0.64 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| MUBUSDT | LONG | 927.870 | 969.120 | 4.45 | +2.17 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| INJUSDT | LONG | 8.03100 | 7.98300 | -0.60 | -0.35 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| EURUSDT | LONG | 1.11480 | 1.11410 | -0.06 | -0.08 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
-| HBARUSDT | LONG | 0.0761400 | 0.0765100 | 0.49 | +0.19 | 25 | LS Dip Uyumsuzluk 2s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 27/10 05:00 0.0760300 → 27/10 17:00 0.0752700 (alçalan) · L/S dipleri 2.625 → 2.658 (yükselen)) | 28.10.2026 01:26:19 | — |
-| SOLUSDT | LONG | 101.110 | 101.980 | 0.86 | +0.38 | 25 | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 03:00 99.8100 → 27/10 11:00 99.1100 (alçalan) · L/S dipleri 2.189 → 2.427 (yükselen)) | 28.10.2026 01:26:33 | — |
-| AAVEUSDT | LONG | 132.370 | 134.590 | 1.68 | +0.79 | 25 | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200,DBL-lowest200,DBL-bdiv96 (fiyat dipleri 26/10 03:00 133.490 → 27/10 11:00 129.410 (alçalan) · L/S dipleri 1.948 → 2.293 (yükselen)) | 28.10.2026 01:26:52 | — |
-| LTCUSDT | LONG | 56.7500 | 57.5500 | 1.41 | +0.65 | 25 | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 03:00 55.9500 → 27/10 11:00 55.6900 (alçalan) · L/S dipleri 2.770 → 2.779 (yükselen)) | 28.10.2026 01:27:02 | — |
-| AVAXUSDT | LONG | 8.88700 | 9.02200 | 1.52 | +0.71 | 25 | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200,DBL-lowest200 (fiyat dipleri 26/10 03:00 8.75700 → 27/10 07:00 8.65600 (alçalan) · L/S dipleri 2.166 → 2.337 (yükselen)) | 28.10.2026 01:27:04 | — |
-| XLMUSDT | LONG | 0.169990 | 0.171700 | 1.01 | +0.45 | 25 | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 03:00 0.166450 → 27/10 11:00 0.166320 (alçalan) · L/S dipleri 1.841 → 1.918 (yükselen)) | 28.10.2026 01:27:05 | — |
-| ARBUSDT | LONG | 0.168030 | 0.169700 | 0.99 | +0.45 | 25 | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 23:00 0.165660 → 27/10 11:00 0.164120 (alçalan) · L/S dipleri 1.375 → 1.484 (yükselen)) | 28.10.2026 01:27:22 | — |
-| ZROUSDT | LONG | 1.68300 | 1.71800 | 2.08 | +0.99 | 10 | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 01:27:40 | — |
-| GRAMUSDT | LONG | 1.21300 | 1.23900 | 2.14 | +1.02 | 10 | Gold div_bull 4s gold:div_bull | 28.10.2026 01:27:40 | — |
-| SOXLBUSDT | LONG | 101.020 | 103.970 | 2.92 | +1.41 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 01:27:40 | — |
-| SOLUSDT | LONG | 101.160 | 101.980 | 0.81 | +0.36 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:27:40 | — |
-| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:27:40 | — |
-| XLMUSDT | LONG | 0.170000 | 0.171700 | 1.00 | +0.45 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:27:41 | — |
-| CELOUSDT | LONG | 0.0818600 | 0.0806400 | -1.49 | -0.79 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:27:41 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:28:07 | — |
-| MUBUSDT | LONG | 927.870 | 969.120 | 4.45 | +2.17 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 01:28:08 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:28:08 | — |
-| SYNUSDT | LONG | 0.180050 | 0.180500 | 0.25 | +0.07 | 10 | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 01:28:08 | — |
-| BTCUSDT | LONG | 80915.2 | 80940.4 | 0.03 | -0.03 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| ETHUSDT | LONG | 2350.05 | 2355.19 | 0.22 | +0.06 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:28:38 | — |
-| SOLUSDT | LONG | 101.250 | 101.990 | 0.73 | +0.32 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| NEARUSDT | LONG | 4.67500 | 4.67500 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| XRPUSDT | LONG | 1.32520 | 1.32890 | 0.28 | +0.09 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:28:38 | — |
-| SUIUSDT | LONG | 0.928200 | 0.937800 | 1.03 | +0.47 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| PUMPUSDT | LONG | 0.00433200 | 0.00435600 | 0.55 | +0.23 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| QNTUSDT | LONG | 199.850 | 199.320 | -0.27 | -0.18 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:28:38 | — |
-| LINKUSDT | LONG | 11.5290 | 11.7560 | 1.97 | +0.93 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 01:28:38 | — |
-| ADAUSDT | LONG | 0.205100 | 0.206800 | 0.83 | +0.36 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| LTCUSDT | LONG | 56.9400 | 57.5700 | 1.11 | +0.50 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| TAOUSDT | LONG | 253.900 | 257.900 | 1.58 | +0.74 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| BCHUSDT | LONG | 291.700 | 299.100 | 2.54 | +1.22 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| AVAXUSDT | LONG | 8.91900 | 9.02200 | 1.15 | +0.53 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| ERAUSDT | LONG | 0.0817000 | 0.0797000 | -2.45 | -1.27 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 01:28:38 | — |
-| MSTRBUSDT | LONG | 140.950 | 142.260 | 0.93 | +0.41 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
-| ZECUSDT | LONG | 1307.61 | 1313.95 | 0.48 | +0.19 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| NEARUSDT | LONG | 4.67700 | 4.67500 | -0.04 | -0.07 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| SOXLBUSDT | LONG | 99.1800 | 104.030 | 4.89 | +2.39 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| ENAUSDT | LONG | 0.211200 | 0.205900 | -2.51 | -1.30 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| XAUTUSDT | LONG | 4060.18 | 4032.53 | -0.68 | -0.39 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| NILUSDT | LONG | 0.0925700 | 0.0837600 | -9.52 | -4.81 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| UNIUSDT | LONG | 7.08900 | 7.18700 | 1.38 | +0.64 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| QNTUSDT | LONG | 200.660 | 199.230 | -0.71 | -0.41 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| DASHUSDT | LONG | 55.3000 | 54.6800 | -1.12 | -0.61 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 01:28:38 | — |
-| TAOUSDT | LONG | 254.400 | 257.900 | 1.38 | +0.64 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| MUBUSDT | LONG | 927.870 | 969.120 | 4.45 | +2.17 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| INJUSDT | LONG | 8.03100 | 7.98400 | -0.59 | -0.34 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| EURUSDT | LONG | 1.11480 | 1.11400 | -0.07 | -0.09 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
-| ETHUSDT | LONG | 2350.97 | 2355.02 | 0.17 | +0.04 | yok | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 01:58:59 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | yok | RSI + MACD 1s MACD↑+rm_x30 | 28.10.2026 01:59:03 | — |
-| SUIUSDT | LONG | 0.928800 | 0.937700 | 0.96 | +0.43 | yok | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 01:59:05 | — |
-| LINKUSDT | LONG | 11.5380 | 11.7570 | 1.90 | +0.90 | yok | RSI + MACD 1s MACD↑+rm_div1h,rm_div4h | 28.10.2026 01:59:12 | — |
-| ZROUSDT | LONG | 1.68300 | 1.71800 | 2.08 | +0.99 | 10 | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 01:59:28 | — |
-| GRAMUSDT | LONG | 1.21300 | 1.23900 | 2.14 | +1.02 | 10 | Gold div_bull 4s gold:div_bull | 28.10.2026 01:59:28 | — |
-| SOXLBUSDT | LONG | 101.020 | 103.960 | 2.91 | +1.40 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 01:59:28 | — |
-| SOLUSDT | LONG | 101.160 | 101.970 | 0.80 | +0.35 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:59:29 | — |
-| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:59:29 | — |
-| XLMUSDT | LONG | 0.170000 | 0.171700 | 1.00 | +0.45 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:59:29 | — |
-| CELOUSDT | LONG | 0.0818600 | 0.0806300 | -1.50 | -0.80 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:59:29 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:59:40 | — |
-| MUBUSDT | LONG | 927.870 | 969.120 | 4.45 | +2.17 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 01:59:41 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:59:41 | — |
-| SYNUSDT | LONG | 0.180050 | 0.180580 | 0.29 | +0.10 | 10 | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 01:59:41 | — |
-| TRXUSDT | LONG | 0.331600 | 0.331200 | -0.12 | -0.11 | 3 | KOMBİN: TP RSI Bulut 30m cloudX | 28.10.2026 01:59:43 | — |
-| UNIUSDT | LONG | 7.08400 | 7.19000 | 1.50 | +0.70 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:00:17 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:00:17 | — |
-| TRUMPUSDT | LONG | 1.70100 | 1.71700 | 0.94 | +0.42 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:00:17 | — |
-| ZECUSDT | LONG | 1307.61 | 1313.57 | 0.46 | +0.18 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| NEARUSDT | LONG | 4.67700 | 4.67500 | -0.04 | -0.07 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| SOXLBUSDT | LONG | 99.1800 | 104.040 | 4.90 | +2.40 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| ENAUSDT | LONG | 0.211200 | 0.205900 | -2.51 | -1.30 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| XAUTUSDT | LONG | 4060.18 | 4032.53 | -0.68 | -0.39 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| NILUSDT | LONG | 0.0925700 | 0.0838200 | -9.45 | -4.77 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| UNIUSDT | LONG | 7.08900 | 7.19000 | 1.42 | +0.66 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| QNTUSDT | LONG | 200.660 | 199.340 | -0.66 | -0.38 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| DASHUSDT | LONG | 55.3000 | 54.6800 | -1.12 | -0.61 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 02:00:17 | — |
-| TAOUSDT | LONG | 254.400 | 257.900 | 1.38 | +0.64 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| INJUSDT | LONG | 8.03100 | 8.00600 | -0.31 | -0.21 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| MUBUSDT | LONG | 927.870 | 969.120 | 4.45 | +2.17 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| EURUSDT | LONG | 1.11480 | 1.11400 | -0.07 | -0.09 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| PAXGUSDT | LONG | 4066.57 | 4042.26 | -0.60 | -0.35 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| ONDOUSDT | LONG | 0.418000 | 0.418200 | 0.05 | -0.03 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| CHIPUSDT | LONG | 0.0544300 | 0.0542500 | -0.33 | -0.22 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| ARBUSDT | LONG | 0.167700 | 0.169700 | 1.19 | +0.55 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| SYNUSDT | LONG | 0.180050 | 0.180500 | 0.25 | +0.07 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| NVDABUSDT | LONG | 217.880 | 218.730 | 0.39 | +0.14 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| SOLUSDT | LONG | 101.380 | 101.990 | 0.60 | +0.25 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| XRPUSDT | LONG | 1.32500 | 1.32890 | 0.29 | +0.10 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| BNBUSDT | LONG | 746.680 | 745.930 | -0.10 | -0.10 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| ENAUSDT | LONG | 0.211200 | 0.205900 | -2.51 | -1.30 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| HYPEUSDT | LONG | 81.1900 | 81.6000 | 0.50 | +0.20 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:00:17 | — |
-| NILUSDT | LONG | 0.0925700 | 0.0837900 | -9.48 | -4.79 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| WLDUSDT | LONG | 0.437300 | 0.436900 | -0.09 | -0.10 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:00:17 | — |
-| CRCLBUSDT | LONG | 81.1200 | 81.3400 | 0.27 | +0.09 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
-| BTCUSDT | LONG | 80905.8 | 80943.5 | 0.05 | -0.03 | yok | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 02:05:07 | — |
-| ZROUSDT | LONG | 1.68300 | 1.71800 | 2.08 | +0.99 | 10 | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 02:05:36 | — |
-| GRAMUSDT | LONG | 1.21300 | 1.23900 | 2.14 | +1.02 | 10 | Gold div_bull 4s gold:div_bull | 28.10.2026 02:05:36 | — |
-| SOXLBUSDT | LONG | 101.020 | 104.030 | 2.98 | +1.44 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 02:05:36 | — |
-| SOLUSDT | LONG | 101.160 | 102.000 | 0.83 | +0.36 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 02:05:36 | — |
-| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 02:05:36 | — |
-| XLMUSDT | LONG | 0.170000 | 0.171700 | 1.00 | +0.45 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 02:05:36 | — |
-| CELOUSDT | LONG | 0.0818600 | 0.0806500 | -1.48 | -0.79 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 02:05:36 | — |
-| CRCLBUSDT | LONG | 81.1100 | 81.3400 | 0.28 | +0.09 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 02:05:48 | — |
-| HUMAUSDT | LONG | 0.0259100 | 0.0266600 | 2.89 | +1.40 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 02:05:48 | — |
-| SYNUSDT | LONG | 0.179750 | 0.180500 | 0.42 | +0.16 | 10 | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 02:05:48 | — |
-| PEPEUSDT | LONG | 0.00000458000 | 0.00000476000 | 3.93 | +1.91 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
-| SUIUSDT | LONG | 0.929400 | 0.937800 | 0.90 | +0.40 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
-| UNIUSDT | LONG | 7.08400 | 7.19200 | 1.52 | +0.71 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
-| DOGEUSDT | LONG | 0.0788000 | 0.0797300 | 1.18 | +0.54 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
-| TRUMPUSDT | LONG | 1.70100 | 1.71700 | 0.94 | +0.42 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
-| ZECUSDT | LONG | 1310.42 | 1314.04 | 0.28 | +0.09 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| NEARUSDT | LONG | 4.70200 | 4.67700 | -0.53 | -0.32 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| SOXLBUSDT | LONG | 99.4100 | 104.040 | 4.66 | +2.28 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| ENAUSDT | LONG | 0.209000 | 0.205900 | -1.48 | -0.79 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| TRXUSDT | LONG | 0.331600 | 0.331300 | -0.09 | -0.10 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| XAUTUSDT | LONG | 4060.82 | 4032.53 | -0.70 | -0.40 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| NILUSDT | LONG | 0.0918600 | 0.0837500 | -8.83 | -4.46 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| UNIUSDT | LONG | 7.08400 | 7.19200 | 1.52 | +0.71 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| QNTUSDT | LONG | 200.480 | 199.150 | -0.66 | -0.38 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| DASHUSDT | LONG | 55.1200 | 54.7000 | -0.76 | -0.43 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 02:06:18 | — |
-| TAOUSDT | LONG | 255.200 | 257.800 | 1.02 | +0.46 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| RWUSDUSDT | LONG | 0.999600 | 0.999900 | 0.03 | -0.04 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| INJUSDT | LONG | 7.93800 | 8.00400 | 0.83 | +0.37 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| MUBUSDT | LONG | 927.090 | 969.120 | 4.53 | +2.22 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| EURUSDT | LONG | 1.11490 | 1.11400 | -0.08 | -0.09 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| MSTRBUSDT | LONG | 141.140 | 142.260 | 0.79 | +0.35 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| PAXGUSDT | LONG | 4068.58 | 4042.26 | -0.65 | -0.37 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| ONDOUSDT | LONG | 0.419600 | 0.418200 | -0.33 | -0.22 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| CHIPUSDT | LONG | 0.0541900 | 0.0542500 | 0.11 | +0.01 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| ARBUSDT | LONG | 0.166500 | 0.169700 | 1.92 | +0.91 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| SYNUSDT | LONG | 0.179750 | 0.180700 | 0.53 | +0.21 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| NVDABUSDT | LONG | 217.870 | 218.730 | 0.39 | +0.15 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| SOLUSDT | LONG | 101.380 | 101.990 | 0.60 | +0.25 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| XRPUSDT | LONG | 1.32500 | 1.32890 | 0.29 | +0.10 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| BNBUSDT | LONG | 746.680 | 745.990 | -0.09 | -0.10 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| ENAUSDT | LONG | 0.211200 | 0.205900 | -2.51 | -1.30 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| HYPEUSDT | LONG | 81.1900 | 81.6000 | 0.50 | +0.20 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:06:18 | — |
-| NILUSDT | LONG | 0.0925700 | 0.0837500 | -9.53 | -4.81 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| WLDUSDT | LONG | 0.437300 | 0.436800 | -0.11 | -0.11 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:06:18 | — |
-| CRCLBUSDT | LONG | 81.1200 | 81.3400 | 0.27 | +0.09 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| PUMPUSDT | LONG | 0.00432000 | 0.00435700 | 0.86 | +0.38 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up | 28.10.2026 02:06:18 | — |
-| DOGEUSDT | LONG | 0.0785800 | 0.0797200 | 1.45 | +0.68 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
-| SNDKBUSDT | LONG | 1309.96 | 1364.55 | 4.17 | +2.03 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 03:35:34 | — |
-| CELOUSDT | LONG | 0.0815500 | 0.0806500 | -1.10 | -0.60 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 03:35:34 | — |
-| XAUTUSDT | LONG | 4060.79 | 4032.53 | -0.70 | -0.40 | 25 | KOMBİN: TP RSI TSI 4s tsiG | 28.10.2026 03:35:35 | — |
-| PAXGUSDT | LONG | 4068.94 | 4042.26 | -0.66 | -0.38 | 25 | KOMBİN: TP RSI TSI 4s tsiG | 28.10.2026 03:35:35 | — |
-| SOLUSDT | LONG | 101.350 | 102.000 | 0.64 | +0.27 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
-| WLDUSDT | LONG | 0.439400 | 0.436800 | -0.59 | -0.35 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
-| PUMPUSDT | LONG | 0.00436000 | 0.00435700 | -0.07 | -0.08 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
-| AVAXUSDT | LONG | 8.96100 | 9.02400 | 0.70 | +0.30 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
-| CELOUSDT | LONG | 0.0815500 | 0.0806500 | -1.10 | -0.60 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 03:35:36 | — |
-| HBARUSDT | LONG | 0.0761000 | 0.0765000 | 0.53 | +0.21 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 03:35:36 | — |
-| ONDOUSDT | LONG | 0.420900 | 0.418200 | -0.64 | -0.37 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 03:35:46 | 3g 19s |
-| CRCLBUSDT | LONG | 81.0400 | 81.3400 | 0.37 | +0.14 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 03:35:48 | — |
-| HUMAUSDT | LONG | 0.0258700 | 0.0267300 | 3.32 | +1.61 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 03:35:48 | — |
-| NVDABUSDT | LONG | 218.320 | 218.730 | 0.19 | +0.04 | 10 | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 03:35:49 | — |
-| NEARUSDT | LONG | 4.67100 | 4.67500 | 0.09 | -0.01 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
-| WLDUSDT | LONG | 0.438500 | 0.436800 | -0.39 | -0.24 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
-| XUSDUSDT | LONG | 1.00100 | 1.00120 | 0.02 | -0.04 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
-| LINKUSDT | LONG | 11.5640 | 11.7580 | 1.68 | +0.79 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
-| HUMAUSDT | LONG | 0.0260100 | 0.0267300 | 2.77 | +1.33 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 03:36:19 | — |
-| AVAXUSDT | LONG | 8.95900 | 9.02300 | 0.71 | +0.31 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
-| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 03:36:19 | — |
-| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 03:36:19 | — |
-| ZECUSDT | LONG | 1309.60 | 1313.80 | 0.32 | +0.11 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| NEARUSDT | LONG | 4.68200 | 4.67400 | -0.17 | -0.14 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| SOXLBUSDT | LONG | 100.830 | 103.960 | 3.10 | +1.50 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| ENAUSDT | LONG | 0.208700 | 0.205800 | -1.39 | -0.74 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| XAUTUSDT | LONG | 4060.79 | 4032.53 | -0.70 | -0.40 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| NILUSDT | LONG | 0.0919600 | 0.0835600 | -9.13 | -4.61 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| UNIUSDT | LONG | 7.08500 | 7.18900 | 1.47 | +0.68 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| QNTUSDT | LONG | 199.390 | 199.010 | -0.19 | -0.15 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| MUBUSDT | LONG | 942.290 | 969.330 | 2.87 | +1.38 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| TAOUSDT | LONG | 255.800 | 257.800 | 0.78 | +0.34 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| RWUSDUSDT | LONG | 0.999800 | 0.999900 | 0.01 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| INJUSDT | LONG | 7.96600 | 8.00200 | 0.45 | +0.18 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| EURUSDT | LONG | 1.11440 | 1.11400 | -0.04 | -0.07 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| PAXGUSDT | LONG | 4068.94 | 4042.26 | -0.66 | -0.38 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| MSTRBUSDT | LONG | 141.270 | 142.260 | 0.70 | +0.30 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| ARBUSDT | LONG | 0.167500 | 0.169600 | 1.25 | +0.58 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| ONDOUSDT | LONG | 0.420900 | 0.418100 | -0.67 | -0.38 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| NVDABUSDT | LONG | 218.320 | 218.730 | 0.19 | +0.04 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| CHIPUSDT | LONG | 0.0541700 | 0.0542500 | 0.15 | +0.02 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| SYNUSDT | LONG | 0.178420 | 0.180350 | 1.08 | +0.49 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| XRPUSDT | LONG | 1.33130 | 1.32840 | -0.22 | -0.16 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| BNBUSDT | LONG | 744.940 | 745.930 | 0.13 | +0.02 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| ENAUSDT | LONG | 0.208700 | 0.205700 | -1.44 | -0.77 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| NILUSDT | LONG | 0.0919600 | 0.0835100 | -9.19 | -4.64 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
-| WLDUSDT | LONG | 0.439400 | 0.436500 | -0.66 | -0.38 | 10 | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 03:36:19 | — |
-| GRAMUSDT | LONG | 1.24100 | 1.24100 | 0.00 | -0.05 | 4 | LS Üçlü Uyumsuzluk + MACD üçlü div (fiyat dipleri 25/10 11:00 1.22700 → 26/10 15:00 1.20200 → 27/10 03:00 1.19000 (alçalan) · L/S dipleri 2.505 → 2.601 → 2.611 (yükselen)) + MACD↑ | 28.10.2026 08:25:43 | — |
-| PEPEUSDT | LONG | 0.00000483740 | 0.00000483740 | 0.00 | -0.05 | 4 | LS İkili Uyumsuzluk + MACD ikili div (fiyat dipleri 25/10 11:00 0.00000433490 → 26/10 03:00 0.00000420680 (alçalan) · L/S dipleri 1.457 → 1.464 (yükselen)) + MACD↑ | 28.10.2026 08:25:43 | — |
-| GRAMUSDT | LONG | 1.24100 | 1.24100 | 0.00 | -0.05 | 4 | LS İkili Uyumsuzluk + MACD ikili div (fiyat dipleri 25/10 11:00 1.22700 → 26/10 15:00 1.20200 (alçalan) · L/S dipleri 2.505 → 2.601 (yükselen)) + MACD↑ | 28.10.2026 08:25:43 | — |
-| PEPEUSDT | LONG | 0.00000483000 | 0.00000483000 | 0.00 | -0.05 | yok | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 08:27:09 | — |
-| XAUTUSDT | LONG | 4039.25 | 4039.25 | 0.00 | -0.05 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 08:27:34 | — |
-| PAXGUSDT | LONG | 4048.29 | 4048.29 | 0.00 | -0.05 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 08:27:35 | — |
-| TRUMPUSDT | LONG | 1.71800 | 1.71800 | 0.00 | -0.05 | 25 | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 08:27:35 | — |
-| XRPUSDT | LONG | 1.33720 | 1.33720 | 0.00 | -0.05 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 08:27:36 | — |
-| SNDKBUSDT | LONG | 1362.85 | 1362.85 | 0.00 | -0.05 | 10 | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 08:27:36 | — |
-| WLDUSDT | LONG | 0.439100 | 0.439100 | 0.00 | -0.05 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:27:36 | — |
-| PUMPUSDT | LONG | 0.00437700 | 0.00437700 | 0.00 | -0.05 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:27:36 | — |
-| AVAXUSDT | LONG | 9.03300 | 9.03300 | 0.00 | -0.05 | 10 | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:27:36 | — |
-| FETUSDT | LONG | 0.182500 | 0.182500 | 0.00 | -0.05 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 08:27:36 | — |
-| HBARUSDT | LONG | 0.0768600 | 0.0768600 | 0.00 | -0.05 | 10 | Hull c50_200 4s hull:c50_200 | 28.10.2026 08:27:36 | — |
-| TRXUSDT | LONG | 0.331300 | 0.331300 | 0.00 | -0.05 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 08:27:38 | 3g 23s |
-| FETUSDT | LONG | 0.182500 | 0.182500 | 0.00 | -0.05 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 08:27:41 | 3g 23s |
-| TAOUSDT | LONG | 258.300 | 258.300 | 0.00 | -0.05 | 10 | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 08:27:43 | 3g 23s |
-| ZAMAUSDT | LONG | 0.0769500 | 0.0769500 | 0.00 | -0.05 | 10 | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 08:27:49 | — |
-| NEARUSDT | LONG | 4.67700 | 4.67700 | 0.00 | -0.05 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:28:19 | — |
-| DOGEUSDT | LONG | 0.0797300 | 0.0797300 | 0.00 | -0.05 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:28:19 | — |
-| QNTUSDT | LONG | 199.030 | 199.030 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 08:28:19 | — |
-| MUBUSDT | LONG | 969.000 | 969.000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 08:28:19 | — |
-| AVAXUSDT | LONG | 9.01500 | 9.01500 | 0.00 | -0.05 | 10 | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:28:19 | — |
-| ERAUSDT | LONG | 0.0796000 | 0.0796000 | 0.00 | -0.05 | 10 | HAM/MACD 15m macd:cross_up | 28.10.2026 08:28:19 | — |
-| ZECUSDT | LONG | 1314.94 | 1314.94 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| NEARUSDT | LONG | 4.67400 | 4.67400 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| SOXLBUSDT | LONG | 103.100 | 103.100 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| ENAUSDT | LONG | 0.205500 | 0.205500 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| XAUTUSDT | LONG | 4032.66 | 4032.66 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| NILUSDT | LONG | 0.0827200 | 0.0827200 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| UNIUSDT | LONG | 7.19400 | 7.19400 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| XUSDUSDT | LONG | 1.00120 | 1.00120 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| SKHYBUSDT | LONG | 154.990 | 154.990 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| QNTUSDT | LONG | 198.750 | 198.750 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| MUBUSDT | LONG | 964.470 | 964.470 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| KORUBUSDT | LONG | 12.9300 | 12.9300 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| INJUSDT | LONG | 8.00500 | 8.00500 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| ERAUSDT | LONG | 0.0790000 | 0.0790000 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| EURUSDT | LONG | 1.11420 | 1.11420 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| PAXGUSDT | LONG | 4042.70 | 4042.70 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| ARBUSDT | LONG | 0.169900 | 0.169900 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| NVDABUSDT | LONG | 218.750 | 218.750 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| ONDOUSDT | LONG | 0.418700 | 0.418700 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| INITUSDT | LONG | 0.175900 | 0.175900 | 0.00 | -0.05 | 10 | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| XRPUSDT | LONG | 1.33720 | 1.33720 | 0.00 | -0.05 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| BNBUSDT | LONG | 747.270 | 747.270 | 0.00 | -0.05 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| ENAUSDT | LONG | 0.207000 | 0.207000 | 0.00 | -0.05 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| TRXUSDT | LONG | 0.331300 | 0.331300 | 0.00 | -0.05 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
-| NILUSDT | LONG | 0.0837800 | 0.0837800 | 0.00 | -0.05 | 10 | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+## MFE / MAE — kaynaklara göre (TP hedefi ayarı)
+MFE = girişten beri en iyi nokta, MAE = en kötü nokta (ort. girişe göre %). Açık + kapalı pozisyonlar; kapalılarda TP'de kesildiği için MFE ≤ TP.
+
+| Kaynak | n (açık/kapalı) | MFE medyan | MFE ort. | MAE medyan | MAE ort. | MFE≥3% | ≥5% | ≥10% | ≥15% | ≥25% |
+|---|---|---|---|---|---|---|---|---|---|---|
+| KAL Hibrit AL 1s | 212 (210/2) | 1.13% | 1.62% | -0.50% | -1.12% | 16.5% | 5.7% | 0.9% | 0% | 0% |
+| HAM/MACD 15m | 126 (121/5) | 1.65% | 2.21% | -0.30% | -1.38% | 20.6% | 11.1% | 3.2% | 0% | 0% |
+| KAL Hibrit AL 2s | 51 (51/0) | 0.81% | 1.06% | -0.23% | -1.06% | 5.9% | 3.9% | 0% | 0% | 0% |
+| PLI Yön 1s (alt/üst bant ↑) | 36 (33/3) | 1.91% | 3.83% | -0.60% | -2.01% | 41.7% | 13.9% | 8.3% | 5.6% | 0% |
+| KOMBİN: TP RSI Bulut 15m | 28 (15/13) | 2.66% | 3.62% | -1.72% | -2.32% | 46.4% | 14.3% | 7.1% | 3.6% | 0% |
+| OBV reg_bull 4s | 27 (27/0) | 0.76% | 1.27% | -0.20% | -2.78% | 11.1% | 11.1% | 0% | 0% | 0% |
+| Hull c50_200 4s | 26 (23/3) | 1.51% | 2.37% | -0.84% | -1.25% | 15.4% | 11.5% | 11.5% | 0% | 0% |
+| KOMBİN: TP RSI Bulut 2s | 25 (18/7) | 1.44% | 3.11% | -0.79% | -0.99% | 32% | 28% | 8% | 0% | 0% |
+| KOMBİN: TP RSI Bulut 30m | 23 (15/8) | 2.18% | 2.33% | -1.73% | -2.25% | 34.8% | 4.3% | 0% | 0% | 0% |
+| KOMBİN: PLI↑ + Bulut3− 4s | 18 (18/0) | 1.16% | 2.95% | -0.96% | -2.01% | 27.8% | 22.2% | 5.6% | 5.6% | 0% |
+| Gold div_bull 4s | 18 (15/3) | 2.56% | 4.00% | -0.75% | -1.17% | 38.9% | 27.8% | 16.7% | 0% | 0% |
+| Gold2 div_bull 4s | 17 (8/9) | 10.30% | 7.34% | -0.91% | -3.05% | 88.2% | 52.9% | 52.9% | 0% | 0% |
+| PLI DT div 4s | 17 (11/6) | 3.53% | 6.17% | -2.04% | -1.70% | 76.5% | 41.2% | 35.3% | 0% | 0% |
+| MA x_50_200 1s | 7 (6/1) | 1.38% | 3.10% | -1.42% | -1.11% | 28.6% | 14.3% | 14.3% | 0% | 0% |
+| LS İkili Uyumsuzluk + MACD | 6 (6/0) | 0.55% | 0.93% | -0.22% | -0.49% | 0% | 0% | 0% | 0% | 0% |
+| LS Dip Uyumsuzluk 4s | 6 (6/0) | 1.76% | 1.95% | -0.10% | -0.25% | 0% | 0% | 0% | 0% | 0% |
+| RSI + MACD 1s | 6 (6/0) | 0.59% | 0.96% | -0.27% | -0.45% | 0% | 0% | 0% | 0% | 0% |
+| KOMBİN: TP RSI TSI 4s | 5 (5/0) | 0.99% | 4.60% | -1.73% | -1.82% | 20% | 20% | 20% | 20% | 0% |
+| ham:raw_dual_up | 3 (0/3) | 1.76% | 4.30% | -6.13% | -4.83% | 33.3% | 33.3% | 33.3% | 0% | 0% |
+| LS Dip Uyumsuzluk 2s | 1 (1/0) | 1.52% | 1.52% | -0.54% | -0.54% | 0% | 0% | 0% | 0% | 0% |
+| LS Üçlü Uyumsuzluk + MACD | 1 (1/0) | 0.00% | 0.00% | -0.24% | -0.24% | 0% | 0% | 0% | 0% | 0% |
+
+## Açık pozisyonlar (596/600)
+| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | MFE % (zaman) | MAE % (zaman) | Kaynak | Açılış | Süreye kalan |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| TRXUSDT | LONG | 0.329100 | 0.331300 | 0.67 | +1.42 | 25 | +0.97 (28.10.2026 03:15:00) | -0.52 (27.10.2026 12:15:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 24.10.2026 22:51:07 | — |
+| RLUSDUSDT | LONG | 1.00130 | 1.00140 | 0.01 | -0.23 | 3 | +0.06 (27.10.2026 14:15:00) | -0.02 (27.10.2026 20:15:00) | KOMBİN: TP RSI Bulut 15m cloudX | 24.10.2026 22:51:50 | — |
+| LTCUSDT | LONG | 56.6600 | 57.4200 | 1.34 | +3.10 | 3 | +1.98 (28.10.2026 06:30:00) | -1.66 (27.10.2026 13:15:00) | KOMBİN: TP RSI Bulut 15m cloudX | 24.10.2026 23:05:54 | — |
+| EURUSDT | LONG | 1.12060 | 1.11400 | -0.59 | -1.72 | 10 | +0.30 (26.10.2026 00:00:00) | -0.62 (28.10.2026 08:31:00) | Gold div_bull 4s gold:div_bull | 24.10.2026 23:08:30 | — |
+| BNBUSDT | LONG | 730.160 | 745.380 | 2.08 | +4.96 | 10 | +3.31 (27.10.2026 18:15:00) | +0.00 (24.10.2026 23:09:32) | HAM/MACD 15m ham:raw_dual_up | 24.10.2026 23:09:32 | — |
+| TAOUSDT | LONG | 249.100 | 257.200 | 3.25 | +7.88 | 10 | +4.25 (28.10.2026 06:30:00) | -1.65 (25.10.2026 12:15:00) | HAM/MACD 15m ham:raw_dual_up | 24.10.2026 23:12:45 | — |
+| AAVEUSDT | LONG | 136.500 | 134.530 | -1.44 | -3.86 | 10 | +1.85 (25.10.2026 20:15:00) | -5.12 (27.10.2026 13:15:00) | HAM/MACD 15m ham:raw_dual_up | 24.10.2026 23:12:45 | — |
+| DASHUSDT | LONG | 52.4200 | 54.5200 | 4.01 | +9.64 | 10 | +6.68 (27.10.2026 11:00:00) | -4.50 (26.10.2026 06:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 02:46:15 | — |
+| XAUTUSDT | LONG | 3993.80 | 4029.46 | 0.89 | +1.96 | 3 | +1.88 (28.10.2026 03:00:00) | -0.36 (26.10.2026 04:00:00) | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 02:46:20 | — |
+| INJUSDT | LONG | 7.71800 | 7.94900 | 2.99 | +7.04 | 10 | +7.50 (27.10.2026 19:15:00) | -2.67 (25.10.2026 12:15:00) | Gold div_bull 4s gold:div_bull | 25.10.2026 05:50:43 | — |
+| GTCUSDT | LONG | 0.263280 | 0.241060 | -8.44 | -4.27 | 10 | +0.76 (28.10.2026 05:30:00) | -15.40 (26.10.2026 08:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 17:22:39 | — |
+| GTCUSDT | LONG | 0.263280 | 0.241060 | -8.44 | -4.27 | 10 | +0.76 (28.10.2026 05:30:00) | -15.40 (26.10.2026 08:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 17:29:55 | — |
+| GTCUSDT | LONG | 0.263280 | 0.241060 | -8.44 | -4.27 | 10 | +0.76 (28.10.2026 05:30:00) | -15.40 (26.10.2026 08:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 18:18:21 | — |
+| BNBUSDT | LONG | 737.330 | 745.380 | 1.09 | +0.50 | 10 | +2.30 (27.10.2026 18:15:00) | -0.66 (26.10.2026 11:00:00) | KOMBİN: TP RSI Bulut 2s cloudX | 25.10.2026 18:18:23 | 1g 9s |
+| DOTUSDT | LONG | 1.03700 | 1.00100 | -3.47 | -1.78 | 3 | +0.96 (25.10.2026 20:00:00) | -5.79 (27.10.2026 17:00:00) | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 18:19:17 | — |
+| ZECUSDT | LONG | 1214.55 | 1313.76 | 8.17 | +4.03 | 10 | +9.58 (28.10.2026 07:30:00) | -3.01 (26.10.2026 06:45:00) | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
+| BNBUSDT | LONG | 741.480 | 745.370 | 0.52 | +0.21 | 10 | +1.73 (27.10.2026 18:15:00) | -1.22 (26.10.2026 11:00:00) | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
+| SUIUSDT | LONG | 0.917500 | 0.935400 | 1.95 | +0.92 | 10 | +3.10 (28.10.2026 06:30:00) | -1.90 (26.10.2026 06:45:00) | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
+| LTCUSDT | LONG | 56.7600 | 57.4200 | 1.16 | +0.53 | 10 | +1.80 (28.10.2026 06:30:00) | -1.83 (27.10.2026 13:15:00) | HAM/MACD 15m ham:raw_dual_up | 25.10.2026 18:19:22 | — |
+| ADAUSDT | LONG | 0.205200 | 0.206300 | 0.54 | +0.22 | 10 | +1.66 (28.10.2026 06:30:00) | -2.29 (26.10.2026 06:45:00) | HAM/MACD 15m ham:raw_dual_up | 25.10.2026 18:19:22 | — |
+| AAVEUSDT | LONG | 136.520 | 134.510 | -1.47 | -0.79 | 10 | +1.83 (25.10.2026 20:15:00) | -5.13 (27.10.2026 13:15:00) | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
+| MSTRBUSDT | LONG | 144.950 | 142.290 | -1.84 | -0.97 | 10 | +0.59 (25.10.2026 20:15:00) | -5.13 (26.10.2026 16:30:00) | HAM/MACD 15m ham:raw_dual_up | 25.10.2026 18:19:22 | — |
+| PUMPUSDT | LONG | 0.00426700 | 0.00434600 | 1.85 | +0.88 | 10 | +3.59 (26.10.2026 18:00:00) | -4.10 (27.10.2026 12:45:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 25.10.2026 18:19:22 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (25.10.2026 18:19:22) | +0.00 (25.10.2026 18:19:22) | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
+| CRCLBUSDT | LONG | 85.0500 | 81.3500 | -4.35 | -2.22 | 10 | +0.92 (25.10.2026 20:15:00) | -7.58 (27.10.2026 16:30:00) | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:22 | — |
+| STRKUSDT | LONG | 0.0453100 | 0.0464600 | 2.54 | +1.22 | 10 | +5.19 (27.10.2026 22:15:00) | -2.47 (26.10.2026 10:30:00) | HAM/MACD 15m macd:cross_up | 25.10.2026 18:19:23 | — |
+| GTCUSDT | LONG | 0.250790 | 0.241130 | -3.85 | -1.97 | 10 | +5.78 (28.10.2026 05:30:00) | -11.19 (26.10.2026 08:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 20:03:59 | — |
+| NEARUSDT | LONG | 4.66700 | 4.68700 | 0.43 | +0.16 | 10 | +3.00 (28.10.2026 00:30:00) | -5.96 (27.10.2026 06:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 20:04:29 | — |
+| TRUMPUSDT | LONG | 1.66900 | 1.71000 | 2.46 | +1.18 | 10 | +3.60 (28.10.2026 05:15:00) | -3.06 (26.10.2026 06:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 20:04:30 | — |
+| CRCLBUSDT | LONG | 85.6000 | 81.3500 | -4.96 | -2.53 | 3 | +0.27 (25.10.2026 20:15:00) | -8.18 (27.10.2026 16:30:00) | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 20:04:42 | — |
+| ETHUSDT | LONG | 2357.01 | 2353.47 | -0.15 | -0.13 | 3 | +0.52 (28.10.2026 05:15:00) | -2.71 (26.10.2026 06:45:00) | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 20:04:46 | — |
+| SUIUSDT | LONG | 0.930500 | 0.935300 | 0.52 | +0.21 | 3 | +1.66 (28.10.2026 06:30:00) | -3.27 (26.10.2026 06:45:00) | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 20:04:48 | — |
+| ADAUSDT | LONG | 0.206700 | 0.206200 | -0.24 | -0.17 | 3 | +0.92 (28.10.2026 06:30:00) | -3.00 (26.10.2026 06:45:00) | KOMBİN: TP RSI Bulut 15m cloudX | 25.10.2026 20:04:52 | — |
+| GTCUSDT | LONG | 0.250790 | 0.241130 | -3.85 | -1.97 | 10 | +5.78 (28.10.2026 05:30:00) | -11.19 (26.10.2026 08:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 25.10.2026 22:36:11 | — |
+| SUIUSDT | LONG | 0.930600 | 0.935300 | 0.51 | +0.20 | 10 | +1.64 (28.10.2026 06:30:00) | -3.28 (26.10.2026 06:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:41 | — |
+| TRXUSDT | LONG | 0.330400 | 0.331300 | 0.27 | +0.09 | 10 | +0.57 (28.10.2026 03:15:00) | -0.91 (27.10.2026 12:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:41 | — |
+| ARBUSDT | LONG | 0.169600 | 0.169200 | -0.24 | -0.17 | 10 | +2.42 (26.10.2026 11:45:00) | -2.83 (27.10.2026 12:30:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:42 | — |
+| FILUSDT | LONG | 0.928700 | 0.909300 | -2.09 | -1.09 | 10 | +0.44 (26.10.2026 18:15:00) | -5.10 (27.10.2026 17:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 25.10.2026 22:36:42 | — |
+| ADAUSDT | LONG | 0.205500 | 0.206200 | 0.34 | +0.12 | 3 | +1.51 (28.10.2026 06:30:00) | -2.43 (26.10.2026 06:45:00) | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:48 | — |
+| XLMUSDT | LONG | 0.168800 | 0.171200 | 1.42 | +0.66 | 3 | +2.43 (28.10.2026 05:15:00) | -1.36 (27.10.2026 13:15:00) | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:54 | — |
+| MSTRBUSDT | LONG | 145.030 | 142.310 | -1.88 | -0.99 | 3 | +0.12 (26.10.2026 01:00:00) | -5.18 (26.10.2026 16:30:00) | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:55 | — |
+| APTUSDT | LONG | 0.703800 | 0.695600 | -1.17 | -0.63 | 3 | +1.42 (26.10.2026 18:15:00) | -4.23 (27.10.2026 17:00:00) | KOMBİN: TP RSI Bulut 30m cloudX | 25.10.2026 22:36:57 | — |
+| AAVEUSDT | LONG | 135.920 | 134.520 | -1.03 | -0.56 | 10 | +2.10 (26.10.2026 18:15:00) | -4.72 (27.10.2026 13:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 26.10.2026 01:04:18 | — |
+| DOTUSDT | LONG | 1.02400 | 1.00100 | -2.25 | -1.17 | 10 | +1.27 (26.10.2026 01:30:00) | -4.59 (27.10.2026 17:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 26.10.2026 01:04:18 | — |
+| TRXUSDT | LONG | 0.330500 | 0.331200 | 0.21 | +0.06 | 10 | +0.55 (28.10.2026 03:15:00) | -0.94 (27.10.2026 12:15:00) | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 01:04:48 | — |
+| HYPEUSDT | LONG | 76.4100 | 81.3900 | 6.52 | +3.21 | 10 | +7.50 (28.10.2026 05:00:00) | -1.86 (26.10.2026 06:45:00) | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 01:04:48 | — |
+| ZECUSDT | LONG | 1213.76 | 1314.09 | 8.27 | +4.08 | 10 | +9.65 (28.10.2026 07:30:00) | -2.95 (26.10.2026 06:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 26.10.2026 03:22:00 | — |
+| BTCUSDT | LONG | 80108.4 | 80978.4 | 1.09 | +0.49 | 10 | +1.49 (28.10.2026 00:30:00) | -0.92 (26.10.2026 06:45:00) | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 03:22:31 | — |
+| NEARUSDT | LONG | 4.60400 | 4.68800 | 1.82 | +0.86 | 10 | +4.41 (28.10.2026 00:30:00) | -4.67 (27.10.2026 06:15:00) | HAM/MACD 15m macd:cross_up | 26.10.2026 03:22:31 | — |
+| SUIUSDT | LONG | 0.921500 | 0.935400 | 1.51 | +0.70 | 10 | +2.65 (28.10.2026 06:30:00) | -2.32 (26.10.2026 06:45:00) | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 03:22:31 | — |
+| XAUTUSDT | LONG | 3991.36 | 4029.37 | 0.95 | +0.43 | 10 | +1.94 (28.10.2026 03:00:00) | -0.30 (26.10.2026 04:00:00) | HAM/MACD 15m ham:raw_dual_up | 26.10.2026 03:22:31 | — |
+| GTCUSDT | LONG | 0.246410 | 0.241130 | -2.14 | -1.12 | 10 | +7.66 (28.10.2026 05:30:00) | -9.61 (26.10.2026 08:15:00) | HAM/MACD 15m macd:cross_up | 26.10.2026 03:22:31 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (26.10.2026 03:22:31) | +0.00 (26.10.2026 03:22:31) | HAM/MACD 15m macd:cross_up | 26.10.2026 03:22:31 | — |
+| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | +0.64 (28.10.2026 03:15:00) | -0.85 (27.10.2026 12:15:00) | Gold div_bull 4s gold:div_bull | 26.10.2026 08:07:11 | — |
+| ENAUSDT | LONG | 0.203100 | 0.205800 | 1.33 | +0.61 | 10 | +6.60 (27.10.2026 19:30:00) | -2.81 (27.10.2026 13:15:00) | KOMBİN: TP RSI Bulut 2s cloudX | 26.10.2026 08:07:14 | 1g 23s |
+| EURUSDT | LONG | 1.12370 | 1.11400 | -0.86 | -0.48 | 10 | +0.03 (26.10.2026 08:15:00) | -0.89 (28.10.2026 08:31:00) | KOMBİN: TP RSI Bulut 2s cloudX | 26.10.2026 08:07:19 | 1g 23s |
+| SOLUSDT | LONG | 101.310 | 101.890 | 0.57 | +0.24 | 10 | +1.40 (26.10.2026 18:15:00) | -2.12 (27.10.2026 13:00:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 26.10.2026 08:08:13 | — |
+| XRPUSDT | LONG | 1.28830 | 1.32730 | 3.03 | +1.46 | 10 | +4.36 (28.10.2026 05:15:00) | -1.16 (26.10.2026 11:00:00) | HAM/MACD 15m macd:cross_up | 26.10.2026 08:08:13 | — |
+| NEARUSDT | LONG | 4.51300 | 4.68800 | 3.88 | +1.89 | 10 | +6.51 (28.10.2026 00:30:00) | -2.75 (27.10.2026 06:15:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 26.10.2026 08:08:13 | — |
+| ENAUSDT | LONG | 0.207700 | 0.205800 | -0.91 | -0.51 | 10 | +4.24 (27.10.2026 19:30:00) | -4.96 (27.10.2026 13:15:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 26.10.2026 08:08:13 | — |
+| FETUSDT | LONG | 0.172900 | 0.180600 | 4.45 | +2.18 | 25 | +6.25 (28.10.2026 06:30:00) | -1.27 (27.10.2026 06:15:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 26.10.2026 14:05:22 | — |
+| TRXUSDT | LONG | 0.330400 | 0.331300 | 0.27 | +0.09 | 10 | +0.57 (28.10.2026 03:15:00) | -0.91 (27.10.2026 12:15:00) | Gold div_bull 4s gold:div_bull | 26.10.2026 14:05:25 | — |
+| BEAMXUSDT | LONG | 0.00324800 | 0.00334200 | 2.89 | +1.40 | 10 | +6.40 (27.10.2026 17:45:00) | -1.29 (27.10.2026 13:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 26.10.2026 14:05:25 | — |
+| TRXUSDT | LONG | 0.331600 | 0.331300 | -0.09 | -0.10 | 10 | +0.21 (28.10.2026 03:15:00) | -1.27 (27.10.2026 12:15:00) | KOMBİN: TP RSI Bulut 2s cloudX | 26.10.2026 14:05:29 | 2g 5s |
+| KATUSDT | LONG | 0.00477000 | 0.00458000 | -3.98 | -2.04 | 10 | +1.68 (27.10.2026 06:00:00) | -13.63 (27.10.2026 13:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 26.10.2026 14:05:55 | — |
+| ADAUSDT | LONG | 0.204300 | 0.206200 | 0.93 | +0.41 | 3 | +2.10 (28.10.2026 06:30:00) | -1.47 (27.10.2026 13:00:00) | KOMBİN: TP RSI Bulut 30m cloudX | 26.10.2026 14:06:02 | — |
+| TRXUSDT | LONG | 0.331000 | 0.331200 | 0.06 | -0.02 | 25 | +0.39 (28.10.2026 03:15:00) | -1.09 (27.10.2026 12:15:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 26.10.2026 20:22:18 | — |
+| XUSDUSDT | LONG | 1.00130 | 1.00120 | -0.01 | -0.05 | 10 | +0.05 (27.10.2026 06:30:00) | -0.04 (27.10.2026 20:45:00) | Gold2 div_bull 4s gold2:div_bull | 26.10.2026 20:22:29 | — |
+| TRUMPUSDT | LONG | 1.69100 | 1.71000 | 1.12 | +0.51 | 10 | +2.25 (28.10.2026 05:15:00) | -1.60 (27.10.2026 13:00:00) | Gold div_bull 4s gold:div_bull | 26.10.2026 20:22:29 | — |
+| QNTUSDT | LONG | 210.460 | 199.360 | -5.27 | -2.69 | 10 | +1.21 (27.10.2026 10:30:00) | -6.62 (27.10.2026 08:30:00) | Hull c50_200 4s hull:c50_200 | 26.10.2026 20:22:30 | — |
+| UNIUSDT | LONG | 7.06600 | 7.17700 | 1.57 | +0.74 | 25 | +2.36 (28.10.2026 07:45:00) | -1.73 (27.10.2026 13:00:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 00:45:18 | — |
+| CHIPUSDT | LONG | 0.0529400 | 0.0544300 | 2.81 | +1.36 | 10 | +4.91 (28.10.2026 06:00:00) | -5.86 (27.10.2026 12:30:00) | Gold2 div_bull 4s gold2:div_bull | 27.10.2026 00:45:29 | — |
+| XUSDUSDT | LONG | 1.00130 | 1.00120 | -0.01 | -0.05 | 10 | +0.05 (27.10.2026 06:30:00) | -0.04 (27.10.2026 20:45:00) | Gold2 div_bull 4s gold2:div_bull | 27.10.2026 00:45:29 | — |
+| TRUMPUSDT | LONG | 1.70100 | 1.71000 | 0.53 | +0.21 | 10 | +1.65 (28.10.2026 05:15:00) | -2.17 (27.10.2026 13:00:00) | Gold div_bull 4s gold:div_bull | 27.10.2026 00:45:30 | — |
+| SKHYBUSDT | LONG | 142.790 | 156.090 | 9.31 | +4.60 | 10 | +9.84 (28.10.2026 08:29:00) | +0.00 (27.10.2026 00:45:30) | PLI DT div 4s pliDtDiv:pdt_d_div | 27.10.2026 00:45:30 | — |
+| CHIPUSDT | LONG | 0.0529400 | 0.0544300 | 2.81 | +1.36 | 10 | +4.91 (28.10.2026 06:00:00) | -5.86 (27.10.2026 12:30:00) | Hull c50_200 4s hull:c50_200 | 27.10.2026 00:45:30 | — |
+| NVDABUSDT | LONG | 216.280 | 218.940 | 1.23 | +0.56 | 10 | +1.44 (27.10.2026 19:00:00) | -0.67 (27.10.2026 11:00:00) | Hull c50_200 4s hull:c50_200 | 27.10.2026 00:45:30 | — |
+| ZECUSDT | LONG | 1228.30 | 1314.16 | 6.99 | +3.44 | 10 | +8.36 (28.10.2026 07:30:00) | -1.45 (27.10.2026 02:00:00) | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 00:45:31 | 2g 15s |
+| SNDKBUSDT | LONG | 1257.22 | 1360.18 | 8.19 | +4.04 | 10 | +8.86 (28.10.2026 06:45:00) | -0.28 (27.10.2026 10:00:00) | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 00:45:33 | 2g 15s |
+| NVDABUSDT | LONG | 216.280 | 218.940 | 1.23 | +0.56 | 10 | +1.44 (27.10.2026 19:00:00) | -0.67 (27.10.2026 11:00:00) | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 00:45:42 | 2g 15s |
+| NVDABUSDT | LONG | 216.910 | 218.940 | 0.94 | +0.42 | 10 | +1.14 (27.10.2026 19:00:00) | -0.95 (27.10.2026 11:00:00) | Hull c50_200 4s hull:c50_200 | 27.10.2026 03:53:27 | — |
+| BCHUSDT | LONG | 281.200 | 299.000 | 6.33 | +3.11 | 10 | +6.58 (28.10.2026 08:31:00) | -1.39 (27.10.2026 08:30:00) | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 03:53:37 | 2g 19s |
+| PAXGUSDT | LONG | 4017.66 | 4039.96 | 0.56 | +0.23 | 10 | +1.47 (28.10.2026 03:00:00) | -0.35 (27.10.2026 11:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 27.10.2026 03:53:55 | — |
+| BTCUSDT | LONG | 80275.0 | 80978.4 | 0.88 | +0.39 | 3 | +1.28 (28.10.2026 00:30:00) | -0.96 (27.10.2026 13:15:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:10 | — |
+| ETHUSDT | LONG | 2327.73 | 2353.99 | 1.13 | +0.51 | 3 | +1.78 (28.10.2026 05:15:00) | -1.30 (27.10.2026 13:15:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:10 | — |
+| PUMPUSDT | LONG | 0.00430300 | 0.00434600 | 1.00 | +0.45 | 3 | +2.46 (28.10.2026 06:30:00) | -4.90 (27.10.2026 12:45:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:16 | — |
+| AVAXUSDT | LONG | 8.95900 | 9.01100 | 0.58 | +0.24 | 3 | +1.42 (28.10.2026 06:30:00) | -3.31 (27.10.2026 08:30:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:19 | — |
+| XLMUSDT | LONG | 0.169500 | 0.171200 | 1.00 | +0.45 | 3 | +2.01 (28.10.2026 05:15:00) | -1.77 (27.10.2026 13:15:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 03:54:22 | — |
+| SOLUSDT | LONG | 100.170 | 101.880 | 1.71 | +0.80 | 25 | +2.27 (28.10.2026 06:30:00) | -1.01 (27.10.2026 13:00:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:29 | — |
+| ZROUSDT | LONG | 1.61300 | 1.71300 | 6.20 | +3.05 | 25 | +8.49 (28.10.2026 07:00:00) | -0.37 (27.10.2026 13:00:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:37 | — |
+| INTCBUSDT | LONG | 90.8100 | 95.2300 | 4.87 | +2.38 | 25 | +5.29 (28.10.2026 06:45:00) | -1.66 (27.10.2026 10:00:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:39 | — |
+| NVDABUSDT | LONG | 216.470 | 218.950 | 1.15 | +0.52 | 25 | +1.35 (27.10.2026 19:00:00) | -0.75 (27.10.2026 11:00:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 08:54:43 | — |
+| DASHUSDT | LONG | 53.8100 | 54.5200 | 1.32 | +0.61 | 10 | +3.92 (27.10.2026 11:00:00) | -0.26 (27.10.2026 17:45:00) | Gold div_bull 4s gold:div_bull | 27.10.2026 08:54:44 | — |
+| GRAMUSDT | LONG | 1.20000 | 1.23800 | 3.17 | +1.53 | 10 | +3.67 (28.10.2026 08:00:00) | +0.00 (27.10.2026 08:55:14) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 27.10.2026 08:55:14 | — |
+| UNIUSDT | LONG | 7.03800 | 7.17700 | 1.97 | +0.94 | 10 | +2.77 (28.10.2026 07:45:00) | -1.34 (27.10.2026 13:00:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 08:55:44 | — |
+| AAVEUSDT | LONG | 132.210 | 134.510 | 1.74 | +0.82 | 10 | +3.04 (28.10.2026 06:45:00) | -2.04 (27.10.2026 13:15:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 08:55:44 | — |
+| ZROUSDT | LONG | 1.61500 | 1.71300 | 6.07 | +2.98 | 10 | +8.36 (28.10.2026 07:00:00) | -0.49 (27.10.2026 13:00:00) | HAM/MACD 15m macd:cross_up | 27.10.2026 08:55:44 | — |
+| SOXLBUSDT | LONG | 88.2600 | 103.420 | 17.18 | +8.53 | 25 | +18.50 (28.10.2026 06:45:00) | +0.00 (27.10.2026 14:28:23) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 14:28:23 | — |
+| SYNUSDT | LONG | 0.195350 | 0.180710 | -7.49 | -3.80 | 25 | +0.00 (27.10.2026 14:28:34) | -12.14 (27.10.2026 17:00:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 14:28:34 | — |
+| BANKUSDT | LONG | 0.0278000 | 0.0295000 | 6.12 | +3.01 | 25 | +20.86 (28.10.2026 01:15:00) | -2.88 (27.10.2026 14:30:00) | KOMBİN: TP RSI TSI 4s tsiG | 27.10.2026 14:28:34 | — |
+| SPCXBUSDT | LONG | 147.220 | 150.050 | 1.92 | +0.91 | 10 | +2.91 (27.10.2026 19:00:00) | -0.21 (27.10.2026 16:30:00) | Hull c50_200 4s hull:c50_200 | 27.10.2026 14:28:35 | — |
+| XRPUSDT | LONG | 1.29680 | 1.32730 | 2.35 | +1.13 | 10 | +3.67 (28.10.2026 05:15:00) | +0.00 (27.10.2026 14:28:36) | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 14:28:36 | 3g 5s |
+| XAUTUSDT | LONG | 4004.96 | 4029.37 | 0.61 | +0.25 | 10 | +1.59 (28.10.2026 03:00:00) | +0.00 (27.10.2026 14:28:40) | KOMBİN: TP RSI Bulut 2s cloudX | 27.10.2026 14:28:40 | 3g 5s |
+| SPCXBUSDT | LONG | 148.800 | 150.050 | 0.84 | +0.37 | 3 | +1.82 (27.10.2026 19:00:00) | -1.27 (27.10.2026 16:30:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 14:29:22 | — |
+| XRPUSDT | LONG | 1.30460 | 1.32730 | 1.74 | +0.82 | 10 | +3.05 (28.10.2026 05:15:00) | -0.26 (27.10.2026 14:30:00) | HAM/MACD 15m macd:cross_up | 27.10.2026 14:29:34 | — |
+| ZROUSDT | LONG | 1.64700 | 1.71300 | 4.01 | +1.95 | 10 | +6.25 (28.10.2026 07:00:00) | +0.00 (27.10.2026 16:20:11) | Gold div_bull 4s gold:div_bull | 27.10.2026 16:20:11 | — |
+| SPCXBUSDT | LONG | 148.710 | 150.050 | 0.90 | +0.40 | 10 | +1.88 (27.10.2026 19:00:00) | -1.21 (27.10.2026 16:30:00) | Hull c50_200 4s hull:c50_200 | 27.10.2026 16:20:11 | — |
+| WLDUSDT | LONG | 0.435600 | 0.434900 | -0.16 | -0.13 | 10 | +1.91 (28.10.2026 00:30:00) | -2.46 (27.10.2026 17:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 27.10.2026 16:20:39 | — |
+| MSTRBUSDT | LONG | 141.350 | 142.290 | 0.67 | +0.28 | 3 | +1.20 (28.10.2026 06:45:00) | -1.68 (27.10.2026 17:00:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 16:21:05 | — |
+| XLMUSDT | LONG | 0.168100 | 0.171200 | 1.84 | +0.87 | 3 | +2.85 (28.10.2026 05:15:00) | -0.77 (27.10.2026 16:30:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 16:21:05 | — |
+| NEARUSDT | LONG | 4.54800 | 4.68600 | 3.03 | +1.47 | 10 | +5.70 (28.10.2026 00:30:00) | -1.43 (27.10.2026 17:00:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:09 | — |
+| SUIUSDT | LONG | 0.918400 | 0.935500 | 1.86 | +0.88 | 10 | +2.99 (28.10.2026 06:30:00) | -0.87 (27.10.2026 17:00:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:09 | — |
+| LINKUSDT | LONG | 11.3450 | 11.7300 | 3.39 | +1.65 | 10 | +4.25 (28.10.2026 06:45:00) | -0.58 (27.10.2026 16:30:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:09 | — |
+| RWUSDUSDT | LONG | 0.999900 | 1.00000 | 0.01 | -0.05 | 10 | +0.01 (27.10.2026 16:45:00) | -0.07 (28.10.2026 01:30:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 16:21:10 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (27.10.2026 16:21:10) | +0.00 (27.10.2026 16:21:10) | HAM/MACD 15m macd:cross_up | 27.10.2026 16:21:10 | — |
+| BTCUSDT | LONG | 80365.7 | 80978.4 | 0.76 | +0.33 | 10 | +1.16 (28.10.2026 00:30:00) | -0.59 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
+| ETHUSDT | LONG | 2335.22 | 2353.68 | 0.79 | +0.35 | 10 | +1.46 (28.10.2026 05:15:00) | -0.83 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
+| SOLUSDT | LONG | 100.910 | 101.890 | 0.97 | +0.44 | 10 | +1.52 (28.10.2026 06:30:00) | -1.02 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
+| ZECUSDT | LONG | 1268.05 | 1314.56 | 3.67 | +1.78 | 10 | +4.96 (28.10.2026 07:30:00) | -0.82 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| NEARUSDT | LONG | 4.56900 | 4.68600 | 2.56 | +1.23 | 10 | +5.21 (28.10.2026 00:30:00) | -1.88 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| BNBUSDT | LONG | 742.930 | 745.490 | 0.34 | +0.12 | 10 | +1.53 (27.10.2026 18:15:00) | -0.37 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_long+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| ENAUSDT | LONG | 0.207000 | 0.205700 | -0.63 | -0.36 | 10 | +4.59 (27.10.2026 19:30:00) | -1.84 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| SOXLBUSDT | LONG | 95.6300 | 103.420 | 8.15 | +4.02 | 10 | +9.37 (28.10.2026 06:45:00) | -1.47 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| CRCLBUSDT | LONG | 80.5400 | 81.3500 | 1.01 | +0.45 | 10 | +1.66 (27.10.2026 23:00:00) | -2.41 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
+| SUIUSDT | LONG | 0.921500 | 0.935500 | 1.52 | +0.71 | 10 | +2.65 (28.10.2026 06:30:00) | -1.21 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
+| QNTUSDT | LONG | 202.060 | 199.340 | -1.35 | -0.72 | 10 | +0.46 (28.10.2026 00:30:00) | -2.71 (27.10.2026 16:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| SNDKBUSDT | LONG | 1282.24 | 1360.26 | 6.08 | +2.99 | 10 | +6.73 (28.10.2026 06:45:00) | -1.61 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 16:21:10 | — |
+| HYPEUSDT | LONG | 78.7600 | 81.3900 | 3.34 | +1.62 | 10 | +4.29 (28.10.2026 05:00:00) | -0.13 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 16:21:10 | — |
+| NILUSDT | LONG | 0.0947500 | 0.0847500 | -10.55 | -5.32 | 10 | +1.18 (27.10.2026 21:30:00) | -13.17 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| TRXUSDT | LONG | 0.328600 | 0.331300 | 0.82 | +0.36 | 10 | +1.13 (28.10.2026 03:15:00) | -0.30 (27.10.2026 19:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| AAVEUSDT | LONG | 132.450 | 134.520 | 1.56 | +0.73 | 10 | +2.85 (28.10.2026 06:45:00) | -1.64 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 16:21:10 | — |
+| XAUTUSDT | LONG | 4023.92 | 4029.58 | 0.14 | +0.02 | 10 | +1.11 (28.10.2026 03:00:00) | -0.06 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| CHIPUSDT | LONG | 0.0532900 | 0.0544300 | 2.14 | +1.02 | 10 | +4.22 (28.10.2026 06:00:00) | -3.00 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| MUBUSDT | LONG | 926.570 | 968.360 | 4.51 | +2.20 | 10 | +4.64 (28.10.2026 08:24:00) | -1.56 (27.10.2026 16:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| TAOUSDT | LONG | 250.900 | 257.300 | 2.55 | +1.22 | 10 | +3.51 (28.10.2026 06:30:00) | -1.31 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| EURUSDT | LONG | 1.11710 | 1.11400 | -0.28 | -0.19 | 10 | +0.01 (27.10.2026 17:00:00) | -0.30 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| GOOGLBUSDT | LONG | 318.800 | 325.260 | 2.03 | +0.96 | 10 | +2.52 (28.10.2026 03:45:00) | -0.43 (27.10.2026 16:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| INJUSDT | LONG | 8.03800 | 7.94600 | -1.14 | -0.62 | 10 | +3.22 (27.10.2026 19:15:00) | -2.12 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| MSTRBUSDT | LONG | 142.170 | 142.300 | 0.09 | -0.00 | 10 | +0.61 (28.10.2026 06:45:00) | -2.24 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| ONDOUSDT | LONG | 0.413900 | 0.416600 | 0.65 | +0.28 | 10 | +2.25 (28.10.2026 05:15:00) | -1.01 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| INTCBUSDT | LONG | 92.5000 | 95.2300 | 2.95 | +1.42 | 10 | +3.36 (28.10.2026 06:45:00) | -0.57 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 16:21:10 | — |
+| SYNUSDT | LONG | 0.177320 | 0.180880 | 2.01 | +0.95 | 10 | +3.96 (27.10.2026 18:45:00) | -3.20 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| NVDABUSDT | LONG | 218.500 | 218.940 | 0.20 | +0.05 | 10 | +0.41 (27.10.2026 19:00:00) | -1.19 (27.10.2026 17:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| BTCUSDT | LONG | 79910.0 | 80978.4 | 1.34 | +0.62 | 10 | +1.74 (28.10.2026 00:30:00) | -0.03 (27.10.2026 17:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| ETHUSDT | LONG | 2316.04 | 2353.85 | 1.63 | +0.77 | 10 | +2.30 (28.10.2026 05:15:00) | -0.01 (27.10.2026 17:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| SOLUSDT | LONG | 100.130 | 101.880 | 1.75 | +0.82 | 10 | +2.31 (28.10.2026 06:30:00) | -0.25 (27.10.2026 17:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| ZECUSDT | LONG | 1249.48 | 1314.74 | 5.22 | +2.56 | 10 | +6.52 (28.10.2026 07:30:00) | +0.00 (27.10.2026 16:21:10) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| XRPUSDT | LONG | 1.30290 | 1.32730 | 1.87 | +0.89 | 10 | +3.19 (28.10.2026 05:15:00) | +0.00 (27.10.2026 16:21:10) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| BNBUSDT | LONG | 740.360 | 745.490 | 0.69 | +0.30 | 10 | +1.88 (27.10.2026 18:15:00) | -0.02 (27.10.2026 16:30:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| ENAUSDT | LONG | 0.201000 | 0.205700 | 2.34 | +1.12 | 10 | +7.71 (27.10.2026 19:30:00) | +0.00 (27.10.2026 16:21:10) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| CRCLBUSDT | LONG | 80.0500 | 81.3500 | 1.62 | +0.76 | 10 | +2.29 (27.10.2026 23:00:00) | -1.81 (27.10.2026 16:30:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 16:21:10 | — |
+| SPCXBUSDT | LONG | 150.170 | 150.040 | -0.09 | -0.09 | 25 | +0.43 (27.10.2026 20:00:00) | -0.91 (27.10.2026 22:45:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 19:49:02 | — |
+| INJUSDT | LONG | 8.19900 | 7.94600 | -3.09 | -1.59 | 25 | +0.00 (27.10.2026 19:49:08) | -3.72 (28.10.2026 06:00:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 27.10.2026 19:49:08 | — |
+| UNIUSDT | LONG | 7.16100 | 7.17700 | 0.22 | +0.06 | 25 | +1.00 (28.10.2026 07:45:00) | -1.73 (28.10.2026 00:15:00) | KOMBİN: TP RSI TSI 4s tsiG | 27.10.2026 19:49:12 | — |
+| SYNUSDT | LONG | 0.181640 | 0.180880 | -0.42 | -0.26 | 25 | +0.99 (28.10.2026 00:15:00) | -2.90 (27.10.2026 20:00:00) | KOMBİN: TP RSI TSI 4s tsiG | 27.10.2026 19:49:12 | — |
+| ZROUSDT | LONG | 1.68700 | 1.71300 | 1.54 | +0.72 | 10 | +3.73 (28.10.2026 07:00:00) | -1.90 (28.10.2026 00:15:00) | Gold div_bull 4s gold:div_bull | 27.10.2026 19:49:12 | — |
+| GRAMUSDT | LONG | 1.21500 | 1.23800 | 1.89 | +0.90 | 10 | +2.39 (28.10.2026 08:00:00) | -0.66 (27.10.2026 23:00:00) | Gold div_bull 4s gold:div_bull | 27.10.2026 19:49:12 | — |
+| SOXLBUSDT | LONG | 99.8400 | 103.420 | 3.59 | +1.74 | 10 | +4.76 (28.10.2026 06:45:00) | -1.52 (27.10.2026 23:00:00) | PLI DT div 4s pliDtDiv:pdt_d_div | 27.10.2026 19:49:12 | — |
+| XLMUSDT | LONG | 0.169200 | 0.171200 | 1.18 | +0.54 | 10 | +2.19 (28.10.2026 05:15:00) | -0.12 (27.10.2026 21:00:00) | Hull c50_200 4s hull:c50_200 | 27.10.2026 19:49:13 | — |
+| MUBUSDT | LONG | 932.190 | 968.360 | 3.88 | +1.89 | 10 | +4.01 (28.10.2026 08:24:00) | -0.93 (27.10.2026 23:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 27.10.2026 19:49:41 | — |
+| BCHUSDT | LONG | 287.600 | 298.900 | 3.93 | +1.91 | 10 | +4.21 (28.10.2026 08:31:00) | +0.00 (27.10.2026 19:49:42) | MA x_50_200 1s maSimple:x_50_200 | 27.10.2026 19:49:42 | — |
+| BNBUSDT | LONG | 751.100 | 745.480 | -0.75 | -0.42 | 3 | +0.24 (27.10.2026 20:15:00) | -1.21 (28.10.2026 03:30:00) | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:43 | — |
+| WLDUSDT | LONG | 0.439200 | 0.435000 | -0.96 | -0.53 | 3 | +1.07 (28.10.2026 00:30:00) | -1.73 (28.10.2026 00:15:00) | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:45 | — |
+| PUMPUSDT | LONG | 0.00431500 | 0.00434600 | 0.72 | +0.31 | 3 | +2.18 (28.10.2026 06:30:00) | -1.88 (27.10.2026 21:00:00) | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:47 | — |
+| TAOUSDT | LONG | 252.500 | 257.300 | 1.90 | +0.90 | 3 | +2.85 (28.10.2026 06:30:00) | -0.75 (27.10.2026 21:00:00) | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:50 | — |
+| ARBUSDT | LONG | 0.168800 | 0.169300 | 0.30 | +0.10 | 3 | +1.24 (28.10.2026 05:15:00) | -1.78 (28.10.2026 00:15:00) | KOMBİN: TP RSI Bulut 30m cloudX | 27.10.2026 19:49:56 | — |
+| ENAUSDT | LONG | 0.213600 | 0.205700 | -3.70 | -1.90 | 3 | +0.05 (28.10.2026 00:30:00) | -4.12 (28.10.2026 08:00:00) | KOMBİN: TP RSI Bulut 15m cloudX | 27.10.2026 19:49:58 | — |
+| CRCLBUSDT | LONG | 80.3400 | 81.3500 | 1.26 | +0.58 | 10 | +1.92 (27.10.2026 23:00:00) | -0.12 (27.10.2026 20:00:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 19:50:13 | — |
+| NILUSDT | LONG | 0.0915300 | 0.0848000 | -7.35 | -3.72 | 10 | +4.74 (27.10.2026 21:30:00) | -10.12 (28.10.2026 08:00:00) | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
+| QNTUSDT | LONG | 199.720 | 199.470 | -0.13 | -0.11 | 10 | +1.63 (28.10.2026 00:30:00) | -1.36 (28.10.2026 07:00:00) | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
+| XUSDUSDT | LONG | 1.00110 | 1.00120 | 0.01 | -0.05 | 10 | +0.02 (28.10.2026 05:30:00) | -0.02 (27.10.2026 20:45:00) | HAM/MACD 15m ham:raw_dual_up | 27.10.2026 19:50:13 | — |
+| DASHUSDT | LONG | 54.8100 | 54.5300 | -0.51 | -0.31 | 10 | +1.73 (28.10.2026 00:30:00) | -0.71 (28.10.2026 08:45:00) | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (27.10.2026 19:50:13) | +0.00 (27.10.2026 19:50:13) | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
+| MSTRBUSDT | LONG | 140.490 | 142.300 | 1.29 | +0.59 | 10 | +1.81 (28.10.2026 06:45:00) | -0.57 (27.10.2026 21:00:00) | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
+| GRAMUSDT | LONG | 1.21900 | 1.23800 | 1.56 | +0.73 | 10 | +2.05 (28.10.2026 08:00:00) | -0.98 (27.10.2026 23:00:00) | HAM/MACD 15m macd:cross_up | 27.10.2026 19:50:13 | — |
+| ZECUSDT | LONG | 1293.51 | 1314.83 | 1.65 | +0.77 | 10 | +2.89 (28.10.2026 07:30:00) | -0.54 (27.10.2026 21:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| NEARUSDT | LONG | 4.56300 | 4.68700 | 2.72 | +1.31 | 10 | +5.35 (28.10.2026 00:30:00) | +0.00 (27.10.2026 19:50:13) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| BNBUSDT | LONG | 750.100 | 745.490 | -0.61 | -0.36 | 10 | +0.37 (27.10.2026 20:15:00) | -1.08 (28.10.2026 03:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| ENAUSDT | LONG | 0.212800 | 0.205700 | -3.34 | -1.72 | 10 | +0.42 (28.10.2026 00:30:00) | -3.76 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| SOXLBUSDT | LONG | 99.8400 | 103.420 | 3.59 | +1.74 | 10 | +4.76 (28.10.2026 06:45:00) | -1.52 (27.10.2026 23:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| XAUTUSDT | LONG | 4063.20 | 4029.29 | -0.83 | -0.47 | 10 | +0.14 (28.10.2026 03:00:00) | -0.90 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| TRXUSDT | LONG | 0.328300 | 0.331200 | 0.88 | +0.39 | 10 | +1.22 (28.10.2026 03:15:00) | -0.21 (27.10.2026 20:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| NILUSDT | LONG | 0.0928100 | 0.0848000 | -8.63 | -4.36 | 10 | +3.30 (27.10.2026 21:30:00) | -11.36 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| UNIUSDT | LONG | 7.16100 | 7.17800 | 0.24 | +0.07 | 10 | +1.00 (28.10.2026 07:45:00) | -1.73 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| QNTUSDT | LONG | 198.160 | 199.470 | 0.66 | +0.28 | 10 | +2.43 (28.10.2026 00:30:00) | -0.58 (28.10.2026 07:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| PUMPUSDT | LONG | 0.00428700 | 0.00434500 | 1.35 | +0.63 | 10 | +2.85 (28.10.2026 06:30:00) | -1.24 (27.10.2026 21:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 19:50:13 | — |
+| DOGEUSDT | LONG | 0.0781700 | 0.0796100 | 1.84 | +0.87 | 10 | +2.73 (28.10.2026 06:30:00) | -0.20 (27.10.2026 21:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 19:50:13 | — |
+| CHIPUSDT | LONG | 0.0541000 | 0.0544300 | 0.61 | +0.25 | 10 | +2.66 (28.10.2026 06:00:00) | -1.74 (27.10.2026 21:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| LTCUSDT | LONG | 56.6800 | 57.4100 | 1.29 | +0.59 | 10 | +1.94 (28.10.2026 06:30:00) | -0.27 (27.10.2026 20:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 19:50:13 | — |
+| ADAUSDT | LONG | 0.205600 | 0.206200 | 0.29 | +0.10 | 10 | +1.46 (28.10.2026 06:30:00) | -0.63 (27.10.2026 21:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 19:50:13 | — |
+| GOOGLBUSDT | LONG | 320.950 | 325.260 | 1.34 | +0.62 | 10 | +1.84 (28.10.2026 03:45:00) | +0.00 (27.10.2026 19:50:13) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| TAOUSDT | LONG | 251.400 | 257.300 | 2.35 | +1.12 | 10 | +3.30 (28.10.2026 06:30:00) | -0.32 (27.10.2026 21:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| MUBUSDT | LONG | 932.190 | 968.360 | 3.88 | +1.89 | 10 | +4.01 (28.10.2026 08:24:00) | -0.93 (27.10.2026 23:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| EURUSDT | LONG | 1.11610 | 1.11400 | -0.19 | -0.14 | 10 | +0.00 (27.10.2026 19:50:13) | -0.21 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| BCHUSDT | LONG | 287.600 | 299.000 | 3.96 | +1.93 | 10 | +4.21 (28.10.2026 08:31:00) | +0.00 (27.10.2026 19:50:13) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 27.10.2026 19:50:13 | — |
+| RWUSDUSDT | LONG | 0.999800 | 1.00000 | 0.02 | -0.04 | 10 | +0.02 (28.10.2026 04:30:00) | -0.06 (28.10.2026 01:30:00) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 27.10.2026 19:50:13 | — |
+| XLMUSDT | LONG | 0.169200 | 0.171200 | 1.18 | +0.54 | 10 | +2.19 (28.10.2026 05:15:00) | -0.12 (27.10.2026 21:00:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 27.10.2026 19:50:13 | — |
+| HUMAUSDT | LONG | 0.0266300 | 0.0266700 | 0.15 | +0.03 | 25 | +1.43 (28.10.2026 08:41:00) | -8.22 (28.10.2026 04:15:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 00:06:43 | — |
+| ZROUSDT | LONG | 1.68300 | 1.71300 | 1.78 | +0.84 | 10 | +3.98 (28.10.2026 07:00:00) | -1.66 (28.10.2026 00:15:00) | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 00:06:51 | — |
+| GRAMUSDT | LONG | 1.21300 | 1.23800 | 2.06 | +0.98 | 10 | +2.56 (28.10.2026 08:00:00) | +0.00 (28.10.2026 00:06:51) | Gold div_bull 4s gold:div_bull | 28.10.2026 00:06:51 | — |
+| SOXLBUSDT | LONG | 101.020 | 103.410 | 2.37 | +1.13 | 10 | +3.53 (28.10.2026 06:45:00) | -2.46 (28.10.2026 00:15:00) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 00:06:52 | — |
+| SOLUSDT | LONG | 101.160 | 101.890 | 0.72 | +0.31 | 10 | +1.26 (28.10.2026 06:30:00) | -0.23 (28.10.2026 00:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 00:06:52 | — |
+| TRXUSDT | LONG | 0.330200 | 0.331200 | 0.30 | +0.10 | 10 | +0.64 (28.10.2026 03:15:00) | +0.00 (28.10.2026 00:06:52) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 00:06:52 | — |
+| XLMUSDT | LONG | 0.170000 | 0.171200 | 0.71 | +0.30 | 10 | +1.71 (28.10.2026 05:15:00) | -0.23 (28.10.2026 00:15:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 00:06:52 | — |
+| CELOUSDT | LONG | 0.0818600 | 0.0804900 | -1.67 | -0.89 | 10 | +0.49 (28.10.2026 05:30:00) | -1.97 (28.10.2026 08:34:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 00:06:52 | — |
+| DOGEUSDT | LONG | 0.0784000 | 0.0796100 | 1.54 | +0.72 | 10 | +2.42 (28.10.2026 06:30:00) | -0.13 (28.10.2026 00:15:00) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:06:56 | 3g 15s |
+| SPCXBUSDT | LONG | 148.860 | 150.030 | 0.79 | +0.34 | 10 | +0.96 (28.10.2026 06:45:00) | +0.00 (28.10.2026 00:06:56) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:06:56 | 3g 15s |
+| INJUSDT | LONG | 8.10600 | 7.94600 | -1.97 | -1.04 | 10 | +0.85 (28.10.2026 00:30:00) | -2.62 (28.10.2026 06:00:00) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:07:01 | 3g 15s |
+| TRUMPUSDT | LONG | 1.69600 | 1.71000 | 0.83 | +0.36 | 10 | +1.95 (28.10.2026 05:15:00) | -0.53 (28.10.2026 00:15:00) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 00:07:03 | 3g 15s |
+| TRXUSDT | LONG | 0.331400 | 0.331300 | -0.03 | -0.07 | 10 | +0.27 (28.10.2026 03:15:00) | -0.15 (28.10.2026 07:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 00:07:20 | — |
+| MUBUSDT | LONG | 926.840 | 967.990 | 4.44 | +2.17 | 10 | +4.61 (28.10.2026 08:24:00) | -0.14 (28.10.2026 00:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 00:07:20 | — |
+| MSTRBUSDT | LONG | 140.360 | 142.350 | 1.42 | +0.66 | 10 | +1.91 (28.10.2026 06:45:00) | -0.16 (28.10.2026 00:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 00:07:21 | — |
+| AAVEUSDT | LONG | 132.480 | 134.470 | 1.50 | +0.70 | 3 | +2.83 (28.10.2026 06:45:00) | -0.71 (28.10.2026 00:15:00) | KOMBİN: TP RSI Bulut 30m cloudX | 28.10.2026 00:07:27 | — |
+| TRXUSDT | LONG | 0.331400 | 0.331200 | -0.06 | -0.08 | 10 | +0.27 (28.10.2026 03:15:00) | -0.15 (28.10.2026 07:45:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
+| XAUTUSDT | LONG | 4058.60 | 4029.29 | -0.72 | -0.41 | 10 | +0.25 (28.10.2026 03:00:00) | -0.79 (28.10.2026 08:30:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
+| PUMPUSDT | LONG | 0.00429500 | 0.00434500 | 1.16 | +0.53 | 10 | +2.65 (28.10.2026 06:30:00) | -0.70 (28.10.2026 00:15:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
+| SPCXBUSDT | LONG | 149.400 | 150.040 | 0.43 | +0.16 | 10 | +0.60 (28.10.2026 06:45:00) | -0.15 (28.10.2026 01:30:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
+| SKHYBUSDT | LONG | 145.200 | 156.210 | 7.58 | +3.74 | 10 | +8.02 (28.10.2026 08:29:00) | -0.26 (28.10.2026 00:15:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 00:07:51 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 00:07:51) | +0.00 (28.10.2026 00:07:51) | HAM/MACD 15m macd:cross_up | 28.10.2026 00:07:51 | — |
+| REZUSDT | LONG | 0.00534200 | 0.00507800 | -4.94 | -2.52 | 10 | +2.73 (28.10.2026 00:15:00) | -7.75 (28.10.2026 05:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 00:07:51 | — |
+| ZECUSDT | LONG | 1297.22 | 1314.89 | 1.36 | +0.63 | 10 | +2.60 (28.10.2026 07:30:00) | -0.47 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| NEARUSDT | LONG | 4.62200 | 4.68700 | 1.41 | +0.65 | 10 | +4.00 (28.10.2026 00:30:00) | -0.50 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| SOXLBUSDT | LONG | 98.8000 | 103.400 | 4.66 | +2.28 | 10 | +5.86 (28.10.2026 06:45:00) | -0.26 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| ENAUSDT | LONG | 0.209000 | 0.205600 | -1.63 | -0.86 | 10 | +2.25 (28.10.2026 00:30:00) | -2.01 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| TRXUSDT | LONG | 0.331400 | 0.331200 | -0.06 | -0.08 | 10 | +0.27 (28.10.2026 03:15:00) | -0.15 (28.10.2026 07:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| XAUTUSDT | LONG | 4058.60 | 4030.55 | -0.69 | -0.40 | 10 | +0.25 (28.10.2026 03:00:00) | -0.79 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| NILUSDT | LONG | 0.0939400 | 0.0849500 | -9.57 | -4.83 | 10 | +0.00 (28.10.2026 00:07:51) | -12.42 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| UNIUSDT | LONG | 7.06600 | 7.17700 | 1.57 | +0.74 | 10 | +2.36 (28.10.2026 07:45:00) | -0.41 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| QNTUSDT | LONG | 199.530 | 199.470 | -0.03 | -0.07 | 10 | +1.73 (28.10.2026 00:30:00) | -1.27 (28.10.2026 07:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| TAOUSDT | LONG | 253.200 | 257.300 | 1.62 | +0.76 | 10 | +2.57 (28.10.2026 06:30:00) | -0.40 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| RWUSDUSDT | LONG | 0.999900 | 1.00000 | 0.01 | -0.05 | 10 | +0.01 (28.10.2026 04:30:00) | -0.07 (28.10.2026 01:30:00) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| BMTUSDT | LONG | 0.0276200 | 0.0273300 | -1.05 | -0.57 | 10 | +7.02 (28.10.2026 03:00:00) | -1.59 (28.10.2026 08:33:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 00:07:51 | — |
+| MUBUSDT | LONG | 926.840 | 967.990 | 4.44 | +2.17 | 10 | +4.61 (28.10.2026 08:24:00) | -0.14 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| INJUSDT | LONG | 8.08500 | 7.94900 | -1.68 | -0.89 | 10 | +1.11 (28.10.2026 00:30:00) | -2.36 (28.10.2026 06:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| EURUSDT | LONG | 1.11450 | 1.11400 | -0.04 | -0.07 | 10 | +0.05 (28.10.2026 03:00:00) | -0.07 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| MSTRBUSDT | LONG | 140.360 | 142.350 | 1.42 | +0.66 | 10 | +1.91 (28.10.2026 06:45:00) | -0.16 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| PAXGUSDT | LONG | 4065.27 | 4039.96 | -0.62 | -0.36 | 10 | +0.28 (28.10.2026 03:00:00) | -0.65 (28.10.2026 08:37:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| CHIPUSDT | LONG | 0.0546500 | 0.0544300 | -0.40 | -0.25 | 10 | +1.63 (28.10.2026 06:00:00) | -1.68 (28.10.2026 01:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| SYNUSDT | LONG | 0.181030 | 0.180730 | -0.17 | -0.13 | 10 | +1.33 (28.10.2026 00:15:00) | -2.12 (28.10.2026 03:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| ONDOUSDT | LONG | 0.415900 | 0.416700 | 0.19 | +0.05 | 10 | +1.75 (28.10.2026 05:15:00) | -0.19 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| NVDABUSDT | LONG | 217.960 | 218.940 | 0.45 | +0.17 | 10 | +0.47 (28.10.2026 07:00:00) | -0.17 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| ARBUSDT | LONG | 0.167000 | 0.169200 | 1.32 | +0.61 | 10 | +2.33 (28.10.2026 05:15:00) | -0.72 (28.10.2026 00:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| BTCUSDT | LONG | 80817.8 | 80978.4 | 0.20 | +0.05 | 10 | +0.60 (28.10.2026 00:30:00) | -0.24 (28.10.2026 04:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| SOLUSDT | LONG | 101.160 | 101.890 | 0.72 | +0.31 | 10 | +1.26 (28.10.2026 06:30:00) | -0.23 (28.10.2026 00:15:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| XRPUSDT | LONG | 1.32450 | 1.32730 | 0.21 | +0.06 | 10 | +1.50 (28.10.2026 05:15:00) | -0.52 (28.10.2026 00:15:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| BNBUSDT | LONG | 749.110 | 745.480 | -0.48 | -0.29 | 10 | +0.12 (28.10.2026 00:30:00) | -0.95 (28.10.2026 03:30:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 00:07:51 | — |
+| ETHUSDT | LONG | 2349.95 | 2353.86 | 0.17 | +0.03 | 4 | +0.82 (28.10.2026 05:15:00) | -0.39 (28.10.2026 04:00:00) | LS İkili Uyumsuzluk + MACD ikili div (dipler 2316.00>2291.72, L/S 1.686<1.722) + MACD↑ | 28.10.2026 01:02:35 | — |
+| TRXUSDT | LONG | 0.331410 | 0.331300 | -0.03 | -0.07 | 4 | +0.27 (28.10.2026 03:15:00) | -0.15 (28.10.2026 07:45:00) | LS İkili Uyumsuzluk + MACD ikili div (dipler 0.328370>0.327020, L/S 0.572<0.579) + MACD↑ | 28.10.2026 01:02:35 | — |
+| SUIUSDT | LONG | 0.928000 | 0.935500 | 0.81 | +0.35 | 4 | +1.93 (28.10.2026 06:30:00) | -0.20 (28.10.2026 01:30:00) | LS İkili Uyumsuzluk + MACD ikili div (dipler 0.903800>0.900000, L/S 2.008<2.063) + MACD↑ | 28.10.2026 01:02:35 | — |
+| LINKUSDT | LONG | 11.5290 | 11.7300 | 1.74 | +0.82 | 4 | +2.58 (28.10.2026 06:45:00) | -0.17 (28.10.2026 01:30:00) | LS İkili Uyumsuzluk + MACD ikili div (dipler 11.2580>11.2440, L/S 2.160<2.284) + MACD↑ | 28.10.2026 01:02:35 | — |
+| ZROUSDT | LONG | 1.68300 | 1.71300 | 1.78 | +0.84 | 10 | +3.98 (28.10.2026 07:00:00) | -0.89 (28.10.2026 02:30:00) | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 01:02:51 | — |
+| GRAMUSDT | LONG | 1.21300 | 1.23800 | 2.06 | +0.98 | 10 | +2.56 (28.10.2026 08:00:00) | +0.00 (28.10.2026 01:02:51) | Gold div_bull 4s gold:div_bull | 28.10.2026 01:02:51 | — |
+| SOXLBUSDT | LONG | 101.020 | 103.430 | 2.39 | +1.14 | 10 | +3.53 (28.10.2026 06:45:00) | -2.17 (28.10.2026 01:15:00) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 01:02:51 | — |
+| SOLUSDT | LONG | 101.160 | 101.890 | 0.72 | +0.31 | 10 | +1.26 (28.10.2026 06:30:00) | -0.12 (28.10.2026 04:00:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:02:52 | — |
+| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | +0.64 (28.10.2026 03:15:00) | +0.00 (28.10.2026 01:02:52) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:02:52 | — |
+| XLMUSDT | LONG | 0.170000 | 0.171100 | 0.65 | +0.27 | 10 | +1.71 (28.10.2026 05:15:00) | -0.18 (28.10.2026 02:15:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:02:52 | — |
+| CELOUSDT | LONG | 0.0818600 | 0.0805000 | -1.66 | -0.88 | 10 | +0.49 (28.10.2026 05:30:00) | -1.97 (28.10.2026 08:34:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:02:52 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:03:18 | — |
+| MUBUSDT | LONG | 927.870 | 967.990 | 4.32 | +2.11 | 10 | +4.49 (28.10.2026 08:24:00) | -0.19 (28.10.2026 02:30:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 01:03:19 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.350 | 0.86 | +0.38 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:03:19 | — |
+| SYNUSDT | LONG | 0.180050 | 0.180720 | 0.37 | +0.14 | 10 | +1.38 (28.10.2026 05:15:00) | -1.59 (28.10.2026 03:15:00) | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 01:03:19 | — |
+| ETHUSDT | LONG | 2350.97 | 2353.85 | 0.12 | +0.01 | 10 | +0.78 (28.10.2026 05:15:00) | -0.43 (28.10.2026 04:00:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
+| SOLUSDT | LONG | 101.380 | 101.890 | 0.50 | +0.20 | 10 | +1.05 (28.10.2026 06:30:00) | -0.34 (28.10.2026 04:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| PUMPUSDT | LONG | 0.00432000 | 0.00434300 | 0.53 | +0.22 | 10 | +2.06 (28.10.2026 06:30:00) | -0.12 (28.10.2026 01:45:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
+| AAVEUSDT | LONG | 132.650 | 134.460 | 1.36 | +0.63 | 10 | +2.70 (28.10.2026 06:45:00) | -0.35 (28.10.2026 01:15:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| QNTUSDT | LONG | 200.660 | 199.410 | -0.62 | -0.36 | 10 | +0.13 (28.10.2026 05:15:00) | -1.82 (28.10.2026 07:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| LINKUSDT | LONG | 11.5380 | 11.7300 | 1.66 | +0.78 | 10 | +2.50 (28.10.2026 06:45:00) | -0.24 (28.10.2026 01:30:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 01:03:49 | — |
+| ADAUSDT | LONG | 0.205700 | 0.206200 | 0.24 | +0.07 | 10 | +1.41 (28.10.2026 06:30:00) | -0.34 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| LTCUSDT | LONG | 56.8400 | 57.4000 | 0.99 | +0.44 | 10 | +1.65 (28.10.2026 06:30:00) | +0.00 (28.10.2026 01:03:49) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| TAOUSDT | LONG | 254.400 | 257.300 | 1.14 | +0.52 | 10 | +2.08 (28.10.2026 06:30:00) | -0.28 (28.10.2026 01:15:00) | HAM/MACD 15m macd:cross_up+ham:raw_dual_up | 28.10.2026 01:03:49 | — |
+| ERAUSDT | LONG | 0.0820000 | 0.0809000 | -1.34 | -0.72 | 10 | +0.85 (28.10.2026 02:00:00) | -5.49 (28.10.2026 07:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| AVAXUSDT | LONG | 8.91500 | 9.01500 | 1.12 | +0.51 | 10 | +1.92 (28.10.2026 06:30:00) | -0.02 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| GOOGLBUSDT | LONG | 322.460 | 325.200 | 0.85 | +0.37 | 10 | +1.36 (28.10.2026 03:45:00) | -0.08 (28.10.2026 02:00:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
+| EURUSDT | LONG | 1.11480 | 1.11400 | -0.07 | -0.09 | 10 | +0.03 (28.10.2026 03:00:00) | -0.10 (28.10.2026 08:31:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| HBARUSDT | LONG | 0.0761800 | 0.0762700 | 0.12 | +0.01 | 10 | +1.47 (28.10.2026 06:30:00) | -0.59 (28.10.2026 03:45:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.350 | 0.86 | +0.38 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| RWUSDUSDT | LONG | 0.999900 | 1.00000 | 0.01 | -0.05 | 10 | +0.01 (28.10.2026 04:30:00) | -0.07 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 01:03:49) | +0.00 (28.10.2026 01:03:49) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| GRAMUSDT | LONG | 1.22300 | 1.23800 | 1.23 | +0.56 | 10 | +1.72 (28.10.2026 08:00:00) | +0.00 (28.10.2026 01:03:49) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:03:49 | — |
+| REZUSDT | LONG | 0.00540400 | 0.00507700 | -6.05 | -3.07 | 10 | +0.57 (28.10.2026 01:15:00) | -8.81 (28.10.2026 05:30:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:03:49 | — |
+| ZECUSDT | LONG | 1307.61 | 1315.01 | 0.57 | +0.23 | 10 | +1.78 (28.10.2026 07:30:00) | -1.21 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| NEARUSDT | LONG | 4.67700 | 4.68600 | 0.19 | +0.05 | 10 | +1.67 (28.10.2026 05:15:00) | -0.92 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| SOXLBUSDT | LONG | 99.1800 | 103.430 | 4.29 | +2.09 | 10 | +5.46 (28.10.2026 06:45:00) | -0.35 (28.10.2026 01:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| ENAUSDT | LONG | 0.211200 | 0.205700 | -2.60 | -1.35 | 10 | +0.00 (28.10.2026 01:03:49) | -3.03 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| XAUTUSDT | LONG | 4060.18 | 4030.56 | -0.73 | -0.41 | 10 | +0.21 (28.10.2026 03:00:00) | -0.83 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| NILUSDT | LONG | 0.0925700 | 0.0846600 | -8.54 | -4.32 | 10 | +0.60 (28.10.2026 01:15:00) | -11.13 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| UNIUSDT | LONG | 7.08900 | 7.17700 | 1.24 | +0.57 | 10 | +2.03 (28.10.2026 07:45:00) | -0.56 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| QNTUSDT | LONG | 200.660 | 199.410 | -0.62 | -0.36 | 10 | +0.13 (28.10.2026 05:15:00) | -1.82 (28.10.2026 07:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| DASHUSDT | LONG | 55.3000 | 54.5500 | -1.36 | -0.73 | 10 | +0.40 (28.10.2026 07:15:00) | -1.59 (28.10.2026 08:45:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 01:03:49 | — |
+| TAOUSDT | LONG | 254.400 | 257.300 | 1.14 | +0.52 | 10 | +2.08 (28.10.2026 06:30:00) | -0.28 (28.10.2026 01:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| MUBUSDT | LONG | 927.870 | 967.990 | 4.32 | +2.11 | 10 | +4.49 (28.10.2026 08:24:00) | -0.19 (28.10.2026 02:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| INJUSDT | LONG | 8.03100 | 7.94900 | -1.02 | -0.56 | 10 | +0.46 (28.10.2026 05:15:00) | -1.71 (28.10.2026 06:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| EURUSDT | LONG | 1.11480 | 1.11400 | -0.07 | -0.09 | 10 | +0.03 (28.10.2026 03:00:00) | -0.10 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.350 | 0.86 | +0.38 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| RWUSDUSDT | LONG | 0.999900 | 1.00000 | 0.01 | -0.05 | 10 | +0.01 (28.10.2026 04:30:00) | -0.07 (28.10.2026 01:30:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 01:03:49 | — |
+| HBARUSDT | LONG | 0.0761400 | 0.0762700 | 0.17 | +0.04 | 25 | +1.52 (28.10.2026 06:30:00) | -0.54 (28.10.2026 03:45:00) | LS Dip Uyumsuzluk 2s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 27/10 05:00 0.0760300 → 27/10 17:00 0.0752700 (alçalan) · L/S dipleri 2.625 → 2.658 (yükselen)) | 28.10.2026 01:26:19 | — |
+| SOLUSDT | LONG | 101.110 | 101.900 | 0.78 | +0.34 | 25 | +1.31 (28.10.2026 06:30:00) | -0.07 (28.10.2026 04:00:00) | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 03:00 99.8100 → 27/10 11:00 99.1100 (alçalan) · L/S dipleri 2.189 → 2.427 (yükselen)) | 28.10.2026 01:26:33 | — |
+| AAVEUSDT | LONG | 132.370 | 134.460 | 1.58 | +0.74 | 25 | +2.92 (28.10.2026 06:45:00) | -0.12 (28.10.2026 01:30:00) | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200,DBL-lowest200,DBL-bdiv96 (fiyat dipleri 26/10 03:00 133.490 → 27/10 11:00 129.410 (alçalan) · L/S dipleri 1.948 → 2.293 (yükselen)) | 28.10.2026 01:26:52 | — |
+| LTCUSDT | LONG | 56.7500 | 57.4100 | 1.16 | +0.53 | 25 | +1.81 (28.10.2026 06:30:00) | +0.00 (28.10.2026 01:27:02) | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 03:00 55.9500 → 27/10 11:00 55.6900 (alçalan) · L/S dipleri 2.770 → 2.779 (yükselen)) | 28.10.2026 01:27:02 | — |
+| AVAXUSDT | LONG | 8.88700 | 9.01500 | 1.44 | +0.67 | 25 | +2.24 (28.10.2026 06:30:00) | +0.00 (28.10.2026 01:27:04) | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200,DBL-lowest200 (fiyat dipleri 26/10 03:00 8.75700 → 27/10 07:00 8.65600 (alçalan) · L/S dipleri 2.166 → 2.337 (yükselen)) | 28.10.2026 01:27:04 | — |
+| XLMUSDT | LONG | 0.169990 | 0.171100 | 0.65 | +0.28 | 25 | +1.71 (28.10.2026 05:15:00) | -0.17 (28.10.2026 02:15:00) | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 03:00 0.166450 → 27/10 11:00 0.166320 (alçalan) · L/S dipleri 1.841 → 1.918 (yükselen)) | 28.10.2026 01:27:05 | — |
+| ARBUSDT | LONG | 0.168030 | 0.169300 | 0.76 | +0.33 | 25 | +1.71 (28.10.2026 05:15:00) | -1.15 (28.10.2026 01:45:00) | LS Dip Uyumsuzluk 4s ikili dip uyumsuzluk DBL-atr2-200 (fiyat dipleri 26/10 23:00 0.165660 → 27/10 11:00 0.164120 (alçalan) · L/S dipleri 1.375 → 1.484 (yükselen)) | 28.10.2026 01:27:22 | — |
+| ZROUSDT | LONG | 1.68300 | 1.71300 | 1.78 | +0.84 | 10 | +3.98 (28.10.2026 07:00:00) | -0.89 (28.10.2026 02:30:00) | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 01:27:40 | — |
+| GRAMUSDT | LONG | 1.21300 | 1.23900 | 2.14 | +1.02 | 10 | +2.56 (28.10.2026 08:00:00) | +0.00 (28.10.2026 01:27:40) | Gold div_bull 4s gold:div_bull | 28.10.2026 01:27:40 | — |
+| SOXLBUSDT | LONG | 101.020 | 103.420 | 2.38 | +1.14 | 10 | +3.53 (28.10.2026 06:45:00) | -2.04 (28.10.2026 02:15:00) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 01:27:40 | — |
+| SOLUSDT | LONG | 101.160 | 101.890 | 0.72 | +0.31 | 10 | +1.26 (28.10.2026 06:30:00) | -0.12 (28.10.2026 04:00:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:27:40 | — |
+| TRXUSDT | LONG | 0.330200 | 0.331200 | 0.30 | +0.10 | 10 | +0.64 (28.10.2026 03:15:00) | +0.00 (28.10.2026 01:27:40) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:27:40 | — |
+| XLMUSDT | LONG | 0.170000 | 0.171100 | 0.65 | +0.27 | 10 | +1.71 (28.10.2026 05:15:00) | -0.18 (28.10.2026 02:15:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:27:41 | — |
+| CELOUSDT | LONG | 0.0818600 | 0.0805000 | -1.66 | -0.88 | 10 | +0.49 (28.10.2026 05:30:00) | -1.97 (28.10.2026 08:34:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:27:41 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:28:07 | — |
+| MUBUSDT | LONG | 927.870 | 967.990 | 4.32 | +2.11 | 10 | +4.49 (28.10.2026 08:24:00) | -0.19 (28.10.2026 02:30:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 01:28:08 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.350 | 0.86 | +0.38 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:28:08 | — |
+| SYNUSDT | LONG | 0.180050 | 0.180820 | 0.43 | +0.16 | 10 | +1.38 (28.10.2026 05:15:00) | -1.59 (28.10.2026 03:15:00) | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 01:28:08 | — |
+| BTCUSDT | LONG | 80915.2 | 80978.4 | 0.08 | -0.01 | 10 | +0.38 (28.10.2026 06:30:00) | -0.36 (28.10.2026 04:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| ETHUSDT | LONG | 2350.05 | 2353.86 | 0.16 | +0.03 | 10 | +0.82 (28.10.2026 05:15:00) | -0.39 (28.10.2026 04:00:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:28:38 | — |
+| SOLUSDT | LONG | 101.250 | 101.870 | 0.61 | +0.26 | 10 | +1.18 (28.10.2026 06:30:00) | -0.21 (28.10.2026 04:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| NEARUSDT | LONG | 4.67500 | 4.68700 | 0.26 | +0.08 | 10 | +1.71 (28.10.2026 05:15:00) | -0.88 (28.10.2026 04:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| XRPUSDT | LONG | 1.32520 | 1.32730 | 0.16 | +0.03 | 10 | +1.45 (28.10.2026 05:15:00) | -0.22 (28.10.2026 01:30:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:28:38 | — |
+| SUIUSDT | LONG | 0.928200 | 0.935500 | 0.79 | +0.34 | 10 | +1.91 (28.10.2026 06:30:00) | -0.23 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| PUMPUSDT | LONG | 0.00433200 | 0.00434400 | 0.28 | +0.09 | 10 | +1.78 (28.10.2026 06:30:00) | -0.39 (28.10.2026 01:45:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| QNTUSDT | LONG | 199.850 | 199.430 | -0.21 | -0.16 | 10 | +0.54 (28.10.2026 05:15:00) | -1.43 (28.10.2026 07:00:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 01:28:38 | — |
+| LINKUSDT | LONG | 11.5290 | 11.7300 | 1.74 | +0.82 | 10 | +2.58 (28.10.2026 06:45:00) | -0.17 (28.10.2026 01:30:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 01:28:38 | — |
+| ADAUSDT | LONG | 0.205100 | 0.206300 | 0.59 | +0.24 | 10 | +1.71 (28.10.2026 06:30:00) | -0.05 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| LTCUSDT | LONG | 56.9400 | 57.4100 | 0.83 | +0.36 | 10 | +1.48 (28.10.2026 06:30:00) | -0.09 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| TAOUSDT | LONG | 253.900 | 257.300 | 1.34 | +0.62 | 10 | +2.28 (28.10.2026 06:30:00) | +0.00 (28.10.2026 01:28:38) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| BCHUSDT | LONG | 291.700 | 299.100 | 2.54 | +1.22 | 10 | +2.74 (28.10.2026 08:31:00) | -0.24 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| AVAXUSDT | LONG | 8.91900 | 9.01500 | 1.08 | +0.49 | 10 | +1.87 (28.10.2026 06:30:00) | -0.07 (28.10.2026 01:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| ERAUSDT | LONG | 0.0817000 | 0.0807000 | -1.22 | -0.66 | 10 | +1.22 (28.10.2026 02:00:00) | -5.14 (28.10.2026 07:00:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 01:28:38 | — |
+| MSTRBUSDT | LONG | 140.950 | 142.350 | 0.99 | +0.45 | 10 | +1.48 (28.10.2026 06:45:00) | -0.38 (28.10.2026 04:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 01:28:38) | +0.00 (28.10.2026 01:28:38) | HAM/MACD 15m macd:cross_up | 28.10.2026 01:28:38 | — |
+| ZECUSDT | LONG | 1307.61 | 1315.30 | 0.59 | +0.24 | 10 | +1.78 (28.10.2026 07:30:00) | -1.21 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| NEARUSDT | LONG | 4.67700 | 4.68800 | 0.24 | +0.07 | 10 | +1.67 (28.10.2026 05:15:00) | -0.92 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| SOXLBUSDT | LONG | 99.1800 | 103.390 | 4.24 | +2.07 | 10 | +5.46 (28.10.2026 06:45:00) | -0.22 (28.10.2026 02:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| ENAUSDT | LONG | 0.211200 | 0.205700 | -2.60 | -1.35 | 10 | +0.00 (28.10.2026 01:28:38) | -3.03 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| XAUTUSDT | LONG | 4060.18 | 4030.56 | -0.73 | -0.41 | 10 | +0.21 (28.10.2026 03:00:00) | -0.83 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| NILUSDT | LONG | 0.0925700 | 0.0844000 | -8.83 | -4.46 | 10 | +0.04 (28.10.2026 02:30:00) | -11.13 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| UNIUSDT | LONG | 7.08900 | 7.17800 | 1.26 | +0.58 | 10 | +2.03 (28.10.2026 07:45:00) | -0.56 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| QNTUSDT | LONG | 200.660 | 199.580 | -0.54 | -0.32 | 10 | +0.13 (28.10.2026 05:15:00) | -1.82 (28.10.2026 07:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| DASHUSDT | LONG | 55.3000 | 54.5700 | -1.32 | -0.71 | 10 | +0.40 (28.10.2026 07:15:00) | -1.32 (28.10.2026 08:45:58) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 01:28:38 | — |
+| TAOUSDT | LONG | 254.400 | 257.300 | 1.14 | +0.52 | 10 | +2.08 (28.10.2026 06:30:00) | -0.12 (28.10.2026 01:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| MUBUSDT | LONG | 927.870 | 967.990 | 4.32 | +2.11 | 10 | +4.49 (28.10.2026 08:24:00) | -0.19 (28.10.2026 02:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| INJUSDT | LONG | 8.03100 | 7.94900 | -1.02 | -0.56 | 10 | +0.46 (28.10.2026 05:15:00) | -1.71 (28.10.2026 06:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| EURUSDT | LONG | 1.11480 | 1.11400 | -0.07 | -0.09 | 10 | +0.03 (28.10.2026 03:00:00) | -0.10 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.350 | 0.86 | +0.38 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 01:28:38 | — |
+| ETHUSDT | LONG | 2350.97 | 2353.99 | 0.13 | +0.01 | yok | +0.78 (28.10.2026 05:15:00) | -0.43 (28.10.2026 04:00:00) | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 01:58:59 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | yok | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | RSI + MACD 1s MACD↑+rm_x30 | 28.10.2026 01:59:03 | — |
+| SUIUSDT | LONG | 0.928800 | 0.935400 | 0.71 | +0.31 | yok | +1.84 (28.10.2026 06:30:00) | -0.05 (28.10.2026 02:15:00) | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 01:59:05 | — |
+| LINKUSDT | LONG | 11.5380 | 11.7300 | 1.66 | +0.78 | yok | +2.50 (28.10.2026 06:45:00) | -0.05 (28.10.2026 02:15:00) | RSI + MACD 1s MACD↑+rm_div1h,rm_div4h | 28.10.2026 01:59:12 | — |
+| ZROUSDT | LONG | 1.68300 | 1.71200 | 1.72 | +0.81 | 10 | +3.98 (28.10.2026 07:00:00) | -0.89 (28.10.2026 02:30:00) | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 01:59:28 | — |
+| GRAMUSDT | LONG | 1.21300 | 1.23800 | 2.06 | +0.98 | 10 | +2.56 (28.10.2026 08:00:00) | +0.00 (28.10.2026 01:59:28) | Gold div_bull 4s gold:div_bull | 28.10.2026 01:59:28 | — |
+| SOXLBUSDT | LONG | 101.020 | 103.430 | 2.39 | +1.14 | 10 | +3.53 (28.10.2026 06:45:00) | -2.04 (28.10.2026 02:15:00) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 01:59:28 | — |
+| SOLUSDT | LONG | 101.160 | 101.870 | 0.70 | +0.30 | 10 | +1.26 (28.10.2026 06:30:00) | -0.12 (28.10.2026 04:00:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:59:29 | — |
+| TRXUSDT | LONG | 0.330200 | 0.331200 | 0.30 | +0.10 | 10 | +0.64 (28.10.2026 03:15:00) | +0.00 (28.10.2026 01:59:29) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 01:59:29 | — |
+| XLMUSDT | LONG | 0.170000 | 0.171200 | 0.71 | +0.30 | 10 | +1.71 (28.10.2026 05:15:00) | -0.18 (28.10.2026 02:15:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:59:29 | — |
+| CELOUSDT | LONG | 0.0818600 | 0.0804900 | -1.67 | -0.89 | 10 | +0.49 (28.10.2026 05:30:00) | -1.97 (28.10.2026 08:34:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 01:59:29 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:59:40 | — |
+| MUBUSDT | LONG | 927.870 | 967.990 | 4.32 | +2.11 | 10 | +4.49 (28.10.2026 08:24:00) | -0.19 (28.10.2026 02:30:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 01:59:41 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.350 | 0.86 | +0.38 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 01:59:41 | — |
+| SYNUSDT | LONG | 0.180050 | 0.180890 | 0.47 | +0.18 | 10 | +1.38 (28.10.2026 05:15:00) | -1.59 (28.10.2026 03:15:00) | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 01:59:41 | — |
+| TRXUSDT | LONG | 0.331600 | 0.331200 | -0.12 | -0.11 | 3 | +0.21 (28.10.2026 03:15:00) | -0.21 (28.10.2026 07:45:00) | KOMBİN: TP RSI Bulut 30m cloudX | 28.10.2026 01:59:43 | — |
+| UNIUSDT | LONG | 7.08400 | 7.17700 | 1.31 | +0.61 | 10 | +2.10 (28.10.2026 07:45:00) | -0.49 (28.10.2026 03:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:00:17 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 02:00:17) | +0.00 (28.10.2026 02:00:17) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:00:17 | — |
+| TRUMPUSDT | LONG | 1.70100 | 1.71000 | 0.53 | +0.21 | 10 | +1.65 (28.10.2026 05:15:00) | -0.29 (28.10.2026 03:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:00:17 | — |
+| ZECUSDT | LONG | 1307.61 | 1315.60 | 0.61 | +0.26 | 10 | +1.78 (28.10.2026 07:30:00) | -1.21 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| NEARUSDT | LONG | 4.67700 | 4.68700 | 0.21 | +0.06 | 10 | +1.67 (28.10.2026 05:15:00) | -0.92 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| SOXLBUSDT | LONG | 99.1800 | 103.420 | 4.28 | +2.09 | 10 | +5.46 (28.10.2026 06:45:00) | -0.22 (28.10.2026 02:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| ENAUSDT | LONG | 0.211200 | 0.205700 | -2.60 | -1.35 | 10 | +0.00 (28.10.2026 02:00:17) | -3.03 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| XAUTUSDT | LONG | 4060.18 | 4030.56 | -0.73 | -0.41 | 10 | +0.21 (28.10.2026 03:00:00) | -0.83 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| NILUSDT | LONG | 0.0925700 | 0.0844000 | -8.83 | -4.46 | 10 | +0.04 (28.10.2026 02:30:00) | -11.13 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| UNIUSDT | LONG | 7.08900 | 7.17700 | 1.24 | +0.57 | 10 | +2.03 (28.10.2026 07:45:00) | -0.56 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| QNTUSDT | LONG | 200.660 | 199.520 | -0.57 | -0.33 | 10 | +0.13 (28.10.2026 05:15:00) | -1.82 (28.10.2026 07:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| DASHUSDT | LONG | 55.3000 | 54.5500 | -1.36 | -0.73 | 10 | +0.40 (28.10.2026 07:15:00) | -1.36 (28.10.2026 08:45:48) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 02:00:17 | — |
+| TAOUSDT | LONG | 254.400 | 257.200 | 1.10 | +0.50 | 10 | +2.08 (28.10.2026 06:30:00) | +0.00 (28.10.2026 02:00:17) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| RWUSDUSDT | LONG | 0.999900 | 1.00000 | 0.01 | -0.05 | 10 | +0.01 (28.10.2026 04:30:00) | -0.04 (28.10.2026 02:15:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| INJUSDT | LONG | 8.03100 | 7.94600 | -1.06 | -0.58 | 10 | +0.46 (28.10.2026 05:15:00) | -1.71 (28.10.2026 06:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| MUBUSDT | LONG | 927.870 | 967.880 | 4.31 | +2.10 | 10 | +4.49 (28.10.2026 08:24:00) | -0.19 (28.10.2026 02:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| EURUSDT | LONG | 1.11480 | 1.11400 | -0.07 | -0.09 | 10 | +0.03 (28.10.2026 03:00:00) | -0.10 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.300 | 0.82 | +0.36 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| PAXGUSDT | LONG | 4066.57 | 4039.97 | -0.65 | -0.38 | 10 | +0.25 (28.10.2026 03:00:00) | -0.68 (28.10.2026 08:37:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| ONDOUSDT | LONG | 0.418000 | 0.416600 | -0.33 | -0.22 | 10 | +1.24 (28.10.2026 05:15:00) | -0.38 (28.10.2026 08:39:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| CHIPUSDT | LONG | 0.0544300 | 0.0543900 | -0.07 | -0.09 | 10 | +2.04 (28.10.2026 06:00:00) | -1.18 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| ARBUSDT | LONG | 0.167700 | 0.169200 | 0.89 | +0.40 | 10 | +1.91 (28.10.2026 05:15:00) | -0.95 (28.10.2026 02:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| SYNUSDT | LONG | 0.180050 | 0.180890 | 0.47 | +0.18 | 10 | +1.38 (28.10.2026 05:15:00) | -1.59 (28.10.2026 03:15:00) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| NVDABUSDT | LONG | 217.880 | 218.920 | 0.48 | +0.19 | 10 | +0.51 (28.10.2026 07:00:00) | -0.13 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| SOLUSDT | LONG | 101.380 | 101.860 | 0.47 | +0.19 | 10 | +1.05 (28.10.2026 06:30:00) | -0.34 (28.10.2026 04:00:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| XRPUSDT | LONG | 1.32500 | 1.32710 | 0.16 | +0.03 | 10 | +1.46 (28.10.2026 05:15:00) | +0.00 (28.10.2026 02:00:17) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| BNBUSDT | LONG | 746.680 | 745.390 | -0.17 | -0.14 | 10 | +0.29 (28.10.2026 06:45:00) | -0.63 (28.10.2026 03:30:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| ENAUSDT | LONG | 0.211200 | 0.205700 | -2.60 | -1.35 | 10 | +0.00 (28.10.2026 02:00:17) | -3.03 (28.10.2026 08:00:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| HYPEUSDT | LONG | 81.1900 | 81.3800 | 0.23 | +0.07 | 10 | +1.17 (28.10.2026 05:00:00) | +0.00 (28.10.2026 02:00:17) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:00:17 | — |
+| NILUSDT | LONG | 0.0925700 | 0.0844000 | -8.83 | -4.46 | 10 | +0.04 (28.10.2026 02:30:00) | -11.13 (28.10.2026 08:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| WLDUSDT | LONG | 0.437300 | 0.435000 | -0.53 | -0.31 | 10 | +1.44 (28.10.2026 06:30:00) | -0.64 (28.10.2026 07:15:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:00:17 | — |
+| CRCLBUSDT | LONG | 81.1200 | 81.3500 | 0.28 | +0.09 | 10 | +0.81 (28.10.2026 06:30:00) | -0.79 (28.10.2026 04:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:00:17 | — |
+| BTCUSDT | LONG | 80905.8 | 80964.7 | 0.07 | -0.01 | yok | +0.40 (28.10.2026 06:30:00) | -0.35 (28.10.2026 04:00:00) | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 02:05:07 | — |
+| ZROUSDT | LONG | 1.68300 | 1.71200 | 1.72 | +0.81 | 10 | +3.98 (28.10.2026 07:00:00) | -0.89 (28.10.2026 02:30:00) | Gold2 div_bull 4s gold2:div_bull | 28.10.2026 02:05:36 | — |
+| GRAMUSDT | LONG | 1.21300 | 1.23800 | 2.06 | +0.98 | 10 | +2.56 (28.10.2026 08:00:00) | +0.00 (28.10.2026 02:05:36) | Gold div_bull 4s gold:div_bull | 28.10.2026 02:05:36 | — |
+| SOXLBUSDT | LONG | 101.020 | 103.360 | 2.32 | +1.11 | 10 | +3.53 (28.10.2026 06:45:00) | -2.04 (28.10.2026 02:15:00) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 02:05:36 | — |
+| SOLUSDT | LONG | 101.160 | 101.850 | 0.68 | +0.29 | 10 | +1.26 (28.10.2026 06:30:00) | -0.12 (28.10.2026 04:00:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 02:05:36 | — |
+| TRXUSDT | LONG | 0.330200 | 0.331300 | 0.33 | +0.12 | 10 | +0.64 (28.10.2026 03:15:00) | +0.00 (28.10.2026 02:05:36) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 02:05:36 | — |
+| XLMUSDT | LONG | 0.170000 | 0.171200 | 0.71 | +0.30 | 10 | +1.71 (28.10.2026 05:15:00) | -0.18 (28.10.2026 02:15:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 02:05:36 | — |
+| CELOUSDT | LONG | 0.0818600 | 0.0805000 | -1.66 | -0.88 | 10 | +0.49 (28.10.2026 05:30:00) | -1.97 (28.10.2026 08:34:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 02:05:36 | — |
+| CRCLBUSDT | LONG | 81.1100 | 81.3500 | 0.30 | +0.10 | 10 | +0.83 (28.10.2026 06:30:00) | -0.78 (28.10.2026 04:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 02:05:48 | — |
+| HUMAUSDT | LONG | 0.0259100 | 0.0268400 | 3.59 | +1.74 | 10 | +4.25 (28.10.2026 08:41:00) | -5.67 (28.10.2026 04:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 02:05:48 | — |
+| SYNUSDT | LONG | 0.179750 | 0.180770 | 0.57 | +0.23 | 10 | +1.55 (28.10.2026 05:15:00) | -1.42 (28.10.2026 03:15:00) | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 02:05:48 | — |
+| PEPEUSDT | LONG | 0.00000458000 | 0.00000477000 | 4.15 | +2.02 | 10 | +9.61 (28.10.2026 06:30:00) | -0.44 (28.10.2026 02:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
+| SUIUSDT | LONG | 0.929400 | 0.935300 | 0.63 | +0.27 | 10 | +1.77 (28.10.2026 06:30:00) | -0.12 (28.10.2026 02:15:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
+| UNIUSDT | LONG | 7.08400 | 7.17900 | 1.34 | +0.62 | 10 | +2.10 (28.10.2026 07:45:00) | -0.49 (28.10.2026 03:00:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
+| DOGEUSDT | LONG | 0.0788000 | 0.0796100 | 1.03 | +0.46 | 10 | +1.90 (28.10.2026 06:30:00) | -0.19 (28.10.2026 03:15:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 02:06:18) | +0.00 (28.10.2026 02:06:18) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
+| TRUMPUSDT | LONG | 1.70100 | 1.71000 | 0.53 | +0.21 | 10 | +1.65 (28.10.2026 05:15:00) | -0.29 (28.10.2026 03:30:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 02:06:18 | — |
+| ZECUSDT | LONG | 1310.42 | 1315.26 | 0.37 | +0.13 | 10 | +1.57 (28.10.2026 07:30:00) | -1.42 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| NEARUSDT | LONG | 4.70200 | 4.68300 | -0.40 | -0.25 | 10 | +1.13 (28.10.2026 05:15:00) | -1.45 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| SOXLBUSDT | LONG | 99.4100 | 103.310 | 3.92 | +1.91 | 10 | +5.21 (28.10.2026 06:45:00) | -0.45 (28.10.2026 02:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| ENAUSDT | LONG | 0.209000 | 0.205600 | -1.63 | -0.86 | 10 | +0.77 (28.10.2026 03:45:00) | -2.01 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| TRXUSDT | LONG | 0.331600 | 0.331300 | -0.09 | -0.10 | 10 | +0.21 (28.10.2026 03:15:00) | -0.21 (28.10.2026 07:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| XAUTUSDT | LONG | 4060.82 | 4030.30 | -0.75 | -0.43 | 10 | +0.19 (28.10.2026 03:00:00) | -0.84 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| NILUSDT | LONG | 0.0918600 | 0.0843700 | -8.15 | -4.12 | 10 | +0.82 (28.10.2026 02:30:00) | -10.44 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| UNIUSDT | LONG | 7.08400 | 7.17900 | 1.34 | +0.62 | 10 | +2.10 (28.10.2026 07:45:00) | -0.49 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| QNTUSDT | LONG | 200.480 | 199.400 | -0.54 | -0.32 | 10 | +0.22 (28.10.2026 05:15:00) | -1.74 (28.10.2026 07:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| DASHUSDT | LONG | 55.1200 | 54.5300 | -1.07 | -0.58 | 10 | +0.73 (28.10.2026 07:15:00) | -1.07 (28.10.2026 08:45:36) | KAL Hibrit AL 1s kalHibrit:kal_ema_up | 28.10.2026 02:06:18 | — |
+| TAOUSDT | LONG | 255.200 | 257.100 | 0.74 | +0.32 | 10 | +1.76 (28.10.2026 06:30:00) | -0.20 (28.10.2026 03:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| RWUSDUSDT | LONG | 0.999600 | 1.00000 | 0.04 | -0.03 | 10 | +0.04 (28.10.2026 04:30:00) | -0.01 (28.10.2026 02:15:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| INJUSDT | LONG | 7.93800 | 7.94500 | 0.09 | -0.01 | 10 | +1.64 (28.10.2026 05:15:00) | -0.55 (28.10.2026 06:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| MUBUSDT | LONG | 927.090 | 967.380 | 4.35 | +2.12 | 10 | +4.58 (28.10.2026 08:24:00) | -0.10 (28.10.2026 02:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| EURUSDT | LONG | 1.11490 | 1.11400 | -0.08 | -0.09 | 10 | +0.02 (28.10.2026 03:00:00) | -0.11 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| MSTRBUSDT | LONG | 141.140 | 142.300 | 0.82 | +0.36 | 10 | +1.35 (28.10.2026 06:45:00) | -0.52 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| PAXGUSDT | LONG | 4068.58 | 4039.97 | -0.70 | -0.40 | 10 | +0.20 (28.10.2026 03:00:00) | -0.73 (28.10.2026 08:37:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| ONDOUSDT | LONG | 0.419600 | 0.416600 | -0.71 | -0.41 | 10 | +0.86 (28.10.2026 05:15:00) | -0.76 (28.10.2026 08:39:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| CHIPUSDT | LONG | 0.0541900 | 0.0543900 | 0.37 | +0.13 | 10 | +2.49 (28.10.2026 06:00:00) | -0.74 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| ARBUSDT | LONG | 0.166500 | 0.169100 | 1.56 | +0.73 | 10 | +2.64 (28.10.2026 05:15:00) | -0.24 (28.10.2026 02:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| SYNUSDT | LONG | 0.179750 | 0.180640 | 0.50 | +0.20 | 10 | +1.55 (28.10.2026 05:15:00) | -1.42 (28.10.2026 03:15:00) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| NVDABUSDT | LONG | 217.870 | 218.870 | 0.46 | +0.18 | 10 | +0.51 (28.10.2026 07:00:00) | -0.12 (28.10.2026 03:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| SOLUSDT | LONG | 101.380 | 101.850 | 0.46 | +0.18 | 10 | +1.05 (28.10.2026 06:30:00) | -0.34 (28.10.2026 04:00:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| XRPUSDT | LONG | 1.32500 | 1.32720 | 0.17 | +0.03 | 10 | +1.46 (28.10.2026 05:15:00) | +0.00 (28.10.2026 02:06:18) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| BNBUSDT | LONG | 746.680 | 745.310 | -0.18 | -0.14 | 10 | +0.29 (28.10.2026 06:45:00) | -0.63 (28.10.2026 03:30:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| ENAUSDT | LONG | 0.211200 | 0.205600 | -2.65 | -1.38 | 10 | +0.00 (28.10.2026 02:06:18) | -3.03 (28.10.2026 08:00:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | +0.24 (28.10.2026 03:15:00) | -0.18 (28.10.2026 07:45:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| HYPEUSDT | LONG | 81.1900 | 81.3600 | 0.21 | +0.05 | 10 | +1.17 (28.10.2026 05:00:00) | +0.00 (28.10.2026 02:06:18) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:06:18 | — |
+| NILUSDT | LONG | 0.0925700 | 0.0843700 | -8.86 | -4.48 | 10 | +0.04 (28.10.2026 02:30:00) | -11.13 (28.10.2026 08:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| WLDUSDT | LONG | 0.437300 | 0.434900 | -0.55 | -0.32 | 10 | +1.44 (28.10.2026 06:30:00) | -0.64 (28.10.2026 07:15:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 02:06:18 | — |
+| CRCLBUSDT | LONG | 81.1200 | 81.3400 | 0.27 | +0.09 | 10 | +0.81 (28.10.2026 06:30:00) | -0.79 (28.10.2026 04:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| PUMPUSDT | LONG | 0.00432000 | 0.00434100 | 0.49 | +0.19 | 10 | +2.06 (28.10.2026 06:30:00) | +0.00 (28.10.2026 02:06:18) | KAL Hibrit AL 2s kalHibrit:kal_ema_up | 28.10.2026 02:06:18 | — |
+| DOGEUSDT | LONG | 0.0785800 | 0.0796100 | 1.31 | +0.61 | 10 | +2.19 (28.10.2026 06:30:00) | +0.00 (28.10.2026 02:06:18) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 02:06:18 | — |
+| SNDKBUSDT | LONG | 1309.96 | 1359.19 | 3.76 | +1.83 | 25 | +4.48 (28.10.2026 06:45:00) | -0.15 (28.10.2026 03:45:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 03:35:34 | — |
+| CELOUSDT | LONG | 0.0815500 | 0.0805200 | -1.26 | -0.68 | 25 | +0.87 (28.10.2026 05:30:00) | -1.59 (28.10.2026 08:34:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 03:35:34 | — |
+| XAUTUSDT | LONG | 4060.79 | 4030.27 | -0.75 | -0.43 | 25 | +0.09 (28.10.2026 03:45:00) | -0.84 (28.10.2026 08:30:00) | KOMBİN: TP RSI TSI 4s tsiG | 28.10.2026 03:35:35 | — |
+| PAXGUSDT | LONG | 4068.94 | 4039.97 | -0.71 | -0.41 | 25 | +0.07 (28.10.2026 03:45:00) | -0.74 (28.10.2026 08:37:00) | KOMBİN: TP RSI TSI 4s tsiG | 28.10.2026 03:35:35 | — |
+| SOLUSDT | LONG | 101.350 | 101.850 | 0.49 | +0.20 | 10 | +1.07 (28.10.2026 06:30:00) | -0.31 (28.10.2026 04:00:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331200 | -0.09 | -0.10 | 10 | +0.06 (28.10.2026 04:15:00) | -0.18 (28.10.2026 07:45:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
+| WLDUSDT | LONG | 0.439400 | 0.434900 | -1.02 | -0.56 | 10 | +0.96 (28.10.2026 06:30:00) | -1.11 (28.10.2026 07:15:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
+| PUMPUSDT | LONG | 0.00436000 | 0.00434100 | -0.44 | -0.27 | 10 | +1.12 (28.10.2026 06:30:00) | -0.67 (28.10.2026 04:00:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
+| AVAXUSDT | LONG | 8.96100 | 9.00800 | 0.52 | +0.21 | 10 | +1.40 (28.10.2026 06:30:00) | -0.20 (28.10.2026 04:00:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 03:35:36 | — |
+| CELOUSDT | LONG | 0.0815500 | 0.0805400 | -1.24 | -0.67 | 10 | +0.87 (28.10.2026 05:30:00) | -1.59 (28.10.2026 08:34:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 03:35:36 | — |
+| HBARUSDT | LONG | 0.0761000 | 0.0762500 | 0.20 | +0.05 | 10 | +1.58 (28.10.2026 06:30:00) | -0.49 (28.10.2026 03:45:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 03:35:36 | — |
+| ONDOUSDT | LONG | 0.420900 | 0.416600 | -1.02 | -0.56 | 10 | +0.55 (28.10.2026 05:15:00) | -1.07 (28.10.2026 08:39:00) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 03:35:46 | 3g 18s |
+| CRCLBUSDT | LONG | 81.0400 | 81.3200 | 0.35 | +0.12 | 10 | +0.91 (28.10.2026 06:30:00) | -0.69 (28.10.2026 04:00:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_lo_up | 28.10.2026 03:35:48 | — |
+| HUMAUSDT | LONG | 0.0258700 | 0.0269300 | 4.10 | +2.00 | 10 | +4.41 (28.10.2026 08:41:00) | -5.53 (28.10.2026 04:15:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 03:35:48 | — |
+| NVDABUSDT | LONG | 218.320 | 218.870 | 0.25 | +0.08 | 10 | +0.31 (28.10.2026 07:00:00) | -0.21 (28.10.2026 04:00:00) | MA x_50_200 1s maSimple:x_50_200 | 28.10.2026 03:35:49 | — |
+| NEARUSDT | LONG | 4.67100 | 4.68100 | 0.21 | +0.06 | 10 | +1.80 (28.10.2026 05:15:00) | -0.79 (28.10.2026 04:00:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
+| WLDUSDT | LONG | 0.438500 | 0.434900 | -0.82 | -0.46 | 10 | +1.16 (28.10.2026 06:30:00) | -0.91 (28.10.2026 07:15:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
+| XUSDUSDT | LONG | 1.00100 | 1.00120 | 0.02 | -0.04 | 10 | +0.03 (28.10.2026 05:30:00) | +0.00 (28.10.2026 03:36:19) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
+| LINKUSDT | LONG | 11.5640 | 11.7230 | 1.37 | +0.64 | 10 | +2.27 (28.10.2026 06:45:00) | -0.05 (28.10.2026 04:00:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
+| HUMAUSDT | LONG | 0.0260100 | 0.0269300 | 3.54 | +1.72 | 10 | +3.85 (28.10.2026 08:41:00) | -6.04 (28.10.2026 04:15:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 03:36:19 | — |
+| AVAXUSDT | LONG | 8.95900 | 9.00800 | 0.55 | +0.22 | 10 | +1.42 (28.10.2026 06:30:00) | -0.18 (28.10.2026 04:00:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 03:36:19 | — |
+| RWUSDUSDT | LONG | 0.999900 | 1.00000 | 0.01 | -0.05 | 10 | +0.01 (28.10.2026 04:30:00) | -0.02 (28.10.2026 06:00:00) | HAM/MACD 15m ham:raw_dual_up+macd:cross_up | 28.10.2026 03:36:19 | — |
+| TONUSDT | LONG | 1.60000 | 1.60000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 03:36:19) | +0.00 (28.10.2026 03:36:19) | HAM/MACD 15m macd:cross_up | 28.10.2026 03:36:19 | — |
+| ZECUSDT | LONG | 1309.60 | 1314.75 | 0.39 | +0.15 | 10 | +1.63 (28.10.2026 07:30:00) | -1.36 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| NEARUSDT | LONG | 4.68200 | 4.68100 | -0.02 | -0.06 | 10 | +1.56 (28.10.2026 05:15:00) | -1.02 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| SOXLBUSDT | LONG | 100.830 | 103.280 | 2.43 | +1.16 | 10 | +3.73 (28.10.2026 06:45:00) | -0.91 (28.10.2026 03:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| ENAUSDT | LONG | 0.208700 | 0.205600 | -1.49 | -0.79 | 10 | +0.91 (28.10.2026 03:45:00) | -1.87 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | +0.06 (28.10.2026 04:15:00) | -0.18 (28.10.2026 07:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| XAUTUSDT | LONG | 4060.79 | 4030.27 | -0.75 | -0.43 | 10 | +0.09 (28.10.2026 03:45:00) | -0.84 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| NILUSDT | LONG | 0.0919600 | 0.0841700 | -8.47 | -4.28 | 10 | +0.00 (28.10.2026 03:36:19) | -10.54 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| UNIUSDT | LONG | 7.08500 | 7.17900 | 1.33 | +0.61 | 10 | +2.09 (28.10.2026 07:45:00) | -0.51 (28.10.2026 04:15:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| QNTUSDT | LONG | 199.390 | 199.340 | -0.03 | -0.06 | 10 | +0.77 (28.10.2026 05:15:00) | -1.20 (28.10.2026 07:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| MUBUSDT | LONG | 942.290 | 967.380 | 2.66 | +1.28 | 10 | +2.90 (28.10.2026 08:24:00) | -0.28 (28.10.2026 03:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| TAOUSDT | LONG | 255.800 | 257.100 | 0.51 | +0.20 | 10 | +1.52 (28.10.2026 06:30:00) | -0.27 (28.10.2026 03:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| RWUSDUSDT | LONG | 0.999800 | 1.00000 | 0.02 | -0.04 | 10 | +0.02 (28.10.2026 04:30:00) | -0.01 (28.10.2026 06:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| INJUSDT | LONG | 7.96600 | 7.94000 | -0.33 | -0.21 | 10 | +1.28 (28.10.2026 05:15:00) | -0.90 (28.10.2026 06:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| EURUSDT | LONG | 1.11440 | 1.11400 | -0.04 | -0.07 | 10 | +0.04 (28.10.2026 05:45:00) | -0.06 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| PAXGUSDT | LONG | 4068.94 | 4039.97 | -0.71 | -0.41 | 10 | +0.07 (28.10.2026 03:45:00) | -0.74 (28.10.2026 08:37:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| MSTRBUSDT | LONG | 141.270 | 142.280 | 0.71 | +0.31 | 10 | +1.25 (28.10.2026 06:45:00) | -0.61 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| ARBUSDT | LONG | 0.167500 | 0.169200 | 1.01 | +0.46 | 10 | +2.03 (28.10.2026 05:15:00) | +0.00 (28.10.2026 03:36:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| ONDOUSDT | LONG | 0.420900 | 0.416500 | -1.05 | -0.57 | 10 | +0.55 (28.10.2026 05:15:00) | -1.07 (28.10.2026 08:39:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| NVDABUSDT | LONG | 218.320 | 218.870 | 0.25 | +0.08 | 10 | +0.31 (28.10.2026 07:00:00) | -0.21 (28.10.2026 04:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| CHIPUSDT | LONG | 0.0541700 | 0.0544300 | 0.48 | +0.19 | 10 | +2.53 (28.10.2026 06:00:00) | -0.33 (28.10.2026 04:45:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| SYNUSDT | LONG | 0.178420 | 0.180330 | 1.07 | +0.48 | 10 | +2.31 (28.10.2026 05:15:00) | -0.49 (28.10.2026 08:00:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| XRPUSDT | LONG | 1.33130 | 1.32720 | -0.31 | -0.20 | 10 | +0.98 (28.10.2026 05:15:00) | -0.44 (28.10.2026 04:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| BNBUSDT | LONG | 744.940 | 745.310 | 0.05 | -0.03 | 10 | +0.53 (28.10.2026 06:45:00) | -0.39 (28.10.2026 04:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| ENAUSDT | LONG | 0.208700 | 0.205600 | -1.49 | -0.79 | 10 | +0.91 (28.10.2026 03:45:00) | -1.87 (28.10.2026 08:00:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div+kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| TRXUSDT | LONG | 0.331500 | 0.331300 | -0.06 | -0.08 | 10 | +0.06 (28.10.2026 04:15:00) | -0.18 (28.10.2026 07:45:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| NILUSDT | LONG | 0.0919600 | 0.0841700 | -8.47 | -4.28 | 10 | +0.00 (28.10.2026 03:36:19) | -10.54 (28.10.2026 08:00:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 03:36:19 | — |
+| WLDUSDT | LONG | 0.439400 | 0.435000 | -1.00 | -0.55 | 10 | +0.96 (28.10.2026 06:30:00) | -1.11 (28.10.2026 07:15:00) | KAL Hibrit AL 2s kalHibrit:kal_ema_up+kalHibrit:kal_hist_div | 28.10.2026 03:36:19 | — |
+| GRAMUSDT | LONG | 1.24100 | 1.23800 | -0.24 | -0.17 | 4 | +0.00 (28.10.2026 08:25:43) | -0.24 (28.10.2026 08:43:00) | LS Üçlü Uyumsuzluk + MACD üçlü div (fiyat dipleri 25/10 11:00 1.22700 → 26/10 15:00 1.20200 → 27/10 03:00 1.19000 (alçalan) · L/S dipleri 2.505 → 2.601 → 2.611 (yükselen)) + MACD↑ | 28.10.2026 08:25:43 | — |
+| PEPEUSDT | LONG | 0.00000483740 | 0.00000476000 | -1.60 | -0.85 | 4 | +0.00 (28.10.2026 08:25:43) | -1.81 (28.10.2026 08:44:00) | LS İkili Uyumsuzluk + MACD ikili div (fiyat dipleri 25/10 11:00 0.00000433490 → 26/10 03:00 0.00000420680 (alçalan) · L/S dipleri 1.457 → 1.464 (yükselen)) + MACD↑ | 28.10.2026 08:25:43 | — |
+| GRAMUSDT | LONG | 1.24100 | 1.23800 | -0.24 | -0.17 | 4 | +0.00 (28.10.2026 08:25:43) | -0.24 (28.10.2026 08:43:00) | LS İkili Uyumsuzluk + MACD ikili div (fiyat dipleri 25/10 11:00 1.22700 → 26/10 15:00 1.20200 (alçalan) · L/S dipleri 2.505 → 2.601 (yükselen)) + MACD↑ | 28.10.2026 08:25:43 | — |
+| PEPEUSDT | LONG | 0.00000483000 | 0.00000476000 | -1.45 | -0.77 | yok | +0.00 (28.10.2026 08:27:09) | -1.66 (28.10.2026 08:44:00) | RSI + MACD 1s MACD↑+rm_div1h | 28.10.2026 08:27:09 | — |
+| XAUTUSDT | LONG | 4039.25 | 4030.27 | -0.22 | -0.16 | 25 | +0.00 (28.10.2026 08:27:34) | -0.31 (28.10.2026 08:30:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 08:27:34 | — |
+| PAXGUSDT | LONG | 4048.29 | 4039.97 | -0.21 | -0.15 | 25 | +0.00 (28.10.2026 08:27:35) | -0.23 (28.10.2026 08:37:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 08:27:35 | — |
+| TRUMPUSDT | LONG | 1.71800 | 1.71000 | -0.47 | -0.28 | 25 | +0.00 (28.10.2026 08:27:35) | -0.52 (28.10.2026 08:38:00) | KOMBİN: PLI↑ + Bulut3− 4s pliLoC3 | 28.10.2026 08:27:35 | — |
+| XRPUSDT | LONG | 1.33720 | 1.32720 | -0.75 | -0.42 | 10 | +0.00 (28.10.2026 08:27:36) | -0.76 (28.10.2026 08:37:00) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 08:27:36 | — |
+| SNDKBUSDT | LONG | 1362.85 | 1358.68 | -0.31 | -0.20 | 10 | +0.24 (28.10.2026 08:29:00) | -0.31 (28.10.2026 08:45:15) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 08:27:36 | — |
+| WLDUSDT | LONG | 0.439100 | 0.435000 | -0.93 | -0.52 | 10 | +0.00 (28.10.2026 08:27:36) | -0.93 (28.10.2026 08:45:15) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:27:36 | — |
+| PUMPUSDT | LONG | 0.00437700 | 0.00434200 | -0.80 | -0.45 | 10 | +0.00 (28.10.2026 08:27:36) | -0.84 (28.10.2026 08:44:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:27:36 | — |
+| AVAXUSDT | LONG | 9.03300 | 9.00800 | -0.28 | -0.19 | 10 | +0.00 (28.10.2026 08:27:36) | -0.39 (28.10.2026 08:39:00) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:27:36 | — |
+| FETUSDT | LONG | 0.182500 | 0.180500 | -1.10 | -0.60 | 10 | +0.00 (28.10.2026 08:27:36) | -1.10 (28.10.2026 08:37:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 08:27:36 | — |
+| HBARUSDT | LONG | 0.0768600 | 0.0762700 | -0.77 | -0.43 | 10 | +0.00 (28.10.2026 08:27:36) | -0.77 (28.10.2026 08:43:00) | Hull c50_200 4s hull:c50_200 | 28.10.2026 08:27:36 | — |
+| TRXUSDT | LONG | 0.331300 | 0.331300 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:27:38) | -0.03 (28.10.2026 08:28:00) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 08:27:38 | 3g 23s |
+| FETUSDT | LONG | 0.182500 | 0.180600 | -1.04 | -0.57 | 10 | +0.00 (28.10.2026 08:27:41) | -1.10 (28.10.2026 08:37:00) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 08:27:41 | 3g 23s |
+| TAOUSDT | LONG | 258.300 | 257.100 | -0.46 | -0.28 | 10 | +0.00 (28.10.2026 08:27:43) | -0.47 (28.10.2026 08:44:00) | KOMBİN: TP RSI Bulut 2s cloudX | 28.10.2026 08:27:43 | 3g 23s |
+| ZAMAUSDT | LONG | 0.0769500 | 0.0768700 | -0.10 | -0.10 | 10 | +0.20 (28.10.2026 08:28:00) | -0.23 (28.10.2026 08:31:00) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 08:27:49 | — |
+| NEARUSDT | LONG | 4.67700 | 4.68100 | 0.09 | -0.01 | 10 | +0.28 (28.10.2026 08:31:00) | -0.02 (28.10.2026 08:37:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:28:19 | — |
+| DOGEUSDT | LONG | 0.0797300 | 0.0796100 | -0.15 | -0.13 | 10 | +0.14 (28.10.2026 08:31:00) | -0.15 (28.10.2026 08:44:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:28:19 | — |
+| QNTUSDT | LONG | 199.030 | 199.340 | 0.16 | +0.03 | 10 | +0.49 (28.10.2026 08:29:00) | -0.07 (28.10.2026 08:37:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 08:28:19 | — |
+| MUBUSDT | LONG | 969.000 | 967.380 | -0.17 | -0.13 | 10 | +0.02 (28.10.2026 08:35:00) | -0.23 (28.10.2026 08:39:00) | HAM/MACD 15m macd:cross_up | 28.10.2026 08:28:19 | — |
+| AVAXUSDT | LONG | 9.01500 | 9.00700 | -0.09 | -0.09 | 10 | +0.08 (28.10.2026 08:29:00) | -0.19 (28.10.2026 08:39:00) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:28:19 | — |
+| ERAUSDT | LONG | 0.0796000 | 0.0808000 | 1.51 | +0.70 | 10 | +2.89 (28.10.2026 08:37:00) | +0.00 (28.10.2026 08:28:19) | HAM/MACD 15m macd:cross_up | 28.10.2026 08:28:19 | — |
+| ZECUSDT | LONG | 1314.94 | 1314.64 | -0.02 | -0.06 | 10 | +0.25 (28.10.2026 08:32:00) | -0.02 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| NEARUSDT | LONG | 4.67400 | 4.68100 | 0.15 | +0.02 | 10 | +0.34 (28.10.2026 08:31:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| SOXLBUSDT | LONG | 103.100 | 103.250 | 0.15 | +0.02 | 10 | +0.90 (28.10.2026 08:30:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| ENAUSDT | LONG | 0.205500 | 0.205600 | 0.05 | -0.03 | 10 | +0.39 (28.10.2026 08:36:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| XAUTUSDT | LONG | 4032.66 | 4030.27 | -0.06 | -0.08 | 10 | +0.00 (28.10.2026 08:28:19) | -0.15 (28.10.2026 08:30:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| NILUSDT | LONG | 0.0827200 | 0.0842400 | 1.84 | +0.87 | 10 | +3.10 (28.10.2026 08:29:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| UNIUSDT | LONG | 7.19400 | 7.17700 | -0.24 | -0.17 | 10 | +0.22 (28.10.2026 08:38:00) | -0.26 (28.10.2026 08:35:00) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| XUSDUSDT | LONG | 1.00120 | 1.00120 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:28:19) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| SKHYBUSDT | LONG | 154.990 | 155.870 | 0.57 | +0.23 | 10 | +1.19 (28.10.2026 08:29:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| QNTUSDT | LONG | 198.750 | 199.330 | 0.29 | +0.10 | 10 | +0.63 (28.10.2026 08:29:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| MUBUSDT | LONG | 964.470 | 967.380 | 0.30 | +0.10 | 10 | +0.49 (28.10.2026 08:35:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| RWUSDUSDT | LONG | 0.999900 | 1.00000 | 0.01 | -0.05 | 10 | +0.01 (28.10.2026 08:29:00) | -0.01 (28.10.2026 08:35:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| KORUBUSDT | LONG | 12.9300 | 13.1200 | 1.47 | +0.68 | 10 | +2.17 (28.10.2026 08:30:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| INJUSDT | LONG | 8.00500 | 7.94000 | -0.81 | -0.46 | 10 | +0.00 (28.10.2026 08:28:19) | -0.85 (28.10.2026 08:44:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| ERAUSDT | LONG | 0.0790000 | 0.0808000 | 2.28 | +1.09 | 10 | +3.67 (28.10.2026 08:37:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| EURUSDT | LONG | 1.11420 | 1.11400 | -0.02 | -0.06 | 10 | +0.00 (28.10.2026 08:28:19) | -0.04 (28.10.2026 08:31:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| PAXGUSDT | LONG | 4042.70 | 4039.97 | -0.07 | -0.08 | 10 | +0.00 (28.10.2026 08:28:19) | -0.10 (28.10.2026 08:37:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| ARBUSDT | LONG | 0.169900 | 0.169100 | -0.47 | -0.29 | 10 | +0.00 (28.10.2026 08:28:19) | -0.47 (28.10.2026 08:45:06) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| NVDABUSDT | LONG | 218.750 | 218.880 | 0.06 | -0.02 | 10 | +0.09 (28.10.2026 08:35:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| ONDOUSDT | LONG | 0.418700 | 0.416500 | -0.53 | -0.31 | 10 | +0.00 (28.10.2026 08:28:19) | -0.55 (28.10.2026 08:39:00) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| INITUSDT | LONG | 0.175900 | 0.178620 | 1.55 | +0.72 | 10 | +2.68 (28.10.2026 08:29:00) | +0.00 (28.10.2026 08:28:19) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| XRPUSDT | LONG | 1.33720 | 1.32730 | -0.74 | -0.42 | 10 | +0.00 (28.10.2026 08:28:19) | -0.76 (28.10.2026 08:37:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| BNBUSDT | LONG | 747.270 | 745.300 | -0.26 | -0.18 | 10 | +0.00 (28.10.2026 08:28:19) | -0.28 (28.10.2026 08:38:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| ENAUSDT | LONG | 0.207000 | 0.205500 | -0.72 | -0.41 | 10 | +0.00 (28.10.2026 08:28:19) | -0.72 (28.10.2026 08:44:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| TRXUSDT | LONG | 0.331300 | 0.331300 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:28:19) | -0.03 (28.10.2026 08:29:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| NILUSDT | LONG | 0.0837800 | 0.0842900 | 0.61 | +0.25 | 10 | +1.79 (28.10.2026 08:29:00) | -0.02 (28.10.2026 08:40:00) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:28:19 | — |
+| XRPUSDT | LONG | 1.33720 | 1.33720 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:47:42) | +0.00 (28.10.2026 08:47:42) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 08:47:42 | — |
+| SNDKBUSDT | LONG | 1362.85 | 1362.85 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:47:42) | +0.00 (28.10.2026 08:47:42) | PLI DT div 4s pliDtDiv:pdt_d_div | 28.10.2026 08:47:42 | — |
+| WLDUSDT | LONG | 0.439100 | 0.439100 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:47:43) | +0.00 (28.10.2026 08:47:43) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:47:43 | — |
+| PUMPUSDT | LONG | 0.00437700 | 0.00437700 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:47:43) | +0.00 (28.10.2026 08:47:43) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:47:43 | — |
+| AVAXUSDT | LONG | 9.03300 | 9.03300 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:47:43) | +0.00 (28.10.2026 08:47:43) | OBV reg_bull 4s divScan:obv|reg_bull | 28.10.2026 08:47:43 | — |
+| FETUSDT | LONG | 0.182500 | 0.182500 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:47:43) | +0.00 (28.10.2026 08:47:43) | Hull c50_200 4s hull:c50_200 | 28.10.2026 08:47:43 | — |
+| HBARUSDT | LONG | 0.0768600 | 0.0768600 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:47:43) | +0.00 (28.10.2026 08:47:43) | Hull c50_200 4s hull:c50_200 | 28.10.2026 08:47:43 | — |
+| ZAMAUSDT | LONG | 0.0769500 | 0.0769500 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:08) | +0.00 (28.10.2026 08:48:08) | PLI Yön 1s (alt/üst bant ↑) pliDir:pli_hi_up | 28.10.2026 08:48:08 | — |
+| BMTUSDT | LONG | 0.0274200 | 0.0274200 | 0.00 | -0.05 | 3 | +0.00 (28.10.2026 08:48:20) | +0.00 (28.10.2026 08:48:20) | KOMBİN: TP RSI Bulut 30m cloudX | 28.10.2026 08:48:20 | — |
+| NEARUSDT | LONG | 4.68200 | 4.68200 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| TRXUSDT | LONG | 0.331300 | 0.331300 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| NILUSDT | LONG | 0.0843200 | 0.0843200 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m macd:cross_up | 28.10.2026 08:48:38 | — |
+| HAEDALUSDT | LONG | 0.0288600 | 0.0288600 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m macd:cross_up | 28.10.2026 08:48:38 | — |
+| PUMPUSDT | LONG | 0.00434200 | 0.00434200 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| DASHUSDT | LONG | 54.6500 | 54.6500 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| RWUSDUSDT | LONG | 1.00000 | 1.00000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| ERAUSDT | LONG | 0.0806000 | 0.0806000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| EURUSDT | LONG | 1.11400 | 1.11400 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| NVDABUSDT | LONG | 218.890 | 218.890 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| INITUSDT | LONG | 0.178620 | 0.178620 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| ZAMAUSDT | LONG | 0.0768700 | 0.0768700 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | HAM/MACD 15m ham:raw_dual_up | 28.10.2026 08:48:38 | — |
+| ZECUSDT | LONG | 1314.94 | 1314.94 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| NEARUSDT | LONG | 4.67400 | 4.67400 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| SOXLBUSDT | LONG | 103.100 | 103.100 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| ENAUSDT | LONG | 0.205500 | 0.205500 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| XAUTUSDT | LONG | 4032.66 | 4032.66 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| NILUSDT | LONG | 0.0827200 | 0.0827200 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| UNIUSDT | LONG | 7.19400 | 7.19400 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_ema_up+kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| XUSDUSDT | LONG | 1.00120 | 1.00120 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| SKHYBUSDT | LONG | 154.990 | 154.990 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| QNTUSDT | LONG | 198.750 | 198.750 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| MUBUSDT | LONG | 964.470 | 964.470 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| KORUBUSDT | LONG | 12.9300 | 12.9300 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| RWUSDUSDT | LONG | 0.999900 | 0.999900 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| INJUSDT | LONG | 8.00500 | 8.00500 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| ERAUSDT | LONG | 0.0790000 | 0.0790000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_long+kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| EURUSDT | LONG | 1.11420 | 1.11420 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| PAXGUSDT | LONG | 4042.70 | 4042.70 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| ARBUSDT | LONG | 0.169900 | 0.169900 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| NVDABUSDT | LONG | 218.750 | 218.750 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| ONDOUSDT | LONG | 0.418700 | 0.418700 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| INITUSDT | LONG | 0.175900 | 0.175900 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 1s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| XRPUSDT | LONG | 1.33720 | 1.33720 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| BNBUSDT | LONG | 747.270 | 747.270 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| ENAUSDT | LONG | 0.207000 | 0.207000 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| TRXUSDT | LONG | 0.331300 | 0.331300 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| NILUSDT | LONG | 0.0837800 | 0.0837800 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| HAEDALUSDT | LONG | 0.0267100 | 0.0267100 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
+| UNIUSDT | LONG | 7.13400 | 7.13400 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_ema_up | 28.10.2026 08:48:38 | — |
+| XUSDUSDT | LONG | 1.00130 | 1.00130 | 0.00 | -0.05 | 10 | +0.00 (28.10.2026 08:48:38) | +0.00 (28.10.2026 08:48:38) | KAL Hibrit AL 2s kalHibrit:kal_band_carry | 28.10.2026 08:48:38 | — |
 
 _Not: Zirve/düşüş/yükseliş tur başı (15 dk) özsermaye ile ölçülür; izleme başlangıcından itibaren geçerlidir. İşlem istatistikleri state'teki son 1000 kapanan işlemden hesaplanır._
