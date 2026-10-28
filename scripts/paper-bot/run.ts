@@ -500,7 +500,7 @@ async function scanAndOpen() {
       const msg = `📡 ${sym} ${side} [${s.label}: ${tag}] ${s.tf} (yaş ${age})`;
       const price = c[c.length - 1].close;
       const sigCandle = c[Math.max(0, c.length - 1 - age)]?.time ?? 0;
-      const eSig = (status: string) => eliziSignal(s.id, sym, side!, price, sigCandle, status, `${s.tf} · ${tag} · yaş ${age}`);
+      const eSig = (status: string) => { if (age > 2) return; eliziSignal(s.id, sym, side!, price, sigCandle, status, `${s.tf} · ${tag} · yaş ${age}`); }; // Elizi: yalnız taze sinyal (yaş 0–2)
       if (evOn(s)) { const g = btGate(s, keys); if (g) { eSig("sinyal (EV filtresi)"); log(msg + " — atlandı: " + g); continue; } }
       const perCap = cfg.perSymSig ?? 1;
       const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
