@@ -28,7 +28,7 @@ type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; s
   mfePx?: number; maePx?: number; mfePct?: number; maePct?: number; mfeT?: number; maeT?: number; mxSrc?: string };
 type Closed = Pos & { exit2?: string; exitPx: number; why: string; r: number; pnl: number; closedAt: number };
 type State = { v: 1; equity: number; pnl: number; open: Pos[]; closed: Closed[]; log: string[];
-  lastRun?: number; runs: number; dataSrc?: string; seen?: Record<string, number>; srcOff?: Record<string, string>; stats?: Stats };
+  lastRun?: number; runs: number; dataSrc?: string; seen?: Record<string, number>; eliziSeen?: Record<string, number>; srcOff?: Record<string, string>; stats?: Stats };
 type Stats = { since: number; peak: number; peakT: number; trough: number; maxDd: number; maxDdPct: number; maxDdT?: number;
   maxUp: number; maxUpPct: number; maxUpT?: number; low: number; mx?: Record<string, MxSum> };
 type MxSum = { label: string; n: number; nOpen: number; nClosed: number; mfeMed: number; mfeAvg: number; maeMed: number; maeAvg: number;
@@ -101,20 +101,40 @@ const fmt = (v: number) => (+v).toPrecision(6);
 const ELIZI_URL = process.env.ELIZI_NTFY_URL || "https://ntfy.sh/elizi94trhan";
 const ELIZI_SIDS = new Set(["gold2-div-4h", "pdt-ddiv-4h", "kal-hibrit-2h"]);
 const isElizi = (sid?: string) => !!sid && (ELIZI_SIDS.has(sid) || /^pdt-ddiv-/.test(sid) || /^gold2-div-/.test(sid));
-const eliziQ: string[] = [];
+const eliziQ: { body: string; key?: string; tag: string }[] = [];
+const ELIZI_KEEP_MS = 7 * 864e5; // tekrar-önleme anahtarları 7 gün saklanır
 function elizi(kind: string, sid: string | undefined, sym: string, side: string, price: number, extra = "") {
   if (!isElizi(sid)) return;
   const lbl = cfg.sources.find((s) => s.id === sid)?.label || sid;
-  eliziQ.push(`${kind} · ${lbl}\n${sym} ${side} @${fmt(price)}${extra ? " · " + extra : ""}\n${trT()} (TSİ)`);
+  eliziQ.push({ body: `${kind} · ${lbl}\n${sym} ${side} @${fmt(price)}${extra ? " · " + extra : ""}\n${trT()} (TSİ)`, tag: `${kind} ${sym}` });
+}
+// HER sinyal (pozisyon açılsın/açılmasın) → aynı kaynak+sembol+mum bir kez (state.eliziSeen)
+function eliziSignal(sid: string, sym: string, side: string, price: number, candleT: number, status: string, extra = "") {
+  if (!isElizi(sid)) return;
+  try {
+    const seen = (st.eliziSeen ||= {});
+    const key = `${sid}|${sym}|${candleT}`;
+    if (seen[key]) return;
+    seen[key] = Date.now();
+    const lbl = cfg.sources.find((s) => s.id === sid)?.label || sid;
+    const icon = status === "pozisyon açıldı" ? "🟢" : "📡";
+    eliziQ.push({ key, tag: `${sym} (${status})`, body: `${icon} SİNYAL · ${lbl}\n${sym} ${side} @${fmt(price)}${extra ? " · " + extra : ""}\nDurum: ${status}\n${trT()} (TSİ)` });
+  } catch { /* ölümcül değil */ }
 }
 async function eliziFlush() {
-  if (!eliziQ.length) return;
-  for (const body of eliziQ) {
+  const seen = (st.eliziSeen ||= {});
+  const now = Date.now();
+  for (const [k, t] of Object.entries(seen)) if (!(now - t < ELIZI_KEEP_MS)) delete seen[k];
+  if (!eliziQ.length) { console.log("elizi ntfy: gönderilecek yok"); return; }
+  const sent: string[] = [];
+  for (const q of eliziQ) {
     try {
-      const r = await fetch(ELIZI_URL, { method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8", Title: "QUANTEX Elizi" }, body });
-      console.log("elizi ntfy " + r.status);
-    } catch { console.log("elizi ntfy hata (atlandı)"); }
+      const r = await fetch(ELIZI_URL, { method: "POST", headers: { "Content-Type": "text/plain; charset=utf-8", Title: "QUANTEX Elizi" }, body: q.body, signal: AbortSignal.timeout(15000) });
+      console.log(`elizi ntfy ${r.status}: ${q.tag}`);
+      if (r.ok) sent.push(q.tag); else if (q.key) delete seen[q.key];
+    } catch { console.log(`elizi ntfy hata (atlandı): ${q.tag}`); if (q.key) delete seen[q.key]; }
   }
+  console.log(`elizi ntfy gönderildi ${sent.length}/${eliziQ.length}: ${sent.join(", ")}`);
 }
 const pr = (p: Pos) => (p.side === "LONG" ? p.last / p.entry - 1 : 1 - p.last / p.entry);
 const fee = (p: Pos) => p.notional * (1 + p.last / p.entry) * (cfg.feePct / 100);
@@ -478,22 +498,24 @@ async function scanAndOpen() {
       }
       hits++;
       const msg = `📡 ${sym} ${side} [${s.label}: ${tag}] ${s.tf} (yaş ${age})`;
-      if (evOn(s)) { const g = btGate(s, keys); if (g) { log(msg + " — atlandı: " + g); continue; } }
+      const price = c[c.length - 1].close;
+      const sigCandle = c[Math.max(0, c.length - 1 - age)]?.time ?? 0;
+      const eSig = (status: string) => eliziSignal(s.id, sym, side!, price, sigCandle, status, `${s.tf} · ${tag} · yaş ${age}`);
+      if (evOn(s)) { const g = btGate(s, keys); if (g) { eSig("sinyal (EV filtresi)"); log(msg + " — atlandı: " + g); continue; } }
       const perCap = cfg.perSymSig ?? 1;
       const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
-      if (nSame >= perCap) { log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); continue; }
+      if (nSame >= perCap) { eSig(`sinyal (aynı sembol sınırı ${nSame}/${perCap})`); log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); continue; }
       const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
-      if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
-      if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
+      if (nNew >= capNew) { eSig("sinyal (tur giriş sınırı)"); log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
+      if (st.open.length >= cfg.maxSlots) { eSig(`sinyal (slot dolu ${st.open.length}/${cfg.maxSlots})`); log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
       const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
       const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
-      if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
-      const price = c[c.length - 1].close;
+      if (!(margin > 0) || used + margin > st.equity + 1e-9) { eSig("sinyal (marjin yetersiz)"); log(msg + " — atlandı: toplam marjin sınırı"); continue; }
       const notional = margin * cfg.leverage;
       const p: Pos = { sym, side, entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
         t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, tpPct: s.tp, exit: s.exit, maxH: s.maxH, tf: s.tf };
       st.open.push(p); nNew++; opened++; if (sk) st.seen[sk] = bt;
-      elizi("🟢 GİRİŞ", s.id, sym, side, price, s.tf);
+      eSig("pozisyon açıldı");
       const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre bilgisi " + s.maxH + " mum (kapatmaz)" : ""} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
       log(m); alerts.push(m);
     }
@@ -596,6 +618,7 @@ async function main() {
   const statsMd = updateStats();
   st.log = st.log.slice(-500); st.closed = st.closed.slice(-1000);
   (st as any).firstScanDone = true;
+  try { await eliziFlush(); } catch { /* ölümcül değil */ }
   if (!DRY) { fs.writeFileSync(STATE_FILE, JSON.stringify(st, null, 1)); fs.writeFileSync(path.join(path.dirname(STATE_FILE), "STATS.md"), statsMd); }
   const unreal = st.open.reduce((a, p) => a + pr(p) * p.notional - fee(p), 0);
   const sum = [
@@ -609,6 +632,5 @@ async function main() {
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n\n" + statsMd + "\n");
   console.log(sum);
   if (alerts.length) await notify(alerts.join("\n") + `\nBakiye ${st.equity.toFixed(2)} USDT · açık ${st.open.length}`);
-  try { await eliziFlush(); } catch { /* ölümcül değil */ }
 }
 main();
