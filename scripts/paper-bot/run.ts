@@ -23,12 +23,16 @@ type Cfg = {
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
   sid?: string; tpPct?: number; /** true → TP yok (yalnız kaynak çıkışı, ör. SAR) */ noTp?: boolean; exit?: string; maxH?: number; tf?: string; sigT?: number;
-  /** ekleme (yalnız lsbot): kaç kez eklendi, ilk giriş, ortalama giriş (= entry) */ adds?: number; firstEntry?: number; avgEntry?: number };
+  /** ekleme (yalnız lsbot): kaç kez eklendi, ilk giriş, ortalama giriş (= entry) */ adds?: number; firstEntry?: number; avgEntry?: number;
+  /** MFE/MAE: girişten beri en iyi / en kötü fiyat (LONG: max high / min low; SHORT tersi), zaman (ms) ve ort. girişe göre % */
+  mfePx?: number; maePx?: number; mfePct?: number; maePct?: number; mfeT?: number; maeT?: number; mxSrc?: string };
 type Closed = Pos & { exit2?: string; exitPx: number; why: string; r: number; pnl: number; closedAt: number };
 type State = { v: 1; equity: number; pnl: number; open: Pos[]; closed: Closed[]; log: string[];
   lastRun?: number; runs: number; dataSrc?: string; seen?: Record<string, number>; srcOff?: Record<string, string>; stats?: Stats };
 type Stats = { since: number; peak: number; peakT: number; trough: number; maxDd: number; maxDdPct: number; maxDdT?: number;
-  maxUp: number; maxUpPct: number; maxUpT?: number; low: number };
+  maxUp: number; maxUpPct: number; maxUpT?: number; low: number; mx?: Record<string, MxSum> };
+type MxSum = { label: string; n: number; nOpen: number; nClosed: number; mfeMed: number; mfeAvg: number; maeMed: number; maeAvg: number;
+  /** MFE'si en az X% olan pozisyonların yüzdesi */ hit: Record<string, number> };
 
 const DIR = path.dirname(new URL(import.meta.url).pathname);
 const cfg: Cfg = JSON.parse(fs.readFileSync(path.join(DIR, "config.json"), "utf8"));
@@ -104,6 +108,44 @@ function closePos(i: number, why: string, px: number) {
   st.open.splice(i, 1);
   const m = `🤖 PAPER ${why} kapattı: ${p.sym} ${p.side} ${(r * 100).toFixed(2)}% (${pnl >= 0 ? "+" : ""}${pnl.toFixed(2)} USDT net) · bakiye ${st.equity.toFixed(2)}`;
   log(m); alerts.push(m);
+}
+
+// ---------- MFE / MAE (pozisyon başı en iyi / en kötü nokta) ----------
+const favOf = (p: Pos, x: number) => (p.side === "LONG" ? x / p.entry - 1 : 1 - x / p.entry);
+function mxPct(p: Pos) {
+  if (p.mfePx === undefined || p.maePx === undefined || !(p.entry > 0)) return;
+  p.mfePct = +Math.max(0, favOf(p, p.mfePx) * 100).toFixed(3);
+  p.maePct = +Math.min(0, favOf(p, p.maePx) * 100).toFixed(3);
+}
+/** hi/lo aralığı (mum ya da tek fiyat) ile MFE/MAE güncelle; t = ms */
+function mxUpd(p: Pos, hi: number, lo: number, t: number) {
+  if (!(hi > 0) || !(lo > 0)) return;
+  const L = p.side === "LONG", fav = L ? hi : lo, adv = L ? lo : hi;
+  if (p.mfePx === undefined || (L ? fav > p.mfePx : fav < p.mfePx)) { p.mfePx = fav; p.mfeT = t; }
+  if (p.maePx === undefined || (L ? adv < p.maePx : adv > p.maePx)) { p.maePx = adv; p.maeT = t; }
+  mxPct(p);
+}
+function mxSeed(p: Pos, src: string) { if (p.mfePx === undefined) { p.mfePx = p.maePx = p.entry; p.mfeT = p.maeT = p.t; p.mxSrc = src; mxPct(p); } }
+/** İlk kurulum: MFE/MAE alanı olmayan eski pozisyonlar (açık + kapalı) için 15m mumlarından geriye dönük doldurma (sembol başı 1 istek). */
+async function mxBackfill() {
+  const need = [...st.open, ...st.closed].filter((p) => p.mfePx === undefined);
+  if (!need.length) return;
+  const bySym: Record<string, Pos[]> = {};
+  for (const p of need) (bySym[p.sym] ||= []).push(p);
+  let ok = 0, px = 0;
+  for (const [sym, ps] of Object.entries(bySym)) {
+    const t0 = Math.floor(Math.min(...ps.map((p) => p.t)) / 9e5) * 9e5;
+    let k: number[][] | null = null;
+    try { k = await klines(sym, "15m", 1000, t0); } catch (e) { if (e instanceof Banned) throw e; k = null; }
+    for (const p of ps) {
+      const c = p as Closed, end = c.closedAt ?? (p.checked || Date.now());
+      mxSeed(p, k && k.length ? "15m-geri" : "fiyat");
+      if (k) for (const b of k) { const o = +b[0]; if (o >= p.t && o + 9e5 <= end) mxUpd(p, +b[2], +b[3], o); }
+      const lastPx = c.closedAt ? c.exitPx : p.last; mxUpd(p, lastPx, lastPx, end);
+      if (k && k.length) ok++; else px++;
+    }
+  }
+  log(`MFE/MAE ilk kurulum: ${need.length} pozisyon (${ok} 15m mumlarından, ${px} yalnız fiyattan)`);
 }
 
 const tpOf = (p: Pos) => (p.noTp ? Infinity : (p.tpPct && p.tpPct > 0 ? p.tpPct : cfg.tp) / 100); // kaynak TP'si yoksa global TP; noTp → TP yok
@@ -195,12 +237,14 @@ async function manage() {
       const h = +b[2], l = +b[3];
       if (cfg.sl > 0 && (p.side === "LONG" ? l <= slv : h >= slv)) { hit = ["SL", slv]; break; }
       if (p.side === "LONG" ? h >= tpv : l <= tpv) { hit = ["TP", tpv]; break; }
+      mxUpd(p, h, l, +b[0]);
     }
+    if (hit) mxUpd(p, hit[1], hit[1], Date.now());
     const last = +k[k.length - 1][4];
     if (closedBars.length) p.checked = +closedBars[closedBars.length - 1][0] + 60000;
     if (hit) { closePos(i, hit[0], hit[1]); continue; }
     if (Math.abs(last / p.entry - 1) > 0.5) { log(`⚠ ${p.sym} şüpheli fiyat ${fmt(last)} atlandı`); continue; }
-    p.last = last;
+    p.last = last; mxUpd(p, last, last, Date.now());
     const r = pr(p);
     if (r >= tpOf(p)) { closePos(i, "TP", last); continue; }
     if (cfg.sl > 0 && r <= -cfg.sl / 100) { closePos(i, "SL", last); continue; }
@@ -344,6 +388,7 @@ async function scanAndOpen() {
           ex.firstEntry ??= ex.entry;
           ex.qty += addQty; ex.notional += addNot; ex.entry = ex.notional / ex.qty; ex.avgEntry = ex.entry; ex.last = price;
           ex.adds = (ex.adds || 0) + 1; ex.sigT = bt * 1000;
+          mxUpd(ex, price, price, Date.now()); mxPct(ex); // MFE/MAE yeni ortalama girişe göre
           nNew++; opened++; st.seen[sk] = bt;
           const m = `➕ PAPER EKLEME: ${sym} ${ex.lev}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] — neden: aynı kaynakta yeni dip uyumsuzluğu ve pozisyon zararda (${(rNow * 100).toFixed(2)}%) → mevcut büyüklük kadar ekleme (marjin +${addMargin.toFixed(2)}, nominal ${(ex.notional - addNot).toFixed(2)}→${ex.notional.toFixed(2)}) · ort. giriş ${fmt(old)}→${fmt(ex.entry)} · TP %${tpOf(ex) * 100} → ${fmt(ex.entry * (1 + tpOf(ex)))} · ekleme #${ex.adds} / SL yok`;
           log(m); alerts.push(m);
@@ -466,6 +511,21 @@ function updateStats(): string {
   const up = eq - S.low, upPct = S.low > 0 ? up / S.low * 100 : 0;
   if (up > S.maxUp) { S.maxUp = up; S.maxUpPct = upPct; S.maxUpT = now; }
   S.trough = Math.min(S.trough ?? eq, eq);
+  // kaynak başı MFE/MAE özeti (açık + kapalı) → TP hedefi ayarı
+  const med = (a: number[]) => { if (!a.length) return 0; const b = [...a].sort((x, y) => x - y), m = b.length >> 1; return b.length % 2 ? b[m] : (b[m - 1] + b[m]) / 2; };
+  const mean = (a: number[]) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0);
+  const MX: Record<string, MxSum> = {};
+  const grp: Record<string, { o: Pos[]; c: Pos[] }> = {};
+  for (const p of st.open) if (p.mfePct !== undefined) (grp[p.sid || p.src] ||= { o: [], c: [] }).o.push(p);
+  for (const p of st.closed) if (p.mfePct !== undefined) (grp[p.sid || p.src] ||= { o: [], c: [] }).c.push(p);
+  for (const [k, g] of Object.entries(grp)) {
+    const all = [...g.o, ...g.c], f = all.map((p) => p.mfePct!), a = all.map((p) => p.maePct!);
+    const hit: Record<string, number> = {};
+    for (const x of [3, 5, 10, 15, 25]) hit[x] = +(f.filter((v) => v >= x).length / f.length * 100).toFixed(1);
+    MX[k] = { label: cfg.sources.find((s) => s.id === k)?.label || k, n: all.length, nOpen: g.o.length, nClosed: g.c.length,
+      mfeMed: +med(f).toFixed(2), mfeAvg: +mean(f).toFixed(2), maeMed: +med(a).toFixed(2), maeAvg: +mean(a).toFixed(2), hit };
+  }
+  S.mx = MX;
   st.stats = S;
   const cl = st.closed, wins = cl.filter((x) => x.pnl > 0), loss = cl.filter((x) => x.pnl <= 0);
   const avg = (a: Closed[]) => (a.length ? a.reduce((x, y) => x + y.pnl, 0) / a.length : 0);
@@ -476,6 +536,7 @@ function updateStats(): string {
   const tT = (t?: number) => (t ? new Date(t).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" }) : "—");
   const by: Record<string, { n: number; w: number; pnl: number }> = {};
   for (const x of cl) { const k = cfg.sources.find((s) => s.id === x.sid)?.label || x.sid || x.src; const b = (by[k] ||= { n: 0, w: 0, pnl: 0 }); b.n++; if (x.pnl > 0) b.w++; b.pnl += x.pnl; }
+  const mxTxt = (v?: number, t?: number) => (v === undefined ? "—" : `${v >= 0 ? "+" : ""}${v.toFixed(2)} (${tT(t)})`);
   const pct = (a: number, b: number) => (b ? (a / b * 100).toFixed(1) + "%" : "—");
   return [
     `# QUANTEX Paper Bot — İstatistikler`, ``, `Güncelleme: **${trT()} (TSİ)** · tur ${st.runs} · veri ${st.dataSrc || "?"} · izleme başlangıcı ${tT(S.since)}`, ``,
@@ -489,8 +550,11 @@ function updateStats(): string {
     `| Ort. kazanç / kayıp | ${n2(avg(wins))} / ${n2(avg(loss))} USDT |`, `| En iyi işlem | ${tr(best)} |`, `| En kötü işlem | ${tr(worst)} |`, ``,
     `## Taramalara göre`, `| Kaynak | İşlem | Kazanma | PnL (USDT) |`, `|---|---|---|---|`,
     ...(Object.keys(by).length ? Object.entries(by).sort((a, b) => b[1].pnl - a[1].pnl).map(([k, b]) => `| ${k} | ${b.n} | ${pct(b.w, b.n)} | ${n2(b.pnl)} |`) : ["| — | 0 | — | 0 |"]), ``,
-    `## Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})`, `| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | Kaynak | Açılış | Süreye kalan |`, `|---|---|---|---|---|---|---|---|---|---|`,
-    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${n2(pr(p) * p.notional - fee(p))} | ${tpTxt(p)} | ${p.src} | ${tT(p.t)} | ${left(p)} |`),
+    `## MFE / MAE — kaynaklara göre (TP hedefi ayarı)`, `MFE = girişten beri en iyi nokta, MAE = en kötü nokta (ort. girişe göre %). Açık + kapalı pozisyonlar; kapalılarda TP'de kesildiği için MFE ≤ TP.`, ``,
+    `| Kaynak | n (açık/kapalı) | MFE medyan | MFE ort. | MAE medyan | MAE ort. | MFE≥3% | ≥5% | ≥10% | ≥15% | ≥25% |`, `|---|---|---|---|---|---|---|---|---|---|---|`,
+    ...(Object.keys(MX).length ? Object.values(MX).sort((a, b) => b.n - a.n).map((m) => `| ${m.label} | ${m.n} (${m.nOpen}/${m.nClosed}) | ${m.mfeMed.toFixed(2)}% | ${m.mfeAvg.toFixed(2)}% | ${m.maeMed.toFixed(2)}% | ${m.maeAvg.toFixed(2)}% | ${m.hit[3]}% | ${m.hit[5]}% | ${m.hit[10]}% | ${m.hit[15]}% | ${m.hit[25]}% |`) : ["| — | 0 | — | — | — | — | — | — | — | — | — |"]), ``,
+    `## Açık pozisyonlar (${st.open.length}/${cfg.maxSlots})`, `| Sembol | Yön | Giriş | Son | K/Z % | K/Z USDT | TP % | MFE % (zaman) | MAE % (zaman) | Kaynak | Açılış | Süreye kalan |`, `|---|---|---|---|---|---|---|---|---|---|---|---|`,
+    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${n2(pr(p) * p.notional - fee(p))} | ${tpTxt(p)} | ${mxTxt(p.mfePct, p.mfeT)} | ${mxTxt(p.maePct, p.maeT)} | ${p.src} | ${tT(p.t)} | ${left(p)} |`),
     ``, `_Not: Zirve/düşüş/yükseliş tur başı (15 dk) özsermaye ile ölçülür; izleme başlangıcından itibaren geçerlidir. İşlem istatistikleri state'teki son 1000 kapanan işlemden hesaplanır._`, ``,
   ].join("\n");
 }
@@ -501,11 +565,13 @@ async function main() {
     await pickHost();
     console.log("Binance erişim: " + reach.join(" | "));
     st.dataSrc = dataSrc();
+    await mxBackfill();
     if (st.open.length) await manage();
     await scanAndOpen();
   } catch (e) {
     log(`⚠ Tur yarıda kaldı: ${(e as Error).message}`);
   }
+  for (const p of st.open) mxSeed(p, "giriş");
   const statsMd = updateStats();
   st.log = st.log.slice(-500); st.closed = st.closed.slice(-1000);
   (st as any).firstScanDone = true;
@@ -515,8 +581,8 @@ async function main() {
     `## QUANTEX Paper Bot — ${trT()} (TSİ)`,
     `Veri: **${dataSrc()}** · Binance istek: ${reqCount} · ${reach.join(" | ")}`,
     `Bakiye: **${st.equity.toFixed(2)} USDT** · gerçekleşen PnL ${st.pnl.toFixed(2)} · açık K/Z ${unreal.toFixed(2)} · açık ${st.open.length}/${cfg.maxSlots}`,
-    "", "| Sembol | Yön | Giriş | Son | K/Z % | TP % | Kaynak |", "|---|---|---|---|---|---|---|",
-    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${tpTxt(p)} | ${p.src} |`),
+    "", "| Sembol | Yön | Giriş | Son | K/Z % | TP % | MFE % | MAE % | Kaynak |", "|---|---|---|---|---|---|---|---|---|",
+    ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${tpTxt(p)} | ${p.mfePct?.toFixed(2) ?? "—"} | ${p.maePct?.toFixed(2) ?? "—"} | ${p.src} |`),
     "", "### Bu tur", ...(alerts.length ? alerts.map((a) => "- " + a) : ["- işlem yok"]),
   ].join("\n");
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n\n" + statsMd + "\n");
