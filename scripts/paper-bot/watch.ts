@@ -1,7 +1,7 @@
 /**
  * QUANTEX İZLEME (watch-only) — Grok Bot rutinlerinden robota taşınan taramalar. 31.10.2026.
  * HİÇBİR İŞLEM AÇMAZ: paper-bot state.json'a (pozisyonlar/bakiye) dokunmaz, borsaya emir yok, API anahtarı yok.
- * Yalnız: tarama → sinyal kaydı (watch.json, paper-bot-state dalı) + ntfy uyarısı (sinyal mumu başına bir kez) + 40 mum sonuç izleme.
+ * Yalnız: tarama → sinyal kaydı (watch.json, paper-bot-state dalı) + ntfy uyarısı (sinyal mumu başına bir kez) + 100 mum sonuç izleme.
  *
  * Taramalar (osc-lab Python sürümleriyle aynı kurallar, aynı zaman dilimleri):
  *  ek-crypto-4h  EK v3 dip uyumsuzluk (EMs) — kripto 4s, top-200 USDT-M perp (spot mumu, yoksa perp)   [new2-20261029/v3mm/scanner.py]
@@ -32,7 +32,7 @@ const TF_MS: Record<string, number> = { "1h": 36e5, "2h": 72e5, "4h": 144e5, "1d
 /** Zaman bütçesi: Actions işi 12 dk ile sınırlı → süreç bu saniyeyi geçince yeni sembol/tarama başlatılmaz (kapı ilerlemez, sonraki turda tamamlanır) */
 const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
-const MAX_AGE = 2, TRACK_BARS = 40, KEEP_SIG = 150, KEEP_NOTIFIED_MS = 60 * 864e5;
+const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
 export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d";
 export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto" | "BIST"; note: string }> = {
@@ -49,7 +49,7 @@ type Calc = { kind: "ek"; exit: "sar" | "atr"; pivlow: number; atr: number; k: n
 export interface WSig {
   key: string; scan: ScanId; symbol: string; tf: string; t: number; tsi: string; age: number; kind: string;
   price: number; entryBasis: string; stop: number; target: number | null; strength?: number | string; info: string;
-  calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number;
+  calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number; stop0?: number; target0?: number | null; trackBars?: number; ex?: Excursion; ex100?: Excursion;
   alerted: "gönderildi" | "gönderilemedi" | "ilk tur (bildirimsiz)" | "dry-run" | "eski (yaş>2)"; foundAt: number;
 }
 interface Coverage { total: number; covered: number; thisRun: number; okThisRun: number; slotTsi: string; oldestTsi: string; full: boolean }
@@ -134,24 +134,43 @@ function levelsFor(s: WSig, entry: number): { stop: number; target: number | nul
   if (c.kind === "atr") { const st = entry - c.k * c.atr; return { stop: st, target: c.rr == null ? null : entry + c.rr * (entry - st) }; }
   return { stop: s.stop, target: s.target };
 }
-/** dyn: hızlı üst bant gibi her mum değişen hedef (önceki kapanışın seviyesi) */
+/** Sinyal sonrası hareket istatistikleri (ekleme/TP seviyelerini sonradan türetmek için). k = girişten itibaren mum no (giriş mumu = 1). */
+export interface Excursion { mfePct: number; mfeR: number | null; mfeBar: number; maePct: number; maeR: number | null; maeBar: number; r1: number | null; r2: number | null; r3: number | null; bars: number }
+function excursion(bars: WBar[], i1: number, upto: number, e: number, risk: number): Excursion {
+  let hi = -Infinity, lo = Infinity, hiK = 0, loK = 0; const rk: (number | null)[] = [null, null, null];
+  for (let j = i1, k = 1; j <= upto; j++, k++) {
+    const b = bars[j];
+    if (b.high > hi) { hi = b.high; hiK = k; }
+    if (b.low < lo) { lo = b.low; loK = k; }
+    if (risk > 0) for (let m = 0; m < 3; m++) if (rk[m] == null && b.high >= e + (m + 1) * risk) rk[m] = k;
+  }
+  const r2 = (v: number) => +v.toFixed(2);
+  return { mfePct: r2((hi - e) / e * 100), mfeR: risk > 0 ? r2((hi - e) / risk) : null, mfeBar: hiK, maePct: r2((lo - e) / e * 100), maeR: risk > 0 ? r2((lo - e) / risk) : null, maeBar: loK, r1: rk[0], r2: rk[1], r3: rk[2], bars: upto - i1 + 1 };
+}
+/** Sonuç izleme: giriş = sinyal sonrası ilk açılış, stop/hedef/100 mum. Mumlardan her seferinde baştan hesaplanır (deterministik);
+ *  40 mumda "süre" ile kapanmış eski sinyaller otomatik 100 muma uzar. Giriş mumu veri penceresinden çıktıysa mevcut kayıt korunur.
+ *  ex = işlem süresince (çıkışa kadar) MFE/MAE + 1R/2R/3R mum no; ex100 = çıkıştan bağımsız 100 mumluk pencere (gölge). dyn: her mum değişen hedef. */
 function track(s: WSig, bars: WBar[], dyn?: number[]) {
-  if (s.status === "hedef" || s.status === "stop" || s.status === "süre") return;
   const i0 = bars.findIndex((b) => b.t > s.t); if (i0 < 0) return;
-  if (s.fillT === undefined) { s.fillT = bars[i0].t; s.entry = bars[i0].open; const lv = levelsFor(s, s.entry); s.stop = lv.stop; if (!dyn) s.target = lv.target; }
+  if (s.fillT === undefined) { s.fillT = bars[i0].t; s.entry = bars[i0].open; const lv = levelsFor(s, s.entry); s.stop = lv.stop; if (!dyn) s.target = lv.target; s.stop0 = s.stop; s.target0 = s.target; }
   const i1 = bars.findIndex((b) => b.t === s.fillT); if (i1 < 0) return;
-  const e = s.entry!, risk = e - s.stop; s.status = "açık";
+  const e = s.entry!; if (s.stop0 === undefined) { s.stop0 = s.stop; s.target0 = dyn ? null : s.target; }
+  const stop = s.stop0, risk = e - stop;
+  s.status = "açık"; s.exitPx = s.exitT = s.R = undefined; s.trackBars = TRACK_BARS;
+  let exitJ = -1;
   for (let j = i1, k = 1; j < bars.length; j++, k++) {
-    const b = bars[j], tg = dyn ? (j > 0 && Number.isFinite(dyn[j - 1]) ? dyn[j - 1] : null) : s.target;
+    const b = bars[j], tg = dyn ? (j > 0 && Number.isFinite(dyn[j - 1]) ? dyn[j - 1] : null) : s.target0 ?? null;
     let px: number | null = null, why: WSig["status"] | null = null;
-    if (b.open <= s.stop) { px = b.open; why = "stop"; }
-    else if (b.low <= s.stop) { px = s.stop; why = "stop"; }
+    if (b.open <= stop) { px = b.open; why = "stop"; }
+    else if (b.low <= stop) { px = stop; why = "stop"; }
     else if (tg != null && b.high >= tg) { px = Math.max(tg, b.open); why = "hedef"; }
     else if (k >= TRACK_BARS) { px = b.close; why = "süre"; }
     s.bars = k; s.last = b.close;
     if (dyn && Number.isFinite(dyn[j])) s.target = dyn[j];
-    if (px != null && why) { s.status = why; s.exitPx = px; s.exitT = b.t; s.R = risk > 0 ? +((px - e) / risk).toFixed(2) : undefined; return; }
+    if (px != null && why) { s.status = why; s.exitPx = px; s.exitT = b.t; s.R = risk > 0 ? +((px - e) / risk).toFixed(2) : undefined; exitJ = j; break; }
   }
+  s.ex = excursion(bars, i1, exitJ >= 0 ? exitJ : bars.length - 1, e, risk);
+  s.ex100 = excursion(bars, i1, Math.min(bars.length - 1, i1 + TRACK_BARS - 1), e, risk);
 }
 
 // ---------- taramalar ----------
@@ -201,7 +220,7 @@ function dualScan(scan: ScanId, sym: string, tf: string, bars: WBar[], typ: "BB"
     out.push({ key: `${scan}|${sym}|${t}`, scan, symbol: sym, tf, t, tsi: tsiBar(t, tf), age, kind: "AL", price: c, entryBasis: "sonraki açılış (ref kapanış)", stop, target: tgt, info,
       calc: { kind: "atr", atr: A[i], k: 1.5, rr: mode === "A" ? 2 : null },
       title: `İZLEME | ${lbl} | ${sym} AL`,
-      body: `${lbl} — ${sym} ${tf}\nSinyal mumu: ${tsiBar(t, tf)} (TSİ, yaş ${age} mum)\n${info}\nGiriş: sonraki mum açılışı (ref ${fmtP(c)})\nStop: ≈${fmtP(stop)} (giriş − 1.5 ATR)\nHedef: ${mode === "A" ? "≈" + fmtP(tgt) + " (2R)" : "hızlı üst bant, şu an " + fmtP(tgt)}\nZaman: 40 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
+      body: `${lbl} — ${sym} ${tf}\nSinyal mumu: ${tsiBar(t, tf)} (TSİ, yaş ${age} mum)\n${info}\nGiriş: sonraki mum açılışı (ref ${fmtP(c)})\nStop: ≈${fmtP(stop)} (giriş − 1.5 ATR)\nHedef: ${mode === "A" ? "≈" + fmtP(tgt) + " (2R)" : "hızlı üst bant, şu an " + fmtP(tgt)}\nZaman: 100 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
   }
   return { found: out, dyn: D.fastUp };
 }
@@ -214,7 +233,7 @@ function rsi30Scan(sym: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
     out.push({ key: `${scan}|${sym}|${t}`, scan, symbol: sym, tf: "1d", t, tsi: tsiBar(t, "1d"), age, kind: "AL", price: c, entryBasis: "sonraki açılış (ref kapanış)", stop, target: tgt, info,
       calc: { kind: "atr", atr: A[i], k: 1.5, rr: 2 },
       title: `İZLEME | ${lbl} | ${sym} AL`,
-      body: `${lbl} — ${sym} 1d\nSinyal mumu: ${tsiBar(t, "1d")} (yaş ${age} mum)\n${info}\nGiriş: sonraki mum açılışı (ref ${fmtP(c)})\nStop: ≈${fmtP(stop)} (giriş − 1.5 ATR)\nHedef: ≈${fmtP(tgt)} (2R)\nZaman: 40 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
+      body: `${lbl} — ${sym} 1d\nSinyal mumu: ${tsiBar(t, "1d")} (yaş ${age} mum)\n${info}\nGiriş: sonraki mum açılışı (ref ${fmtP(c)})\nStop: ≈${fmtP(stop)} (giriş − 1.5 ATR)\nHedef: ≈${fmtP(tgt)} (2R)\nZaman: 100 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
   }
   return out;
 }

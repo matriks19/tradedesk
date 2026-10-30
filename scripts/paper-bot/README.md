@@ -26,4 +26,5 @@ Grok Bot rutinlerinden taşınan taramalar robotun aynı 15 dk döngüsünde ça
 EK v3 DIV (kripto 4s + BIST 1g), L/S 2s top-pozisyon uyumsuzluğu; evren: top-200 USDT-M perp (günlük), BIST ≤200, dönen parti + kalıcı imleç (symLast), Dual 100/10 (kripto 4s LRB, BIST 1g BB), BIST 1g RSI14 30 kırılımı,
 ve günlük L/S veri toplama (`lsdata/YYYY-MM-DD.csv`). Sonuçlar `watch.json` (paper-bot-state dalı) → `/api/watch-report` → `/izleme.html`.
 ntfy: sinyal mumu başına bir kez, adres yalnız secret'tan (`WATCH_NTFY_URL` → `ELIZI_NTFY_URL` → `NTFY_URL`). İlk tur bildirimsiz tohumlar.
+Sonuç takibi: giriş = sinyal sonrası ilk açılış; stop/hedef/**100 mum**. Her sinyalde `ex` (çıkışa kadar) ve `ex100` (çıkıştan bağımsız 100 mum) = MFE/MAE % ve R + ulaşıldığı mum no, `r1/r2/r3` = 1R/2R/3R ilk ulaşılan mum no (ekleme/TP türetmek için). Mumlardan her tur baştan hesaplanır; eski 40 mumluk "süre" kayıtları 100 muma uzar.
 Kapatma: `WATCH_OFF=1`. Yerel deneme: `WATCH_DIR=/tmp/x WATCH_DRY=1 npx tsx scripts/paper-bot/watch.ts`.

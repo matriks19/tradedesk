@@ -17,7 +17,7 @@ export async function GET() {
       if (!r.ok) { errs.push(`${new URL(u).host} ${r.status}`); continue; }
       const j = await r.json();
       // dahili tekrar-önleme anahtarlarını ve kapı sayaçlarını gönderme
-      const { notified: _n, gate: _g, ...rest } = j || {};
+      const { notified: _n, gate: _g, symLast: _s, ...rest } = j || {};
       void _n; void _g;
       return NextResponse.json(rest, { headers: { "cache-control": "s-maxage=60, stale-while-revalidate=120" } });
     } catch (e) { errs.push((e as Error).message); }
