@@ -3,7 +3,7 @@
  "kind": "quantex-watch",
  "tradeMode": "KAPALI (yalnız izleme)",
  "created": 1793400045373,
- "runs": 5,
+ "runs": 6,
  "gate": {
   "crypto4h": 124541,
   "bist2h": 249083,
@@ -88,8 +88,8 @@
    "coverage": {
     "total": 200,
     "covered": 200,
-    "thisRun": 200,
-    "okThisRun": 189,
+    "thisRun": 0,
+    "okThisRun": 0,
     "slotTsi": "30.10.2026 23:00:00",
     "oldestTsi": "31.10.2026 02:09:15",
     "full": true
@@ -271,8 +271,8 @@
    "coverage": {
     "total": 200,
     "covered": 200,
-    "thisRun": 200,
-    "okThisRun": 197,
+    "thisRun": 0,
+    "okThisRun": 0,
     "slotTsi": "31.10.2026 01:00:00",
     "oldestTsi": "31.10.2026 02:09:15",
     "full": true
@@ -432,8 +432,8 @@
    "coverage": {
     "total": 200,
     "covered": 200,
-    "thisRun": 200,
-    "okThisRun": 185,
+    "thisRun": 0,
+    "okThisRun": 0,
     "slotTsi": "31.10.2026 01:00:00",
     "oldestTsi": "31.10.2026 02:09:15",
     "full": true
@@ -516,8 +516,8 @@
    "coverage": {
     "total": 200,
     "covered": 200,
-    "thisRun": 200,
-    "okThisRun": 189,
+    "thisRun": 0,
+    "okThisRun": 0,
     "slotTsi": "30.10.2026 23:00:00",
     "oldestTsi": "31.10.2026 02:09:15",
     "full": true
@@ -989,8 +989,8 @@
    "coverage": {
     "total": 200,
     "covered": 200,
-    "thisRun": 200,
-    "okThisRun": 197,
+    "thisRun": 0,
+    "okThisRun": 0,
     "slotTsi": "31.10.2026 01:00:00",
     "oldestTsi": "31.10.2026 02:09:15",
     "full": true
@@ -1593,8 +1593,8 @@
    "coverage": {
     "total": 200,
     "covered": 200,
-    "thisRun": 200,
-    "okThisRun": 197,
+    "thisRun": 0,
+    "okThisRun": 0,
     "slotTsi": "31.10.2026 01:00:00",
     "oldestTsi": "31.10.2026 02:09:15",
     "full": true
@@ -1670,8 +1670,8 @@
   "lastRows": 5472
  },
  "firstRunDone": true,
- "updated": 1793401869383,
- "updatedTsi": "31.10.2026 02:11:09",
+ "updated": 1793403420208,
+ "updatedTsi": "31.10.2026 02:37:00",
  "symLast": {
   "kripto 4s": {
    "BTCUSDT": 1793401755289,
