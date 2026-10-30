@@ -3,11 +3,12 @@
  "kind": "quantex-watch",
  "tradeMode": "KAPALI (yalnız izleme)",
  "created": 1793400045373,
- "runs": 1,
+ "runs": 2,
  "gate": {
   "crypto4h": 124541,
   "bist2h": 249083,
-  "bistLast": 1793400045373
+  "bistLast": 1793400045373,
+  "ls2h": 249083
  },
  "notified": {
   "dual-bist-1d|GARAN.IS|1792996200000": 1793400045373,
@@ -84,12 +85,13 @@
    "market": "kripto",
    "note": "Top-trader L/S POZİSYON oranı boğa uyumsuzluğu (dip bölgesi); stop = pivot dip, hedef = BB(20,2) üst.",
    "signals": [],
-   "lastRun": 1793400045373,
-   "lastRunTsi": "31.10.2026 01:40:45",
+   "lastRun": 1793400344575,
+   "lastRunTsi": "31.10.2026 01:45:44",
    "nSym": 40,
-   "nOk": 6,
+   "nOk": 38,
    "errors": [
-    "zaman bütçesi doldu — sonraki turda"
+    "PEPEUSDT: HTTP 503",
+    "XDPUSDT: HTTP 503"
    ]
   },
   "dual-crypto-4h": {
@@ -369,10 +371,18 @@
   "31.10.2026 01:41:10 İZLEME SİNYAL Dual 100/10 BB · BIST 1g YKBNK.IS 26.10.2026 @35.84 stop 33.9829 hedef 39.5543 · ntfy ilk tur (bildirimsiz)",
   "31.10.2026 01:41:10 İZLEME SİNYAL Dual 100/10 BB · BIST 1g ISCTR.IS 26.10.2026 @12.26 stop 11.6101 hedef 13.5599 · ntfy ilk tur (bildirimsiz)",
   "31.10.2026 01:41:10 İZLEME SİNYAL Dual 100/10 BB · BIST 1g TCELL.IS 26.10.2026 @90.4 stop 85.7521 hedef 99.6957 · ntfy ilk tur (bildirimsiz)",
-  "31.10.2026 01:41:10 İZLEME SİNYAL RSI14 30 kırılım · BIST 1g TOASO.IS 27.10.2026 @231.5 stop 216.236 hedef 262.028 · ntfy ilk tur (bildirimsiz)"
+  "31.10.2026 01:41:10 İZLEME SİNYAL RSI14 30 kırılım · BIST 1g TOASO.IS 27.10.2026 @231.5 stop 216.236 hedef 262.028 · ntfy ilk tur (bildirimsiz)",
+  "31.10.2026 01:46:46 İZLEME L/S 2s: 38/40 sembol (proxy) · hata 2",
+  "31.10.2026 01:49:05 İZLEME L/S veri toplama 2026-10-29: 5472 satır, 40 sembol"
  ],
- "ls": {},
+ "ls": {
+  "lastDay": "2026-10-29",
+  "files": [
+   "2026-10-29.csv"
+  ],
+  "lastRows": 5472
+ },
  "firstRunDone": true,
- "updated": 1793400070775,
- "updatedTsi": "31.10.2026 01:41:10"
+ "updated": 1793400545557,
+ "updatedTsi": "31.10.2026 01:49:05"
 }
