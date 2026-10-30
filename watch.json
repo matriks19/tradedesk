@@ -3,7 +3,7 @@
  "kind": "quantex-watch",
  "tradeMode": "KAPALI (yalnız izleme)",
  "created": 1793400045373,
- "runs": 2,
+ "runs": 3,
  "gate": {
   "crypto4h": 124541,
   "bist2h": 249083,
@@ -383,6 +383,6 @@
   "lastRows": 5472
  },
  "firstRunDone": true,
- "updated": 1793400545557,
- "updatedTsi": "31.10.2026 01:49:05"
+ "updated": 1793400813136,
+ "updatedTsi": "31.10.2026 01:53:33"
 }
