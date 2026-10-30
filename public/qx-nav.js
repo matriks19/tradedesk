@@ -1,6 +1,6 @@
 /* [bridge138] Ortak üst menü: Grafik / Liste Tarama / QUANTEX İzleme / Radar / Robot. Sadece 'qx_nav_min' anahtarını yazar. */
 (function(){function go(){if(document.getElementById('qxNav'))return;
-var p=location.pathname,L=[['📈 Grafik','/',p==='/'&&!/tab=list/.test(location.search)],['🔎 Liste Tarama','/?tab=list',/tab=list/.test(location.search)],['📊 QUANTEX İzleme','/quantex.html',/quantex/.test(p)&&location.hash!=='#robot'],['🛰 Radar','/radar.html',/radar/.test(p)],['🤖 Robot','/quantex.html#robot',/quantex/.test(p)&&location.hash==='#robot']];
+var p=location.pathname,L=[['📈 Grafik','/',p==='/'&&!/tab=list/.test(location.search)],['🔎 Liste Tarama','/?tab=list',/tab=list/.test(location.search)],['📊 QUANTEX İzleme','/quantex.html',/quantex/.test(p)&&location.hash!=='#robot'],['🛰 Radar','/radar.html',/radar/.test(p)],['📡 İzleme Raporu','/izleme.html',/izleme/.test(p)],['🤖 Robot','/quantex.html#robot',/quantex/.test(p)&&location.hash==='#robot']];
 var d=document.createElement('div');d.id='qxNav';
 d.style.cssText='position:fixed;top:0;left:0;right:0;justify-content:center;height:34px;align-items:center;box-sizing:border-box;z-index:2147483000;display:flex;gap:4px;background:rgba(8,14,28,.92);border:1px solid #2a3a5a;border-radius:0;padding:0 6px;font:600 15px Inter,system-ui,sans-serif;box-shadow:0 2px 10px rgba(0,0,0,.5)';
 var min=false;try{min=localStorage.getItem('qx_nav_min')==='1'&&innerWidth>=768;}catch(e){}

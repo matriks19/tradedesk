@@ -14,6 +14,7 @@ import { lsDivMacdEval, fetchLsRatio, multiDiv, type LsBar } from "../../src/lib
 import { lsBottomEval, type LsBotBar } from "../../src/lib/indicators/lsBottom";
 import { rsiMacdSetups, rsiMacdTag, psarState, RSI_MACD } from "../../src/lib/indicators/rsiMacd";
 import { macdLine } from "../../src/lib/indicators/lsDivMacd";
+import { runWatch } from "./watch";
 
 type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd"; tf: string; k?: number; on: boolean; ev: boolean;
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number;
@@ -101,7 +102,8 @@ const trT = () => new Date().toLocaleString("tr-TR", { timeZone: "Europe/Istanbu
 function log(m: string) { const l = trT() + " " + m; st.log.push(l); console.log(l); }
 const fmt = (v: number) => (+v).toPrecision(6);
 // ---------- Elizi ntfy: yalnız seçili kaynaklar (Gold2 uyumsuzluk, PLI DT uyumsuzluk, KAL Hibrit 2s) — mevcut kanallardan ayrı, hata ölümcül değil ----------
-const ELIZI_URL = process.env.ELIZI_NTFY_URL || "https://ntfy.sh/elizi94trhan";
+// ntfy adresi yalnız GitHub secret/ortam değişkeninden (repo herkese açık — adres koda yazılmaz)
+const ELIZI_URL = process.env.ELIZI_NTFY_URL || process.env.NTFY_URL || "";
 const ELIZI_SIDS = new Set(["gold2-div-4h", "pdt-ddiv-4h", "kal-hibrit-2h"]);
 const isElizi = (sid?: string) => !!sid && (ELIZI_SIDS.has(sid) || /^pdt-ddiv-/.test(sid) || /^gold2-div-/.test(sid));
 const eliziQ: { body: string; key?: string; tag: string }[] = [];
@@ -129,6 +131,7 @@ async function eliziFlush() {
   const now = Date.now();
   for (const [k, t] of Object.entries(seen)) if (!(now - t < ELIZI_KEEP_MS)) delete seen[k];
   if (!eliziQ.length) { console.log("elizi ntfy: gönderilecek yok"); return; }
+  if (DRY || !ELIZI_URL) { console.log(`elizi ntfy ${DRY ? "dry-run" : "adres tanımlı değil"} — ${eliziQ.length} uyarı gönderilmedi`); return; }
   const sent: string[] = [];
   for (const q of eliziQ) {
     try {
@@ -634,6 +637,12 @@ async function main() {
   (st as any).firstScanDone = true;
   try { await eliziFlush(); } catch { /* ölümcül değil */ }
   if (!DRY) { fs.writeFileSync(STATE_FILE, JSON.stringify(st, null, 1)); fs.writeFileSync(path.join(path.dirname(STATE_FILE), "STATS.md"), statsMd); }
+  // İZLEME (watch-only): Grok Bot rutinlerinden taşınan taramalar — pozisyon/bakiye/state.json'a dokunmaz, yalnız watch.json + ntfy
+  let watchSum = "";
+  if (process.env.WATCH_OFF !== "1") {
+    try { watchSum = (await runWatch({ dir: path.dirname(STATE_FILE), dry: DRY || process.env.WATCH_DRY === "1", futHost, proxy: QX_PROXY })).summary; }
+    catch (e) { watchSum = `İzleme hata (ölümcül değil): ${(e as Error).message}`; console.log(watchSum); }
+  }
   const unreal = st.open.reduce((a, p) => a + pr(p) * p.notional - fee(p), 0);
   const sum = [
     `## QUANTEX Paper Bot — ${trT()} (TSİ)`,
@@ -642,6 +651,7 @@ async function main() {
     "", "| Sembol | Yön | Giriş | Son | K/Z % | TP % | MFE % | MAE % | Kaynak |", "|---|---|---|---|---|---|---|---|---|",
     ...st.open.map((p) => `| ${p.sym} | ${p.side} | ${fmt(p.entry)} | ${fmt(p.last)} | ${(pr(p) * 100).toFixed(2)} | ${tpTxt(p)} | ${p.mfePct?.toFixed(2) ?? "—"} | ${p.maePct?.toFixed(2) ?? "—"} | ${p.src} |`),
     "", "### Bu tur", ...(alerts.length ? alerts.map((a) => "- " + a) : ["- işlem yok"]),
+    ...(watchSum ? ["", "### İzleme (işlem açmaz)", "- " + watchSum] : []),
   ].join("\n");
   if (process.env.GITHUB_STEP_SUMMARY) fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, sum + "\n\n" + statsMd + "\n");
   console.log(sum);

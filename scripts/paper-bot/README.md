@@ -20,3 +20,10 @@ PAPER ONLY — borsaya emir gitmez, API anahtarı kullanılmaz. `.github/workflo
 - HAM/MACD 15m — global TP, EV açık
 SL hepsinde global (%5). EV: `evGlobal` + kaynak `ev`; backtest kapısı `ev_td.json` (QX_EV_TD), canlı EV son 30 işlem ort. < 0 → kaynak oto-kapalı.
 `tpc.ts` = quantex.html `tpcCalc` birebir; yalnız kapanmış mumlar.
+
+## İzleme (watch-only) — `watch.ts`
+Grok Bot rutinlerinden taşınan taramalar robotun aynı 15 dk döngüsünde çalışır, **işlem/pozisyon açmaz** (state.json'a dokunmaz):
+EK v3 DIV (kripto 4s + BIST 1g), L/S 2s top-pozisyon uyumsuzluğu (top-40 perp), Dual 100/10 (kripto 4s LRB, BIST 1g BB), BIST 1g RSI14 30 kırılımı,
+ve günlük L/S veri toplama (`lsdata/YYYY-MM-DD.csv`). Sonuçlar `watch.json` (paper-bot-state dalı) → `/api/watch-report` → `/izleme.html`.
+ntfy: sinyal mumu başına bir kez, adres yalnız secret'tan (`WATCH_NTFY_URL` → `ELIZI_NTFY_URL` → `NTFY_URL`). İlk tur bildirimsiz tohumlar.
+Kapatma: `WATCH_OFF=1`. Yerel deneme: `WATCH_DIR=/tmp/x WATCH_DRY=1 npx tsx scripts/paper-bot/watch.ts`.

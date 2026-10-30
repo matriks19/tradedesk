@@ -9,6 +9,8 @@ export const preferredRegion = ["fra1", "arn1", "cdg1"];
 /** Binance top-trader L/S POSITION oranı proxy'si (salt okunur, anahtar yok).
  *  GET /api/lsratio?symbol=BTCUSDT&period=4h → Binance /futures/data/topLongShortPositionRatio biçimi. */
 const HOSTS = ["https://fapi.binance.com", "https://fapi1.binance.com", "https://fapi2.binance.com"];
+/** metric (beyaz liste): topPos (varsayılan) | topAcc | globAcc | taker — QUANTEX izleme L/S günlük veri toplama için */
+const METRICS: Record<string, string> = { topPos: "topLongShortPositionRatio", topAcc: "topLongShortAccountRatio", globAcc: "globalLongShortAccountRatio", taker: "takerlongshortRatio" };
 const PERIODS = new Set(["5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"]);
 
 export async function GET(req: NextRequest) {
@@ -16,11 +18,12 @@ export async function GET(req: NextRequest) {
   const sym = (sp.get("symbol") || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 32);
   const period = sp.get("period") || "4h";
   const lim = Math.min(500, Math.max(1, Number(sp.get("limit") || 500) || 500));
-  if (!sym || !PERIODS.has(period)) return NextResponse.json({ error: "symbol/period" }, { status: 400 });
+  const ep = METRICS[sp.get("metric") || "topPos"];
+  if (!sym || !PERIODS.has(period) || !ep) return NextResponse.json({ error: "symbol/period/metric" }, { status: 400 });
   const errs: string[] = [];
   for (const h of HOSTS) {
     try {
-      const r = await fetch(`${h}/futures/data/topLongShortPositionRatio?symbol=${sym}&period=${period}&limit=${lim}`, { cache: "no-store", signal: AbortSignal.timeout(8000) });
+      const r = await fetch(`${h}/futures/data/${ep}?symbol=${sym}&period=${period}&limit=${lim}`, { cache: "no-store", signal: AbortSignal.timeout(8000) });
       if (r.ok) return NextResponse.json(await r.json(), { headers: { "cache-control": "s-maxage=300", "x-qx-src": h } });
       errs.push(`${h} ${r.status}`);
       if (r.status === 451) continue;
