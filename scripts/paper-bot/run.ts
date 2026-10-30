@@ -2,7 +2,8 @@
  * QUANTEX paper bot — headless (GitHub Actions). PAPER ONLY: hiçbir borsa emri gönderilmez, API anahtarı kullanılmaz.
  * Run: npx tsx scripts/paper-bot/run.ts  (STATE_FILE=path/state.json)
  * Kurallar (quantex.html robotundan): global TP/SL (fiyat %), 1m iğne kontrolü (önce SL), slot sınırı, toplam marjin ≤ bakiye,
- * tur başı yeni giriş ≤ maxNew, sembol başı tek pozisyon. Binance: ≤4 istek/sn sıra, 418/429 → Retry-After / ban bekleme.
+ * tur başı yeni giriş ≤ maxNew, sembol başı TEK açık pozisyon (tüm kaynaklar ortak; kaynak fark etmez — yalnız lsbot aynı pozisyona
+ * en fazla 2 kez, son ekleme fiyatının altında, taban büyüklükte ekleme yapar), aynı sinyal mumu bir kez. Binance: ≤4 istek/sn sıra, 418/429 → Retry-After / ban bekleme.
  */
 import fs from "node:fs";
 import path from "node:path";
@@ -15,7 +16,8 @@ import { rsiMacdSetups, rsiMacdTag, psarState, RSI_MACD } from "../../src/lib/in
 import { macdLine } from "../../src/lib/indicators/lsDivMacd";
 
 type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd"; tf: string; k?: number; on: boolean; ev: boolean;
-  scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number };
+  scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number;
+  /** lsbot ekleme: en fazla kaç ekleme (vars. 2) ve son ekleme fiyatının altında olma eşiği (oran, vars. 0 = herhangi bir düşüş) */ maxAdds?: number; addStep?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
   riskPct: number; tp: number; sl: number; maxSlots: number; marginUsd?: number; maxNew: number; maxNewFirst?: number; perSymSig?: number; feePct: number; evGlobal: boolean; sources: Src[];
@@ -24,6 +26,7 @@ type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; s
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
   sid?: string; tpPct?: number; /** true → TP yok (yalnız kaynak çıkışı, ör. SAR) */ noTp?: boolean; exit?: string; maxH?: number; tf?: string; sigT?: number;
   /** ekleme (yalnız lsbot): kaç kez eklendi, ilk giriş, ortalama giriş (= entry) */ adds?: number; firstEntry?: number; avgEntry?: number;
+  /** son ekleme fiyatı (yoksa entry) ve taban (ilk giriş) nominali — eski kayıtlarda yok: notional / 2^adds ile türetilir */ lastAddPx?: number; baseNotional?: number;
   /** MFE/MAE: girişten beri en iyi / en kötü fiyat (LONG: max high / min low; SHORT tersi), zaman (ms) ve ort. girişe göre % */
   mfePx?: number; maePx?: number; mfePct?: number; maePct?: number; mfeT?: number; maeT?: number; mxSrc?: string };
 type Closed = Pos & { exit2?: string; exitPx: number; why: string; r: number; pnl: number; closedAt: number };
@@ -137,6 +140,8 @@ async function eliziFlush() {
   console.log(`elizi ntfy gönderildi ${sent.length}/${eliziQ.length}: ${sent.join(", ")}`);
 }
 const pr = (p: Pos) => (p.side === "LONG" ? p.last / p.entry - 1 : 1 - p.last / p.entry);
+/** sembol başı tek açık pozisyon (kaynak fark etmez) */
+const symOpen = (sym: string) => st.open.some((p) => p.sym === sym);
 const fee = (p: Pos) => p.notional * (1 + p.last / p.entry) * (cfg.feePct / 100);
 
 function closePos(i: number, why: string, px: number) {
@@ -388,6 +393,7 @@ async function scanAndOpen() {
         const perCap = cfg.perSymSig ?? 1;
         const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
         if (nSame >= perCap) { log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); markSeen(); continue; }
+        if (symOpen(sym)) { log(msg + ` — atlandı: sembolde açık pozisyon var (sembol başı tek pozisyon)`); markSeen(); continue; }
         const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
         if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
         if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
@@ -420,27 +426,31 @@ async function scanAndOpen() {
         const ex = st.open.filter((p) => p.sym === sym && p.sid === s.id).pop();
         if (ex) {
           const rNow = price / ex.entry - 1;
-          if (rNow >= 0) { log(msg + ` — atlandı: mevcut pozisyon kârda (${(rNow * 100).toFixed(2)}%), ekleme yok`); st.seen[sk] = bt; continue; }
-          const addNot = ex.notional, addMargin = addNot / ex.lev;
+          const nAdds = ex.adds || 0, maxAdds = s.maxAdds ?? 2, step = s.addStep ?? 0, ref = ex.lastAddPx ?? ex.entry;
+          if (nAdds >= maxAdds) { log(msg + ` — atlandı: ekleme sınırı doldu (${nAdds}/${maxAdds})`); st.seen[sk] = bt; continue; }
+          if (!(price < ref * (1 - step))) { log(msg + ` — atlandı: fiyat son ekleme/giriş fiyatının altında değil (${fmt(price)} ≥ ${fmt(ref * (1 - step))}), ekleme yok`); st.seen[sk] = bt; continue; }
+          const base = ex.baseNotional ?? ex.notional / Math.pow(2, nAdds); // eski kayıtlar: her ekleme mevcut büyüklük kadardı (2×)
+          const addNot = base, addMargin = addNot / ex.lev;
           if (nNew >= capNew) { log(msg + ` — EKLEME atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
           if (used + addMargin > st.equity + 1e-9) { log(msg + ` — EKLEME atlandı: toplam marjin sınırı (gerekli ${addMargin.toFixed(2)})`); continue; }
           const old = ex.entry, addQty = addNot / price;
-          ex.firstEntry ??= ex.entry;
+          ex.firstEntry ??= ex.entry; ex.baseNotional ??= base;
           ex.qty += addQty; ex.notional += addNot; ex.entry = ex.notional / ex.qty; ex.avgEntry = ex.entry; ex.last = price;
-          ex.adds = (ex.adds || 0) + 1; ex.sigT = bt * 1000;
+          ex.adds = nAdds + 1; ex.lastAddPx = price; ex.sigT = bt * 1000;
           mxUpd(ex, price, price, Date.now()); mxPct(ex); // MFE/MAE yeni ortalama girişe göre
           nNew++; opened++; st.seen[sk] = bt;
-          const m = `➕ PAPER EKLEME: ${sym} ${ex.lev}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] — neden: aynı kaynakta yeni dip uyumsuzluğu ve pozisyon zararda (${(rNow * 100).toFixed(2)}%) → mevcut büyüklük kadar ekleme (marjin +${addMargin.toFixed(2)}, nominal ${(ex.notional - addNot).toFixed(2)}→${ex.notional.toFixed(2)}) · ort. giriş ${fmt(old)}→${fmt(ex.entry)} · TP %${tpOf(ex) * 100} → ${fmt(ex.entry * (1 + tpOf(ex)))} · ekleme #${ex.adds} / SL yok`;
+          const m = `➕ PAPER EKLEME: ${sym} ${ex.lev}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] — neden: aynı kaynakta yeni dip uyumsuzluğu ve pozisyon zararda (${(rNow * 100).toFixed(2)}%) → taban büyüklükte ekleme (marjin +${addMargin.toFixed(2)}, nominal ${(ex.notional - addNot).toFixed(2)}→${ex.notional.toFixed(2)}) · ort. giriş ${fmt(old)}→${fmt(ex.entry)} · TP %${tpOf(ex) * 100} → ${fmt(ex.entry * (1 + tpOf(ex)))} · ekleme #${ex.adds}/${maxAdds} / SL yok`;
           log(m); alerts.push(m);
           continue;
         }
+        if (symOpen(sym)) { log(msg + ` — atlandı: sembolde açık pozisyon var (sembol başı tek pozisyon)`); st.seen[sk] = bt; continue; }
         if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
         if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
         const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
         if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
         const notional = margin * cfg.leverage;
         st.open.push({ sym, side: "LONG", entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
-          t: Date.now(), checked: Date.now(), pxSrc: futHost ? "perp" : "perp-proxy", sid: s.id, tpPct: s.tp, tf: s.tf, sigT: bt * 1000 });
+          t: Date.now(), checked: Date.now(), pxSrc: futHost ? "perp" : "perp-proxy", sid: s.id, tpPct: s.tp, tf: s.tf, sigT: bt * 1000, baseNotional: notional });
         nNew++; opened++; st.seen[sk] = bt;
         const m = `🤖 PAPER AL: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
         log(m); alerts.push(m);
@@ -461,6 +471,7 @@ async function scanAndOpen() {
         const perCap = cfg.perSymSig ?? 1;
         const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
         if (nSame >= perCap) { log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); continue; }
+        if (symOpen(sym)) { log(msg + ` — atlandı: sembolde açık pozisyon var (sembol başı tek pozisyon)`); st.seen[sk] = bt; continue; }
         const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
         if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
         if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
@@ -486,6 +497,8 @@ async function scanAndOpen() {
         if (!side) continue;
         const hs = side === "LONG" ? bull : bear;
         keys = hs.map((h) => `${h.kind}:${h.cond}`); tag = keys.join("+"); age = Math.min(...hs.map((h) => h.barsAgo));
+        bt = c[Math.max(0, c.length - 1 - age)].time; sk = `${s.id}|${sym}`;
+        if (st.seen[sk] === bt) continue; // liste: aynı sinyal mumu bir kez işlenir
       } else {
         const R = tpcCalc({ c: c.map((x) => x.close) }) as unknown as Record<string, boolean[]>;
         const arr = R[s.sig!]; const n = c.length;
@@ -505,6 +518,7 @@ async function scanAndOpen() {
       const perCap = cfg.perSymSig ?? 1;
       const nSame = st.open.filter((p) => p.sym === sym && p.sid === s.id).length;
       if (nSame >= perCap) { eSig(`sinyal (aynı sembol sınırı ${nSame}/${perCap})`); log(msg + ` — atlandı: aynı sembol+sinyal sınırı (${nSame}/${perCap})`); continue; }
+      if (symOpen(sym)) { eSig("sinyal (sembolde açık pozisyon var)"); log(msg + ` — atlandı: sembolde açık pozisyon var (sembol başı tek pozisyon)`); if (sk) st.seen[sk] = bt; continue; }
       const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
       if (nNew >= capNew) { eSig("sinyal (tur giriş sınırı)"); log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
       if (st.open.length >= cfg.maxSlots) { eSig(`sinyal (slot dolu ${st.open.length}/${cfg.maxSlots})`); log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }

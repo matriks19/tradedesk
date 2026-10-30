@@ -17,7 +17,7 @@
  "maxSlots": 600,
  "maxNew": 50,
  "maxNewFirst": 50,
- "perSymSig": 10,
+ "perSymSig": 1,
  "feePct": 0.05,
  "evGlobal": true,
  "sources": [
