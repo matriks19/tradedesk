@@ -619,11 +619,14 @@ function updateStats(): string {
   ].join("\n");
 }
 
+let watchP: ReturnType<typeof runWatch> | null = null;
 async function main() {
   st.runs++; st.lastRun = Date.now();
   try {
     await pickHost();
     console.log("Binance erişim: " + reach.join(" | "));
+    // İZLEME (watch-only): Grok Bot rutinlerinden taşınan taramalar — paralel çalışır; pozisyon/bakiye/state.json'a dokunmaz, yalnız watch.json + ntfy
+    if (process.env.WATCH_OFF !== "1") watchP = runWatch({ dir: path.dirname(STATE_FILE), dry: DRY || process.env.WATCH_DRY === "1", futHost, proxy: QX_PROXY }); watchP?.catch(() => { /* sonuçta raporlanır */ });
     st.dataSrc = dataSrc();
     await mxBackfill();
     if (st.open.length) await manage();
@@ -637,12 +640,9 @@ async function main() {
   (st as any).firstScanDone = true;
   try { await eliziFlush(); } catch { /* ölümcül değil */ }
   if (!DRY) { fs.writeFileSync(STATE_FILE, JSON.stringify(st, null, 1)); fs.writeFileSync(path.join(path.dirname(STATE_FILE), "STATS.md"), statsMd); }
-  // İZLEME (watch-only): Grok Bot rutinlerinden taşınan taramalar — pozisyon/bakiye/state.json'a dokunmaz, yalnız watch.json + ntfy
+  // İZLEME sonucu (tur başında paralel başlatıldı)
   let watchSum = "";
-  if (process.env.WATCH_OFF !== "1") {
-    try { watchSum = (await runWatch({ dir: path.dirname(STATE_FILE), dry: DRY || process.env.WATCH_DRY === "1", futHost, proxy: QX_PROXY })).summary; }
-    catch (e) { watchSum = `İzleme hata (ölümcül değil): ${(e as Error).message}`; console.log(watchSum); }
-  }
+  if (watchP) { try { watchSum = (await watchP).summary; } catch (e) { watchSum = `İzleme hata (ölümcül değil): ${(e as Error).message}`; console.log(watchSum); } }
   const unreal = st.open.reduce((a, p) => a + pr(p) * p.notional - fee(p), 0);
   const sum = [
     `## QUANTEX Paper Bot — ${trT()} (TSİ)`,

@@ -368,7 +368,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
 
   doc.firstRunDone = true; doc.updated = Date.now(); doc.updatedTsi = trT(); doc.log = doc.log.slice(-200);
   fs.writeFileSync(file, JSON.stringify(doc, null, 1));
-  const summary = `İzleme: ${ran.length ? ran.join(", ") : "bu tur taranacak yeni mum yok"} · yeni sinyal ${nNew} · ntfy ${sent}${ctx.dry ? " (dry-run)" : ""}${first ? " · ilk tur: bildirimsiz tohumlama" : ""}`;
+  const summary = `İzleme: ${ran.length ? ran.join(", ") : over() ? "zaman bütçesi doldu (sonraki turda)" : "bu tur taranacak yeni mum yok"} · yeni sinyal ${nNew} · ntfy ${sent}${ctx.dry ? " (dry-run)" : ""}${first ? " · ilk tur: bildirimsiz tohumlama" : ""}`;
   lg(summary);
   return { newSignals: nNew, sent, ran, summary };
 }
