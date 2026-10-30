@@ -26,7 +26,7 @@ const EMS_PICK: Partial<DivParams> = { osc: "EMs", Lb: 3, R: 5, G1: 5, G2: 60, d
 const EK_EXIT: Record<string, { exit: "sar" | "atr"; k: number; tp: number }> = { "4h": { exit: "sar", k: 1.5, tp: 4 }, "1d": { exit: "atr", k: 1.5, tp: 4 } };
 const TF_MS: Record<string, number> = { "1h": 36e5, "2h": 72e5, "4h": 144e5, "1d": 864e5 };
 /** Zaman bütçesi: Actions işi 12 dk ile sınırlı → süreç bu saniyeyi geçince yeni sembol/tarama başlatılmaz (kapı ilerlemez, sonraki turda tamamlanır) */
-const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 480);
+const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
 const MAX_AGE = 2, TRACK_BARS = 40, KEEP_SIG = 150, KEEP_NOTIFIED_MS = 60 * 864e5;
 
@@ -48,7 +48,7 @@ export interface WSig {
   calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number;
   alerted: "gönderildi" | "gönderilemedi" | "ilk tur (bildirimsiz)" | "dry-run" | "eski (yaş>2)"; foundAt: number;
 }
-interface ScanRep { label: string; tf: string; market: string; note: string; lastRun?: number; lastRunTsi?: string; nSym?: number; nOk?: number; errors?: string[]; newCount?: number; signals: WSig[] }
+interface ScanRep { label: string; tf: string; market: string; note: string; lastRun?: number; lastFull?: number; lastRunTsi?: string; nSym?: number; nOk?: number; errors?: string[]; newCount?: number; signals: WSig[] }
 export interface WatchDoc {
   v: 1; kind: "quantex-watch"; tradeMode: "KAPALI (yalnız izleme)"; created: number; updated?: number; updatedTsi?: string; runs: number; firstRunDone?: boolean;
   gate: Record<string, number>; notified: Record<string, number>; scans: Record<string, ScanRep>; ls?: { lastDay?: string; files?: string[]; lastRows?: number; lastErr?: string; pend?: { day: string; syms: string[]; done: number; rows: number; errs: number } }; log: string[];
@@ -152,7 +152,7 @@ function track(s: WSig, bars: WBar[], dyn?: number[]) {
 // ---------- taramalar ----------
 type Found = Omit<WSig, "alerted" | "foundAt" | "status"> & { title: string; body: string };
 const tsiBar = (t: number, tf: string) => (tf === "1d" ? new Date(t).toLocaleDateString("tr-TR", { timeZone: "Europe/Istanbul" }) : trT(t).slice(0, -3));
-function ekScan(scan: ScanId, sym: string, tf: string, bars: WBar[]): Found[] {
+function ekScan(scan: ScanId, sym: string, tf: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
   const m = tf === "4h" ? 6 : 5, X = EK_EXIT[tf];
   const r = ekDivergenceV3(bars, EMS_PICK, { m }), v = emilimV3(bars, { m }), A = atr14Ewm(bars), n = bars.length;
   const cx = v.fms.map(() => false); let last = -1e9;
@@ -170,7 +170,7 @@ function ekScan(scan: ScanId, sym: string, tf: string, bars: WBar[]): Found[] {
   });
   const out: Found[] = [];
   for (const e of evs) {
-    const age = n - 1 - e.c; if (age > MAX_AGE) continue;
+    const age = n - 1 - e.c; if (age > maxAge) continue;
     const c0 = e.dc, d = e.d;
     const ds = Math.min(1, Math.max(0, (r.osc[d.p] - r.osc[d.p0]) / 20)), deep = v.depth[d.p] >= 0.5 ? 1 : 0, fm = v.fms[c0] > 0 ? 1 : 0;
     let al = 0; for (let j = Math.max(0, c0 - 10); j <= c0; j++) if (v.al[j]) al = 1;
@@ -187,9 +187,9 @@ function ekScan(scan: ScanId, sym: string, tf: string, bars: WBar[]): Found[] {
   }
   return out;
 }
-function dualScan(scan: ScanId, sym: string, tf: string, bars: WBar[], typ: "BB" | "LRB", z: number, mode: "A" | "B"): { found: Found[]; dyn: number[] } {
+function dualScan(scan: ScanId, sym: string, tf: string, bars: WBar[], typ: "BB" | "LRB", z: number, mode: "A" | "B", maxAge = MAX_AGE): { found: Found[]; dyn: number[] } {
   const D = dualBandBuy(bars, 100, 10, typ, z), A = atr14Rma(bars), n = bars.length, out: Found[] = [], lbl = SCANS[scan].label;
-  for (let i = Math.max(1, n - 1 - MAX_AGE); i < n; i++) {
+  for (let i = Math.max(1, n - 1 - maxAge); i < n; i++) {
     if (!D.buy[i] || !Number.isFinite(A[i])) continue;
     const c = bars[i].close, stop = c - 1.5 * A[i], tgt = mode === "A" ? c + 3 * A[i] : D.fastUp[i], t = bars[i].t, age = n - 1 - i;
     const info = `kapanış ${fmtP(c)} · hızlı alt bant ${fmtP(D.fastLow[i])} · yavaş %B(önceki) ${D.pbPrev[i].toFixed(2)}`;
@@ -200,9 +200,9 @@ function dualScan(scan: ScanId, sym: string, tf: string, bars: WBar[], typ: "BB"
   }
   return { found: out, dyn: D.fastUp };
 }
-function rsi30Scan(sym: string, bars: WBar[]): Found[] {
+function rsi30Scan(sym: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
   const scan: ScanId = "rsi30-bist-1d", R = rsi30Buy(bars), A = atr14Rma(bars), n = bars.length, out: Found[] = [], lbl = SCANS[scan].label;
-  for (let i = Math.max(1, n - 1 - MAX_AGE); i < n; i++) {
+  for (let i = Math.max(1, n - 1 - maxAge); i < n; i++) {
     if (!R.buy[i] || !Number.isFinite(A[i])) continue;
     const c = bars[i].close, stop = c - 1.5 * A[i], tgt = c + 3 * A[i], t = bars[i].t, age = n - 1 - i;
     const info = `RSI14 ${R.rsi[i - 1].toFixed(1)} → ${R.rsi[i].toFixed(1)} · kapanış ${fmtP(c)}`;
@@ -255,10 +255,13 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   const touched: { scan: ScanId; sym: string; bars: WBar[]; dyn?: number[] }[] = [];
   const rep = (id: ScanId) => (doc.scans[id] ||= { ...SCANS[id], signals: [] });
   for (const id of Object.keys(SCANS) as ScanId[]) Object.assign(rep(id), { label: SCANS[id].label, note: SCANS[id].note, tf: SCANS[id].tf, market: SCANS[id].market });
+  /** Robot seyrek çalışırsa (Actions cron gecikmesi) son taramadan beri kapanan mumlar da rapora girer; ntfy yalnız yaş ≤ 2 */
+  const win = (id: ScanId) => { const lr = doc.scans[id]?.lastFull; return lr ? Math.min(30, Math.max(MAX_AGE, Math.ceil((now - lr) / TF_MS[SCANS[id].tf]) + 1)) : MAX_AGE; };
   const mark = (ids: ScanId[], nSym: number, nOk: number, errors: string[]) => { for (const id of ids) Object.assign(rep(id), { lastRun: now, lastRunTsi: trT(now), nSym, nOk, errors: errors.slice(0, 15) }); ran.push(...ids); };
 
+  const slot4 = Math.floor(now / TF_MS["4h"]), slot2 = Math.floor(now / TF_MS["2h"]);
+  const blkCrypto = async () => {
   // 1) kripto 4s: EK v3 DIV + Dual LRB (yeni 4s mum kapandığında bir kez)
-  const slot4 = Math.floor(now / TF_MS["4h"]);
   if (doc.gate.crypto4h !== slot4 && !over()) {
     let ok = 0; const errs: string[] = [];
     for (const sym of WATCH_CRYPTO) {
@@ -266,16 +269,17 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
       const b = await spotBars(sym, "4h");
       if (!b || b.length < 300) { errs.push(`${sym}: ${b ? b.length + " mum" : "veri yok"}`); continue; }
       ok++;
-      try { for (const f of ekScan("ek-crypto-4h", sym, "4h", b)) found.push({ f, bars: b }); touched.push({ scan: "ek-crypto-4h", sym, bars: b }); } catch (e) { errs.push(`${sym} EK: ${(e as Error).message}`); }
-      try { const d = dualScan("dual-crypto-4h", sym, "4h", b, "LRB", 0.1, "B"); for (const f of d.found) found.push({ f, bars: b, dyn: d.dyn }); touched.push({ scan: "dual-crypto-4h", sym, bars: b, dyn: d.dyn }); } catch (e) { errs.push(`${sym} DUAL: ${(e as Error).message}`); }
+      try { for (const f of ekScan("ek-crypto-4h", sym, "4h", b, win("ek-crypto-4h"))) found.push({ f, bars: b }); touched.push({ scan: "ek-crypto-4h", sym, bars: b }); } catch (e) { errs.push(`${sym} EK: ${(e as Error).message}`); }
+      try { const d = dualScan("dual-crypto-4h", sym, "4h", b, "LRB", 0.1, "B", win("dual-crypto-4h")); for (const f of d.found) found.push({ f, bars: b, dyn: d.dyn }); touched.push({ scan: "dual-crypto-4h", sym, bars: b, dyn: d.dyn }); } catch (e) { errs.push(`${sym} DUAL: ${(e as Error).message}`); }
     }
     mark(["ek-crypto-4h", "dual-crypto-4h"], WATCH_CRYPTO.length, ok, errs);
-    if (ok >= WATCH_CRYPTO.length / 2 && !over()) doc.gate.crypto4h = slot4;
+    if (ok >= WATCH_CRYPTO.length / 2 && !over()) { doc.gate.crypto4h = slot4; rep("ek-crypto-4h").lastFull = rep("dual-crypto-4h").lastFull = now; }
     lg(`kripto 4s: ${ok}/${WATCH_CRYPTO.length} sembol${errs.length ? " · hata " + errs.length : ""}`);
   }
 
+  };
+  const blkBist = async () => {
   // 2) BIST 1g: EK v3 DIV + Dual BB + RSI30 (2 saatte bir + 18:35 TSİ kapanış sonrası)
-  const slot2 = Math.floor(now / TF_MS["2h"]);
   const tsiNow = new Date(now + 3 * 36e5), closeToday = Date.UTC(tsiNow.getUTCFullYear(), tsiNow.getUTCMonth(), tsiNow.getUTCDate(), 18, 35) - 3 * 36e5;
   const afterClose = now >= closeToday && (doc.gate.bistLast || 0) < closeToday;
   if ((doc.gate.bist2h !== slot2 || afterClose) && !over()) {
@@ -285,15 +289,17 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
       const b = await yahooBars(sym);
       if (!b || b.length < 300) { errs.push(`${sym}: ${b ? b.length + " mum" : "veri yok"}`); continue; }
       ok++;
-      try { for (const f of ekScan("ek-bist-1d", sym, "1d", b)) found.push({ f, bars: b }); touched.push({ scan: "ek-bist-1d", sym, bars: b }); } catch (e) { errs.push(`${sym} EK: ${(e as Error).message}`); }
-      try { const d = dualScan("dual-bist-1d", sym, "1d", b, "BB", 0.5, "A"); for (const f of d.found) found.push({ f, bars: b }); touched.push({ scan: "dual-bist-1d", sym, bars: b }); } catch (e) { errs.push(`${sym} DUAL: ${(e as Error).message}`); }
-      try { for (const f of rsi30Scan(sym, b)) found.push({ f, bars: b }); touched.push({ scan: "rsi30-bist-1d", sym, bars: b }); } catch (e) { errs.push(`${sym} RSI30: ${(e as Error).message}`); }
+      try { for (const f of ekScan("ek-bist-1d", sym, "1d", b, win("ek-bist-1d"))) found.push({ f, bars: b }); touched.push({ scan: "ek-bist-1d", sym, bars: b }); } catch (e) { errs.push(`${sym} EK: ${(e as Error).message}`); }
+      try { const d = dualScan("dual-bist-1d", sym, "1d", b, "BB", 0.5, "A", win("dual-bist-1d")); for (const f of d.found) found.push({ f, bars: b }); touched.push({ scan: "dual-bist-1d", sym, bars: b }); } catch (e) { errs.push(`${sym} DUAL: ${(e as Error).message}`); }
+      try { for (const f of rsi30Scan(sym, b, win("rsi30-bist-1d"))) found.push({ f, bars: b }); touched.push({ scan: "rsi30-bist-1d", sym, bars: b }); } catch (e) { errs.push(`${sym} RSI30: ${(e as Error).message}`); }
     }
     mark(["ek-bist-1d", "dual-bist-1d", "rsi30-bist-1d"], WATCH_BIST.length, ok, errs);
-    if (ok >= WATCH_BIST.length / 2 && !over()) { doc.gate.bist2h = slot2; doc.gate.bistLast = now; }
+    if (ok >= WATCH_BIST.length / 2 && !over()) { doc.gate.bist2h = slot2; doc.gate.bistLast = now; rep("ek-bist-1d").lastFull = rep("dual-bist-1d").lastFull = rep("rsi30-bist-1d").lastFull = now; }
     lg(`BIST 1g: ${ok}/${WATCH_BIST.length} sembol${errs.length ? " · hata " + errs.length : ""}`);
   }
 
+  };
+  const blkLs = async () => {
   // 3) L/S 2s uyumsuzluk (yeni 2s mum kapandığında bir kez)
   if (doc.gate.ls2h !== slot2 && !over()) {
     let ok = 0; const errs: string[] = []; let uni: string[] = [];
@@ -306,7 +312,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
         const mp = new Map<number, number>(rs.map((x) => [Number(x.timestamp), Number(x.longShortRatio)]));
         const ratio = k.bars.map((b) => (mp.has(b.t) ? mp.get(b.t)! : null));
         ok++;
-        for (const d of lsDivergences(k.bars, ratio)) {
+        for (const d of lsDivergences(k.bars, ratio, win("ls-2h"))) {
           const t = k.bars[d.p].t, tc = k.bars[d.c].t, lbl = SCANS["ls-2h"].label;
           const info = `güç ${d.strength} · oran ${d.prev.toFixed(3)} → ${d.ratio.toFixed(3)} (+${d.rr.toFixed(1)}%) · BB alt bant ${d.bb ? "EVET" : "hayır"} · pivot ${tsiBar(t, "2h")}`;
           found.push({ bars: k.bars, f: { key: `ls-2h|${sym}|${t}`, scan: "ls-2h", symbol: sym, tf: "2h", t: tc, tsi: tsiBar(tc, "2h"), age: d.age, kind: "AL", price: k.px, entryBasis: "anlık fiyat",
@@ -318,9 +324,15 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
       } catch (e) { errs.push(`${sym}: ${(e as Error).message}`); }
     }
     mark(["ls-2h"], uni.length, ok, errs);
-    if (uni.length && ok >= uni.length / 2 && !over()) doc.gate.ls2h = slot2;
+    if (uni.length && ok >= uni.length / 2 && !over()) { doc.gate.ls2h = slot2; rep("ls-2h").lastFull = now; }
     lg(`L/S 2s: ${ok}/${uni.length} sembol (${ctx.futHost ? "fapi" : "proxy"})${errs.length ? " · hata " + errs.length : ""}`);
   }
+
+  };
+  // en uzun süredir tam taranamayan blok önce (zaman bütçesi hepsine sırayla yetsin)
+  const order: [() => Promise<void>, number][] = [[blkCrypto, rep("ek-crypto-4h").lastFull || 0], [blkBist, rep("ek-bist-1d").lastFull || 0], [blkLs, rep("ls-2h").lastFull || 0]];
+  order.sort((x, y) => x[1] - y[1]);
+  for (const [fn] of order) await fn();
 
   // 4) yeni sinyaller → rapor + ntfy (sinyal mumu başına bir kez; ilk turda bildirimsiz tohumlama)
   let sent = 0, nNew = 0;
@@ -330,6 +342,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     const { title, body, ...rest } = f;
     const s: WSig = { ...rest, status: "bekliyor", alerted: "dry-run", foundAt: now };
     if (doc.notified[f.key]) s.alerted = "gönderildi";
+    else if (f.age > MAX_AGE) s.alerted = "eski (yaş>2)";
     else if (first) { s.alerted = "ilk tur (bildirimsiz)"; doc.notified[f.key] = now; }
     else if (ctx.dry) { s.alerted = "dry-run"; console.log(`--- ntfy (dry-run, gönderilmedi) ---\n${title}\n${body}`); }
     else {

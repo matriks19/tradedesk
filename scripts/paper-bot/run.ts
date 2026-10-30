@@ -544,7 +544,7 @@ async function scanAndOpen() {
 
 // ---------- alerts (yalnız Secrets'tan) ----------
 async function notify(text: string) {
-  const tok = process.env.TELEGRAM_BOT_TOKEN, chat = process.env.TELEGRAM_CHAT_ID, ntfy = process.env.NTFY_URL;
+  const tok = process.env.TELEGRAM_BOT_TOKEN, chat = process.env.TELEGRAM_CHAT_ID, ntfy = process.env.PAPER_NTFY_URL; // NTFY_URL secret Elizi + İzleme uyarılarına ayrıldı (paper işlem bildirimleri Telegram'da)
   const out: string[] = [];
   if (tok && chat) {
     try { const r = await fetch(`https://api.telegram.org/bot${tok}/sendMessage`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ chat_id: chat, text: text.slice(0, 4000), disable_web_page_preview: true }) }); out.push("telegram " + r.status); }
@@ -553,7 +553,7 @@ async function notify(text: string) {
   if (ntfy) {
     try { const r = await fetch(ntfy, { method: "POST", headers: { "Content-Type": "text/plain", Title: "QUANTEX Paper Bot" }, body: text.slice(0, 4000) }); out.push("ntfy " + r.status); }
     catch { out.push("ntfy hata"); }
-  } else out.push("ntfy: secret yok");
+  } else out.push("ntfy: kapalı (PAPER_NTFY_URL yok)");
   console.log("alerts → " + out.join(", "));
 }
 

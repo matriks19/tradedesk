@@ -128,13 +128,13 @@ export type LsStrength = "GUCLU" | "ORTA" | "ZAYIF";
 export const lsStrength = (rr: number, bb: boolean): LsStrength => (rr >= 10 && bb ? "GUCLU" : rr >= 5 || bb ? "ORTA" : "ZAYIF");
 export interface LsDiv { p: number; q: number; c: number; age: number; ratio: number; prev: number; rr: number; bb: boolean; strength: LsStrength; stop: number; target: number; rpos: number }
 /** Kapanmış 2s mumlar + aynı mum açılışına damgalı oran → onaylı (KESIN) uyumsuzluklar, yaş 0..MAXAGE */
-export function lsDivergences(b: WBar[], ratio: (number | null)[]): LsDiv[] {
+export function lsDivergences(b: WBar[], ratio: (number | null)[], maxAge = LS_P.MAXAGE): LsDiv[] {
   const n = b.length, l = b.map((x) => x.low), h = b.map((x) => x.high), c = b.map((x) => x.close);
   const bb = bbBands(b, 20);
   const rpos = c.map((x, i) => { if (i < LS_P.RANGE_N - 1) return NaN; let hh = -Infinity, ll = Infinity; for (let j = i - LS_P.RANGE_N + 1; j <= i; j++) { hh = Math.max(hh, h[j]); ll = Math.min(ll, l[j]); } return (x - ll) / (hh - ll); });
   const pv = lsPivotsLow(l), out: LsDiv[] = [];
   for (const p of pv) {
-    const cc = p + LS_P.R, age = n - 1 - cc; if (age > LS_P.MAXAGE) continue;
+    const cc = p + LS_P.R, age = n - 1 - cc; if (age > maxAge) continue;
     const q = lsPrevPivot(pv, p); if (q === null) continue;
     const a = ratio[q], r = ratio[p];
     if (a == null || r == null || !fin(a) || !fin(r) || !(l[p] < l[q] && r > a)) continue;
