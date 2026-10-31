@@ -19,6 +19,7 @@ th{color:var(--mu);font-weight:600;font-size:12px}td.n{text-align:right;font-var
 .empty{color:var(--mu);padding:6px 0}.log{font:12px ui-monospace,monospace;color:var(--mu);white-space:pre-wrap;max-height:240px;overflow:auto}
 .cov{display:flex;gap:8px;align-items:center;font-size:12px;color:var(--mu);margin:4px 0}.cov .bar{width:140px;height:8px;background:#1a2742;border-radius:5px;overflow:hidden;flex:none}.cov .bar i{display:block;height:100%}
 .sum{display:flex;gap:10px;flex-wrap:wrap}.sum div{background:#0b1324;border:1px solid var(--line);border-radius:9px;padding:6px 10px;font-size:12px;color:var(--mu)}.sum b{color:var(--tx);font-size:15px}
+.kd .tabs button{font-size:12px}.kd table{min-width:900px}.pos{color:#2ecc71}.neg{color:#ff5c5c}
 </style></head><body>
 <div class="wrap">
 <h1>📡 İzleme Raporu</h1>
@@ -27,6 +28,7 @@ th{color:var(--mu);font-weight:600;font-size:12px}td.n{text-align:right;font-var
 <div class="sum" id="sum"></div>
 <div class="tabs" id="tabs"></div>
 <div id="cards"></div>
+<div class="card kd" id="kdwrap"><h2>📒 Kağıt Defterler <span class="pill">salt okunur · dondurulmuş</span></h2><div class="note" id="kdnote">yükleniyor…</div><div class="tabs" id="kdtabs"></div><div id="kd"></div></div>
 <div class="card"><h2>L/S günlük veri toplama</h2><div class="meta" id="ls">—</div></div>
 <div class="card"><h2>Son kayıtlar</h2><div class="log" id="log"></div></div>
 </div>
@@ -62,4 +64,27 @@ function draw(){if(!D)return;var ids=Object.keys(D.scans||{});
 }
 function load(){fetch('/api/watch-report',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){if(j.error){document.getElementById('upd').textContent='Rapor henüz yok veya okunamadı ('+j.error+'). Robotun ilk izleme turundan sonra görünür.';return}D=j;document.getElementById('upd').textContent='Son güncelleme: '+(j.updatedTsi||tsi(j.updated))+' TSİ · işlem modu: '+(j.tradeMode||'KAPALI')+' · 60 sn\'de bir yenilenir';draw()}).catch(function(e){document.getElementById('upd').textContent='Hata: '+e.message})}
 load();setInterval(load,60000);
+
+var K=null,KF=null;
+function pc(v,u){if(v==null||!isFinite(v))return'—';return '<span class="'+(v>0?'pos':v<0?'neg':'')+'">'+(v>0?'+':'')+(+v).toFixed(2)+(u||'%')+'</span>'}
+function money(v){return v==null?'—':(+v).toLocaleString('tr-TR',{maximumFractionDigits:2})}
+function kdraw(){if(!K)return;var L=K.ledgers||[];if(!KF)KF=L[0]&&L[0].id;
+ var tb=document.getElementById('kdtabs');tb.innerHTML='';L.forEach(function(l){var b=document.createElement('button');b.textContent=l.label+' ('+l.open.length+' açık · '+l.closed.length+' kapalı)';if(KF===l.id)b.className='on';b.onclick=function(){KF=l.id;kdraw()};tb.appendChild(b)});
+ var l=L.filter(function(x){return x.id===KF})[0];if(!l){document.getElementById('kd').innerHTML='';return}
+ var wins=l.closed.filter(function(t){return t.R>0}).length,sR=l.sumR!=null?l.sumR:l.closed.reduce(function(a,t){return a+(t.R||0)},0);
+ var h='<div class="note">'+esc(l.note)+'</div><div class="sum">'+
+  (l.start!=null?'<div>Başlangıç<br><b>'+money(l.start)+'</b></div><div>Özsermaye<br><b>'+money(l.equity)+'</b> '+pc(l.equity!=null?100*(l.equity/l.start-1):null)+'</div><div>Realize K/Z<br><b>'+money(l.realized)+'</b></div>':'')+
+  (l.cash!=null?'<div>Nakit<br><b>'+money(l.cash)+'</b></div>':'')+
+  '<div>Açık<br><b>'+l.open.length+'</b></div><div>Kapalı<br><b>'+l.closedCount+'</b></div><div>Kazanan<br><b>'+wins+'/'+l.closed.length+'</b></div><div>Toplam R<br><b>'+pc(sR,'R')+'</b></div>'+
+  (l.sumPct!=null?'<div>Toplam getiri<br><b>'+pc(l.sumPct)+'</b></div>':'')+
+  '<div>Kuruldu / son tur (TSİ)<br><b>'+esc(l.created||'—')+'</b> → <b>'+esc(l.lastRun||'—')+'</b></div></div>';
+ h+='<h3 style="font-size:14px;margin:12px 0 4px">Açık pozisyonlar</h3>';
+ if(!l.open.length)h+='<div class="empty">Açık pozisyon yok.</div>';else{h+='<div class="tw"><table><tr><th>Sembol</th><th>Sinyal mumu</th><th>Giriş mumu</th><th class="n">Giriş</th><th class="n">Stop</th><th class="n">Hedef</th><th class="n">Adet</th><th class="n">Mum</th><th class="n">Son fiyat</th><th class="n">Açık %</th><th class="n">MFE %/R</th><th class="n">MAE %/R</th></tr>';
+  l.open.forEach(function(o){h+='<tr><td><b>'+esc(o.symbol.replace('.IS',''))+'</b></td><td>'+esc(o.signal)+'</td><td>'+esc(o.fill)+'</td><td class="n">'+fp(o.entry)+'</td><td class="n">'+fp(o.stop)+'</td><td class="n">'+fp(o.tp)+'</td><td class="n">'+fp(o.qty)+'</td><td class="n">'+(o.bars==null?'—':o.bars)+'</td><td class="n">'+fp(o.last)+'</td><td class="n">'+pc(o.openPct)+'</td><td class="n">'+pc(o.mfePct)+(o.mfeR!=null?' '+o.mfeR+'R':'')+'</td><td class="n">'+pc(o.maePct)+(o.maeR!=null?' '+o.maeR+'R':'')+'</td></tr>'});h+='</table></div>'}
+ h+='<h3 style="font-size:14px;margin:12px 0 4px">Kapanan işlemler</h3>';
+ if(!l.closed.length)h+='<div class="empty">Kapanan işlem yok.</div>';else{h+='<div class="tw"><table><tr><th>Sembol</th><th>Sinyal mumu</th><th>Giriş mumu</th><th>Çıkış mumu</th><th class="n">Giriş</th><th class="n">Çıkış</th><th class="n">Stop</th><th>Neden</th><th class="n">Mum</th><th class="n">R</th><th class="n">%</th><th class="n">K/Z</th><th class="n">Özsermaye</th><th class="n">MFE/MAE %</th></tr>';
+  l.closed.forEach(function(t){h+='<tr><td><b>'+esc(t.symbol.replace('.IS',''))+'</b></td><td>'+esc(t.signal)+'</td><td>'+esc(t.fill)+'</td><td>'+esc(t.exitBar)+'</td><td class="n">'+fp(t.entry)+'</td><td class="n">'+fp(t.exit)+'</td><td class="n">'+fp(t.stop)+'</td><td>'+esc(t.why)+'</td><td class="n">'+t.bars+'</td><td class="n">'+pc(t.R,'R')+'</td><td class="n">'+pc(t.pct)+'</td><td class="n">'+money(t.pnl)+'</td><td class="n">'+money(t.equityAfter)+'</td><td class="n">'+(t.mfePct!=null?pc(t.mfePct)+' / '+pc(t.maePct):'—')+'</td></tr>'});h+='</table></div>'}
+ if(l.signals&&l.signals.length){h+='<h3 style="font-size:14px;margin:12px 0 4px">'+(l.id==='ls'?'Gönderilen uyarılar':'Görülen sinyaller')+' ('+l.signals.length+')</h3><div class="meta">'+l.signals.map(function(x){return '<b>'+esc(x.key.replace('.IS',''))+'</b> '+esc(x.bar)}).join(' · ')+'</div>'}
+ document.getElementById('kd').innerHTML=h}
+fetch('/paper-ledgers.json',{cache:'no-store'}).then(function(r){return r.json()}).then(function(j){K=j;document.getElementById('kdnote').textContent='Anlık görüntü: '+j.snapshot+' TSİ. '+j.note+' Mum saatleri UTC, açılış/kapanış zamanları TSİ. Bu defterler artık güncellenmez.';kdraw()}).catch(function(e){document.getElementById('kdnote').textContent='Defterler okunamadı: '+e.message});
 </script></body></html>
