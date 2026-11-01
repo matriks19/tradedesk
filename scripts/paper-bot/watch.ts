@@ -34,6 +34,8 @@ const EMS_PICK: Partial<DivParams> = { osc: "EMs", Lb: 3, R: 5, G1: 5, G2: 60, d
 const EK_EXIT: Record<string, { exit: "sar" | "atr"; k: number; tp: number }> = { "4h": { exit: "sar", k: 1.5, tp: 4 }, "1d": { exit: "atr", k: 1.5, tp: 4 } };
 const TF_MS: Record<string, number> = { "1h": 36e5, "2h": 72e5, "4h": 144e5, "1d": 864e5 };
 /** Zaman bütçesi: Actions işi 12 dk ile sınırlı → süreç bu saniyeyi geçince yeni sembol/tarama başlatılmaz (kapı ilerlemez, sonraki turda tamamlanır) */
+/** ntfy tazelik sınırı (sinyal mumu yaşı, mum): varsayılan MAX_AGE (2); ✦ İkili için 0–10 mum (kullanıcı onayı 02.11.2026). Her sinyal yine bir kez bildirilir (anahtar + notified). */
+const ALERT_AGE: Partial<Record<ScanId, number>> = { "ikili-4h": 10 };
 const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
@@ -47,7 +49,7 @@ export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto"
   "dual-bist-1d": { label: "Dual 100/10 BB · BIST 1g", tf: "1d", market: "BIST", note: "Hızlı alt banda geri giriş, yavaş %B ≤ 0.5; stop = giriş − 1.5 ATR, hedef 2R." },
   "rsi30-bist-1d": { label: "RSI14 30 kırılım · BIST 1g", tf: "1d", market: "BIST", note: "RSI14 30'u yukarı keser (10 mum bekleme); stop = giriş − 1.5 ATR, hedef 2R." },
   "umut-4h": { label: "Umut (KAL+RSI uyumsuzluk 4s)", tf: "4h", market: "kripto", note: "KAL boğa uyumsuzluğu + RSI14 boğa uyumsuzluğu 5 mum içinde (ileriye bakmaz). Giriş sonraki açılış; stop = giriş − 2 ATR; R1 +%10 (test edilen), R2 +%20, R3 +%30; 100 mum. Test: 2013 işlem, %42 kazanma, PF 1.15, IS/OOS ≈ +%0.5/işlem. Yalnız izleme." },
-  "ikili-4h": { label: "✦ İkili: KDC-MACD + Uyumsuzluk (4s)", tf: "4h", market: "kripto", note: "Patlama ihtimali: aynı coinde KDC-MACD sinyali (30dk KDC K↑D, ≤10 saat içinde 1s MACD 12/26/9 yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Kombinasyon geriye dönük test EDİLMEDİ. Yalnız izleme." },
+  "ikili-4h": { label: "✦ İkili: KDC-MACD + Uyumsuzluk (4s)", tf: "4h", market: "kripto", note: "Patlama ihtimali: aynı coinde KDC-MACD sinyali (30dk KDC K↑D, ≤10 saat içinde 1s MACD 12/26/9 yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy: sinyal mumu 0–10 mum yaşındaysa (tek sefer). Kombinasyon geriye dönük test EDİLMEDİ. Yalnız izleme." },
 };
 
 /** Seviye hesabı (giriş kesinleşince yeniden hesaplanır) */
@@ -265,11 +267,28 @@ function umutScan(sym: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
   return out;
 }
 
-/** ✦ İKİLİ: KDC-MACD + Umut (KAL/RSI uyumsuzluk) < 5 mum arayla (4s). 30dk/1s spot mumlar yalnız yakın Umut sinyali olan coinde çekilir. */
-async function ikiliScan(sym: string, b4: WBar[], U: UmutHit[], maxAge = MAX_AGE): Promise<Found[]> {
+/** Vadeli (USDT-M perp) kapanmış mumlar: fapi doğrudan → Vercel proxy (/api/fklines); yoksa spot. İkili için 4s/1s/30dk aynı kaynaktan. */
+function futBars(ctx: WatchCtx, sym: string, tf: string): Promise<{ bars: WBar[]; src: "perp" | "spot" } | null> {
+  const k = "f|" + sym + "|" + tf;
+  return (FC[k] ||= (async () => {
+    try {
+      const j = (await futGet(ctx, `/fapi/v1/klines?symbol=${sym}&interval=${tf}&limit=1000`, `/api/fklines?symbol=${sym}&interval=${tf}&limit=1000`)) as (string | number)[][];
+      if (Array.isArray(j) && j.length >= 100) { const now = Date.now(); return { bars: j.filter((r) => Number(r[6]) < now).map((r) => ({ t: Number(r[0]), open: +r[1], high: +r[2], low: +r[3], close: +r[4], volume: +r[5] })), src: "perp" as const }; }
+    } catch { /* spot */ }
+    const sp = await spotBars(sym, tf); return sp && sp.length ? { bars: sp, src: "spot" as const } : null;
+  })());
+}
+const FC: Record<string, Promise<{ bars: WBar[]; src: "perp" | "spot" } | null>> = {};
+/** İkili 4s mumları (vadeli önce) — tarama ve sonuç takibi aynı mumlarla */
+async function ikiliBars(ctx: WatchCtx, sym: string, fb: WBar[]): Promise<WBar[]> { const f = await futBars(ctx, sym, "4h"); return f && f.bars.length >= 300 ? f.bars : fb; }
+
+/** ✦ İKİLİ: KDC-MACD + Umut (KAL/RSI uyumsuzluk) < 5 mum arayla (4s). Mumlar vadeli önce (yoksa spot): 4s + 30dk + 1s; 30dk/1s yalnız yakın Umut sinyali olan coinde çekilir. */
+async function ikiliScan(ctx: WatchCtx, sym: string, b4: WBar[], maxAge = MAX_AGE): Promise<Found[]> {
   const scan: ScanId = "ikili-4h", n = b4.length, out: Found[] = [], lbl = SCANS[scan].label;
+  const U = umutSignals(b4);
   if (!U.some((u) => n - 1 - u.i <= maxAge + UMUT.N)) return out;
-  const [b30, b1] = await Promise.all([spotBars(sym, "30m"), spotBars(sym, "1h")]);
+  const [f30, f1] = await Promise.all([futBars(ctx, sym, "30m"), futBars(ctx, sym, "1h")]);
+  const b30 = f30?.bars, b1 = f1?.bars;
   if (!b30 || !b1 || b30.length < 200 || b1.length < 100) return out;
   const A = atrW(b4);
   for (const h of ikiliSignals(b4, b30, b1, U).hits) {
@@ -390,15 +409,19 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     for (const f of umutScan(sym, b, uAge)) found.push({ f, bars: b });
     touched.push({ scan: "umut-4h", sym, bars: b });
     // ✦ İKİLİ: ilk taramada son 30 mum geriye doldurulur; 30dk/1s yalnız yakın Umut sinyali varsa çekilir (12 dk bütçesi)
-    const iSeed = (symLast["ikili-seed"] ||= {}), iAge = iSeed[sym] ? maxAge : 30;
-    try { for (const f of await ikiliScan(sym, b, umutSignals(b), iAge)) found.push({ f, bars: b }); iSeed[sym] = now; } catch { /* sonraki tur */ }
-    touched.push({ scan: "ikili-4h", sym, bars: b });
+    // vadeli mumlara geçiş (01.11.2026): yeni tohum anahtarı → 200 coinin hepsi bir kez son 30 mum geriye doldurulur (yaş>2 bildirimsiz)
+    const iSeed = (symLast["ikili-seed-f"] ||= {}), iAge = iSeed[sym] ? Math.max(maxAge, ALERT_AGE["ikili-4h"]!) : 30;
+    try {
+      const bi = await ikiliBars(ctx, sym, b);
+      for (const f of await ikiliScan(ctx, sym, bi, iAge)) found.push({ f, bars: bi });
+      touched.push({ scan: "ikili-4h", sym, bars: bi }); iSeed[sym] = now;
+    } catch { /* sonraki tur */ }
     for (const f of ekScan("ek-crypto-4h", sym, "4h", b, maxAge)) found.push({ f, bars: b });
     touched.push({ scan: "ek-crypto-4h", sym, bars: b });
     const d = dualScan("dual-crypto-4h", sym, "4h", b, "LRB", 0.1, "B", maxAge); for (const f of d.found) found.push({ f, bars: b, dyn: d.dyn });
     touched.push({ scan: "dual-crypto-4h", sym, bars: b, dyn: d.dyn });
     return null;
-  }, (sym) => !(symLast["umut-seed"] || {})[sym] || !(symLast["ikili-seed"] || {})[sym]); // yeni eklenen Umut taraması: henüz Umut ile taranmamış semboller bu mum aralığında da taranır
+  }, (sym) => !(symLast["umut-seed"] || {})[sym] || !(symLast["ikili-seed-f"] || {})[sym]); // yeni eklenen Umut taraması: henüz Umut ile taranmamış semboller bu mum aralığında da taranır
   const blkBist = () => runBlock("BIST 1g", ["ek-bist-1d", "dual-bist-1d", "rsi30-bist-1d"], "1d", TF_MS["2h"], WATCH_BIST, 2, async (sym, maxAge) => {
     const b = await yahooBars(sym);
     if (!b || b.length < 100) return b ? `${b.length} mum (<100, atlandı)` : "veri yok";
@@ -439,7 +462,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     const { title, body, ...rest } = f;
     const s: WSig = { ...rest, status: "bekliyor", alerted: "dry-run", foundAt: now };
     if (doc.notified[f.key]) s.alerted = "gönderildi";
-    else if (f.age > MAX_AGE) s.alerted = "eski (yaş>2)";
+    else if (f.age > (ALERT_AGE[f.scan] ?? MAX_AGE)) s.alerted = `eski (yaş>${ALERT_AGE[f.scan] ?? MAX_AGE})`;
     else if (first || seedSyms.has(f.scan + "|" + f.symbol)) { s.alerted = "ilk tur (bildirimsiz)"; doc.notified[f.key] = now; }
     else if (ctx.dry) { s.alerted = "dry-run"; console.log(`--- ntfy (dry-run, gönderilmedi) ---\n${title}\n${body}`); }
     else {

@@ -19,7 +19,7 @@ var SECS=[
  {id:'umut',ic:'🌱',nm:'Umut',h:'Umut — KAL + RSI uyumsuzluğu (4s)',
   d:'Testi geçen tek kural: 4 saatlikte KAL boğa uyumsuzluğu ile RSI14 boğa uyumsuzluğu 5 mum içinde birlikte gelir. İzleme robotu ilk 200 coini tarar, sinyali kaydeder ve 100 mum boyunca izler: R1 +%10 (test edilen hedef), R2 +%20, R3 +%30, stop = giriş − 2 ATR. Yalnız izleme, işlem açılmaz.',cards:[]},
  {id:'ikili',ic:'✦',nm:'İkili',h:'İkili: KDC-MACD + Uyumsuzluk (4s) — patlama ihtimali',
-  d:'Aynı coinde KDC-MACD sinyali (30dk KDC K↑D → ≤10 saat içinde 1s MACD yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla (4s) gelir. İzleme robotu Umut sinyali olan coinlerde KDC-MACD’yi de hesaplar, son 30 mumu geriye doldurur, yeni sinyalde (yaş 0–2 mum) ntfy gönderir ve 100 mum izler: R1 +%10, R2 +%20, R3 +%30, stop = giriş − 2 ATR. Bu kombinasyon test edilmedi; yalnız izleme, işlem açılmaz.',cards:[]},
+  d:'Aynı coinde KDC-MACD sinyali (30dk KDC K↑D → ≤10 saat içinde 1s MACD yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla (4s) gelir. İzleme robotu 200 coinin hepsinde vadeli (USDT-M) mumlarla (yoksa spot) Umut sinyali olan coinlerde KDC-MACD’yi de hesaplar, son 30 mumu geriye doldurur, sinyal mumu 0–10 mum yaşındaysa bir kez ntfy gönderir ve 100 mum izler: R1 +%10, R2 +%20, R3 +%30, stop = giriş − 2 ATR. Bu kombinasyon test edilmedi; yalnız izleme, işlem açılmaz.',cards:[]},
  {id:'izleme',ic:'📡',nm:'İzleme sinyalleri',h:'İzleme robotu sinyalleri',
   d:'GitHub üzerinde 2 saatte bir çalışan izleme robotunun bulduğu sinyaller (EK v3 DIV, L/S uyumsuzluk, Dual, RSI30). Robot ilk 200 coin + 200 BIST hissesini tarar; yalnız uyarı üretir, işlem açmaz. Tüm sütunlar ve geçmiş için Robot Paneli\'ne geç.',cards:[]},
  {id:'harita',ic:'🗺',nm:'Görsel harita',h:'Görsel harita (isteğe bağlı)',
@@ -203,8 +203,8 @@ function renderWatch(){if(CUR!=='izleme'&&$('rxBd-izleme')==null)return;var u=$(
 }
 
 /* ---------- Umut (KAL+RSI uyumsuzluk 4s) ---------- */
-var UCF={umut:{p:'rxU',scan:'umut-4h',nm:'Umut',lab:'Umut (KAL+RSI uyumsuzluk)',test:'<br><b>Test (2022–2026, 4s):</b> 2.013 işlem · kazanma %42 · kâr faktörü 1,15 · işlem başı +%0,51 (2024 Nisan öncesi) / +%0,52 (sonrası) · rastgele giriş −%0,18. Geçmiş sonuç geleceği garanti etmez.'},
- ikili:{p:'rxI',scan:'ikili-4h',nm:'✦ İkili',lab:'✦ İkili: KDC-MACD + Uyumsuzluk',test:'<br><b>Test yok:</b> bu ikili kombinasyon geriye dönük test edilmedi (Umut tek başına PF 1,15; KDC-MACD tek başına ücret sonrası −0,18R, avantajsız). Yalnız izleme, “patlama ihtimali” bir varsayımdır.'}};
+var UCF={umut:{al:2,p:'rxU',scan:'umut-4h',nm:'Umut',lab:'Umut (KAL+RSI uyumsuzluk)',test:'<br><b>Test (2022–2026, 4s):</b> 2.013 işlem · kazanma %42 · kâr faktörü 1,15 · işlem başı +%0,51 (2024 Nisan öncesi) / +%0,52 (sonrası) · rastgele giriş −%0,18. Geçmiş sonuç geleceği garanti etmez.'},
+ ikili:{al:10,p:'rxI',scan:'ikili-4h',nm:'✦ İkili',lab:'✦ İkili: KDC-MACD + Uyumsuzluk',test:'<br><b>Test yok:</b> bu ikili kombinasyon geriye dönük test edilmedi (Umut tek başına PF 1,15; KDC-MACD tek başına ücret sonrası −0,18R, avantajsız). Yalnız izleme, “patlama ihtimali” bir varsayımdır.'}};
 var UFS={umut:{st:'aktif',q:'',sort:'t',asc:false,lim:60},ikili:{st:'',q:'',sort:'t',asc:false,lim:60}},UF=UFS.umut,LP={},LPT=0;
 var USTN={'bekliyor':['bekliyor','Sonraki 4s açılışı bekleniyor'],'hedefe gidiyor':['gidiyor','Giriş yapıldı, henüz R1 yok, stop sağlam'],'R1':['r1','+%10 hedefe ulaştı (test edilen çıkış)'],'R2':['r2','+%20'],'R3':['r3','+%30 — izleme tamam'],'stop':['stop','R1 gelmeden giriş − 2 ATR stop'],'süre doldu':['sure','100 mumda R1 gelmedi']};
 function loadLP(){if(Date.now()-LPT<55000)return Promise.resolve();LPT=Date.now();
@@ -226,7 +226,7 @@ function renderU(ID){var G=UCF[ID],P=G.p,UF=UFS[ID],body=$(P+'body'),note=$(P+'n
  var bd=$('rxBd-'+ID),na=all.filter(function(r){return r.act;}).length;if(bd){bd.style.display=na?'':'none';bd.textContent=na||'';bd.title=na+' aktif '+G.nm+' sinyali';}
  if(CUR!==ID)return;
  if(!W){note.innerHTML=WERR?'İzleme raporu okunamadı ('+esc(WERR)+').':G.nm+' sinyalleri yükleniyor…';return;}
- note.innerHTML=sc?'<b>Tarama:</b> '+esc(sc.label)+' · '+(sc.nOk||0)+'/'+(sc.nSym||0)+' coin tarandı · son tur '+esc(sc.lastRunTsi||W.updatedTsi||'—')+' TSİ · robot 2 saatte bir çalışır, yeni sinyalde ntfy bildirimi gönderir (yaş ≤ 2 mum).'+G.test:G.nm+' taraması henüz robotta çalışmadı — ilk turdan sonra burada görünür.';
+ note.innerHTML=sc?'<b>Tarama:</b> '+esc(sc.label)+' · '+(sc.nOk||0)+'/'+(sc.nSym||0)+' coin tarandı · son tur '+esc(sc.lastRunTsi||W.updatedTsi||'—')+' TSİ · robot 2 saatte bir çalışır, yeni sinyalde ntfy bildirimi gönderir (yaş ≤ '+G.al+' mum).'+G.test:G.nm+' taraması henüz robotta çalışmadı — ilk turdan sonra burada görünür.';
  var c=function(f){return all.filter(f).length;};
  kp.innerHTML=[['Toplam sinyal',all.length,'son 300 kayıt'],['Aktif',na,'bekliyor + hedefe gidiyor + R1/R2'],['Hedefe gidiyor',c(function(r){return r.st==='hedefe gidiyor';}),'girişte, R1 bekleniyor'],['R1+ (≥ %10)',c(function(r){return r.stage>=1;}),'R2: '+c(function(r){return r.stage>=2;})+' · R3: '+c(function(r){return r.stage>=3;}),'g'],['Stop',c(function(r){return r.st==='stop';}),'süre doldu: '+c(function(r){return r.st==='süre doldu';}),'r'],['Ekleme? ipucu',c(function(r){return r.add;}),'yalnız ipucu, tavsiye değil','y']]
   .map(function(x){return '<div><div class="l">'+x[0]+'</div><div class="v'+(x[3]==='g'&&x[1]?' rxG':x[3]==='r'&&x[1]?' rxR':x[3]==='y'&&x[1]?' rxY':'')+'">'+x[1]+'</div><div class="s">'+x[2]+'</div></div>';}).join('');
