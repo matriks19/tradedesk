@@ -329,7 +329,8 @@ function rIzleme(){var w=D.watch,body=document.getElementById('izBody');
   '<input class="inp" id="iq" placeholder="Sembol ara" value="'+esc(IZ.q)+'">'+
   '<select class="inp" id="im"><option value="">Tüm piyasalar</option><option value="kripto"'+(IZ.mk==='kripto'?' selected':'')+'>Kripto</option><option value="BIST"'+(IZ.mk==='BIST'?' selected':'')+'>BIST</option></select>'+
   '<select class="inp" id="is"><option value="">Tüm sonuçlar</option>'+['bekliyor','açık','hedef','stop','süre'].map(function(s){return '<option value="'+s+'"'+(IZ.st===s?' selected':'')+'>'+({bekliyor:'Bekliyor',açık:'Açık',hedef:'Hedef ✓',stop:'Stop ✗',süre:'Süre doldu'})[s]+'</option>'}).join('')+'</select>'+
-  '<label class="tg"><input type="checkbox" id="ix"'+(IZ.x?' checked':'')+'> MFE/MAE sütunları</label>';
+  '<label class="tg"><input type="checkbox" id="ix"'+(IZ.x?' checked':'')+'> MFE/MAE sütunları</label>'+
+  (w.scans['umut-4h']?'<a class="btn" href="/radar.html#umut" title="Umut sinyalleri: hedefe ilerleme, R1/R2/R3, Ekleme? ipucu">🌱 Umut → Radar</a>':'');
  bar.querySelectorAll('#izChips button').forEach(function(b){b.onclick=function(){IZ.scan=b.getAttribute('data-v');rIzleme()}});
  var q=document.getElementById('iq');q.oninput=function(){IZ.q=q.value;f()};
  document.getElementById('im').onchange=function(e){IZ.mk=e.target.value;f()};document.getElementById('is').onchange=function(e){IZ.st=e.target.value;f()};
@@ -348,6 +349,7 @@ function rIzleme(){var w=D.watch,body=document.getElementById('izBody');
    {k:'stop',l:'Stop',n:1,f:function(s){return fp(s.stop)}},{k:'target',l:'Hedef',n:1,f:function(s){return fp(s.target)}},
    {k:'status',l:'Sonuç',f:function(s){return '<span class="st '+stCls(s.status)+'">'+esc(s.status)+(s.R!=null?' '+(s.R>0?'+':'')+nf(s.R,2)+'R':'')+'</span>'+(s.bars?' <span class="mu">'+s.bars+' mum</span>':'')}},
    {k:'R',l:'R',n:1,f:function(s){return s.R==null?'—':sg(s.R,2,'R')}},
+   {k:'u',l:'Umut R1·R2·R3',u:1,t:'Umut taraması: +%10 / +%20 / +%30 hedeflerine ulaşılan mum no ve güncel durum (stop = giriş − 2 ATR, 100 mum)',v:function(s){return s.u?s.u.stage*1000-(s.u.hit.stop?1:0):-1},f:function(s){var u=s.u;if(!u)return '<span class="mu">—</span>';var h=u.hit||{};return '<span class="st '+(u.stage?'hedef':u.live==='stop'?'stop':u.live==='bekliyor'?'bekliyor':'açık')+'">'+esc(u.live)+'</span> <span class="mu">'+[h.r1,h.r2,h.r3].map(function(x){return x==null?'—':x}).join(' · ')+(u.add?' · <b style="color:var(--y)" title="'+esc(u.addWhy)+' — yalnız ipucu, tavsiye değil">Ekleme? ipucu</b>':'')+'</span>'}},
    {k:'last',l:'Son',n:1,v:function(s){return s.exitPx!=null?s.exitPx:s.last},f:function(s){return fp(s.exitPx!=null?s.exitPx:s.last)}},
    {k:'mfe',l:'MFE',n:1,x:1,t:'Çıkışa kadar en iyi hareket (% · R @ mum)',v:function(s){return s.ex&&s.ex.mfePct},f:function(s){return xm(s.ex,'mfe')}},
    {k:'mae',l:'MAE',n:1,x:1,t:'Çıkışa kadar en kötü hareket',v:function(s){return s.ex&&s.ex.maePct},f:function(s){return xm(s.ex,'mae')}},
@@ -357,6 +359,7 @@ function rIzleme(){var w=D.watch,body=document.getElementById('izBody');
    {k:'foundAt',l:'Bulundu (TSİ)',f:function(s){return dt(s.foundAt)}},
    {k:'info',l:'Not',c:'wrap',t:'Tam metin için satırın üzerine gelin',f:function(s){return '<span title="'+esc(s.info)+'">'+esc(s.info)+'</span>'}}];
   if(!IZ.x)cols=cols.filter(function(c){return !c.x});
+  if(!v.some(function(s){return s.u}))cols=cols.filter(function(c){return !c.u});
   table('iz',body,cols,v,{sort:'t',empty:'Bu filtreye uyan sinyal yok.'})}
  f();
  var L=w.ls||{};document.getElementById('lsInfo').textContent=L.lastDay?('Son gün: '+L.lastDay+' · '+(L.lastRows||0).toLocaleString('tr-TR')+' satır · '+(L.files||[]).length+' günlük dosya (paper-bot-state dalı, lsdata/)'+(L.lastErr?' · '+L.lastErr:'')):'Henüz toplanmadı.';

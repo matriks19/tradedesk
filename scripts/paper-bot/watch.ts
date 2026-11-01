@@ -10,6 +10,7 @@
  *  dual-crypto-4h Dual 100/10 LRB (z 0.1, hedef hızlı üst bant) — kripto 4s                      [dual-band-20261029/scan_dual.py]
  *  dual-bist-1d  Dual 100/10 BB (z 0.5, 2R) — BIST 1g                                            [aynı]
  *  rsi30-bist-1d RSI14 30 yukarı kırılım — BIST 1g                                               [matriks-dt-20261030/scan_rsi30_bist.py]
+ *  umut-4h       UMUT: KAL uyumsuzluk + RSI14 uyumsuzluk 5 mum içinde — kripto 4s (TP %10, 2 ATR, 100 mum) [kal-tp-test-20261101/combo3.py]
  *  + L/S günlük veri toplama (top-40, 4 metrik × 1s/2s) → lsdata/YYYY-MM-DD.csv                  [ls-div-20261029/collect.py]
  * ntfy adresi yalnız ortam değişkeninden (WATCH_NTFY_URL → ELIZI_NTFY_URL → NTFY_URL); koda/loga/rapora yazılmaz.
  */
@@ -19,6 +20,7 @@ import { ekDivergenceV3, emilimV3, type DivParams } from "../../src/lib/watch/ek
 import { BIST30, BIST_LIQUID_EXTRA } from "../../src/lib/data/bistLists";
 import { BIST_EXTRA } from "../../src/lib/data/bistUniverse";
 import { atr14Ewm, atr14Rma, dualBandBuy, rsi30Buy, lsDivergences, type WBar } from "../../src/lib/watch/watchInd";
+import { umutSignals, umutTrack, atrW, UMUT, type UmutTrack } from "../../src/lib/watch/umut";
 
 export const WATCH_CRYPTO = ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","TRX","AVAX","LINK","DOT","LTC","BCH","NEAR","UNI","ATOM","ETC","XLM","FIL","APT",
   "ARB","OP","INJ","SUI","AAVE","HBAR","ALGO","ICP","SEI","TIA","RUNE","LDO","CRV","SAND","GALA","PEPE","SHIB","WLD","FET","ENA"].map((s) => s + "USDT");
@@ -34,7 +36,7 @@ const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
-export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d";
+export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h";
 export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto" | "BIST"; note: string }> = {
   "ek-crypto-4h": { label: "EK v3 DIV · kripto 4s", tf: "4h", market: "kripto", note: "EMs dip uyumsuzluk; stop = pivot dip (SAR çıkışı), sabit hedef yok. Backtest IS MAR<0 → yalnız uyarı." },
   "ek-bist-1d": { label: "EK v3 DIV · BIST 1g", tf: "1d", market: "BIST", note: "EMs dip uyumsuzluk; stop = pivot − 1.5 ATR, hedef = giriş + 4 ATR. core=1 BIST testinde güçlü." },
@@ -42,14 +44,15 @@ export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto"
   "dual-crypto-4h": { label: "Dual 100/10 LRB · kripto 4s", tf: "4h", market: "kripto", note: "Hızlı alt banda geri giriş, yavaş %B ≤ 0.1; stop = giriş − 1.5 ATR, hedef = hızlı üst bant (her mum güncellenir)." },
   "dual-bist-1d": { label: "Dual 100/10 BB · BIST 1g", tf: "1d", market: "BIST", note: "Hızlı alt banda geri giriş, yavaş %B ≤ 0.5; stop = giriş − 1.5 ATR, hedef 2R." },
   "rsi30-bist-1d": { label: "RSI14 30 kırılım · BIST 1g", tf: "1d", market: "BIST", note: "RSI14 30'u yukarı keser (10 mum bekleme); stop = giriş − 1.5 ATR, hedef 2R." },
+  "umut-4h": { label: "Umut (KAL+RSI uyumsuzluk 4s)", tf: "4h", market: "kripto", note: "KAL boğa uyumsuzluğu + RSI14 boğa uyumsuzluğu 5 mum içinde (ileriye bakmaz). Giriş sonraki açılış; stop = giriş − 2 ATR; R1 +%10 (test edilen), R2 +%20, R3 +%30; 100 mum. Test: 2013 işlem, %42 kazanma, PF 1.15, IS/OOS ≈ +%0.5/işlem. Yalnız izleme." },
 };
 
 /** Seviye hesabı (giriş kesinleşince yeniden hesaplanır) */
-type Calc = { kind: "ek"; exit: "sar" | "atr"; pivlow: number; atr: number; k: number; tpm: number } | { kind: "atr"; atr: number; k: number; rr: number | null } | { kind: "fixed" };
+type Calc = { kind: "ek"; exit: "sar" | "atr"; pivlow: number; atr: number; k: number; tpm: number } | { kind: "atr"; atr: number; k: number; rr: number | null } | { kind: "fixed" } | { kind: "umut"; atr: number; k: number; tp: number; pivLow: number };
 export interface WSig {
   key: string; scan: ScanId; symbol: string; tf: string; t: number; tsi: string; age: number; kind: string;
   price: number; entryBasis: string; stop: number; target: number | null; strength?: number | string; info: string;
-  calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number; stop0?: number; target0?: number | null; trackBars?: number; ex?: Excursion; ex100?: Excursion;
+  calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number; stop0?: number; target0?: number | null; trackBars?: number; ex?: Excursion; ex100?: Excursion; u?: UmutTrack;
   alerted: "gönderildi" | "gönderilemedi" | "ilk tur (bildirimsiz)" | "dry-run" | "eski (yaş>2)"; foundAt: number;
 }
 interface Coverage { total: number; covered: number; thisRun: number; okThisRun: number; slotTsi: string; oldestTsi: string; full: boolean }
@@ -131,6 +134,7 @@ function levelsFor(s: WSig, entry: number): { stop: number; target: number | nul
     if (c.exit === "sar") { let st = c.pivlow; if (st >= entry) st = entry - c.atr; return { stop: st, target: null }; }
     let st = c.pivlow - c.k * c.atr; if (st >= entry) st = entry - c.k * c.atr; return { stop: st, target: entry + c.tpm * c.atr };
   }
+  if (c.kind === "umut") return { stop: entry - c.k * c.atr, target: entry * (1 + c.tp) };
   if (c.kind === "atr") { const st = entry - c.k * c.atr; return { stop: st, target: c.rr == null ? null : entry + c.rr * (entry - st) }; }
   return { stop: s.stop, target: s.target };
 }
@@ -151,7 +155,8 @@ function excursion(bars: WBar[], i1: number, upto: number, e: number, risk: numb
  *  40 mumda "süre" ile kapanmış eski sinyaller otomatik 100 muma uzar. Giriş mumu veri penceresinden çıktıysa mevcut kayıt korunur.
  *  ex = işlem süresince (çıkışa kadar) MFE/MAE + 1R/2R/3R mum no; ex100 = çıkıştan bağımsız 100 mumluk pencere (gölge). dyn: her mum değişen hedef. */
 function track(s: WSig, bars: WBar[], dyn?: number[]) {
-  const i0 = bars.findIndex((b) => b.t > s.t); if (i0 < 0) return;
+  const i0 = bars.findIndex((b) => b.t > s.t);
+  if (i0 < 0) { if (s.calc.kind === "umut" && !s.u) s.u = umutTrack(bars, bars.length, s.price, s.stop, s.calc.pivLow, s.calc.atr); return; }
   if (s.fillT === undefined) { s.fillT = bars[i0].t; s.entry = bars[i0].open; const lv = levelsFor(s, s.entry); s.stop = lv.stop; if (!dyn) s.target = lv.target; s.stop0 = s.stop; s.target0 = s.target; }
   const i1 = bars.findIndex((b) => b.t === s.fillT); if (i1 < 0) return;
   const e = s.entry!; if (s.stop0 === undefined) { s.stop0 = s.stop; s.target0 = dyn ? null : s.target; }
@@ -171,6 +176,7 @@ function track(s: WSig, bars: WBar[], dyn?: number[]) {
   }
   s.ex = excursion(bars, i1, exitJ >= 0 ? exitJ : bars.length - 1, e, risk);
   s.ex100 = excursion(bars, i1, Math.min(bars.length - 1, i1 + TRACK_BARS - 1), e, risk);
+  if (s.calc.kind === "umut") { const A = atrW(bars); s.u = umutTrack(bars, i1, e, stop, s.calc.pivLow, A[bars.length - 1]); }
 }
 
 // ---------- taramalar ----------
@@ -234,6 +240,24 @@ function rsi30Scan(sym: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
       calc: { kind: "atr", atr: A[i], k: 1.5, rr: 2 },
       title: `İZLEME | ${lbl} | ${sym} AL`,
       body: `${lbl} — ${sym} 1d\nSinyal mumu: ${tsiBar(t, "1d")} (yaş ${age} mum)\n${info}\nGiriş: sonraki mum açılışı (ref ${fmtP(c)})\nStop: ≈${fmtP(stop)} (giriş − 1.5 ATR)\nHedef: ≈${fmtP(tgt)} (2R)\nZaman: 100 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
+  }
+  return out;
+}
+
+/** UMUT: KAL + RSI uyumsuzluğu 5 mum içinde (4s). Giriş ref = sonraki açılış (yoksa son kapanış). */
+function umutScan(sym: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
+  const scan: ScanId = "umut-4h", n = bars.length, out: Found[] = [], lbl = SCANS[scan].label;
+  for (const h of umutSignals(bars)) {
+    const age = n - 1 - h.i; if (age > maxAge) continue;
+    if (Date.now() - bars[h.i].t > (maxAge + 2) * TF_MS["4h"]) continue; // bayat veri (işlem görmeyen/eski sembol)
+    const entry = age >= 1 ? bars[h.i + 1].open : bars[n - 1].close, stop = entry - UMUT.atrK * h.atr, t = bars[h.i].t;
+    const R = UMUT.tps.map((p) => entry * (1 + p));
+    const first = h.kalAt <= h.rsiAt ? "KAL→RSI" : "RSI→KAL", gap = Math.abs(h.kalAt - h.rsiAt);
+    const info = `KAL uyumsuzluk + RSI uyumsuzluk (${first}, ${gap} mum arayla) · RSI14 ${h.rsi.toFixed(1)} · KAL ${h.kal.toFixed(1)} · ATR ${fmtP(h.atr)} · dip ${fmtP(h.pivLow)}`;
+    out.push({ key: `${scan}|${sym}|${t}`, scan, symbol: sym, tf: "4h", t, tsi: tsiBar(t, "4h"), age, kind: "AL", price: entry, entryBasis: age >= 1 ? "sonraki açılış" : "son kapanış (sonraki açılış henüz yok)",
+      stop, target: R[0], info, calc: { kind: "umut", atr: h.atr, k: UMUT.atrK, tp: UMUT.tps[0], pivLow: h.pivLow },
+      title: `UMUT | ${sym} 4s AL (KAL+RSI uyumsuzluk)`,
+      body: `${lbl} — ${sym} 4s\nSinyal mumu: ${tsiBar(t, "4h")} TSİ (yaş ${age} mum)\n${info}\nGiriş: ${fmtP(entry)} (${age >= 1 ? "sonraki 4s açılış" : "ref son kapanış, giriş sonraki açılış"})\nStop: ${fmtP(stop)} (giriş − 2 ATR)\nR1 +%10: ${fmtP(R[0])} (test edilen hedef)\nR2 +%20: ${fmtP(R[1])}\nR3 +%30: ${fmtP(R[2])}\nSüre: 100 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
   }
   return out;
 }
@@ -332,9 +356,13 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   }
   const CRYPTO = U.crypto?.length ? U.crypto : WATCH_CRYPTO;
 
-  const blkCrypto = () => runBlock("kripto 4s", ["ek-crypto-4h", "dual-crypto-4h"], "4h", TF_MS["4h"], CRYPTO, 2, async (sym, maxAge) => {
+  const blkCrypto = () => runBlock("kripto 4s", ["ek-crypto-4h", "dual-crypto-4h", "umut-4h"], "4h", TF_MS["4h"], CRYPTO, 2, async (sym, maxAge) => {
     const { bars: b } = await coinBars(ctx, sym);
     if (!b || b.length < 300) return b ? `${b.length} mum (<300, atlandı)` : "veri yok";
+    // UMUT: sembolün ilk Umut taramasında son 30 mum (5 gün) geriye doldurulur (yaş>2 → bildirimsiz), sonra normal pencere
+    const uSeed = (symLast["umut-seed"] ||= {}), uAge = uSeed[sym] ? maxAge : 30;
+    for (const f of umutScan(sym, b, uAge)) found.push({ f, bars: b });
+    uSeed[sym] = now; touched.push({ scan: "umut-4h", sym, bars: b });
     for (const f of ekScan("ek-crypto-4h", sym, "4h", b, maxAge)) found.push({ f, bars: b });
     touched.push({ scan: "ek-crypto-4h", sym, bars: b });
     const d = dualScan("dual-crypto-4h", sym, "4h", b, "LRB", 0.1, "B", maxAge); for (const f of d.found) found.push({ f, bars: b, dyn: d.dyn });
@@ -375,6 +403,8 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   let sent = 0, nNew = 0;
   for (const { f, bars, dyn } of found) {
     const r = rep(f.scan); if (r.signals.some((s) => s.key === f.key)) continue;
+    // Umut: testteki gibi coin başına tek açık izleme — önceki Umut sinyali hâlâ açıksa (R1/stop/süre olmadı) yenisi kaydedilmez
+    if (f.scan === "umut-4h" && r.signals.some((s) => s.symbol === f.symbol && s.t < f.t && (s.exitT == null || s.exitT >= f.t))) continue;
     nNew++;
     const { title, body, ...rest } = f;
     const s: WSig = { ...rest, status: "bekliyor", alerted: "dry-run", foundAt: now };
