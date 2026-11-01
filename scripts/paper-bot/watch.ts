@@ -11,6 +11,7 @@
  *  dual-bist-1d  Dual 100/10 BB (z 0.5, 2R) — BIST 1g                                            [aynı]
  *  rsi30-bist-1d RSI14 30 yukarı kırılım — BIST 1g                                               [matriks-dt-20261030/scan_rsi30_bist.py]
  *  ikili-4h      ✦ İKİLİ: KDC-MACD (30dk KDC K↑D → ≤10s içinde 1s MACD↑) + Umut sinyali < 5 mum arayla — kripto 4s, Umut gibi izlenir (test edilmedi)
+ *  umutpg-4h     UMUT+PG: Umut sinyali + Patlama Gücü (PG5 ≥ 50, sinyal mumunda) — kripto 4s, vadeli mumlar; sanal kağıt defter (Umut ile yan yana) [patlama-gucu-20261102]
  *  umut-4h       UMUT: KAL uyumsuzluk + RSI14 uyumsuzluk 5 mum içinde — kripto 4s (TP %10, 2 ATR, 100 mum) [kal-tp-test-20261101/combo3.py]
  *  + L/S günlük veri toplama (top-40, 4 metrik × 1s/2s) → lsdata/YYYY-MM-DD.csv                  [ls-div-20261029/collect.py]
  * ntfy adresi yalnız ortam değişkeninden (WATCH_NTFY_URL → ELIZI_NTFY_URL → NTFY_URL); koda/loga/rapora yazılmaz.
@@ -23,6 +24,8 @@ import { BIST_EXTRA } from "../../src/lib/data/bistUniverse";
 import { atr14Ewm, atr14Rma, dualBandBuy, rsi30Buy, lsDivergences, type WBar } from "../../src/lib/watch/watchInd";
 import { umutSignals, umutTrack, atrW, UMUT, type UmutTrack, type UmutHit } from "../../src/lib/watch/umut";
 import { ikiliSignals } from "../../src/lib/watch/sigExt";
+import { pgComponents, pgAt, PG, type PGAt } from "../../src/lib/watch/patlama";
+import { paperTrack, paperStats, PAPER, type PTrade, type PStats } from "../../src/lib/watch/paper";
 
 export const WATCH_CRYPTO = ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","TRX","AVAX","LINK","DOT","LTC","BCH","NEAR","UNI","ATOM","ETC","XLM","FIL","APT",
   "ARB","OP","INJ","SUI","AAVE","HBAR","ALGO","ICP","SEI","TIA","RUNE","LDO","CRV","SAND","GALA","PEPE","SHIB","WLD","FET","ENA"].map((s) => s + "USDT");
@@ -40,7 +43,7 @@ const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
-export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h";
+export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h";
 export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto" | "BIST"; note: string }> = {
   "ek-crypto-4h": { label: "EK v3 DIV · kripto 4s", tf: "4h", market: "kripto", note: "EMs dip uyumsuzluk; stop = pivot dip (SAR çıkışı), sabit hedef yok. Backtest IS MAR<0 → yalnız uyarı." },
   "ek-bist-1d": { label: "EK v3 DIV · BIST 1g", tf: "1d", market: "BIST", note: "EMs dip uyumsuzluk; stop = pivot − 1.5 ATR, hedef = giriş + 4 ATR. core=1 BIST testinde güçlü." },
@@ -49,6 +52,7 @@ export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto"
   "dual-bist-1d": { label: "Dual 100/10 BB · BIST 1g", tf: "1d", market: "BIST", note: "Hızlı alt banda geri giriş, yavaş %B ≤ 0.5; stop = giriş − 1.5 ATR, hedef 2R." },
   "rsi30-bist-1d": { label: "RSI14 30 kırılım · BIST 1g", tf: "1d", market: "BIST", note: "RSI14 30'u yukarı keser (10 mum bekleme); stop = giriş − 1.5 ATR, hedef 2R." },
   "umut-4h": { label: "Umut (KAL+RSI uyumsuzluk 4s)", tf: "4h", market: "kripto", note: "KAL boğa uyumsuzluğu + RSI14 boğa uyumsuzluğu 5 mum içinde (ileriye bakmaz). Giriş sonraki açılış; stop = giriş − 2 ATR; R1 +%10 (test edilen), R2 +%20, R3 +%30; 100 mum. Test: 2013 işlem, %42 kazanma, PF 1.15, IS/OOS ≈ +%0.5/işlem. Yalnız izleme." },
+  "umutpg-4h": { label: "Umut+PG (Umut + Patlama Gücü ≥50, 4s)", tf: "4h", market: "kripto", note: "Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu, 5 mum içinde) ve sinyal mumunda Patlama Gücü PG5 ≥ 50 (VPA, SQZ, RS/BTC, TAKER, FUND eşit ağırlık; 200 mum yüzdelik). Vadeli verisi (taker/funding) yoksa PG3 (VPA, SQZ, RS) ile karar verilir ve işaretlenir. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce. Test (80 coin, OOS 2024-04→): 924 işlem, +%0.58/işlem (Umut +%0.48), DD 252 vs 413 — eşiğe hassas (≥60/70 bozuluyor). Sanal kağıt defter: Panel → Umut+PG. GERÇEK İŞLEM YOK." },
   "ikili-4h": { label: "✦ İkili: KDC-MACD + Uyumsuzluk (4s)", tf: "4h", market: "kripto", note: "Patlama ihtimali: aynı coinde KDC-MACD sinyali (30dk KDC K↑D, ≤10 saat içinde 1s MACD 12/26/9 yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy: sinyal mumu 0–10 mum yaşındaysa (tek sefer). Kombinasyon geriye dönük test EDİLMEDİ. Yalnız izleme." },
 };
 
@@ -57,7 +61,7 @@ type Calc = { kind: "ek"; exit: "sar" | "atr"; pivlow: number; atr: number; k: n
 export interface WSig {
   key: string; scan: ScanId; symbol: string; tf: string; t: number; tsi: string; age: number; kind: string;
   price: number; entryBasis: string; stop: number; target: number | null; strength?: number | string; info: string;
-  calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number; stop0?: number; target0?: number | null; trackBars?: number; ex?: Excursion; ex100?: Excursion; u?: UmutTrack;
+  calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number; stop0?: number; target0?: number | null; trackBars?: number; ex?: Excursion; ex100?: Excursion; u?: UmutTrack; pg?: PGAt & { src?: string };
   alerted: "gönderildi" | "gönderilemedi" | "ilk tur (bildirimsiz)" | "dry-run" | `eski (yaş>${number})`; foundAt: number;
 }
 interface Coverage { total: number; covered: number; thisRun: number; okThisRun: number; slotTsi: string; oldestTsi: string; full: boolean }
@@ -65,7 +69,10 @@ interface ScanRep { label: string; tf: string; market: string; note: string; las
 export interface WatchDoc {
   v: 1; kind: "quantex-watch"; tradeMode: "KAPALI (yalnız izleme)"; created: number; updated?: number; updatedTsi?: string; runs: number; firstRunDone?: boolean;
   gate: Record<string, number>; symLast?: Record<string, Record<string, number>>; univ?: { day?: string; crypto?: string[] }; notified: Record<string, number>; scans: Record<string, ScanRep>; ls?: { lastDay?: string; files?: string[]; lastRows?: number; lastErr?: string; pend?: { day: string; syms: string[]; done: number; rows: number; errs: number } }; log: string[];
+  paper?: PaperDoc;
 }
+/** Sanal kağıt defter (gerçek emir yok): Umut+PG ve düz Umut aynı vadeli mumlarla yan yana */
+export interface PaperDoc { v: 1; rule: string; start: number; size: number; fee: number; since?: number; pg: PTrade[]; u: PTrade[]; stats?: { pg: PStats; u: PStats }; updated?: number; updatedTsi?: string }
 export interface WatchCtx { dir: string; dry: boolean; futHost: string | null; proxy: string; log?: (m: string) => void }
 
 const trT = (t = Date.now()) => new Date(t).toLocaleString("tr-TR", { timeZone: "Europe/Istanbul" });
@@ -95,7 +102,7 @@ function spotBars(sym: string, tf: string): Promise<WBar[] | null> {
   return (KC["s|" + sym + "|" + tf] ||= (async () => {
     const rows = (await getJson(`https://data-api.binance.vision/api/v3/klines?symbol=${sym}&interval=${tf}&limit=1000`, 120, 2)) as (string | number)[][];
     const now = Date.now();
-    return rows.filter((r) => Number(r[6]) < now).map((r) => ({ t: Number(r[0]), open: +r[1], high: +r[2], low: +r[3], close: +r[4], volume: +r[5] }));
+    return rows.filter((r) => Number(r[6]) < now).map((r) => ({ t: Number(r[0]), open: +r[1], high: +r[2], low: +r[3], close: +r[4], volume: +r[5], qv: +r[7], tbq: +r[10] }));
   })().catch(() => null));
 }
 interface YChart { chart: { result: { timestamp: number[]; indicators: { quote: { open: (number | null)[]; high: (number | null)[]; low: (number | null)[]; close: (number | null)[]; volume: (number | null)[] }[] } }[] } }
@@ -273,7 +280,7 @@ function futBars(ctx: WatchCtx, sym: string, tf: string): Promise<{ bars: WBar[]
   return (FC[k] ||= (async () => {
     try {
       const j = (await futGet(ctx, `/fapi/v1/klines?symbol=${sym}&interval=${tf}&limit=1000`, `/api/fklines?symbol=${sym}&interval=${tf}&limit=1000`)) as (string | number)[][];
-      if (Array.isArray(j) && j.length >= 100) { const now = Date.now(); return { bars: j.filter((r) => Number(r[6]) < now).map((r) => ({ t: Number(r[0]), open: +r[1], high: +r[2], low: +r[3], close: +r[4], volume: +r[5] })), src: "perp" as const }; }
+      if (Array.isArray(j) && j.length >= 100) { const now = Date.now(); return { bars: j.filter((r) => Number(r[6]) < now).map((r) => ({ t: Number(r[0]), open: +r[1], high: +r[2], low: +r[3], close: +r[4], volume: +r[5], qv: +r[7], tbq: +r[10] })), src: "perp" as const }; }
     } catch { /* spot */ }
     const sp = await spotBars(sym, tf); return sp && sp.length ? { bars: sp, src: "spot" as const } : null;
   })());
@@ -305,6 +312,43 @@ async function ikiliScan(ctx: WatchCtx, sym: string, b4: WBar[], maxAge = MAX_AG
       body: `${lbl} — ${sym} 4s · patlama ihtimali\nSinyal mumu: ${tsiBar(t, "4h")} TSİ (yaş ${age} mum)\n${info}\nGiriş: ${fmtP(entry)} (${age >= 1 ? "sonraki 4s açılış" : "ref son kapanış, giriş sonraki açılış"})\nStop: ${fmtP(stop)} (giriş − 2 ATR)\nR1 +%10: ${fmtP(R[0])}\nR2 +%20: ${fmtP(R[1])}\nR3 +%30: ${fmtP(R[2])}\nSüre: 100 mum\nNot: kombinasyon test edilmedi\nDurum: SADECE İZLEME — işlem açılmadı` });
   }
   return out;
+}
+
+/** Funding geçmişi (USDT-M, son 1000 kayıt ≈ 333 gün): fapi doğrudan → Vercel proxy (/api/ffunding). Yoksa null (PG3'e düşülür). */
+const FUNDC: Record<string, Promise<[number, number][] | null>> = {};
+function fundHist(ctx: WatchCtx, sym: string): Promise<[number, number][] | null> {
+  return (FUNDC[sym] ||= (async () => {
+    try {
+      const j = (await futGet(ctx, `/fapi/v1/fundingRate?symbol=${sym}&limit=1000`, `/api/ffunding?symbol=${sym}&limit=1000`)) as { fundingTime: number; fundingRate: string }[];
+      if (!Array.isArray(j) || !j.length) return null;
+      return j.map((x) => [Number(x.fundingTime), Number(x.fundingRate)] as [number, number]).filter((x) => Number.isFinite(x[1])).sort((a, b) => a[0] - b[0]);
+    } catch { return null; }
+  })());
+}
+let BTC4: Promise<Map<number, number> | null> | null = null;
+const btcMap = (ctx: WatchCtx) => (BTC4 ||= futBars(ctx, "BTCUSDT", "4h").then((f) => (f && f.bars.length ? new Map(f.bars.map((b) => [b.t, b.close])) : null)).catch(() => null));
+
+/** UMUT+PG: Umut sinyalleri (vadeli 4s) + sinyal mumunda Patlama Gücü. Dönüş: PG ≥ 50 olanlar (izleme/ntfy) + tüm Umut adayları (kağıt defter, düz Umut kıyası). */
+async function umutpgScan(ctx: WatchCtx, sym: string, b4: WBar[], src: string, maxAge: number): Promise<{ found: Found[]; cands: PTrade[] }> {
+  const scan: ScanId = "umutpg-4h", n = b4.length, out: Found[] = [], cands: PTrade[] = [], lbl = SCANS[scan].label, now = Date.now();
+  const U = umutSignals(b4).filter((h) => n - 1 - h.i <= maxAge && now - b4[h.i].t <= (maxAge + 2) * TF_MS["4h"]);
+  if (!U.length) return { found: out, cands };
+  const [btc, fund] = await Promise.all([sym === "BTCUSDT" ? Promise.resolve(new Map(b4.map((b) => [b.t, b.close]))) : btcMap(ctx), fundHist(ctx, sym)]);
+  const C = pgComponents(b4, { btc, fund });
+  for (const h of U) {
+    const age = n - 1 - h.i, p = pgAt(C, h.i), t = b4[h.i].t, pgv = { ...p, score: Number.isFinite(p.score) ? +p.score.toFixed(1) : NaN, src };
+    cands.push({ key: `paper|${sym}|${t}`, sym, t, tsi: tsiBar(t, "4h"), atr: h.atr, pg: pgv.score, pgMode: p.mode, pgC: p.comps as Record<string, number>, backfill: age > MAX_AGE, foundAt: now, status: "bekliyor" });
+    if (!(p.score >= PG.pass) || p.mode === "PG-eksik") continue;
+    const entry = age >= 1 ? b4[h.i + 1].open : b4[n - 1].close, stop = entry - UMUT.atrK * h.atr;
+    const R = UMUT.tps.map((q) => entry * (1 + q)), first = h.kalAt <= h.rsiAt ? "KAL→RSI" : "RSI→KAL", gap = Math.abs(h.kalAt - h.rsiAt);
+    const cs = Object.entries(p.comps).map(([k, v]) => `${k} ${Math.round(v as number)}`).join(" · ");
+    const info = `PG ${pgv.score.toFixed(0)} (${p.mode}${p.mode === "PG3" ? " — vadeli verisi eksik: " + p.missing.join("/") : ""}) · ${cs} · Umut ${first} ${gap} mum arayla · RSI14 ${h.rsi.toFixed(1)} · KAL ${h.kal.toFixed(1)} · ATR ${fmtP(h.atr)} · mum ${src}`;
+    out.push({ key: `${scan}|${sym}|${t}`, scan, symbol: sym, tf: "4h", t, tsi: tsiBar(t, "4h"), age, kind: "AL", price: entry, entryBasis: age >= 1 ? "sonraki açılış" : "son kapanış (sonraki açılış henüz yok)",
+      stop, target: R[0], strength: pgv.score, info, pg: pgv, calc: { kind: "umut", atr: h.atr, k: UMUT.atrK, tp: UMUT.tps[0], pivLow: h.pivLow },
+      title: `UMUT+PG | ${sym} 4s AL (PG ${pgv.score.toFixed(0)}${p.mode === "PG3" ? " · PG3" : ""})`,
+      body: `${lbl} — ${sym} 4s\nSinyal mumu: ${tsiBar(t, "4h")} TSİ (yaş ${age} mum)\nPatlama Gücü: ${pgv.score.toFixed(1)} (${p.mode}) · ${cs}\nUmut: KAL + RSI uyumsuzluk (${first}, ${gap} mum arayla) · RSI14 ${h.rsi.toFixed(1)}\nGiriş: ${fmtP(entry)} (${age >= 1 ? "sonraki 4s açılış" : "ref son kapanış, giriş sonraki açılış"})\nStop: ${fmtP(stop)} (giriş − 2 ATR)\nR1 +%10: ${fmtP(R[0])}\nR2 +%20: ${fmtP(R[1])}\nR3 +%30: ${fmtP(R[2])}\nSüre: 100 mum\nDurum: SANAL KAĞIT İŞLEM — gerçek işlem açılmadı` });
+  }
+  return { found: out, cands };
 }
 
 // ---------- L/S (perp) veri ----------
@@ -356,6 +400,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   const first = !doc.firstRunDone;
   const ran: string[] = []; const found: { f: Found; bars: WBar[]; dyn?: number[] }[] = [];
   const touched: { scan: ScanId; sym: string; bars: WBar[]; dyn?: number[] }[] = [];
+  const paperIn: { sym: string; bars: WBar[]; cands: PTrade[] }[] = [];
   const rep = (id: ScanId) => (doc.scans[id] ||= { ...SCANS[id], signals: [] });
   for (const id of Object.keys(SCANS) as ScanId[]) Object.assign(rep(id), { label: SCANS[id].label, note: SCANS[id].note, tf: SCANS[id].tf, market: SCANS[id].market });
   const mark = (ids: ScanId[], extra: Partial<ScanRep>) => { for (const id of ids) Object.assign(rep(id), { lastRun: now, lastRunTsi: trT(now) }, extra); };
@@ -401,7 +446,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   }
   const CRYPTO = U.crypto?.length ? U.crypto : WATCH_CRYPTO;
 
-  const blkCrypto = () => runBlock("kripto 4s", ["ek-crypto-4h", "dual-crypto-4h", "umut-4h", "ikili-4h"], "4h", TF_MS["4h"], CRYPTO, 2, async (sym, maxAge) => {
+  const blkCrypto = () => runBlock("kripto 4s", ["ek-crypto-4h", "dual-crypto-4h", "umut-4h", "ikili-4h", "umutpg-4h"], "4h", TF_MS["4h"], CRYPTO, 2, async (sym, maxAge) => {
     const uSeed = (symLast["umut-seed"] ||= {}), uAge = uSeed[sym] ? maxAge : 30; uSeed[sym] = now;
     const { bars: b } = await coinBars(ctx, sym);
     if (!b || b.length < 300) return b ? `${b.length} mum (<300, atlandı)` : "veri yok";
@@ -416,12 +461,21 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
       for (const f of await ikiliScan(ctx, sym, bi, iAge)) found.push({ f, bars: bi });
       touched.push({ scan: "ikili-4h", sym, bars: bi }); iSeed[sym] = now;
     } catch { /* sonraki tur */ }
+    // UMUT+PG: vadeli 4s mumlar (İkili ile aynı önbellek, ek kline isteği yok) + funding yalnız yakın Umut sinyali varsa; ilk taramada son 30 mum geriye doldurulur
+    const pSeed = (symLast["umutpg-seed"] ||= {}), pAge = pSeed[sym] ? maxAge : 30;
+    try {
+      const fb = await futBars(ctx, sym, "4h"), pb = fb && fb.bars.length >= 300 ? fb.bars : b, psrc = fb && fb.bars.length >= 300 ? fb.src : "spot";
+      const r = await umutpgScan(ctx, sym, pb, psrc, pAge);
+      for (const f of r.found) found.push({ f, bars: pb });
+      paperIn.push({ sym, bars: pb, cands: r.cands });
+      touched.push({ scan: "umutpg-4h", sym, bars: pb }); pSeed[sym] = now;
+    } catch { /* sonraki tur */ }
     for (const f of ekScan("ek-crypto-4h", sym, "4h", b, maxAge)) found.push({ f, bars: b });
     touched.push({ scan: "ek-crypto-4h", sym, bars: b });
     const d = dualScan("dual-crypto-4h", sym, "4h", b, "LRB", 0.1, "B", maxAge); for (const f of d.found) found.push({ f, bars: b, dyn: d.dyn });
     touched.push({ scan: "dual-crypto-4h", sym, bars: b, dyn: d.dyn });
     return null;
-  }, (sym) => !(symLast["umut-seed"] || {})[sym] || !(symLast["ikili-seed-f"] || {})[sym]); // yeni eklenen Umut taraması: henüz Umut ile taranmamış semboller bu mum aralığında da taranır
+  }, (sym) => !(symLast["umut-seed"] || {})[sym] || !(symLast["ikili-seed-f"] || {})[sym] || !(symLast["umutpg-seed"] || {})[sym]); // yeni eklenen Umut taraması: henüz Umut ile taranmamış semboller bu mum aralığında da taranır
   const blkBist = () => runBlock("BIST 1g", ["ek-bist-1d", "dual-bist-1d", "rsi30-bist-1d"], "1d", TF_MS["2h"], WATCH_BIST, 2, async (sym, maxAge) => {
     const b = await yahooBars(sym);
     if (!b || b.length < 100) return b ? `${b.length} mum (<100, atlandı)` : "veri yok";
@@ -457,7 +511,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   for (const { f, bars, dyn } of found) {
     const r = rep(f.scan); if (r.signals.some((s) => s.key === f.key)) continue;
     // Umut: testteki gibi coin başına tek açık izleme — önceki Umut sinyali hâlâ açıksa (R1/stop/süre olmadı) yenisi kaydedilmez
-    if ((f.scan === "umut-4h" || f.scan === "ikili-4h") && r.signals.some((s) => s.symbol === f.symbol && s.t < f.t && (s.exitT == null || s.exitT >= f.t))) continue;
+    if ((f.scan === "umut-4h" || f.scan === "ikili-4h" || f.scan === "umutpg-4h") && r.signals.some((s) => s.symbol === f.symbol && s.t < f.t && (s.exitT == null || s.exitT >= f.t))) continue;
     nNew++;
     const { title, body, ...rest } = f;
     const s: WSig = { ...rest, status: "bekliyor", alerted: "dry-run", foundAt: now };
@@ -475,6 +529,8 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   }
   // 5) eski sinyallerin sonuç takibi (yalnız bu turda verisi olan semboller)
   for (const tc of touched) for (const s of rep(tc.scan).signals) if (s.symbol === tc.sym) track(s, tc.bars, tc.dyn);
+  // 5b) SANAL KAĞIT DEFTER (gerçek emir yok): Umut+PG (PG ≥ 50) ve düz Umut, aynı vadeli mumlarla; coin başına tek işlem (defter bazında)
+  try { paperUpdate(doc, paperIn, now); } catch (e) { lg("kağıt defter hata: " + (e as Error).message); }
   // retry: bildirimi başarısız kalan güncel sinyaller
   if (!ctx.dry) for (const r of Object.values(doc.scans)) for (const s of r.signals) {
     if (s.alerted !== "gönderilemedi" || now - s.foundAt > 6 * 36e5) continue;
@@ -491,6 +547,27 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   const summary = `İzleme: ${ran.length ? ran.join(", ") : over() ? "zaman bütçesi doldu (sonraki turda)" : "bu tur taranacak yeni mum yok"} · yeni sinyal ${nNew} · ntfy ${sent}${ctx.dry ? " (dry-run)" : ""}${first ? " · ilk tur: bildirimsiz tohumlama" : ""}`;
   lg(summary);
   return { newSignals: nNew, sent, ran, summary };
+}
+
+function paperUpdate(doc: WatchDoc, inp: { sym: string; bars: WBar[]; cands: PTrade[] }[], now: number) {
+  const P = (doc.paper ||= { v: 1, rule: "", start: PAPER.start, size: PAPER.size, fee: PAPER.fee, pg: [], u: [] });
+  P.rule = `Sanal kağıt: giriş sonraki 4s açılış · stop giriş − 2 ATR · 1/3 R1 +%10, 1/3 R2 +%20, 1/3 R3 +%30 (kalan stop/100 mum) · ücret %${PAPER.fee * 100}/taraf · işlem başı ${PAPER.size}$ · başlangıç ${PAPER.start}$ · coin başına tek işlem · gerçek emir yok`;
+  Object.assign(P, { start: PAPER.start, size: PAPER.size, fee: PAPER.fee });
+  for (const { sym, bars, cands } of inp) {
+    for (const book of ["pg", "u"] as const) {
+      const L = P[book];
+      for (const tr of L) if (tr.sym === sym) paperTrack(tr, bars);
+      for (const c of cands.slice().sort((a, b) => a.t - b.t)) {
+        if (book === "pg" && !(c.pg != null && c.pg >= PG.pass && c.pgMode !== "PG-eksik")) continue;
+        if (L.some((x) => x.key === c.key)) continue;
+        if (L.some((x) => x.sym === sym && x.t < c.t && (x.exitT == null || x.exitT >= c.t))) continue; // coin başına tek işlem
+        const tr: PTrade = { ...c, pgC: c.pgC ? { ...c.pgC } : undefined }; paperTrack(tr, bars); L.unshift(tr);
+        if (P.since == null || tr.t < P.since) P.since = tr.t;
+      }
+    }
+  }
+  for (const book of ["pg", "u"] as const) { P[book].sort((a, b) => b.t - a.t); P[book] = P[book].slice(0, 400); }
+  P.stats = { pg: paperStats(P.pg), u: paperStats(P.u) }; P.updated = now; P.updatedTsi = trT(now);
 }
 
 /** collect.py karşılığı: kripto evreni (top-200 perp), 4 metrik × (1s, 2s), dünün (UTC) satırları → lsdata/YYYY-MM-DD.csv (gün başına bir dosya, bir kez yazılır) */

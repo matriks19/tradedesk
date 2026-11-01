@@ -48,9 +48,14 @@ function compute(b){var n=b.length,close=b.map(function(x){return x.close;}),low
 var CACHE={};
 function bars(sym,tf){var key=sym+'|'+tf,c=CACHE[key];if(c&&Date.now()-c.at<60000)return Promise.resolve(c.b);
  return fetch('/api/fklines?symbol='+encodeURIComponent(sym)+'&interval='+tf+'&limit=1000',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('mum verisi alınamadı (HTTP '+r.status+')');return r.json();}).then(function(a){
-  if(!Array.isArray(a)||!a.length)throw new Error('mum verisi boş');var b=a.map(function(x){return {t:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5]};});
+  if(!Array.isArray(a)||!a.length)throw new Error('mum verisi boş');var b=a.map(function(x){return {t:+x[0],open:+x[1],high:+x[2],low:+x[3],close:+x[4],volume:+x[5],qv:+x[7],tbq:+x[10]};});
   // açık (henüz kapanmamış) son mum robotta da kullanılmaz → grafikte gösterilir ama sinyal hesabı kapanmış mumlarla
   CACHE[key]={at:Date.now(),b:b};return b;});}
+function loadPGlib(){if(window.QXPatlama)return Promise.resolve(window.QXPatlama);if(loadPGlib.p)return loadPGlib.p;
+ loadPGlib.p=new Promise(function(res,rej){var s=document.createElement('script');s.src='/patlama.js?v=1';s.onload=function(){res(window.QXPatlama);};s.onerror=function(){loadPGlib.p=null;rej(new Error('Patlama Gücü kütüphanesi yüklenemedi'));};document.head.appendChild(s);});return loadPGlib.p;}
+/* Umut+PG: Patlama Gücü için BTC (RS) + funding geçmişi (FUND); biri gelmezse PG3'e düşer */
+function pgData(sym,tf){return Promise.all([loadPGlib(),sym==='BTCUSDT'?Promise.resolve(null):bars('BTCUSDT',tf).catch(function(){return null;}),
+ fetch('/api/ffunding?symbol='+encodeURIComponent(sym)+'&limit=1000',{cache:'no-store'}).then(function(r){return r.ok?r.json():null;}).then(function(a){return Array.isArray(a)?a.map(function(x){return [+x.fundingTime,+x.fundingRate];}).filter(function(x){return fin(x[1]);}).sort(function(a,b){return a[0]-b[0];}):null;}).catch(function(){return null;})]);}
 function loadLW(){if(window.LightweightCharts)return Promise.resolve(window.LightweightCharts);if(loadLW.p)return loadLW.p;
  loadLW.p=new Promise(function(res,rej){var s=document.createElement('script');s.src='/vendor/lightweight-charts-5.2.1.js';s.onload=function(){res(window.LightweightCharts);};s.onerror=function(){rej(new Error('grafik kütüphanesi yüklenemedi'));};document.head.appendChild(s);});return loadLW.p;}
 function pad(x){return (x<10?'0':'')+x;}
@@ -65,13 +70,14 @@ function cssOnce(){if(document.getElementById('uchCss'))return;var st=document.c
  '.uch-c{position:relative;width:100%;height:640px}.uch-msg{display:flex;align-items:center;justify-content:center;height:100%;color:#8ea3c4;font:14px system-ui}'+
  '.uch-pl{position:absolute;left:8px;z-index:3;font:600 11.5px system-ui;color:#8ea3c4;background:rgba(11,19,36,.75);padding:1px 6px;border-radius:5px;pointer-events:none}'+
  '.uch-lg{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:8px;font:12px system-ui;color:#8ea3c4}.uch-lg i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}'+
+ '.uch-c.pg{height:780px}@media(max-width:700px){.uch-c.pg{height:680px}}'+
  '@media(max-width:700px){.uch-c{height:560px}.uch{padding:8px 4px}.uch-h b{font-size:15px}}';document.head.appendChild(st);}
 
 var CUR=null;
 function close(){if(CUR){try{CUR.ro&&CUR.ro.disconnect();CUR.chart&&CUR.chart.remove();}catch(e){}CUR.el.innerHTML='';CUR.el.style.display='none';CUR=null;}}
 /* sig: {symbol,t,tf,entry,price,stop,target,u:{lv,hit},fillT,tsi,scan,_label} */
 function open(el,sig,opt){opt=opt||{};cssOnce();close();
- var sym=String(sig.symbol||'').toUpperCase(),tf=sig.tf||'4h',isU=sig.scan==='umut-4h'||!!sig.u,u=sig.u||{},lv=u.lv||{},hit=u.hit||{};
+ var sym=String(sig.symbol||'').toUpperCase(),tf=sig.tf||'4h',isPG=sig.scan==='umutpg-4h'||!!opt.pg,isU=sig.scan==='umut-4h'||isPG||!!sig.u,u=sig.u||{},lv=u.lv||{},hit=u.hit||{};
  var e=fin(sig.entry)?sig.entry:sig.price,stop=fin(lv.stop)?lv.stop:sig.stop;
  var lvl=isU?[['Giriş',e,'#d9e4f5',0],['Stop (−2 ATR)',stop,'#ff5c5c',2],['R1 +%10',fin(lv.r1)?lv.r1:e*1.1,'#2ecc71',2],['R2 +%20',fin(lv.r2)?lv.r2:e*1.2,'#27ae60',2],['R3 +%30',fin(lv.r3)?lv.r3:e*1.3,'#1e8449',2]]
   :[['Giriş',e,'#d9e4f5',0],['Stop',stop,'#ff5c5c',2],['Hedef',sig.target,'#2ecc71',2]];
@@ -79,12 +85,12 @@ function open(el,sig,opt){opt=opt||{};cssOnce();close();
  el.innerHTML='<div class="uch"><div class="uch-h"><b>'+esc(sym.replace(/USDT$/,''))+'</b><span class="mu">'+esc((sig._label||(isU?'Umut':'Sinyal'))+' · '+tf+' · sinyal mumu '+tsi(sig.t)+' TSİ'+(sig.fillT?' · giriş '+tsi(sig.fillT)+' açılışı':' · giriş bekleniyor'))+'</span>'+
   '<button class="uch-x" type="button">Kapat ✕</button></div>'+
   '<div class="uch-lv">'+lvl.filter(function(l){return fin(l[1]);}).map(function(l){return '<span style="color:'+l[2]+';border-color:'+l[2]+'55">'+l[0]+' '+fp(l[1])+'</span>';}).join('')+'</div>'+
-  '<div class="uch-c"><div class="uch-msg">Grafik yükleniyor…</div></div>'+
-  '<div class="uch-lg"><span><i style="background:#f1c40f"></i>Sinyal mumu (▲ SİNYAL)</span><span><i style="background:#2ecc71"></i>Boğa uyumsuzluğu (fiyat daha düşük dip, osilatör daha yüksek dip)</span><span><i style="background:#b388ff"></i>RSI14 (30/70)</span><span><i style="background:#ff9f43"></i>KAL · <i style="background:#8ea3c4"></i>EMA9</span><span>◆ KAL AL = KAL uyumsuzluk + EMA9 yukarı kesişim (Umut koşulu)</span><span>Saatler TSİ · yalnız izleme, tavsiye değildir</span></div></div>';
+  '<div class="uch-c'+(isPG?' pg':'')+'"><div class="uch-msg">Grafik yükleniyor…</div></div>'+
+  '<div class="uch-lg"><span><i style="background:#f1c40f"></i>Sinyal mumu (▲ SİNYAL)</span><span><i style="background:#2ecc71"></i>Boğa uyumsuzluğu (fiyat daha düşük dip, osilatör daha yüksek dip)</span><span><i style="background:#b388ff"></i>RSI14 (30/70)</span><span><i style="background:#ff9f43"></i>KAL · <i style="background:#8ea3c4"></i>EMA9</span><span>◆ KAL AL = KAL uyumsuzluk + EMA9 yukarı kesişim (Umut koşulu)</span>'+(isPG?'<span><i style="background:#00d2d3"></i>Patlama Gücü (PG5: VPA·SQZ·RS·TAKER·FUND; eksik veride PG3) — ≥50 eşiği</span>':'')+'<span>Saatler TSİ · yalnız izleme, tavsiye değildir</span></div></div>';
  var box=el.querySelector('.uch-c'),me={el:el};CUR=me;
  el.querySelector('.uch-x').onclick=function(){close();if(opt.onClose)opt.onClose();};
  if(opt.scroll!==false)setTimeout(function(){try{el.scrollIntoView({behavior:'smooth',block:'start'});}catch(x){}},30);
- Promise.all([loadLW(),bars(sym,tf)]).then(function(res){if(CUR!==me)return;var LW=res[0],b=res[1];
+ Promise.all([loadLW(),bars(sym,tf),isPG?pgData(sym,tf).catch(function(){return null;}):null]).then(function(res){if(CUR!==me)return;var LW=res[0],b=res[1],PGD=res[2];
   var tfms=TFS[tf]||14400e3,closed=b.filter(function(x){return x.t+tfms<=Date.now();});
   var C=compute(closed),n=b.length,T=function(i){return Math.floor(b[i].t/1000)+TSI;};
   box.innerHTML='';
@@ -121,15 +127,24 @@ function open(el,sig,opt){opt=opt||{};cssOnce();close();
    if(C.kd.ev[i]){var c2=C.kd.pv[i],p2=C.kd.pb[i];if(p2>=0){seg(2,p2,c2,C.kh.k[p2],C.kh.k[c2],'#2ecc71');seg(0,p2,c2,lows[p2],lows[c2],'#ff9f43aa');mkK.push({time:T(i),position:'belowBar',color:'#2ecc71',shape:'arrowUp',size:1,text:'KAL uyumsuz'});}}
    if(C.kh.hd[i])mkK.push({time:T(i),position:'aboveBar',color:'#f1c40f',shape:'circle',size:1,text:'◆ KAL AL'});}
   if(LW.createSeriesMarkers){mr.sort(function(a,b){return a.time-b.time;});mkK.sort(function(a,b){return a.time-b.time;});LW.createSeriesMarkers(rs,mr);LW.createSeriesMarkers(ks,mkK);}
-  try{var ps=chart.panes();if(ps[0])ps[0].setStretchFactor(3);if(ps[1])ps[1].setStretchFactor(1.15);if(ps[2])ps[2].setStretchFactor(1.15);}catch(x){}
+  // Patlama Gücü alt paneli (Umut+PG)
+  var pgInfo=null;
+  if(isPG&&PGD&&PGD[0]){try{var QP=PGD[0],btc=PGD[1]?new Map(PGD[1].map(function(x){return [x.t,x.close];})):(sym==='BTCUSDT'?new Map(closed.map(function(x){return [x.t,x.close];})):null);
+   var PC=QP.components(closed,{btc:btc,fund:PGD[2],tfMs:tfms}),pv=QP.series(PC,closed.length);
+   var pgs=chart.addSeries(LW.LineSeries,{autoscaleInfoProvider:fix,color:'#00d2d3',lineWidth:2,priceLineVisible:false,lastValueVisible:true,priceFormat:{type:'price',precision:1,minMove:0.1}},3);
+   pgs.setData(pv.map(function(v,i){return fin(v)?{time:T(i),value:v}:{time:T(i)};}));
+   pgs.createPriceLine({price:QP.PASS,color:'#f1c40f',lineStyle:2,lineWidth:1,axisLabelVisible:true,title:'50'});
+   if(si!=null&&si<closed.length){var pa=QP.at(PC,si);pgInfo=pa;if(LW.createSeriesMarkers)LW.createSeriesMarkers(pgs,[{time:T(si),position:'aboveBar',color:pa.score>=QP.PASS?'#2ecc71':'#ff5c5c',shape:'circle',size:1,text:'PG '+(fin(pa.score)?pa.score.toFixed(0):'—')+' '+pa.mode}]);}
+  }catch(x){pgInfo={err:String(x&&x.message||x)};}}
+  try{var ps=chart.panes();if(ps[0])ps[0].setStretchFactor(3);if(ps[3])ps[3].setStretchFactor(1.15);if(ps[1])ps[1].setStretchFactor(1.15);if(ps[2])ps[2].setStretchFactor(1.15);}catch(x){}
   // pane etiketleri
-  setTimeout(function(){if(CUR!==me)return;try{var ps=chart.panes(),y=0;['Fiyat '+tf,'RSI 14','KAL (+ EMA9, bant)'].forEach(function(nm,j){if(!ps[j])return;var d=document.createElement('div');d.className='uch-pl';d.style.top=(y+4)+'px';d.textContent=nm;box.appendChild(d);y+=ps[j].getHeight()+1;});}catch(x){}},60);
+  setTimeout(function(){if(CUR!==me)return;try{var ps=chart.panes(),y=0;['Fiyat '+tf,'RSI 14','KAL (+ EMA9, bant)','Patlama Gücü'+(pgInfo&&pgInfo.mode?' ('+pgInfo.mode+(pgInfo.missing&&pgInfo.missing.length?' · eksik: '+pgInfo.missing.join('/'):'')+')':'')].forEach(function(nm,j){if(!ps[j])return;var d=document.createElement('div');d.className='uch-pl';d.style.top=(y+4)+'px';d.textContent=nm;box.appendChild(d);y+=ps[j].getHeight()+1;});}catch(x){}},60);
   var mobile=box.clientWidth<600,c0=si!=null?si:n-1,L=mobile?70:130;
   var to=Math.min(n-1+6,Math.max(c0+(mobile?25:45),Math.min(n-1+6,c0+(u.bars||0)+8)));chart.timeScale().setVisibleLogicalRange({from:Math.max(0,to-L),to:to});
   var found=si!=null&&C.sigs.some(function(h){return h.i===si;});
   if(isU&&si!=null&&!found){var w=document.createElement('div');w.className='uch-pl';w.style.cssText+='top:auto;bottom:34px;color:#f1c40f';w.textContent='Not: sinyal robotun kaydından; güncel veriyle yeniden hesapta bu mum işaretlenmedi';box.appendChild(w);}
   if(si==null){var w2=document.createElement('div');w2.className='uch-pl';w2.style.cssText+='top:auto;bottom:34px;color:#f1c40f';w2.textContent='Sinyal mumu son 1000 mumun dışında';box.appendChild(w2);}
-  me.info={n:n,si:si,fi:fi,found:found,sigs:C.sigs.length,rsiDiv:mr.length,kalMk:mkK.length};
+  me.info={n:n,si:si,fi:fi,found:found,sigs:C.sigs.length,rsiDiv:mr.length,kalMk:mkK.length,pg:pgInfo};
  }).catch(function(err){if(CUR!==me)return;box.innerHTML='<div class="uch-msg">Grafik açılamadı: '+esc(err&&err.message||err)+'</div>';});
  return me;}
 /* Sinyale hazırlık (Radar) için: KAL + RSI dizileri, onaylı pivotlar — robotla aynı hesap */
