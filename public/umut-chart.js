@@ -33,10 +33,10 @@ function atrW(b,n){n=n||14;var L=b.length,out=new Array(L).fill(NaN);if(L<n)retu
  var tr=b.map(function(x,i){return i===0?x.high-x.low:Math.max(x.high-x.low,Math.abs(x.high-b[i-1].close),Math.abs(x.low-b[i-1].close));});
  var a=0,i;for(i=0;i<n;i++)a+=tr[i];a/=n;out[n-1]=a;for(i=n;i<L;i++){a=(a*(n-1)+tr[i])/n;out[i]=a;}return out;}
 /* oscDiv + önceki pivot (çizgi için) */
-function oscDiv(low,k,piv,maxLb){piv=piv||3;maxLb=maxLb||50;var n=low.length,ev=new Array(n).fill(false),pv=new Array(n).fill(-1),pp0=new Array(n).fill(-1),pb=-1,pp=0,pk=0,has=false;
+function oscDiv(low,k,piv,maxLb){piv=piv||3;maxLb=maxLb||50;var n=low.length,ev=new Array(n).fill(false),pv=new Array(n).fill(-1),pp0=new Array(n).fill(-1),pb=-1,pp=0,pk=0,has=false,pl=[];
  for(var i=1;i<n;i++){var c=i-piv;if(c-piv>=0&&fin(k[c])){var isp=true;for(var j=c-piv;j<=c+piv;j++)if(j!==c&&low[j]<=low[c]&&(j>c||low[j]<low[c])){isp=false;break;}
-  if(isp){if(has&&c-pb<=maxLb&&low[c]<pp&&k[c]>pk){ev[i]=true;pv[i]=c;pp0[i]=pb;}pb=c;pp=low[c];pk=k[c];has=true;}}}
- return {ev:ev,pv:pv,pb:pp0};}
+  if(isp){if(has&&c-pb<=maxLb&&low[c]<pp&&k[c]>pk){ev[i]=true;pv[i]=c;pp0[i]=pb;}pb=c;pp=low[c];pk=k[c];has=true;pl.push({c:c,at:i});}}}
+ return {ev:ev,pv:pv,pb:pp0,pl:pl};}
 function compute(b){var n=b.length,close=b.map(function(x){return x.close;}),low=b.map(function(x){return x.low;});
  var kh=kal(b),r=rsiW(close),A=atrW(b),vd=oscDiv(low,r,P.piv,P.maxLb),kd=oscDiv(low,kh.k,P.piv,P.maxLb),hd=kh.hd;
  var lastD=-1e9,lastV=-1e9,sigs=[];
@@ -132,5 +132,7 @@ function open(el,sig,opt){opt=opt||{};cssOnce();close();
   me.info={n:n,si:si,fi:fi,found:found,sigs:C.sigs.length,rsiDiv:mr.length,kalMk:mkK.length};
  }).catch(function(err){if(CUR!==me)return;box.innerHTML='<div class="uch-msg">Grafik açılamadı: '+esc(err&&err.message||err)+'</div>';});
  return me;}
-window.QXUmutChart={open:open,close:close,compute:compute,_cur:function(){return CUR;}};
+/* Sinyale hazırlık (Radar) için: KAL + RSI dizileri, onaylı pivotlar — robotla aynı hesap */
+function kr(b){var C=compute(b);return {k:C.kh.k,sig:C.kh.sig,hist:C.kh.hist,hd:C.kh.hd,rsi:C.rsi,kd:C.kd,vd:C.vd,low:b.map(function(x){return x.low;}),n:b.length};}
+window.QXUmutChart={open:open,close:close,compute:compute,kr:kr,_cur:function(){return CUR;}};
 })();
