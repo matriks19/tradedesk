@@ -53,7 +53,7 @@ th,td{padding:6px 8px;border-bottom:1px solid var(--line2);text-align:left;white
 thead th{position:sticky;top:0;z-index:2;background:#101a30;color:var(--mu);font-weight:700;font-size:12px;cursor:pointer;user-select:none}
 thead th:hover{color:var(--tx)}thead th.s::after{content:" ▾";color:var(--b)}thead th.s.asc::after{content:" ▴"}
 td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}
-td.sym{font-weight:700}td.wrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px;color:var(--mu);font-size:12px}
+td.sym{font-weight:700}.symb{background:#111c33;border:1px solid var(--line);color:var(--tx);border-radius:7px;padding:3px 8px;font:700 13px system-ui,sans-serif;cursor:pointer;white-space:nowrap}.symb:hover{border-color:var(--b);color:var(--b)}td.wrap{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px;color:var(--mu);font-size:12px}
 tbody tr:hover td{background:#0f1a2f}
 td:first-child,th:first-child{position:sticky;left:0;background:var(--card);z-index:1}thead th:first-child{z-index:3;background:#101a30}
 tbody tr:hover td:first-child{background:#0f1a2f}
@@ -129,6 +129,7 @@ details summary{cursor:pointer;color:var(--mu);font-weight:600;font-size:13px}
  <section id="s-izleme">
   <div class="note" style="margin-bottom:10px">Bu taramalar robotun döngüsünde çalışır ve <b>hiçbir pozisyon açmaz</b>. “Sonuç”, sinyalden sonraki 100 mumda stop/hedefe değip değmediğidir; gerçek işlem değildir. Sinyal mumu başına bir kez ntfy uyarısı gider.</div>
   <div class="scancards" id="izScans"></div>
+  <div id="izChart" style="display:none"></div>
   <div class="card">
    <div class="bar" id="izBar"></div>
    <div id="izStats" class="note" style="margin-bottom:8px"></div>
@@ -153,6 +154,7 @@ details summary{cursor:pointer;color:var(--mu);font-weight:600;font-size:13px}
 </main>
 </div>
 <script src="/qx-nav.js"></script>
+<script src="/umut-chart.js?v=1"></script>
 <script>
 (function(){
 "use strict";
@@ -320,6 +322,11 @@ function drawLog(){var q=RB.q.trim().toLocaleLowerCase('tr');var L=(D.rob.log||[
 
 /* ---------- İzleme ---------- */
 var IZ={scan:'',mk:'',st:'',q:'',x:false};
+/* İzleme satırı → aynı Umut grafik bileşeni (mum + giriş/stop/hedef + RSI14 / KAL alt panelleri, boğa uyumsuzlukları) */
+function izOpen(key){var s=(X.sig||[]).filter(function(x){return x.key===key})[0],el=document.getElementById('izChart');if(!s||!el||!window.QXUmutChart)return;
+ var w=D.watch&&D.watch.scans&&D.watch.scans[s._scan];var o=Object.assign({},s,{scan:s._scan,tf:s.tf||(w&&w.tf)||'4h'});
+ try{history.replaceState(null,'','#izleme/'+s.symbol+'/'+s.t+'/'+s._scan)}catch(e){}
+ window.QXUmutChart.open(el,o,{onClose:function(){try{history.replaceState(null,'','#izleme')}catch(e){}}})}
 function rIzleme(){var w=D.watch,body=document.getElementById('izBody');
  if(!w){document.getElementById('izScans').innerHTML='';body.innerHTML='<div class="empty">İzleme raporu okunamadı'+(ERR.watch?' ('+esc(ERR.watch)+')':'')+'. Robotun ilk izleme turundan sonra görünür.</div>';return}
  scanCards(document.getElementById('izScans'),IZ.scan,function(id){IZ.scan=IZ.scan===id?'':id;rIzleme()});
@@ -341,7 +348,7 @@ function rIzleme(){var w=D.watch,body=document.getElementById('izBody');
   var c=function(st){return v.filter(function(s){return s.status===st}).length};
   document.getElementById('izStats').innerHTML=v.length?('<b>'+v.length+'</b> sinyal · <span class="pos">'+c('hedef')+' hedef</span> · <span class="neg">'+c('stop')+' stop</span> · '+c('süre')+' süre doldu · '+(c('açık')+c('bekliyor'))+' açık/bekliyor'+(n?' · 100 mum penceresinde ≥1R %'+qp(1)+' · ≥2R %'+qp(2)+' · ≥3R %'+qp(3)+' · medyan MFE '+nf(med(a.map(function(s){return s.ex100.mfeR})),2)+'R · medyan MAE '+nf(med(a.map(function(s){return s.ex100.maeR})),2)+'R':'')):'';
   var cols=[
-   {k:'symbol',l:'Sembol',c:'sym',f:function(s){return esc(cleanSym(s.symbol))},v:function(s){return cleanSym(s.symbol)}},
+   {k:'symbol',l:'Sembol',c:'sym',f:function(s){return s._market==='kripto'&&s.key?'<button type="button" class="symb" data-ikey="'+esc(s.key)+'" title="Grafik: sinyal mumu, giriş/stop/hedef, RSI + KAL alt panelleri ve uyumsuzluklar">📈 '+esc(cleanSym(s.symbol))+'</button>':esc(cleanSym(s.symbol))},v:function(s){return cleanSym(s.symbol)}},
    {k:'_label',l:'Tarama',f:function(s){return '<span class="pill">'+esc(s._label)+'</span>'}},
    {k:'t',l:'Sinyal mumu (TSİ)',f:function(s){return esc(s.tsi)}},
    {k:'kind',l:'Tür',f:function(s){return esc(s.kind)+(s.strength!=null?' <span class="mu">· '+esc(s.strength)+'</span>':'')}},
@@ -361,6 +368,8 @@ function rIzleme(){var w=D.watch,body=document.getElementById('izBody');
   if(!IZ.x)cols=cols.filter(function(c){return !c.x});
   if(!v.some(function(s){return s.u}))cols=cols.filter(function(c){return !c.u});
   table('iz',body,cols,v,{sort:'t',empty:'Bu filtreye uyan sinyal yok.'})}
+ if(!rIzleme._dl){rIzleme._dl=1;var m=(location.hash||'').match(/^#izleme\/([A-Z0-9]+)\/(\d+)\/([a-z0-9-]+)$/);if(m)setTimeout(function(){izOpen(m[3]+'|'+m[1]+'|'+m[2])},50)}
+ if(!body._ic){body._ic=1;body.addEventListener('click',function(ev){var b=ev.target.closest&&ev.target.closest('[data-ikey]');if(!b)return;izOpen(b.getAttribute('data-ikey'))})}
  f();
  var L=w.ls||{};document.getElementById('lsInfo').textContent=L.lastDay?('Son gün: '+L.lastDay+' · '+(L.lastRows||0).toLocaleString('tr-TR')+' satır · '+(L.files||[]).length+' günlük dosya (paper-bot-state dalı, lsdata/)'+(L.lastErr?' · '+L.lastErr:'')):'Henüz toplanmadı.';
  document.getElementById('izLog').innerHTML=(w.log||[]).slice(-150).reverse().map(function(l){return '<div class="'+(/⚠|hata/i.test(l)?'w':/SİNYAL/.test(l)?'s':'')+'">'+esc(l)+'</div>'}).join('')}

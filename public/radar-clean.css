@@ -137,3 +137,6 @@ main#rxMain{display:grid!important;grid-template-columns:200px minmax(0,1fr);gri
 .rxUb i em.e{width:2px;background:var(--tx)}
 .rxUb i u{position:absolute;top:-3px;width:5px;height:15px;margin-left:-2px;border-radius:2px;background:var(--y);text-decoration:none}
 .rxUb small{color:var(--mu);font-size:11px}
+
+.rxUgo{background:#12203a;border:1px solid #2a3d63;color:var(--tx);border-radius:7px;padding:4px 9px;font:700 13px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.rxUgo:hover{border-color:var(--b);color:var(--b)}
