@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>QUANTEX · Radar v11 (taslak)</title>
+<title>Radar · TradeDesk</title>
+<meta name="theme-color" content="#070c18">
 <script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}</script>
 <style>
 :root{--bg:#02060b;--tx:#d9fff4;--mut:#5f8f88;--g:#00ffaa;--r:#ff2e6e;--y:#ffe600;--c:#7dd3fc;--v:#c084fc;--ln:rgba(0,255,170,.16);--f:"JetBrains Mono","IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
@@ -302,19 +303,29 @@ body.basit #score{display:none}
 @media (max-width:700px){.o12r{grid-template-columns:1fr;grid-template-areas:"a" "bar" "c" "m";padding:10px 4px}.o12vw{margin-left:0}.o12tt{width:100%}.o12h{margin-left:0}.o12tabs button,.o12vw button{padding:7px 10px;font-size:14px}}
 .o12nt{font-size:12px;padding:1px 7px;border-radius:999px;border:1px dashed #8a96a3;color:#aab6c2;white-space:nowrap}.o12more{display:block;margin:12px auto;font:600 15px system-ui,sans-serif;padding:9px 18px;border-radius:8px;border:1px solid #2a3846;background:#0e1822;color:#e8eef4;cursor:pointer}
 </style>
+<link rel="stylesheet" href="/radar-clean.css?v=13">
+<script>try{sessionStorage.setItem("qxr_intro6","1");sessionStorage.setItem("qxr_tour6","1");}catch(e){}</script>
 <script src="/qx-direct.js?v=151"></script><script src="/qx-nav.js?v=153" defer></script>
 </head><body>
 <div id="intro"><div id="iT"></div><div id="iL"></div><div id="iB"><i id="iBar"></i></div><div id="iSkip">TIKLA / ESC → GEÇ</div></div>
-<header>
- <div class="logo">QUANTEX <span>RADAR</span></div><span class="tag">TASLAK v11</span>
- <div class="sw"><button data-mode="coin" class="on">Coin</button><button data-mode="bist">BIST</button></div>
- <button class="btn" id="vBtn">2D</button><button class="btn" id="sBtn">🔇 ses</button>
- <button class="btn" id="evBtn" title="Evren: Top50 (hacme göre ilk N) ↔ Lab37 (E)">evren: <b>Top50</b></button><label class="mut" id="rdNl">evren <select id="rdN"><option value="50">Top50</option><option value="100" selected>Top100</option><option value="200">Top200</option></select></label>
- <button class="btn" id="rdBtn">⟳ Tara</button><button class="btn" id="kBtn" title="Komut paleti (Ctrl+K veya /)">⌕ Ctrl+K</button><button class="btn" id="setBtn" title="Ayarlar (,)">⚙</button><button class="btn" id="hlpBtn" title="Kısayollar (?)">?</button><button class="btn" id="zBtn" title="Temiz mod (Z)">Z</button><button class="btn ws off" id="wsPill" title="canlı akış">○ REST</button><a class="btn" href="/quantex.html?v=151">← QUANTEX</a>
+<header id="rxHead">
+ <div class="rxT"><h1>🛰 Radar</h1><span class="rxSub">Sinyale yaklaşan coin ve BIST hisselerini tarayıcında canlı tarar · yalnız izleme, işlem açmaz</span></div>
+ <div class="rxCtl">
+  <div class="sw" title="Hangi piyasa taransın?"><button data-mode="coin" class="on">Coin</button><button data-mode="bist">BIST</button></div>
+  <label id="rdNl" title="Binance vadeli işlemlerde hacme göre ilk kaç coin taransın">Coin sayısı <select id="rdN"><option value="50">İlk 50</option><option value="100" selected>İlk 100</option><option value="200">İlk 200</option></select></label>
+  <button class="btn" id="evBtn" title="Evren: hacme göre ilk N coin ↔ geri testteki 37 coin (Lab37) · kısayol E">evren: <b>Top50</b></button>
+  <button class="btn pri" id="rdBtn" title="Taramayı şimdi yeniden başlat">⟳ Yeniden tara</button>
+  <button class="btn" id="kBtn" title="Coin / hisse / komut ara (Ctrl+K veya /)">🔍 Ara</button>
+  <button class="btn" id="sBtn" title="Sinyal seslerini aç/kapat">🔇 ses</button>
+  <button class="btn" id="setBtn" title="Ayarlar (,)">⚙ Ayarlar</button>
+  <button class="btn" id="hlpBtn" title="Kısayollar ve yardım (?)">? Yardım</button>
+  <button class="btn" id="vBtn">2D</button><button class="btn" id="zBtn" title="Temiz mod (Z)">Z</button>
+  <button class="btn ws off" id="wsPill" title="canlı fiyat akışı">○ REST</button>
+ </div>
  <div class="tk"><span id="tBtc">BTC —</span><span id="tClock"></span><i id="tScan"></i><span id="rdStatus">başlıyor…</span></div>
  <div class="prog"><i id="tProg"></i></div>
 </header>
-<main>
+<main id="rxMain">
  <section class="glass" id="hero">
   <div id="hero3d"></div><canvas id="hero2d"></canvas>
   <div class="hov" id="hTitle"><h2>◉ SİNYAL GALAKSİSİ</h2><div id="hMode"></div><div class="cnt3"><b class="y" id="hFire">0</b><span class="y">ateşliyor</span> · <b class="c" id="hNear">0</b><span class="c">yakın</span> · <b id="hTot">0</b>sembol</div><div id="hCorr"></div></div>
@@ -374,4 +385,5 @@ body.basit #score{display:none}
 <kbd>Ctrl+K · /</kbd><span>komut paleti — coin/hisseye atla, ☆ ile sabitle</span><kbd>Space</kbd><span>zaman makinesi oynat / duraklat (kapalıysa başlatır)</span><kbd>F</kbd><span>en yakın adaya odaklan</span><kbd>P</kbd><span>odaktaki yakın aday için işlem planı</span>
 <kbd>R</kbd><span>piyasa rejimi paneli</span><kbd>B</kbd><span>günlük brifing</span><kbd>W</kbd><span>izleme listesi</span><kbd>M</kbd><span>performans aynası</span><kbd>Z</kbd><span>temiz mod (yalnız galaksi)</span><kbd>,</kbd><span>ayarlar</span><kbd>?</kbd><span>bu yardım</span><kbd>Esc</kbd><span>pencereyi kapat / odaktan çık</span></div></div></div>
 <script src="/radar.js?v=151"></script>
+<script src="/radar-ui.js?v=13"></script>
 </body></html>
