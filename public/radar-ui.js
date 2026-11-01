@@ -18,7 +18,7 @@ var SECS=[
   cards:['cWhy','cWatch']},
  {id:'umut',ic:'🌱',nm:'Umut',h:'Umut — KAL + RSI uyumsuzluğu (4s)',
   d:'Testi geçen tek kural: 4 saatlikte KAL boğa uyumsuzluğu ile RSI14 boğa uyumsuzluğu 5 mum içinde birlikte gelir. İzleme robotu ilk 200 coini tarar, sinyali kaydeder ve 100 mum boyunca izler: R1 +%10 (test edilen hedef), R2 +%20, R3 +%30, stop = giriş − 2 ATR. Yalnız izleme, işlem açılmaz.',cards:[]},
- {id:'ikili',ic:'✦',nm:'İkili',h:'✦ İkili: KDC-MACD + Uyumsuzluk (4s) — patlama ihtimali',
+ {id:'ikili',ic:'✦',nm:'İkili',h:'İkili: KDC-MACD + Uyumsuzluk (4s) — patlama ihtimali',
   d:'Aynı coinde KDC-MACD sinyali (30dk KDC K↑D → ≤10 saat içinde 1s MACD yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla (4s) gelir. İzleme robotu Umut sinyali olan coinlerde KDC-MACD’yi de hesaplar, son 30 mumu geriye doldurur, yeni sinyalde (yaş 0–2 mum) ntfy gönderir ve 100 mum izler: R1 +%10, R2 +%20, R3 +%30, stop = giriş − 2 ATR. Bu kombinasyon test edilmedi; yalnız izleme, işlem açılmaz.',cards:[]},
  {id:'izleme',ic:'📡',nm:'İzleme sinyalleri',h:'İzleme robotu sinyalleri',
   d:'GitHub üzerinde 2 saatte bir çalışan izleme robotunun bulduğu sinyaller (EK v3 DIV, L/S uyumsuzluk, Dual, RSI30). Robot ilk 200 coin + 200 BIST hissesini tarar; yalnız uyarı üretir, işlem açmaz. Tüm sütunlar ve geçmiş için Robot Paneli\'ne geç.',cards:[]},
