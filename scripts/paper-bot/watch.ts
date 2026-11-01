@@ -321,10 +321,10 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   /** Dönen parti (rotating batch): her blokta semboller "en eski taranan önce" sırayla işlenir, kalıcı imleç = sembol başı son tarama zamanı.
    *  Bu mum aralığında (slot) taranmış sembol tekrar taranmaz; bütçe biterse kalanlar sonraki turda devam eder → uzun vadede hiçbir sembol atlanmaz.
    *  Pencere (yaş): sembolün son taramasından beri kapanan mumlar da rapora girer; ntfy yalnız yaş ≤ 2. */
-  async function runBlock(blk: string, ids: ScanId[], tf: string, slotMs: number, syms: string[], conc: number, one: (sym: string, maxAge: number) => Promise<string | null>) {
+  async function runBlock(blk: string, ids: ScanId[], tf: string, slotMs: number, syms: string[], conc: number, one: (sym: string, maxAge: number) => Promise<string | null>, needs?: (sym: string) => boolean) {
     const L = (symLast[blk] ||= {}), slotStart = Math.floor(now / slotMs) * slotMs;
     for (const k of Object.keys(L)) if (!syms.includes(k) && now - L[k] > 7 * 864e5) delete L[k];
-    const pend = syms.filter((x) => !(L[x] >= slotStart)).sort((x, y) => (L[x] || 0) - (L[y] || 0));
+    const pend = syms.filter((x) => !(L[x] >= slotStart) || (needs ? needs(x) : false)).sort((x, y) => (L[x] || 0) - (L[y] || 0));
     const errs: string[] = []; let done = 0, ok = 0, i = 0;
     const worker = async () => {
       while (i < pend.length && !over()) {
@@ -357,18 +357,18 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   const CRYPTO = U.crypto?.length ? U.crypto : WATCH_CRYPTO;
 
   const blkCrypto = () => runBlock("kripto 4s", ["ek-crypto-4h", "dual-crypto-4h", "umut-4h"], "4h", TF_MS["4h"], CRYPTO, 2, async (sym, maxAge) => {
+    const uSeed = (symLast["umut-seed"] ||= {}), uAge = uSeed[sym] ? maxAge : 30; uSeed[sym] = now;
     const { bars: b } = await coinBars(ctx, sym);
     if (!b || b.length < 300) return b ? `${b.length} mum (<300, atlandı)` : "veri yok";
     // UMUT: sembolün ilk Umut taramasında son 30 mum (5 gün) geriye doldurulur (yaş>2 → bildirimsiz), sonra normal pencere
-    const uSeed = (symLast["umut-seed"] ||= {}), uAge = uSeed[sym] ? maxAge : 30;
     for (const f of umutScan(sym, b, uAge)) found.push({ f, bars: b });
-    uSeed[sym] = now; touched.push({ scan: "umut-4h", sym, bars: b });
+    touched.push({ scan: "umut-4h", sym, bars: b });
     for (const f of ekScan("ek-crypto-4h", sym, "4h", b, maxAge)) found.push({ f, bars: b });
     touched.push({ scan: "ek-crypto-4h", sym, bars: b });
     const d = dualScan("dual-crypto-4h", sym, "4h", b, "LRB", 0.1, "B", maxAge); for (const f of d.found) found.push({ f, bars: b, dyn: d.dyn });
     touched.push({ scan: "dual-crypto-4h", sym, bars: b, dyn: d.dyn });
     return null;
-  });
+  }, (sym) => !(symLast["umut-seed"] || {})[sym]); // yeni eklenen Umut taraması: henüz Umut ile taranmamış semboller bu mum aralığında da taranır
   const blkBist = () => runBlock("BIST 1g", ["ek-bist-1d", "dual-bist-1d", "rsi30-bist-1d"], "1d", TF_MS["2h"], WATCH_BIST, 2, async (sym, maxAge) => {
     const b = await yahooBars(sym);
     if (!b || b.length < 100) return b ? `${b.length} mum (<100, atlandı)` : "veri yok";
