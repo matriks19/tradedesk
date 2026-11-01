@@ -58,7 +58,7 @@ export interface WSig {
   key: string; scan: ScanId; symbol: string; tf: string; t: number; tsi: string; age: number; kind: string;
   price: number; entryBasis: string; stop: number; target: number | null; strength?: number | string; info: string;
   calc: Calc; fillT?: number; entry?: number; status: "bekliyor" | "açık" | "hedef" | "stop" | "süre"; exitPx?: number; exitT?: number; R?: number; bars?: number; last?: number; stop0?: number; target0?: number | null; trackBars?: number; ex?: Excursion; ex100?: Excursion; u?: UmutTrack;
-  alerted: "gönderildi" | "gönderilemedi" | "ilk tur (bildirimsiz)" | "dry-run" | "eski (yaş>2)"; foundAt: number;
+  alerted: "gönderildi" | "gönderilemedi" | "ilk tur (bildirimsiz)" | "dry-run" | `eski (yaş>${number})`; foundAt: number;
 }
 interface Coverage { total: number; covered: number; thisRun: number; okThisRun: number; slotTsi: string; oldestTsi: string; full: boolean }
 interface ScanRep { label: string; tf: string; market: string; note: string; lastRun?: number; lastFull?: number; coverage?: Coverage; errCount?: number; lastRunTsi?: string; nSym?: number; nOk?: number; errors?: string[]; newCount?: number; signals: WSig[] }
