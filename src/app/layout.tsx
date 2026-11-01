@@ -15,7 +15,7 @@ export default function RootLayout({
     <html lang="tr" className="dark">
       <head>
         <script src="/qx-direct.js?v=151" />
-        <script src="/qx-nav.js?v=151" defer />
+        <script src="/qx-nav.js?v=153" defer />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

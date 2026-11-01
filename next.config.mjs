@@ -9,6 +9,15 @@ const nextConfig = {
       { source: "/radar.html", headers: nc },
       { source: "/qx-direct.js", headers: nc },
       { source: "/qx-nav.js", headers: nc },
+      { source: "/panel.html", headers: nc },
+      { source: "/izleme.html", headers: nc },
+    ];
+  },
+  async redirects() {
+    // Robot Paneli kısa adresleri (eski izleme.html kendi içinde #izleme bölümüne yönlendirir)
+    return [
+      { source: "/robot", destination: "/panel.html", permanent: false },
+      { source: "/panel", destination: "/panel.html", permanent: false },
     ];
   },
   webpack: (config) => {
