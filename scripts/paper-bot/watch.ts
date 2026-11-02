@@ -43,7 +43,7 @@ const TF_MS: Record<string, number> = { "1h": 36e5, "2h": 72e5, "4h": 144e5, "8h
 const ALERT_AGE: Partial<Record<ScanId, number>> = { "ikili-4h": 10 };
 const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
-/** Dip taramaları yeni eklendiğinde de taze (yaş ≤ 2) sinyaller bildirilir (kullanıcı isteği 02.11.2026); eski olanlar yalnız listeye girer. */
+/** Dip taramaları: bir sembolün ilk taramasında yalnız son kapanmış mumdaki (yaş 0) sinyal bildirilir (sel önleme); sonra normal kural (yaş ≤ 2). Eskiler yalnız listeye girer. */
 const DIP_SCANS = new Set<string>(["dip8", "dip12"]);
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
@@ -548,7 +548,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     const s: WSig = { ...rest, status: "bekliyor", alerted: "dry-run", foundAt: now };
     if (doc.notified[f.key]) s.alerted = "gönderildi";
     else if (f.age > (ALERT_AGE[f.scan] ?? MAX_AGE)) s.alerted = `eski (yaş>${ALERT_AGE[f.scan] ?? MAX_AGE})`;
-    else if (first || (seedSyms.has(f.scan + "|" + f.symbol) && !DIP_SCANS.has(f.scan))) { s.alerted = "ilk tur (bildirimsiz)"; doc.notified[f.key] = now; }
+    else if (first || (seedSyms.has(f.scan + "|" + f.symbol) && (!DIP_SCANS.has(f.scan) || f.age > 0))) { s.alerted = "ilk tur (bildirimsiz)"; doc.notified[f.key] = now; }
     else if (ctx.dry) { s.alerted = "dry-run"; console.log(`--- ntfy (dry-run, gönderilmedi) ---\n${title}\n${body}`); }
     else {
       try { await ntfySend(title, body); s.alerted = "gönderildi"; doc.notified[f.key] = now; sent++; }
