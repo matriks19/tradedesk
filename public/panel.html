@@ -150,6 +150,17 @@ details summary{cursor:pointer;color:var(--mu);font-weight:600;font-size:13px}
   </div>
  </section>
 
+ <section id="s-donch">
+  <div class="note" style="margin-bottom:10px">🐢 <b>Donchian</b> — iki sanal sistem, <b>gerçek emir açılmaz, robot pozisyonlarına dokunulmaz</b>. <b>Ensemble robot:</b> 5/10/20/30 günlük Donchian kapanış kırılımları (orta çizgi iz süren stop), en likit 10 kripto (≥365 gün geçmiş, ay başında yenilenir), coin başı 1/10 dilim, ağırlık = aktif model oranı × min(%25 / 90 gün vol, %200). Her günlük kapanıştan sonra (03:00 TSİ sonrası ilk tur) işlenir; giriş/çıkışta ntfy. <b>Range Dip defteri:</b> senin kuralın — alt bantta likidite avı + ikili/üçlü dip → long, hedef üst bant, stop fitil altı; yeni sinyalde ve çıkışta ntfy. <span id="dnRule"></span></div>
+  <div class="grid2" id="dnBooks" style="grid-template-columns:repeat(auto-fit,minmax(280px,1fr))"></div>
+  <div class="card"><h2>📈 Sanal özsermaye <span class="r">1.000$ başlangıç · robot günlük, Range Dip kapanan işlemler</span></h2><div class="chart" id="dnEq"></div><div class="legend"><span><i style="background:#00d2d3"></i>Donchian ensemble</span><span><i style="background:#e67e22"></i>Range Dip</span><span><i style="background:#8ea3c4"></i>Başlangıç 1.000$</span></div></div>
+  <div class="card">
+   <div class="subtabs" id="dnTabs"></div>
+   <div class="bar" id="dnBar"></div>
+   <div id="dnBody"></div>
+  </div>
+ </section>
+
  <section id="s-defter">
   <div class="note" id="kdNote" style="margin-bottom:10px">yükleniyor…</div>
   <div class="ledgers" id="kdCards"></div>
@@ -249,10 +260,10 @@ function derive(){var r=D.rob;X={};
 }
 
 /* ---------- gezinme ---------- */
-var SECS=[['ozet','📊','Özet'],['robot','🤖','Robot'],['izleme','📡','İzleme'],['umutpg','🚀','Umut+PG'],['defter','📒','Kağıt Defterler'],['gecmis','🕘','Geçmiş']];
-var ALIAS={'umut-pg':'umutpg','patlama':'umutpg','defterler':'defter','kagit':'defter','history':'gecmis','robot':'robot'};
+var SECS=[['ozet','📊','Özet'],['robot','🤖','Robot'],['izleme','📡','İzleme'],['umutpg','🚀','Umut+PG'],['donch','🐢','Donchian'],['defter','📒','Kağıt Defterler'],['gecmis','🕘','Geçmiş']];
+var ALIAS={'donchian':'donch','rangedip':'donch','range-dip':'donch','umut-pg':'umutpg','patlama':'umutpg','defterler':'defter','kagit':'defter','history':'gecmis','robot':'robot'};
 function cur(){var h=(location.hash||'').replace('#','').split('/')[0];h=ALIAS[h]||h;return SECS.some(function(s){return s[0]===h})?h:'ozet'}
-function navDraw(){var c=cur(),badge={robot:D.rob?(D.rob.open||[]).length:'',izleme:X.sigToday?X.sigToday.length||'':'',defter:D.led?(D.led.ledgers||[]).length:'',umutpg:D.watch&&D.watch.paper?((D.watch.paper.stats||{}).pg||{}).open||'':'',gecmis:X.runs?X.runs.length:''};
+function navDraw(){var c=cur(),badge={robot:D.rob?(D.rob.open||[]).length:'',izleme:X.sigToday?X.sigToday.length||'':'',defter:D.led?(D.led.ledgers||[]).length:'',umutpg:D.watch&&D.watch.paper?((D.watch.paper.stats||{}).pg||{}).open||'':'',donch:D.watch&&D.watch.donch?(Object.keys(D.watch.donch.sl||{}).filter(function(k){return D.watch.donch.sl[k].frac>0}).length||''):'',gecmis:X.runs?X.runs.length:''};
  document.getElementById('nav').innerHTML=SECS.map(function(s){return '<button data-s="'+s[0]+'" class="'+(c===s[0]?'on':'')+'"><span class="ic">'+s[1]+'</span>'+s[2]+(badge[s[0]]!==''&&badge[s[0]]!=null?'<span class="bd">'+badge[s[0]]+'</span>':'')+'</button>'}).join('');
  document.querySelectorAll('#nav button').forEach(function(b){b.onclick=function(){location.hash=b.getAttribute('data-s')}});
  SECS.forEach(function(s){document.getElementById('s-'+s[0]).className=c===s[0]?'on':''});
@@ -263,7 +274,7 @@ function render(){navDraw();var r=D.rob,w=D.watch;
  var sub=[];if(r)sub.push('Robot son tur: '+dt(r.lastRun)+' TSİ ('+ago(r.lastRun)+')');if(w)sub.push('İzleme: '+(w.updatedTsi||dt(w.updated))+' TSİ');
  var e=Object.keys(ERR);if(e.length)sub.push('⚠ okunamadı: '+e.join(', '));
  document.getElementById('subt').textContent=sub.join(' · ')||'Veri yok';document.getElementById('footUpd').textContent=r?'Son tur: '+dt(r.lastRun)+' TSİ':'';
- var c=cur();({ozet:rOzet,robot:rRobot,izleme:rIzleme,umutpg:rUmutPG,defter:rDefter,gecmis:rGecmis})[c]()}
+ var c=cur();({ozet:rOzet,robot:rRobot,izleme:rIzleme,umutpg:rUmutPG,donch:rDonch,defter:rDefter,gecmis:rGecmis})[c]()}
 
 /* ---------- Özet ---------- */
 function kpi(l,v,s,go){return '<div class="kpi"'+(go?' data-go="'+go+'"':'')+'><div class="l">'+l+'</div><div class="v">'+v+'</div><div class="s">'+(s||'')+'</div></div>'}
@@ -454,6 +465,71 @@ function rUmutPG(){var w=D.watch,P=w&&w.paper,books=document.getElementById('upB
   table('up-'+B,body,cols,L,{sort:'t',empty:'Bu filtreye uyan işlem yok.'})}
  f();
  if(!rUmutPG._dl){rUmutPG._dl=1;var m=(location.hash||'').match(/^#umutpg\/([A-Z0-9]+)\/(\d+)$/);if(m)setTimeout(function(){var t=(P.pg||[]).concat(P.u||[]).filter(function(x){return x.sym===m[1]&&String(x.t)===m[2]})[0];if(t)upOpen(upTrade2sig(t,'pg'))},50)}}
+
+/* ---------- Donchian (sanal robot + Range Dip defteri) ---------- */
+var DN={t:'pos',q:''};
+function rDonch(){var w=D.watch,R=w&&w.donch,P=w&&w.rdip,books=document.getElementById('dnBooks'),body=document.getElementById('dnBody');
+ if(!R&&!P){books.innerHTML='';document.getElementById('dnEq').innerHTML='';document.getElementById('dnTabs').innerHTML='';document.getElementById('dnBar').innerHTML='';
+  body.innerHTML='<div class="empty">'+(w?'Donchian robotu ve Range Dip defteri robotun bir sonraki izleme turunda oluşacak (her 15 dk; robot günlük kapanıştan sonra işler).':'İzleme raporu okunamadı'+(ERR.watch?' ('+esc(ERR.watch)+')':'')+'.')+'</div>';return}
+ document.getElementById('dnRule').innerHTML='<br><b>Robot:</b> '+esc(R&&R.rule||'—')+(R&&R.updatedTsi?' · <b>son işlenen gün '+esc(dayKey(R.lastT))+' · güncelleme '+esc(R.updatedTsi)+' TSİ</b>':'')+(R&&R.err?' · <span class="neg">⚠ '+esc(R.err)+'</span>':'')+'<br><b>Range Dip:</b> '+esc(P&&P.rule||'—');
+ var sl=R?Object.keys(R.sl||{}).map(function(k){var x=R.sl[k];return Object.assign({sym:k},x)}):[],inPos=sl.filter(function(x){return x.frac>0});
+ var eq=R&&R.equity!=null?R.equity:(R?R.start:1000),ch=R?100*(eq/(R.start||1000)-1):null,tr=R?R.trades||[]:[],tw=tr.filter(function(t){return t.pnl>0}).length;
+ var S=(P&&P.stats)||{},bn=S.byN||{};
+ books.innerHTML='<div class="card" style="border-top:3px solid #00d2d3"><h2>🐢 Donchian ensemble robotu <span class="r">'+inPos.length+' / '+sl.length+' coin pozisyonda</span></h2><div class="mini" style="margin:0">'+
+  '<div>Özsermaye<b>'+money(eq)+' $</b> '+pct(ch)+'</div><div>Başlangıç<b>'+(R&&R.since?esc(dayKey(R.since)):'—')+'</b></div>'+
+  '<div>Toplam ağırlık<b>'+nf(inPos.reduce(function(a,x){return a+x.held*x.eq},0)/(eq||1)*100,1)+'%</b></div><div>Kapanan işlem<b>'+tr.length+'</b> <span class="mu">'+(tr.length?'%'+nf(100*tw/tr.length,0)+' kazanan':'')+'</span></div>'+
+  '<div>Evren (ay '+esc(R&&R.month||'—')+')<b style="font-size:12px">'+esc((R&&R.members||[]).map(function(s){return s.replace(/USDT$/,'')}).join(' · '))+'</b></div>'+
+  '<div title="Kendi testimiz (10 coin, 2018→, %0.1 maliyet)">Test<b>Sharpe 1.38</b> <span class="mu">OOS 0.89 · MDD −%14</span></div></div></div>'+
+  '<div class="card" style="border-top:3px solid #e67e22"><h2>🎯 Range Dip defteri <span class="r">'+(S.n||0)+' kapanan · '+(S.open||0)+' açık</span></h2><div class="mini" style="margin:0">'+
+  '<div>Bakiye (kapanan)<b>'+money(S.balance)+' $</b></div><div>Özsermaye (açık dahil)<b>'+money(S.equity)+' $</b> '+pct(S.equity!=null?100*(S.equity/((P&&P.start)||1000)-1):null)+'</div>'+
+  '<div>Kazanma<b>'+(S.n?nf(S.win,1)+'%':'—')+'</b></div><div>Ort. R<b>'+sg(S.avgR,2,'R')+'</b></div><div>Kâr faktörü<b>'+(S.pf==null?'—':nf(S.pf,2))+'</b></div>'+
+  '<div>En büyük düşüş<b class="neg">−'+nf(S.dd,2)+' $</b> <span class="mu">%'+nf(S.ddPct,1)+'</span></div>'+
+  '<div>RD20<b>'+((bn[20]||{}).n||0)+' işlem</b> <span class="mu">'+sg((bn[20]||{}).avgR,2,'R')+'</span></div><div>RD55<b>'+((bn[55]||{}).n||0)+' işlem</b> <span class="mu">'+sg((bn[55]||{}).avgR,2,'R')+'</span></div>'+
+  '<div title="Ön-kayıtlı test (10 coin, günlük, %0.1 maliyet)">Test<b>N55 PF 2.04</b> <span class="mu">OOS 1.75 · N20 PF 1.21 · kazanma ~%20</span></div></div></div>';
+ var base=1000,rc=R&&R.curve&&R.curve.length?[[R.curve[0][0]-864e5,base]].concat(R.curve):[],pc=S.curve&&S.curve.length?[[(P&&P.since)||S.curve[0][0],base]].concat(S.curve):[];
+ chart(document.getElementById('dnEq'),[{n:'Donchian ensemble',c:'#00d2d3',p:rc,fill:1},{n:'Range Dip',c:'#e67e22',p:pc}],base);
+ var sig=(w.scans&&w.scans['donch-1d']&&w.scans['donch-1d'].signals)||[],rds=(w.scans&&w.scans['rangedip-1d']&&w.scans['rangedip-1d'].signals)||[];
+ var tabs=[['pos','🐢 Robot pozisyonları ('+inPos.length+')'],['ev','🔔 Robot giriş/çıkış ('+(R&&R.ev||[]).length+')'],['tr','✅ Robot kapanan ('+tr.length+')'],['rd','🎯 Range Dip işlemleri ('+((P&&P.trades)||[]).length+')'],['rds','📡 Range Dip sinyalleri ('+rds.length+')'],['sig','📡 Donchian 20/55 kırılımlar ('+sig.length+')']];
+ var T=document.getElementById('dnTabs');T.innerHTML=tabs.map(function(t){return '<button data-t="'+t[0]+'" class="'+(DN.t===t[0]?'on':'')+'">'+t[1]+'</button>'}).join('');
+ T.querySelectorAll('button').forEach(function(b){b.onclick=function(){DN.t=b.getAttribute('data-t');rDonch()}});
+ document.getElementById('dnBar').innerHTML='<input class="inp" id="dnq" placeholder="Sembol ara" value="'+esc(DN.q)+'"><span class="note" id="dnCnt"></span>';
+ var q=document.getElementById('dnq');q.oninput=function(){DN.q=q.value;f()};
+ function cs(s){return esc(String(s||'').replace(/USDT$/,''))}
+ function f(){var qq=DN.q.trim().toUpperCase(),m=function(s){return !qq||String(s||'').indexOf(qq)>=0},cnt=document.getElementById('dnCnt');
+  if(DN.t==='pos'){var v=sl.filter(function(x){return m(x.sym)});cnt.textContent=v.length+' coin (evren)';
+   table('dnpos',body,[{k:'sym',l:'Coin',c:'sym',f:function(x){return cs(x.sym)}},
+    {k:'on',l:'Aktif model',n:1,f:function(x){return x.on?'<b class="pos">'+x.on+'/4</b>':'<span class="mu">0/4</span>'}},
+    {k:'held',l:'Ağırlık (dilim)',n:1,v:function(x){return x.held},f:function(x){return x.held?nf(x.held*100,1)+'%':'—'}},
+    {k:'eq',l:'Dilim $',n:1,f:function(x){return money(x.eq)}},
+    {k:'entryPx',l:'Giriş',n:1,f:function(x){return x.entryPx!=null?fp(x.entryPx)+' <span class="mu">'+esc(dayKey(x.entryT))+'</span>':'—'}},
+    {k:'last',l:'Son kapanış',n:1,f:function(x){return fp(x.last)}},
+    {k:'ts',l:'En yakın iz süren stop',n:1,t:'Aktif modellerin orta çizgi stoplarından en yükseği (ilk çıkacak model)',f:function(x){return x.ts!=null?fp(x.ts):'—'}},
+    {k:'pct',l:'Girişten %',n:1,v:function(x){return x.entryPx?(x.last/x.entryPx-1)*100:null},f:function(x){return x.entryPx?pct((x.last/x.entryPx-1)*100):'—'}},
+    {k:'pnl',l:'Dilim K/Z $',n:1,v:function(x){return x.entryEq!=null?x.eq-x.entryEq:null},f:function(x){return x.entryEq!=null?sg(x.eq-x.entryEq,2,' $'):'—'}}],v,{sort:'held',empty:'Henüz evren yok.'});return}
+  if(DN.t==='ev'){var v=((R&&R.ev)||[]).filter(function(e){return m(e.sym)});cnt.textContent=v.length+' olay';
+   table('dnev',body,[{k:'t',l:'Gün (kapanış)',f:function(e){return esc(e.tsi)}},{k:'sym',l:'Coin',c:'sym',f:function(e){return cs(e.sym)}},
+    {k:'type',l:'Olay',f:function(e){return '<span class="st '+(e.type==='GİRİŞ'?'açık':(e.pct||0)>0?'hedef':'stop')+'">'+esc(e.type)+'</span>'}},
+    {k:'why',l:'Neden',c:'wrap',f:function(e){return esc(e.why)}},{k:'px',l:'Fiyat',n:1,f:function(e){return fp(e.px)}},
+    {k:'w',l:'Ağırlık',n:1,f:function(e){return e.type==='GİRİŞ'?nf(e.w,1)+'%':'—'}},{k:'pct',l:'Sonuç',n:1,f:function(e){return e.type==='ÇIKIŞ'?pct(e.pct)+' <span class="mu">'+sg(e.pnl,2,' $')+'</span>':'—'}},
+    {k:'alerted',l:'ntfy',f:function(e){return esc(e.alerted||'—')}}],v,{sort:'t',empty:'Henüz giriş/çıkış yok.'});return}
+  if(DN.t==='tr'){var v=tr.filter(function(t){return m(t.sym)});cnt.textContent=v.length+' işlem';
+   table('dntr',body,[{k:'sym',l:'Coin',c:'sym',f:function(t){return cs(t.sym)}},{k:'inT',l:'Giriş',f:function(t){return esc(dayKey(t.inT))+' · '+fp(t.inPx)}},{k:'outT',l:'Çıkış',f:function(t){return esc(dayKey(t.outT))+' · '+fp(t.outPx)}},
+    {k:'pct',l:'Dilim %',n:1,f:function(t){return pct(t.pct)}},{k:'pnl',l:'K/Z $',n:1,f:function(t){return sg(t.pnl,2,' $')}}],v,{sort:'outT',empty:'Henüz kapanan işlem yok.'});return}
+  if(DN.t==='rd'){var v=((P&&P.trades)||[]).filter(function(t){return m(t.sym)});cnt.textContent=v.length+' işlem';
+   table('dnrd',body,[{k:'sym',l:'Coin',c:'sym',f:function(t){return cs(t.sym)}},{k:'N',l:'N',n:1,f:function(t){return 'RD'+t.N}},{k:'t',l:'Sinyal günü',f:function(t){return esc(t.tsi)}},
+    {k:'k',l:'Dip',n:1,f:function(t){return t.k>=2?'üçlü':'ikili'}},{k:'entry',l:'Giriş',n:1,f:function(t){return fp(t.entry)}},{k:'stop',l:'Stop',n:1,f:function(t){return fp(t.stop)}},{k:'tp',l:'Hedef (üst bant)',n:1,f:function(t){return fp(t.tp)}},
+    {k:'status',l:'Durum',v:function(t){return t.status+(t.why||'')},f:function(t){var c=t.status==='açık'?'açık':t.status==='bekliyor'?'bekliyor':t.status==='iptal'?'diğer':t.why==='hedef'?'hedef':t.why==='süre'?'süre':'stop';return '<span class="st '+c+'">'+esc(t.status==='kapandı'?t.why:t.status)+'</span>'+(t.bars?' <span class="mu">'+t.bars+' gün</span>':'')}},
+    {k:'last',l:'Son / Çıkış',n:1,v:function(t){return t.exitPx!=null?t.exitPx:t.last},f:function(t){return fp(t.exitPx!=null?t.exitPx:t.last)}},
+    {k:'R',l:'R',n:1,f:function(t){return sg(t.R,2,'R')+(t.status==='açık'?' <span class="mu">açık</span>':'')}},{k:'usd',l:'K/Z $',n:1,f:function(t){return sg(t.usd,2,' $')}},
+    {k:'notional',l:'Nominal $',n:1,f:function(t){return money(t.notional)}}],v,{sort:'t',empty:'Henüz Range Dip işlemi yok (ileriye dönük: yalnız yeni sinyaller).'});return}
+  var src=DN.t==='rds'?rds:sig,v=src.filter(function(s){return m(s.symbol)});cnt.textContent=v.length+' sinyal';
+  table('dn'+DN.t,body,[{k:'symbol',l:'Coin',c:'sym',f:function(s){return cs(s.symbol)}},{k:'t',l:'Sinyal günü',f:function(s){return esc(s.tsi)}},{k:'kind',l:'Tür',f:function(s){return esc(s.kind)}},
+   {k:'entry',l:'Giriş',n:1,v:function(s){return s.entry!=null?s.entry:s.price},f:function(s){return fp(s.entry!=null?s.entry:s.price)}},
+   {k:'stop',l:DN.t==='sig'?'İz süren stop':'Stop',n:1,f:function(s){return fp(s.stop)}},{k:'target',l:'Hedef',n:1,f:function(s){return fp(s.target)}},
+   {k:'status',l:'Durum',f:function(s){return '<span class="st '+stCls(s.status)+'">'+esc(s.status)+(s.R!=null?' '+(s.R>0?'+':'')+nf(s.R,2)+'R':'')+'</span>'+(s.bars?' <span class="mu">'+s.bars+' gün</span>':'')}},
+   {k:'last',l:'Son',n:1,v:function(s){return s.exitPx!=null?s.exitPx:s.last},f:function(s){return fp(s.exitPx!=null?s.exitPx:s.last)}},
+   {k:'alerted',l:'ntfy',f:function(s){return esc(s.alerted||'—')}},{k:'info',l:'Not',c:'wrap',f:function(s){return '<span title="'+esc(s.info)+'">'+esc(s.info)+'</span>'}}],v,{sort:'t',empty:'Henüz sinyal yok.'})}
+ f()}
 
 /* ---------- Kağıt Defterler ---------- */
 var KF=null,KT='open';
