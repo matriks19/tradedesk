@@ -13,6 +13,7 @@
  *  ikili-4h      ✦ İKİLİ: KDC-MACD (30dk KDC K↑D → ≤10s içinde 1s MACD↑) + Umut sinyali < 5 mum arayla — kripto 4s, Umut gibi izlenir (test edilmedi)
  *  umutpg-4h     UMUT+PG: Umut sinyali + Patlama Gücü (PG5 ≥ 50, sinyal mumunda) — kripto 4s, vadeli mumlar; sanal kağıt defter (Umut ile yan yana) [patlama-gucu-20261102]
  *  umut-4h       UMUT: KAL uyumsuzluk + RSI14 uyumsuzluk 5 mum içinde — kripto 4s (TP %10, 2 ATR, 100 mum) [kal-tp-test-20261101/combo3.py]
+ *  dip4          DİP 4s (ElifScan): bant çizgileri yer değiştirir — üst bant alt bandı yukarı keser (crossover(upper, lower)), main < 40 — kripto 4s, vadeli mumlar önce; ntfy "Dip" / "dip4 SEMBOL"
  *  dip8 / dip12  DİP (ElifScan, kullanıcının Pine kodu birebir): main alt bandı VEYA üst bant alt bandı yukarı keser, main < 40 — kripto 8s / 12s, vadeli mumlar önce; ntfy kısa: "Dip" / "dip8 SEMBOL" [elifscan-20261102]
  *  + L/S günlük veri toplama (top-40, 4 metrik × 1s/2s) → lsdata/YYYY-MM-DD.csv                  [ls-div-20261029/collect.py]
  * ntfy adresi yalnız ortam değişkeninden (WATCH_NTFY_URL → ELIZI_NTFY_URL → NTFY_URL); koda/loga/rapora yazılmaz.
@@ -26,7 +27,7 @@ import { atr14Ewm, atr14Rma, dualBandBuy, rsi30Buy, lsDivergences, type WBar } f
 import { umutSignals, umutTrack, atrW, UMUT, type UmutTrack, type UmutHit } from "../../src/lib/watch/umut";
 import { ikiliSignals } from "../../src/lib/watch/sigExt";
 import { pgComponents, pgAt, PG, type PGAt } from "../../src/lib/watch/patlama";
-import { dipSignals, ELIF } from "../../src/lib/watch/elif";
+import { dipSignals, dipBandSignals, ELIF } from "../../src/lib/watch/elif";
 import { paperTrack, paperStats, PAPER, type PTrade, type PStats } from "../../src/lib/watch/paper";
 
 export const WATCH_CRYPTO = ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","TRX","AVAX","LINK","DOT","LTC","BCH","NEAR","UNI","ATOM","ETC","XLM","FIL","APT",
@@ -44,10 +45,10 @@ const ALERT_AGE: Partial<Record<ScanId, number>> = { "ikili-4h": 10 };
 const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
 /** Dip taramaları: bir sembolün ilk taramasında yalnız son kapanmış mumdaki (yaş 0) sinyal bildirilir (sel önleme); sonra normal kural (yaş ≤ 2). Eskiler yalnız listeye girer. */
-const DIP_SCANS = new Set<string>(["dip8", "dip12"]);
+const DIP_SCANS = new Set<string>(["dip4", "dip8", "dip12"]);
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
-export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip8" | "dip12";
+export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip4" | "dip8" | "dip12";
 export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto" | "BIST"; note: string }> = {
   "ek-crypto-4h": { label: "EK v3 DIV · kripto 4s", tf: "4h", market: "kripto", note: "EMs dip uyumsuzluk; stop = pivot dip (SAR çıkışı), sabit hedef yok. Backtest IS MAR<0 → yalnız uyarı." },
   "ek-bist-1d": { label: "EK v3 DIV · BIST 1g", tf: "1d", market: "BIST", note: "EMs dip uyumsuzluk; stop = pivot − 1.5 ATR, hedef = giriş + 4 ATR. core=1 BIST testinde güçlü." },
@@ -57,6 +58,7 @@ export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto"
   "rsi30-bist-1d": { label: "RSI14 30 kırılım · BIST 1g", tf: "1d", market: "BIST", note: "RSI14 30'u yukarı keser (10 mum bekleme); stop = giriş − 1.5 ATR, hedef 2R." },
   "umut-4h": { label: "Umut (KAL+RSI uyumsuzluk 4s)", tf: "4h", market: "kripto", note: "KAL boğa uyumsuzluğu + RSI14 boğa uyumsuzluğu 5 mum içinde (ileriye bakmaz). Giriş sonraki açılış; stop = giriş − 2 ATR; R1 +%10 (test edilen), R2 +%20, R3 +%30; 100 mum. Test: 2013 işlem, %42 kazanma, PF 1.15, IS/OOS ≈ +%0.5/işlem. Yalnız izleme." },
   "umutpg-4h": { label: "Umut+PG (Umut + Patlama Gücü ≥50, 4s)", tf: "4h", market: "kripto", note: "Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu, 5 mum içinde) ve sinyal mumunda Patlama Gücü PG5 ≥ 50 (VPA, SQZ, RS/BTC, TAKER, FUND eşit ağırlık; 200 mum yüzdelik). Vadeli verisi (taker/funding) yoksa PG3 (VPA, SQZ, RS) ile karar verilir ve işaretlenir. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce. Test (80 coin, OOS 2024-04→): 924 işlem, +%0.58/işlem (Umut +%0.48), DD 252 vs 413 — eşiğe hassas (≥60/70 bozuluyor). Sanal kağıt defter: Panel → Umut+PG. GERÇEK İŞLEM YOK." },
+  "dip4": { label: "Dip · ElifScan bant kesişimi (4s)", tf: "4h", market: "kripto", note: "ElifScan (kullanıcının Pine kodu birebir, 15/30/10/20): main = (FRAMA(stoch15,10) + FRAMA(stoch30,10))/2; wma1 = WMA(main,20), wma2 = WMA(wma1,20); üst = wma1 + (wma1 − wma2), alt = wma2. Sinyal: kapanmış 4s mumda bant çizgileri yer değiştirir — üst bant alt bandı yukarı keser (crossover(upper, lower)) ve main < 40 (dipte; kesişim mumunda ya da bir önceki mumda). main↑alt koşulu yok. Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy kısa: başlık \"Dip\", metin \"dip4 SEMBOL\" (sinyal mumu başına bir kez). Sonuç izleme: giriş sonraki açılış, stop giriş − 2 ATR, 100 mum (yalnız istatistik). Yalnız izleme." },
   "dip8": { label: "Dip · ElifScan dipten kesim (8s)", tf: "8h", market: "kripto", note: "ElifScan (kullanıcının Pine kodu birebir, 15/30/10/20): main = (FRAMA(stoch15,10) + FRAMA(stoch30,10))/2; wma1 = WMA(main,20), wma2 = WMA(wma1,20), üst/alt = wma1 ± (wma1 − wma2). Sinyal: kapanmış 8s mumda main alt bandı VEYA üst bant alt bandı yukarı keser ve main < 40 (kesişim mumunda ya da bir önceki mumda). Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy kısa: başlık \"Dip\", metin \"dip8 SEMBOL\" (sinyal mumu başına bir kez). Sonuç izleme: giriş sonraki açılış, stop giriş − 2 ATR, 100 mum (yalnız istatistik). Yalnız izleme." },
   "dip12": { label: "Dip · ElifScan dipten kesim (12s)", tf: "12h", market: "kripto", note: "ElifScan (kullanıcının Pine kodu birebir, 15/30/10/20): main = (FRAMA(stoch15,10) + FRAMA(stoch30,10))/2; wma1 = WMA(main,20), wma2 = WMA(wma1,20), üst/alt = wma1 ± (wma1 − wma2). Sinyal: kapanmış 12s mumda main alt bandı VEYA üst bant alt bandı yukarı keser ve main < 40 (kesişim mumunda ya da bir önceki mumda). Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy kısa: başlık \"Dip\", metin \"dip12 SEMBOL\" (sinyal mumu başına bir kez). Sonuç izleme: giriş sonraki açılış, stop giriş − 2 ATR, 100 mum (yalnız istatistik). Yalnız izleme." },
   "ikili-4h": { label: "✦ İkili: KDC-MACD + Uyumsuzluk (4s)", tf: "4h", market: "kripto", note: "Patlama ihtimali: aynı coinde KDC-MACD sinyali (30dk KDC K↑D, ≤10 saat içinde 1s MACD 12/26/9 yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy: sinyal mumu 0–10 mum yaşındaysa (tek sefer). Kombinasyon geriye dönük test EDİLMEDİ. Yalnız izleme." },
@@ -357,10 +359,10 @@ async function umutpgScan(ctx: WatchCtx, sym: string, b4: WBar[], src: string, m
   return { found: out, cands };
 }
 
-/** DİP (ElifScan dipten kesim) — dip8 (8s) / dip12 (12s). Yalnız kapanmış mumlar (futBars kapanmamış mumu atar). ntfy kısa: "Dip" / "dip8 SEMBOL". */
-function dipScan(scan: "dip8" | "dip12", sym: string, bars: WBar[], src: string, maxAge: number): Found[] {
+/** DİP (ElifScan dipten kesim) — dip4 (4s, yalnız üst↑alt bant kesişimi) / dip8 (8s) / dip12 (12s). Yalnız kapanmış mumlar (futBars kapanmamış mumu atar). ntfy kısa: "Dip" / "dip8 SEMBOL". */
+function dipScan(scan: "dip4" | "dip8" | "dip12", sym: string, bars: WBar[], src: string, maxAge: number): Found[] {
   const tf = SCANS[scan].tf, n = bars.length, out: Found[] = [], A = atrW(bars), now = Date.now();
-  for (const h of dipSignals(bars)) {
+  for (const h of scan === "dip4" ? dipBandSignals(bars) : dipSignals(bars)) {
     const age = n - 1 - h.i; if (age > maxAge) continue;
     if (now - bars[h.i].t > (maxAge + 2) * TF_MS[tf]) continue; // bayat veri (işlem görmeyen sembol)
     const atr = A[h.i], t = bars[h.i].t, entry = age >= 1 ? bars[h.i + 1].open : bars[n - 1].close;
@@ -526,7 +528,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     return null;
   });
   // DİP (ElifScan) 8s / 12s: vadeli mumlar önce (yoksa spot); mum aralığı başına sembol başı tek istek. İlk taramada son 30 mum listeye geriye doldurulur (yaş>2 bildirimsiz).
-  const blkDip = (scan: "dip8" | "dip12") => runBlock(scan === "dip8" ? "dip 8s" : "dip 12s", [scan], SCANS[scan].tf, TF_MS[SCANS[scan].tf], CRYPTO, 2, async (sym, maxAge) => {
+  const blkDip = (scan: "dip4" | "dip8" | "dip12") => runBlock(scan === "dip4" ? "dip 4s" : scan === "dip8" ? "dip 8s" : "dip 12s", [scan], SCANS[scan].tf, TF_MS[SCANS[scan].tf], CRYPTO, 2, async (sym, maxAge) => {
     const tf = SCANS[scan].tf, f = await futBars(ctx, sym, tf);
     if (!f || f.bars.length < 150) return f ? `${f.bars.length} mum (<150, atlandı)` : "veri yok";
     const seed = (symLast[scan + "-seed"] ||= {}), age = seed[sym] ? maxAge : 30;
@@ -535,7 +537,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     return null;
   });
   // bloklar paralel (farklı veri kaynakları: Binance spot / Yahoo / proxy), her biri kendi dönen partisiyle
-  await Promise.all([blkCrypto(), blkBist(), blkLs(), blkDip("dip8"), blkDip("dip12")]);
+  await Promise.all([blkCrypto(), blkBist(), blkLs(), blkDip("dip4"), blkDip("dip8"), blkDip("dip12")]);
 
   // 4) yeni sinyaller → rapor + ntfy (sinyal mumu başına bir kez; ilk turda bildirimsiz tohumlama)
   let sent = 0, nNew = 0;

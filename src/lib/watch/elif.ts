@@ -60,3 +60,14 @@ export function dipSignals(b: EBar[], P = ELIF): DipHit[] {
   }
   return out;
 }
+/** dip4 — bant kesişimi: üst bant (wma1 + (wma1 − wma2)) alt bandı (wma2) yukarı keser = crossover(upper, lower), kapanmış mumda;
+ *  main < 40 (kesişim mumunda ya da bir önceki mumda). main↑alt koşulu YOK. */
+export function dipBandSignals(b: EBar[], P = ELIF): DipHit[] {
+  const { main, upper, lower } = elifCalc(b, P), out: DipHit[] = [];
+  for (let i = 1; i < b.length; i++) {
+    if (!xup(upper, lower, i)) continue;
+    if (!(main[i] < P.zone || main[i - 1] < P.zone)) continue;
+    out.push({ i, main: main[i], upper: upper[i], lower: lower[i], via: "üst↑alt" });
+  }
+  return out;
+}
