@@ -7,7 +7,7 @@ export const runtime = "edge";
 export const preferredRegion = ["fra1", "arn1", "cdg1"];
 
 const HOSTS = ["https://fapi.binance.com", "https://fapi1.binance.com", "https://fapi2.binance.com"];
-const TFS = new Set(["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "12h", "1d"]);
+const TFS = new Set(["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d"]);
 
 /** GET /api/fklines?symbol=ETHUSDT&interval=4h&limit=500 → Binance /fapi/v1/klines biçimi (salt okunur, anahtar yok). */
 export async function GET(req: NextRequest) {

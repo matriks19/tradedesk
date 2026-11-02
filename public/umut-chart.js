@@ -3,7 +3,7 @@
  * Kullanım: QXUmutChart.open(el, sig)  — sig = izleme raporu sinyali (symbol, t, tf, entry/price, stop, u.lv, u.hit, fillT…). Yalnız izleme. */
 (function(){
 'use strict';
-var TSI=3*3600,TFS={'1h':3600e3,'2h':7200e3,'4h':14400e3,'1d':86400e3};
+var TSI=3*3600,TFS={'1h':3600e3,'2h':7200e3,'4h':14400e3,'8h':28800e3,'12h':43200e3,'1d':86400e3};
 var P={N:5,piv:3,maxLb:50,atrK:2};
 function fin(x){return typeof x==='number'&&isFinite(x);}
 /* ---- KAL Hibrit (kalHibrit.ts) ---- */
