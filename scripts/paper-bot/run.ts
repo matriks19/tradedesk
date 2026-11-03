@@ -16,8 +16,9 @@ import { rsiMacdSetups, rsiMacdTag, psarState, RSI_MACD } from "../../src/lib/in
 import { macdLine } from "../../src/lib/indicators/lsDivMacd";
 import { runWatch } from "./watch";
 import { restEval, REST, type RBars } from "../../src/lib/watch/rest";
+import { v12k2Eval, V12K2 } from "../../src/lib/watch/v12k2";
 
-type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd" | "rest"; tf: string; k?: number; on: boolean; ev: boolean;
+type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd" | "rest" | "v12k2"; tf: string; k?: number; on: boolean; ev: boolean;
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number;
   /** lsbot ekleme: en fazla kaç ekleme (vars. 2) ve son ekleme fiyatının altında olma eşiği (oran, vars. 0 = herhangi bir düşüş) */ maxAdds?: number; addStep?: number };
 type Cfg = {
@@ -27,6 +28,7 @@ type Cfg = {
 type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; src: string; lev: number;
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
   sid?: string; tpPct?: number; /** true → TP yok (yalnız kaynak çıkışı, ör. SAR) */ noTp?: boolean; exit?: string; maxH?: number; tf?: string; sigT?: number;
+  /** süre çıkışı (yalnız v12k2): sinyal mumundan sonraki giriş mumu dahil maxBars × tf dolunca son fiyattan "SÜRE" ile kapanır */ maxBars?: number;
   /** ekleme (yalnız lsbot): kaç kez eklendi, ilk giriş, ortalama giriş (= entry) */ adds?: number; firstEntry?: number; avgEntry?: number;
   /** son ekleme fiyatı (yoksa entry) ve taban (ilk giriş) nominali — eski kayıtlarda yok: notional / 2^adds ile türetilir */ lastAddPx?: number; baseNotional?: number;
   /** MFE/MAE: girişten beri en iyi / en kötü fiyat (LONG: max high / min low; SHORT tersi), zaman (ms) ve ort. girişe göre % */
@@ -297,8 +299,9 @@ async function manage() {
     const r = pr(p);
     if (r >= tpOf(p)) { closePos(i, "TP", last); continue; }
     if (cfg.sl > 0 && r <= -cfg.sl / 100) { closePos(i, "SL", last); continue; }
-    // süre limiti KALDIRILDI (maxH yalnızca bilgi amaçlı)
+    // süre limiti KALDIRILDI (maxH yalnızca bilgi amaçlı) — istisna: maxBars taşıyan kaynak (v12k2: 100 × 30dk, backtest çıkışı a)
     const ms = p.tf ? TF_MS[p.tf] : 0;
+    if (p.maxBars && ms && Date.now() >= (p.sigT ?? p.t) + (p.maxBars + 1) * ms) { log(`SÜRE: ${p.sym} [${p.src}] — ${p.maxBars} × ${p.tf} doldu`); closePos(i, "SÜRE", last); continue; }
     void ms; // süre limiti kapatmıyor; sadece raporda kalan süre gösterilir
     // kaynak çıkışı (ör. Fisher üst bant ↓) — son kapanmış mumda, giriş sonrası
     if (p.exit === "sar" && p.tf) {
@@ -359,6 +362,10 @@ async function scanAndOpen() {
     // REST: saatte bir taranır (15dk kesişim; son ≤5 kapanmış 15dk mum = son saat)
     if (s.type === "rest" && (st as any).restHour === hourNow) { per.push(`${s.label}: bu saat tarandı`); continue; }
     if (s.type === "rest") (st as any).restHour = hourNow;
+    // V12 Çift K2: her kapanmış 30dk mumda bir kez
+    const v12Bar = Math.floor(Date.now() / 18e5);
+    if (s.type === "v12k2" && (st as any).v12Bar === v12Bar) { per.push(`${s.label}: bu 30dk mum tarandı`); continue; }
+    if (s.type === "v12k2") (st as any).v12Bar = v12Bar;
     // LS Dip kaynakları kendi mum periyodunda bir kez taranır (yeni 2s/4s mum kapandıktan sonra)
     const lsbBar = (st as any).lsbBar || ((st as any).lsbBar = {});
     const barNow = Math.floor(Date.now() / (TF_MS[s.tf] || 36e5));
@@ -460,6 +467,34 @@ async function scanAndOpen() {
           t: Date.now(), checked: Date.now(), pxSrc: futHost ? "perp" : "perp-proxy", sid: s.id, tpPct: s.tp, tf: s.tf, sigT: bt * 1000, baseNotional: notional });
         nNew++; opened++; st.seen[sk] = bt;
         const m = `🤖 PAPER AL: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
+        log(m); alerts.push(m);
+        continue;
+      }
+      if (s.type === "v12k2") {
+        // V12 Çift K2 Long: kapanmış 30dk mumda priceChannel VEYA combined K2c'yi (2·K2−100) yukarı keser, K2c < −30 → LONG (pozisyondayken yeni kesişim yok sayılır).
+        // Yalnız LONG, sembol başı tek pozisyon; TP s.tp (%5), SL global (0 = yok), süre 100 × 30dk (maxBars). Kaynak: src/lib/watch/v12k2.ts
+        const c30 = await closed(sym, "30m", 1000), c15 = await closed(sym, "15m", 1000);
+        if (!c15 || !c30 || c30.length < 600 || c15.length < 300) { fail++; continue; }
+        scanned++;
+        const toV = (c: Candle[]) => ({ t: c.map((x) => x.time * 1000), o: c.map((x) => x.open), h: c.map((x) => x.high), l: c.map((x) => x.low), c: c.map((x) => x.close), v: c.map((x) => x.volume) });
+        const R = v12k2Eval(toV(c30), toV(c15)), n = c30.length, price = c30[n - 1].close, sk = `${s.id}|${sym}`, AGE = 1;
+        const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
+        const e = R.ev.filter((x) => n - 1 - x.i <= AGE && x.i >= R.need).pop();
+        if (!e || st.seen[sk] === c30[e.i].time) continue;
+        const bt = c30[e.i].time, tag = `${e.by} ↑ K2c · pch ${e.pch.toFixed(1)} comb ${e.comb.toFixed(1)} · K2c ${e.k2c.toFixed(1)} · ${tTR(bt + 1800)}`;
+        hits++;
+        const msg = `📡 ${sym} LONG [${s.label}: ${tag}] (yaş ${n - 1 - e.i})`;
+        if (symOpen(sym)) { log(msg + " — atlandı: sembolde açık pozisyon var (sembol başı tek pozisyon)"); st.seen[sk] = bt; continue; }
+        if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
+        if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
+        const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
+        const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+        if (!(margin > 0) || used + margin > st.equity + 1e-9) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
+        const notional = margin * cfg.leverage, tpP = s.tp ?? V12K2.tp * 100;
+        st.open.push({ sym, side: "LONG", entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
+          t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, tpPct: tpP, tf: "30m", sigT: bt * 1000, baseNotional: notional, maxBars: V12K2.maxBars });
+        nNew++; opened++; st.seen[sk] = bt;
+        const m = `v12k2 ${sym.replace(/USDT$/, "")} — 🤖 PAPER AL: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag}] marjin ${margin.toFixed(2)} · TP %${tpP} · stop ${cfg.sl > 0 ? "%" + cfg.sl : "yok"} · süre ${V12K2.maxBars} × 30dk`;
         log(m); alerts.push(m);
         continue;
       }

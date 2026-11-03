@@ -370,6 +370,15 @@
    "ev": false,
    "tp": 10,
    "maxAdds": 2
+  },
+  {
+   "id": "v12k2-30m",
+   "label": "V12 Çift K2 Long 30dk",
+   "type": "v12k2",
+   "tf": "30m",
+   "on": true,
+   "ev": false,
+   "tp": 5
   }
  ]
 }
