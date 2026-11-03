@@ -360,6 +360,16 @@
      "tf": "1d"
     }
    }
+  },
+  {
+   "id": "rest-15m",
+   "label": "REST (MTF Stoch 15dk×30dk)",
+   "type": "rest",
+   "tf": "15m",
+   "on": true,
+   "ev": false,
+   "tp": 10,
+   "maxAdds": 2
   }
  ]
 }

@@ -15,8 +15,9 @@ import { lsBottomEval, type LsBotBar } from "../../src/lib/indicators/lsBottom";
 import { rsiMacdSetups, rsiMacdTag, psarState, RSI_MACD } from "../../src/lib/indicators/rsiMacd";
 import { macdLine } from "../../src/lib/indicators/lsDivMacd";
 import { runWatch } from "./watch";
+import { restEval, REST, type RBars } from "../../src/lib/watch/rest";
 
-type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd"; tf: string; k?: number; on: boolean; ev: boolean;
+type Src = { id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd" | "rest"; tf: string; k?: number; on: boolean; ev: boolean;
   scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number;
   /** lsbot ekleme: en fazla kaç ekleme (vars. 2) ve son ekleme fiyatının altında olma eşiği (oran, vars. 0 = herhangi bir düşüş) */ maxAdds?: number; addStep?: number };
 type Cfg = {
@@ -355,6 +356,9 @@ async function scanAndOpen() {
     const hourNow = Math.floor(Date.now() / 36e5);
     if (s.type === "lsdiv" && (st as any).lsHour === hourNow) { per.push(`${s.label}: bu saat tarandı`); continue; }
     if (s.type === "lsdiv") lsRan = true;
+    // REST: saatte bir taranır (15dk kesişim; son ≤5 kapanmış 15dk mum = son saat)
+    if (s.type === "rest" && (st as any).restHour === hourNow) { per.push(`${s.label}: bu saat tarandı`); continue; }
+    if (s.type === "rest") (st as any).restHour = hourNow;
     // LS Dip kaynakları kendi mum periyodunda bir kez taranır (yeni 2s/4s mum kapandıktan sonra)
     const lsbBar = (st as any).lsbBar || ((st as any).lsbBar = {});
     const barNow = Math.floor(Date.now() / (TF_MS[s.tf] || 36e5));
@@ -457,6 +461,68 @@ async function scanAndOpen() {
         nNew++; opened++; st.seen[sk] = bt;
         const m = `🤖 PAPER AL: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
         log(m); alerts.push(m);
+        continue;
+      }
+      if (s.type === "rest") {
+        // REST (MultiTime Stochastics Pro uyarlaması): K1 15dk (140/30/30) × K2 30dk (140/30/30). K1↑K2 → LONG, K1↓K2 → SHORT (kapanmış mum).
+        // Ters kesişim: açık REST pozisyonu kapanır, ters yöne açılır. TP s.tp (%10, ortalama girişe göre), SL global. Ekleme: pozisyon yönünde fiyat–K1 uyumsuzluğu → taban büyüklükte, en çok maxAdds (2).
+        const c15 = await closed(sym, "15m", 1000), c30 = await closed(sym, "30m", 1000);
+        if (!c15 || !c30 || c15.length < 300 || c30.length < 220) { fail++; continue; }
+        scanned++;
+        const toR = (c: Candle[]): RBars => ({ t: c.map((x) => x.time * 1000), h: c.map((x) => x.high), l: c.map((x) => x.low), c: c.map((x) => x.close) });
+        const R = restEval(toR(c15), toR(c30)), n = c15.length, price = c15[n - 1].close, sk = `${s.id}|${sym}`, AGE = 5;
+        const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
+        const e = R.ev.filter((x) => n - 1 - x.i <= AGE).pop();
+        if (e && st.seen[sk] !== c15[e.i].time) {
+          const bt = c15[e.i].time, tag = `K1 ${e.k1.toFixed(1)} ${e.side === "LONG" ? "↑" : "↓"} K2 ${e.k2.toFixed(1)} · ${tTR(bt + 900)}`;
+          hits++;
+          const msg = `📡 ${sym} ${e.side} [${s.label}: ${tag}] (yaş ${n - 1 - e.i})`;
+          const xi = st.open.findIndex((p) => p.sym === sym && p.sid === s.id);
+          if (xi >= 0 && st.open[xi].side === e.side) { log(msg + " — atlandı: aynı yönde REST pozisyonu açık"); st.seen[sk] = bt; }
+          else {
+            if (xi >= 0) closePos(xi, "TERS KESİŞİM", price);
+            if (e.side === "SHORT" && !cfg.allowShort) { log(msg + " — atlandı: short kapalı"); st.seen[sk] = bt; }
+            else if (symOpen(sym)) { log(msg + ` — atlandı: sembolde açık pozisyon var (sembol başı tek pozisyon)`); st.seen[sk] = bt; }
+            else if (nNew >= capNew) log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`);
+            else if (st.open.length >= cfg.maxSlots) log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`);
+            else {
+              const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
+              const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+              if (!(margin > 0) || used + margin > st.equity + 1e-9) log(msg + " — atlandı: toplam marjin sınırı");
+              else {
+                const notional = margin * cfg.leverage;
+                st.open.push({ sym, side: e.side, entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
+                  t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, tpPct: s.tp ?? REST.tp * 100, tf: s.tf, sigT: bt * 1000, baseNotional: notional, adds: 0 });
+                nNew++; opened++; st.seen[sk] = bt;
+                const m = `🤖 PAPER ${e.side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? REST.tp * 100} · ters kesişimde kapanır / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"} · uyumsuzlukta ≤${s.maxAdds ?? REST.maxAdds} ekleme`;
+                log(m); alerts.push(m);
+              }
+            }
+          }
+        }
+        // ekleme: açık REST pozisyonu yönünde, girişten SONRA onaylanan fiyat–K1 uyumsuzluğu (son ≤5 mum), her uyumsuzluk bir kez
+        const ex = st.open.find((p) => p.sym === sym && p.sid === s.id);
+        if (ex) {
+          const maxAdds = s.maxAdds ?? REST.maxAdds, aks = sk + "|add";
+          for (const d of R.div) {
+            if (d.side !== ex.side || n - 1 - d.i > AGE || (c15[d.i].time + 900) * 1000 <= ex.t || ((st.seen[aks] ?? 0) >= c15[d.i].time)) continue;
+            const nAdds = ex.adds || 0, dt = c15[d.i].time;
+            const tag = `${d.side === "LONG" ? "boğa" : "ayı"} uyumsuzluk fiyat ${fmt(d.px0)}→${fmt(d.px)} · K1 ${d.k0.toFixed(1)}→${d.k.toFixed(1)} (${d.p - d.p0} mum)`;
+            if (nAdds >= maxAdds) { log(`➕ ${sym} ${s.label}: ${tag} — atlandı: ekleme sınırı (${nAdds}/${maxAdds})`); st.seen[aks] = dt; continue; }
+            const base = ex.baseNotional ?? ex.notional / (1 + nAdds), addMargin = base / ex.lev;
+            const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+            if (nNew >= capNew) { log(`➕ ${sym} ${s.label}: EKLEME atlandı: tur başı yeni giriş sınırı`); break; }
+            if (used + addMargin > st.equity + 1e-9) { log(`➕ ${sym} ${s.label}: EKLEME atlandı: toplam marjin sınırı`); break; }
+            const old = ex.entry, addQty = base / price;
+            ex.firstEntry ??= ex.entry; ex.baseNotional ??= base;
+            ex.qty += addQty; ex.notional += base; ex.entry = ex.notional / ex.qty; ex.avgEntry = ex.entry; ex.last = price;
+            ex.adds = nAdds + 1; ex.lastAddPx = price; st.seen[aks] = dt;
+            mxUpd(ex, price, price, Date.now()); mxPct(ex);
+            nNew++; opened++;
+            const m = `➕ PAPER EKLEME: ${sym} ${ex.side} ${ex.lev}x @${fmt(price)} [${s.label}: ${tag}] — taban büyüklükte ekleme ${ex.adds}/${maxAdds} (nominal ${(ex.notional - base).toFixed(2)}→${ex.notional.toFixed(2)}, ort. giriş ${fmt(old)}→${fmt(ex.entry)})`;
+            log(m); alerts.push(m);
+          }
+        }
         continue;
       }
       if (s.type === "lsdiv") {
