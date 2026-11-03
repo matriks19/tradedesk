@@ -34,6 +34,7 @@ import { dipSignals, dipBandSignals, ELIF } from "../../src/lib/watch/elif";
 import { paperTrack, paperStats, PAPER, type PTrade, type PStats } from "../../src/lib/watch/paper";
 import { cciBullDiv, CCIDIV } from "../../src/lib/watch/ccidiv";
 import { restEval, REST } from "../../src/lib/watch/rest";
+import { v12k2Eval, V12K2 } from "../../src/lib/watch/v12k2";
 import { donchTrail, donchEnsemble, rangeDipSignals, rdTrack, rdStats, donchStep, isCoin, DON, RDIP, type DRobot, type DDay, type RDTrade, type RDStats } from "../../src/lib/watch/donchian";
 
 export const WATCH_CRYPTO = ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","TRX","AVAX","LINK","DOT","LTC","BCH","NEAR","UNI","ATOM","ETC","XLM","FIL","APT",
@@ -47,14 +48,14 @@ const EK_EXIT: Record<string, { exit: "sar" | "atr"; k: number; tp: number }> = 
 const TF_MS: Record<string, number> = { "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5, "4h": 144e5, "8h": 288e5, "12h": 432e5, "1d": 864e5 };
 /** Zaman bütçesi: Actions işi 12 dk ile sınırlı → süreç bu saniyeyi geçince yeni sembol/tarama başlatılmaz (kapı ilerlemez, sonraki turda tamamlanır) */
 /** ntfy tazelik sınırı (sinyal mumu yaşı, mum): varsayılan MAX_AGE (2); ✦ İkili için 0–10 mum (kullanıcı onayı 02.11.2026). Her sinyal yine bir kez bildirilir (anahtar + notified). */
-const ALERT_AGE: Partial<Record<ScanId, number>> = { "ikili-4h": 10, "rest-15m": 5 };
+const ALERT_AGE: Partial<Record<ScanId, number>> = { "ikili-4h": 10, "rest-15m": 5, "v12k2-30m": 3, "v12k2-bist-30m": 4 };
 const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
 /** Dip taramaları: bir sembolün ilk taramasında yalnız son kapanmış mumdaki (yaş 0) sinyal bildirilir (sel önleme); sonra normal kural (yaş ≤ 2). Eskiler yalnız listeye girer. */
 const DIP_SCANS = new Set<string>(["dip4", "dip8", "dip12"]);
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
-export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip4" | "dip8" | "dip12" | "donch-1d" | "rangedip-1d" | "ccidiv-1d" | "ccidiv-bist-1d" | "rest-15m";
+export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip4" | "dip8" | "dip12" | "donch-1d" | "rangedip-1d" | "ccidiv-1d" | "ccidiv-bist-1d" | "rest-15m" | "v12k2-30m" | "v12k2-bist-30m";
 export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto" | "BIST"; note: string }> = {
   "ek-crypto-4h": { label: "EK v3 DIV · kripto 4s", tf: "4h", market: "kripto", note: "EMs dip uyumsuzluk; stop = pivot dip (SAR çıkışı), sabit hedef yok. Backtest IS MAR<0 → yalnız uyarı." },
   "ek-bist-1d": { label: "EK v3 DIV · BIST 1g", tf: "1d", market: "BIST", note: "EMs dip uyumsuzluk; stop = pivot − 1.5 ATR, hedef = giriş + 4 ATR. core=1 BIST testinde güçlü." },
@@ -72,11 +73,13 @@ export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto"
   "ccidiv-1d": { label: "CCI Uyums 1G · kripto", tf: "1d", market: "kripto", note: "CCI20 boğa uyumsuzluğu (günlük): pivot dip sol 5 / sağ 5, önceki pivot dip 5–60 mum geride; fiyat daha düşük dip, CCI daha yüksek dip. CCI = (kapanış − SMA20)/(0.015 × ort. mutlak sapma). Sinyal onay mumu (pivot+5) kapanışında; giriş sonraki açılış; stop = giriş − 2 ATR14, hedef +%10, 100 mum. Test (long80 1g, 66 coin): N 455, ort +%1.56, PF 1.32, IS +%2.00 / OOS +%1.44, p 0.002. Yalnız izleme, işlem yok." },
   "ccidiv-bist-1d": { label: "CCI Uyums 1G · BIST", tf: "1d", market: "BIST", note: "CCI20 boğa uyumsuzluğu (günlük): pivot dip sol 5 / sağ 5, önceki pivot dip 5–60 mum geride; fiyat daha düşük dip, CCI daha yüksek dip. CCI = (kapanış − SMA20)/(0.015 × ort. mutlak sapma). Sinyal onay mumu (pivot+5) kapanışında; giriş sonraki açılış; stop = giriş − 2 ATR14, hedef +%10, 100 mum. Test (long80 1g, 66 coin): N 455, ort +%1.56, PF 1.32, IS +%2.00 / OOS +%1.44, p 0.002. Yalnız izleme, işlem yok. BIST'e aynı kural (test coinlerde yapıldı)." },
   "rest-15m": { label: "REST · MTF Stoch 15dk×30dk", tf: "15m", market: "kripto", note: "MultiTime Stochastics Pro uyarlaması: K1 = 15dk Stoch (140, smoothK 30, D 30), K2 = 30dk Stoch (140/30/30; 15dk mum kapanışında kapanmış son 30dk mumu). K1 K2'yi yukarı keser → LONG, aşağı keser → SHORT (kapanmış mum, iki yön). Saatte bir taranır. TP %10 (ort. girişe göre), stop yok, ters kesişimde çıkış/ters yön. EKLE: pozisyon yönünde fiyat–K1 uyumsuzluğu (pivot 5/5, 5–60 mum) → ilk büyüklükte ekleme, en çok 2. Highest/lowest (MTF uç) mantığı yok. Sanal/paper: paper bot kaynağı rest-15m. Test edilmedi. Yalnız izleme, gerçek emir yok." },
+  "v12k2-30m": { label: "V12 Çift K2 Long · 30dk", tf: "30m", market: "kripto", note: "MMSMTF V12 (Mixed 55/15, ATR14 × 1.5 zigzag, ağırlık 1/1/1) + MTF Stoch 140/30/30: K1 = 15dk, K2 = 30dk, K2c = 2·K2 − 100. LONG: kapanmış 30dk mumda priceChannel VEYA combined (0.5·core + 0.5·(K1−K2)) K2c'yi yukarı keser ve o mumda K2c < −30 (iki çizgi şartı yok — kullanıcı kararı 04.11.2026). Yalnız LONG, coin başına tek pozisyon (pozisyondayken yeni kesişim yok sayılır). Giriş sonraki 30dk açılış, TP %5, stop yok, 100 mum (50 saat) süre sınırı. Backtest (30m, 80 coin, çıkış a, %0.1/taraf): N=6896, ort. −%0.20/işlem, PF 0.92, rastgele giriş −%0.22 (p 0.39) — AVANTAJ YOK. Yalnız izleme + sanal kağıt. 30 dakikada bir taranır (vadeli 15dk + 30dk mumlar)." },
+  "v12k2-bist-30m": { label: "V12 Çift K2 Long · BIST 30dk", tf: "30m", market: "BIST", note: "MMSMTF V12 (Mixed 55/15, ATR14 × 1.5 zigzag, ağırlık 1/1/1) + MTF Stoch 140/30/30: K1 = 15dk, K2 = 30dk, K2c = 2·K2 − 100. LONG: kapanmış 30dk mumda priceChannel VEYA combined (0.5·core + 0.5·(K1−K2)) K2c'yi yukarı keser ve o mumda K2c < −30 (iki çizgi şartı yok — kullanıcı kararı 04.11.2026). Yalnız LONG, coin başına tek pozisyon (pozisyondayken yeni kesişim yok sayılır). Giriş sonraki 30dk açılış, TP %5, stop yok, 100 mum (50 saat) süre sınırı. Backtest (30m, 80 coin, çıkış a, %0.1/taraf): N=6896, ort. −%0.20/işlem, PF 0.92, rastgele giriş −%0.22 (p 0.39) — AVANTAJ YOK. Yalnız izleme + sanal kağıt. BIST: Yahoo 15dk mumları (en fazla ~60 gün) 30dk'ya birleştirilir; seans içinde (hafta içi 10:00–19:00 TSİ) 30 dakikada bir taranır. Yahoo gecikmeli/eksik olabilir; ~400 mumdan kısa geçmişte hisse atlanır." },
   "ikili-4h": { label: "✦ İkili: KDC-MACD + Uyumsuzluk (4s)", tf: "4h", market: "kripto", note: "Patlama ihtimali: aynı coinde KDC-MACD sinyali (30dk KDC K↑D, ≤10 saat içinde 1s MACD 12/26/9 yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy: sinyal mumu 0–10 mum yaşındaysa (tek sefer). Kombinasyon geriye dönük test EDİLMEDİ. Yalnız izleme." },
 };
 
 /** Seviye hesabı (giriş kesinleşince yeniden hesaplanır) */
-type Calc = { kind: "ek"; exit: "sar" | "atr"; pivlow: number; atr: number; k: number; tpm: number } | { kind: "atr"; atr: number; k: number; rr: number | null } | { kind: "fixed" } | { kind: "umut"; atr: number; k: number; tp: number; pivLow: number } | { kind: "donch"; n: number };
+type Calc = { kind: "ek"; exit: "sar" | "atr"; pivlow: number; atr: number; k: number; tpm: number } | { kind: "atr"; atr: number; k: number; rr: number | null } | { kind: "fixed" } | { kind: "umut"; atr: number; k: number; tp: number; pivLow: number } | { kind: "donch"; n: number } | { kind: "tp"; tp: number };
 export interface WSig {
   key: string; scan: ScanId; symbol: string; tf: string; t: number; tsi: string; age: number; kind: string;
   price: number; entryBasis: string; stop: number; target: number | null; strength?: number | string; info: string;
@@ -170,6 +173,7 @@ function levelsFor(s: WSig, entry: number): { stop: number; target: number | nul
     let st = c.pivlow - c.k * c.atr; if (st >= entry) st = entry - c.k * c.atr; return { stop: st, target: entry + c.tpm * c.atr };
   }
   if (c.kind === "umut") return { stop: entry - c.k * c.atr, target: entry * (1 + c.tp) };
+  if (c.kind === "tp") return { stop: NaN, target: entry * (1 + c.tp) }; // stop yok
   if (c.kind === "atr") { const st = entry - c.k * c.atr; return { stop: st, target: c.rr == null ? null : entry + c.rr * (entry - st) }; }
   return { stop: s.stop, target: s.target };
 }
@@ -195,7 +199,7 @@ function track(s: WSig, bars: WBar[], dyn?: number[]) {
   if (s.fillT === undefined) { s.fillT = bars[i0].t; s.entry = bars[i0].open; const lv = levelsFor(s, s.entry); s.stop = lv.stop; if (!dyn) s.target = lv.target; s.stop0 = s.stop; s.target0 = s.target; }
   const i1 = bars.findIndex((b) => b.t === s.fillT); if (i1 < 0) return;
   const e = s.entry!; if (s.stop0 === undefined) { s.stop0 = s.stop; s.target0 = dyn ? null : s.target; }
-  const stop = s.stop0, risk = e - stop;
+  const stop = s.stop0 ?? NaN, risk = e - stop; // stop yok (tp) → NaN: stop/R hesaplanmaz
   s.status = "açık"; s.exitPx = s.exitT = s.R = undefined; s.trackBars = TRACK_BARS;
   let exitJ = -1;
   for (let j = i1, k = 1; j < bars.length; j++, k++) {
@@ -318,6 +322,46 @@ function restScan(sym: string, b15: WBar[], b30: WBar[], src: string, maxAge = M
   return out;
 }
 
+/** V12 Çift K2 Long: kapanmış 30dk mumda priceChannel VEYA combined K2c'yi yukarı keser, K2c < −30. b30 = 30dk, b15 = 15dk kapanmış mumlar. */
+function v12k2Scan(scan: "v12k2-30m" | "v12k2-bist-30m", sym: string, b30: WBar[], b15: WBar[], src: string, maxAge = MAX_AGE): Found[] {
+  const n = b30.length, out: Found[] = [], lbl = SCANS[scan].label, nm = sym.replace(/\.IS$/, "");
+  const R = (b: WBar[]) => ({ t: b.map((x) => x.t), o: b.map((x) => x.open), h: b.map((x) => x.high), l: b.map((x) => x.low), c: b.map((x) => x.close), v: b.map((x) => x.volume) });
+  const E = v12k2Eval(R(b30), R(b15));
+  for (const e of E.ev) {
+    const age = n - 1 - e.i; if (age > maxAge || e.i < E.need) continue;
+    if (Date.now() - b30[e.i].t > (maxAge + 4) * TF_MS["30m"]) continue; // bayat veri
+    const entry = age >= 1 ? b30[e.i + 1].open : b30[n - 1].close, tgt = entry * (1 + V12K2.tp), t = b30[e.i].t;
+    const info = `${e.by === "ikisi" ? "priceChannel + combined" : e.by === "pch" ? "priceChannel" : "combined"} K2c'yi (${e.k2c.toFixed(1)} < −30) yukarı keser · pch ${e.pch.toFixed(1)} comb ${e.comb.toFixed(1)} · K1 ${e.k1.toFixed(1)} K2 ${e.k2.toFixed(1)} · ${src === "perp" ? "vadeli" : src === "yahoo" ? "Yahoo" : "spot"} mum`;
+    out.push({ key: `${scan}|${sym}|${t}`, scan, symbol: sym, tf: "30m", t, tsi: tsiBar(t, "30m"), age, kind: "AL", price: entry, entryBasis: age >= 1 ? "sonraki 30dk açılış" : "son kapanış (sonraki açılış henüz yok)",
+      stop: NaN, target: tgt, info, calc: { kind: "tp", tp: V12K2.tp },
+      title: `v12k2 ${nm}`,
+      body: `v12k2 ${nm} LONG · 30dk ${tsiBar(t, "30m")} TSİ · giriş ${fmtP(entry)} · TP %5 ${fmtP(tgt)} · stop yok · 100 mum · yalnız izleme/kağıt` });
+  }
+  return out;
+}
+/** BIST 15dk mumları (Yahoo, ~60 gün) — yalnız kapanmış mumlar */
+function yahooIntra(sym: string): Promise<WBar[] | null> {
+  return (KC["y15|" + sym] ||= (async () => {
+    let j: YChart | null = null;
+    for (const h of ["query1", "query2"]) { try { j = (await getJson(`https://${h}.finance.yahoo.com/v8/finance/chart/${sym}?interval=15m&range=60d`, 400, 2)) as YChart; break; } catch { /* sonraki */ } }
+    if (!j || !j.chart?.result?.[0]?.timestamp) return null;
+    const r = j.chart.result[0], q = r.indicators.quote[0], now = Date.now(), out: WBar[] = [], seen = new Set<number>();
+    r.timestamp.forEach((t, i) => { const o = q.open[i], h = q.high[i], l = q.low[i], c = q.close[i], v = q.volume[i], tm = t * 1000;
+      if (o != null && h != null && l != null && c != null && tm % 9e5 === 0 && tm + 9e5 <= now && !seen.has(tm)) { seen.add(tm); out.push({ t: tm, open: o, high: h, low: l, close: c, volume: v ?? 0 }); } });
+    return out;
+  })().catch(() => null));
+}
+/** 15dk → 30dk (kova = UTC 30dk ızgara; kova ancak 2. 15dk mumu ya da sonraki kova gelince kapanmış sayılır) */
+function to30(b15: WBar[]): WBar[] {
+  const out: WBar[] = []; let cur: WBar | null = null, cnt = 0;
+  for (const b of b15) {
+    const k = Math.floor(b.t / 18e5) * 18e5;
+    if (!cur || cur.t !== k) { if (cur) out.push(cur); cur = { t: k, open: b.open, high: b.high, low: b.low, close: b.close, volume: b.volume }; cnt = 1; }
+    else { cur.high = Math.max(cur.high, b.high); cur.low = Math.min(cur.low, b.low); cur.close = b.close; cur.volume += b.volume; cnt++; }
+    if (cur && b.t + 9e5 >= k + 18e5) { out.push(cur); cur = null; }
+  }
+  return out; // son eksik kova (yalnız ilk 15dk) dışarıda kalır
+}
 /** UMUT: KAL + RSI uyumsuzluğu 5 mum içinde (4s). Giriş ref = sonraki açılış (yoksa son kapanış). */
 function umutScan(sym: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
   const scan: ScanId = "umut-4h", n = bars.length, out: Found[] = [], lbl = SCANS[scan].label;
@@ -664,15 +708,33 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     for (const x of restScan(sym, f15.bars, f30.bars, f15.src, Math.max(maxAge, ALERT_AGE["rest-15m"]!))) found.push({ f: x, bars: f15.bars });
     return null;
   });
+  // V12 Çift K2 Long: 30 dakikada bir, kripto coinler (vadeli 15dk + 30dk); BIST seans içinde Yahoo 15dk → 30dk
+  const blkV12 = () => runBlock("V12K2 30dk", ["v12k2-30m"], "30m", TF_MS["30m"], D1, 2, async (sym, maxAge) => {
+    const [f30, f15] = await Promise.all([futBars(ctx, sym, "30m"), futBars(ctx, sym, "15m")]);
+    if (!f30 || !f15 || f30.bars.length < 600 || f15.bars.length < 300) return "mum yetersiz";
+    for (const x of v12k2Scan("v12k2-30m", sym, f30.bars, f15.bars, f30.src, Math.max(maxAge, ALERT_AGE["v12k2-30m"]!))) found.push({ f: x, bars: f30.bars });
+    touched.push({ scan: "v12k2-30m", sym, bars: f30.bars });
+    return null;
+  });
+  const tsiHm = (() => { const p = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Istanbul", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date(now)); const g = (k: string) => p.find((x) => x.type === k)?.value || ""; return { wd: g("weekday"), hm: Number(g("hour")) * 60 + Number(g("minute")) }; })();
+  const bistOpen = !["Sat", "Sun"].includes(tsiHm.wd) && tsiHm.hm >= 10 * 60 + 15 && tsiHm.hm <= 19 * 60;
+  const blkV12B = () => bistOpen ? runBlock("V12K2 BIST 30dk", ["v12k2-bist-30m"], "30m", TF_MS["30m"], WATCH_BIST, 2, async (sym, maxAge) => {
+    const b15 = await yahooIntra(sym);
+    if (!b15 || b15.length < 300) return b15 ? `${b15.length} 15dk mum (<300, atlandı)` : "Yahoo 15dk veri yok";
+    const b30 = to30(b15); if (b30.length < 400) return `${b30.length} 30dk mum (<400, atlandı)`;
+    for (const x of v12k2Scan("v12k2-bist-30m", sym, b30, b15, "yahoo", Math.max(maxAge, ALERT_AGE["v12k2-bist-30m"]!))) found.push({ f: x, bars: b30 });
+    touched.push({ scan: "v12k2-bist-30m", sym, bars: b30 });
+    return null;
+  }) : Promise.resolve();
   // bloklar paralel (farklı veri kaynakları: Binance spot / Yahoo / proxy), her biri kendi dönen partisiyle
-  await Promise.all([blkCrypto(), blkBist(), blkLs(), blkDip("dip4"), blkDip("dip8"), blkDip("dip12"), blkD1(), blkRest()]);
+  await Promise.all([blkCrypto(), blkBist(), blkLs(), blkDip("dip4"), blkDip("dip8"), blkDip("dip12"), blkD1(), blkRest(), blkV12(), blkV12B()]);
 
   // 4) yeni sinyaller → rapor + ntfy (sinyal mumu başına bir kez; ilk turda bildirimsiz tohumlama)
   let sent = 0, nNew = 0;
   for (const { f, bars, dyn } of found) {
     const r = rep(f.scan); if (r.signals.some((s) => s.key === f.key)) continue;
     // Umut: testteki gibi coin başına tek açık izleme — önceki Umut sinyali hâlâ açıksa (R1/stop/süre olmadı) yenisi kaydedilmez
-    if ((f.scan === "umut-4h" || f.scan === "ikili-4h" || f.scan === "umutpg-4h") && r.signals.some((s) => s.symbol === f.symbol && s.t < f.t && (s.exitT == null || s.exitT >= f.t))) continue;
+    if ((f.scan === "umut-4h" || f.scan === "ikili-4h" || f.scan === "umutpg-4h" || f.scan === "v12k2-30m" || f.scan === "v12k2-bist-30m") && r.signals.some((s) => s.symbol === f.symbol && s.t < f.t && (s.exitT == null || s.exitT >= f.t))) continue;
     nNew++;
     const { title, body, ...rest } = f;
     const s: WSig = { ...rest, status: "bekliyor", alerted: "dry-run", foundAt: now };
@@ -706,7 +768,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   // retry: bildirimi başarısız kalan güncel sinyaller
   if (!ctx.dry) for (const r of Object.values(doc.scans)) for (const s of r.signals) {
     if (s.alerted !== "gönderilemedi" || now - s.foundAt > 6 * 36e5) continue;
-    try { if (DIP_SCANS.has(s.scan)) await ntfySend("Dip", `${s.scan} ${s.symbol}`); else await ntfySend(`İZLEME | ${r.label} | ${s.symbol} ${s.scan === "rest-15m" ? s.kind : "AL"}`, `${r.label} — ${s.symbol} ${s.tf}\nSinyal mumu: ${s.tsi}\n${s.info}\nGiriş ref: ${fmtP(s.price)}\nStop: ${fmtP(s.stop)}\nHedef: ${fmtP(s.target)}\nDurum: SADECE İZLEME — işlem açılmadı`); s.alerted = "gönderildi"; doc.notified[s.key] = now; sent++; } catch { /* sonraki tur */ }
+    try { if (DIP_SCANS.has(s.scan)) await ntfySend("Dip", `${s.scan} ${s.symbol}`); else if (s.scan.startsWith("v12k2")) await ntfySend(`v12k2 ${s.symbol.replace(/\.IS$/, "")}`, `v12k2 ${s.symbol.replace(/\.IS$/, "")} LONG · 30dk ${s.tsi} TSİ · giriş ${fmtP(s.price)} · TP %5 ${fmtP(s.target)}`); else await ntfySend(`İZLEME | ${r.label} | ${s.symbol} ${s.scan === "rest-15m" ? s.kind : "AL"}`, `${r.label} — ${s.symbol} ${s.tf}\nSinyal mumu: ${s.tsi}\n${s.info}\nGiriş ref: ${fmtP(s.price)}\nStop: ${fmtP(s.stop)}\nHedef: ${fmtP(s.target)}\nDurum: SADECE İZLEME — işlem açılmadı`); s.alerted = "gönderildi"; doc.notified[s.key] = now; sent++; } catch { /* sonraki tur */ }
   }
   for (const r of Object.values(doc.scans)) r.signals = r.signals.slice(0, KEEP_SIG);
   for (const [k, t] of Object.entries(doc.notified)) if (now - t > KEEP_NOTIFIED_MS) delete doc.notified[k];

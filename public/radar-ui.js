@@ -20,6 +20,8 @@ var SECS=[
   d:'Testi geçen tek kural: 4 saatlikte KAL boğa uyumsuzluğu ile RSI14 boğa uyumsuzluğu 5 mum içinde birlikte gelir. İzleme robotu ilk 200 coini tarar, sinyali kaydeder ve 100 mum boyunca izler: R1 +%10 (test edilen hedef), R2 +%20, R3 +%30, stop = giriş − 2 ATR. Yalnız izleme, işlem açılmaz.',cards:[]},
  {id:'ikili',ic:'✦',nm:'İkili',h:'İkili: KDC-MACD + Uyumsuzluk (4s) — patlama ihtimali',
   d:'Aynı coinde KDC-MACD sinyali (30dk KDC K↑D → ≤10 saat içinde 1s MACD yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla (4s) gelir. İzleme robotu 200 coinin hepsinde vadeli (USDT-M) mumlarla (yoksa spot) Umut sinyali olan coinlerde KDC-MACD’yi de hesaplar, son 30 mumu geriye doldurur, sinyal mumu 0–10 mum yaşındaysa bir kez ntfy gönderir ve 100 mum izler: R1 +%10, R2 +%20, R3 +%30, stop = giriş − 2 ATR. Bu kombinasyon test edilmedi; yalnız izleme, işlem açılmaz.',cards:[]},
+ {id:'v12k2',ic:'⚡',nm:'V12 K2',h:'V12 Çift K2 Long (30dk) — kripto + BIST',
+  d:'MMSMTF V12 (Mixed 55/15, ATR14 × 1.5, Stoch 140/30/30; K1 15dk, K2 30dk, K2c = 2·K2 − 100): kapanmış 30dk mumda priceChannel VEYA combined K2c’yi yukarı keser ve K2c < −30 → LONG. İzleme robotu 30 dakikada bir tarar (kripto: Binance vadeli; BIST: Yahoo 15dk, hafta içi seans), yeni sinyalde “v12k2 SEMBOL” ntfy gönderir; kağıt robot v12k2-30m: TP %5, stop yok, 100 × 30dk süre, coin başına tek pozisyon. Gerçek emir yok. Backtest (30dk, 80 coin, ücretli): 6.896 işlem · kazanma %55 · PF 0,92 · işlem başı −%0,20 ≈ rastgele giriş — avantaj kanıtlanmadı.',cards:[]},
  {id:'izleme',ic:'📡',nm:'İzleme sinyalleri',h:'İzleme robotu sinyalleri',
   d:'GitHub üzerinde 2 saatte bir çalışan izleme robotunun bulduğu sinyaller (EK v3 DIV, L/S uyumsuzluk, Dual, RSI30). Robot ilk 200 coin + 200 BIST hissesini tarar; yalnız uyarı üretir, işlem açmaz. Tüm sütunlar ve geçmiş için Robot Paneli\'ne geç.',cards:[]},
  {id:'harita',ic:'🗺',nm:'Görsel harita',h:'Görsel harita (isteğe bağlı)',
@@ -76,6 +78,7 @@ function build(){
   if(s.id==='adaylar')sec.insertAdjacentHTML('beforeend','<div class="rxK" id="rxKpi"></div><div class="rxCard" id="rxCand"><h3>Aday tablosu <span class="r" id="rxCandT"></span></h3><div class="rxD">Hazırlık bantları: <span class="rxSt rxb-sig">100 SİNYAL</span> <span class="rxSt rxb-hzr">70–99 hazır olmak üzere</span> <span class="rxSt rxb-yak">40–69 yaklaşıyor</span> <span class="rxSt rxb-uzk">0–39 uzak</span> · "Koşul" = tamamlanan koşul sayısı · "İzleme" = aynı sembolde izleme robotunun açık sinyali var.</div><div class="rxBar" id="rxCandBar"></div><div id="rxCandBody"><div class="rxEmpty">Tarama sürüyor… ilk sonuçlar birkaç saniye içinde gelir.</div></div></div>');
   if(s.id==='izleme')sec.insertAdjacentHTML('beforeend','<div class="rxNote" id="rxUniv">İzleme raporu yükleniyor…</div><div class="rxSc" id="rxWsc"></div><div class="rxCard"><h3>Sinyaller <span class="r" id="rxWst"></span></h3><div class="rxBar" id="rxWbar"></div><div id="rxWbody"></div></div>');
   if(s.id==='umut'||s.id==='ikili'){var P=UCF[s.id].p;sec.insertAdjacentHTML('beforeend',('<div class="rxNote" id="rxUnote">Umut sinyalleri yükleniyor…</div><div class="rxK" id="rxUkpi"></div><div id="rxUchart" style="display:none"></div><div class="rxCard"><h3>Umut sinyalleri <span class="r" id="rxUst"></span></h3><div class="rxD">Çubuk: solda stop, ortada giriş (│), sağa doğru R1 · R2 · R3. Fiyat canlı (Binance vadeli, 1 dk), robot durumu 4s kapanışlarına göre. <b>Ekleme?</b> işareti: fiyat önce en az +1 ATR yükseldi, sonra girişe / giriş −1 ATR bölgesine geri çekildi, stop ve uyumsuzluk dibi sağlam — <b>yalnız ipucu, yatırım tavsiyesi değildir</b>.</div><div class="rxBar" id="rxUbar"></div><div id="rxUbody"></div></div>').replace(/rxU(note|kpi|chart|st|bar|body)\b/g,P+'$1').replace('Umut sinyalleri yükleniyor…',UCF[s.id].nm+' sinyalleri yükleniyor…').replace('<h3>Umut sinyalleri','<h3>'+UCF[s.id].nm+' sinyalleri'));}
+  if(s.id==='v12k2')sec.insertAdjacentHTML('beforeend','<div class="rxNote" id="rxVnote">V12 K2 sinyalleri yükleniyor…</div><div class="rxCard"><h3>V12 K2 sinyalleri <span class="r" id="rxVst"></span></h3><div class="rxBar" id="rxVbar"></div><div id="rxVbody"></div></div>');
   if(s.id==='harita')sec.insertAdjacentHTML('beforeend','<div class="rxTools" id="rxHTools"></div>');
   var g=document.createElement('div');g.className='rxGrid';sec.appendChild(g);
   s.cards.forEach(function(id){var el=$(id);if(!el)return;el.classList.remove('col');if(WIDE[id])el.classList.add('rxWide');
@@ -96,7 +99,7 @@ function go(id,push){CUR=id;document.querySelectorAll('.rxSec').forEach(function
  // gizliyken ölçülemeyen tuvaller için yeniden çizim tetikle
  setTimeout(function(){try{dispatchEvent(new Event('resize'));}catch(e){}},30);
  if(push)scrollTo({top:0});
- if(id==='adaylar')renderCand(true);if(id==='izleme')renderWatch();if(id==='umut'||id==='ikili')renderUmut();}
+ if(id==='adaylar')renderCand(true);if(id==='izleme')renderWatch();if(id==='v12k2')renderV12();if(id==='umut'||id==='ikili')renderUmut();}
 /* eski kısayollar (R, B, W, M, odak vb.) bir paneli kaydırarak açar → önce o paneli içeren bölüme geç */
 var _siv=Element.prototype.scrollIntoView;
 Element.prototype.scrollIntoView=function(){try{var sec=this.closest&&this.closest('.rxSec');if(sec&&!sec.classList.contains('on'))go(sec.id.replace('rx-',''),true);}catch(e){}return _siv.apply(this,arguments);};
@@ -167,7 +170,7 @@ function table(el,cols,rows,S,empty,redraw){if(!rows.length){el.innerHTML='<div 
 /* ---------- İzleme robotu (/api/watch-report) ---------- */
 var W=null,WERR='',WF={scan:'',mk:'',st:'',q:'',sort:'foundAt',asc:false,lim:60};
 function cleanSym(s){return String(s||'').replace(/\.IS$/,'').replace(/USDT$/,'');}
-function loadWatch(){return fetch('/api/watch-report',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(j){W=j;WERR='';}).catch(function(e){WERR=String(e&&e.message||e);}).then(function(){renderWatch();renderUmut();if(UDEEP&&W&&UDEEP.indexOf(CUR+':')===0){var d=UDEEP.slice(CUR.length+1);UDEEP='';uOpen(d,CUR);}if(CUR==='adaylar')renderCand(true);});}
+function loadWatch(){return fetch('/api/watch-report',{cache:'no-store'}).then(function(r){if(!r.ok)throw new Error('HTTP '+r.status);return r.json();}).then(function(j){W=j;WERR='';}).catch(function(e){WERR=String(e&&e.message||e);}).then(function(){renderWatch();renderUmut();renderV12();if(UDEEP&&W&&UDEEP.indexOf(CUR+':')===0){var d=UDEEP.slice(CUR.length+1);UDEEP='';uOpen(d,CUR);}if(CUR==='adaylar')renderCand(true);});}
 function wSigs(){if(!W||!W.scans)return [];var out=[];Object.keys(W.scans).forEach(function(id){var sc=W.scans[id];(sc.signals||[]).forEach(function(s){var e=s.entry!=null?s.entry:s.price,l=s.exitPx!=null?s.exitPx:s.last;
  out.push({o:s,scan:id,label:sc.label||id,market:sc.market||'',symbol:cleanSym(s.symbol),raw:s.symbol,tsi:s.tsi||'',t:s.t||0,status:s.status||'',entry:e,stop:s.stop,target:s.target,last:l,mv:e&&l?100*(l/e-1):NaN,mfe:s.ex100&&s.ex100.mfePct,mae:s.ex100&&s.ex100.maePct,foundAt:s.foundAt||0,info:s.info||'',kind:s.kind||''});});});return out;}
 function watchOpenSet(){var m={},wk=Date.now()-7*864e5;wSigs().forEach(function(s){if((s.status==='açık'||s.status==='bekliyor')&&s.foundAt>=wk){var k=(s.market==='BIST'?'B:':'C:')+s.symbol;m[k]=(m[k]?m[k]+' · ':'')+s.label;}});return m;}
@@ -201,6 +204,32 @@ function renderWatch(){if(CUR!=='izleme'&&$('rxBd-izleme')==null)return;var u=$(
   table(body,cols,v,WF,'Bu filtreye uyan sinyal yok.',draw);
   body.querySelectorAll('.rxSym').forEach(function(x){x.onclick=function(){openSym(x.getAttribute('data-sym'),x.getAttribute('data-b')==='1');};});}
 }
+
+/* ---------- V12 Çift K2 Long (30dk) ---------- */
+var VF={mk:'',st:'',q:'',sort:'t',asc:false,lim:60},V12S=['v12k2-30m','v12k2-bist-30m'];
+function renderV12(){var note=$('rxVnote'),body=$('rxVbody'),bar=$('rxVbar');if(!note||!body)return;
+ var all=wSigs().filter(function(s){return V12S.indexOf(s.scan)>=0;}),bd=$('rxBd-v12k2'),wk=Date.now()-7*864e5,na=all.filter(function(s){return (s.status==='açık'||s.status==='bekliyor')&&s.foundAt>=wk;}).length;
+ if(bd){bd.style.display=na?'':'none';bd.textContent=na||'';}
+ if(CUR!=='v12k2')return;
+ if(!W){note.innerHTML=WERR?'İzleme raporu okunamadı ('+esc(WERR)+').':'V12 K2 sinyalleri yükleniyor…';return;}
+ var S=W.scans||{};note.innerHTML=V12S.map(function(i){var sc=S[i];return sc?'<b>'+esc(sc.label||i)+':</b> '+(sc.nOk||0)+'/'+(sc.nSym||0)+' sembol · son tur '+esc(sc.lastRunTsi||'—')+' TSİ'+(sc.err?' · <span class="rxR">'+esc(sc.err)+'</span>':''):'<b>'+esc(i)+':</b> henüz çalışmadı — ilk turdan sonra burada görünür';}).join('<br>')+'<br>Stop yok; çıkış TP %5 veya 100 × 30dk. <a href="/panel.html#izleme">Robot Paneli →</a>';
+ if(!bar._b){bar._b=1;bar.innerHTML='<select id="rxVm"><option value="">Kripto + BIST</option><option value="kripto">Kripto</option><option value="BIST">BIST</option></select><select id="rxVs"><option value="">Tüm sonuçlar</option><option value="bekliyor">Bekliyor</option><option value="açık">Açık</option><option value="hedef">Hedef ✓</option><option value="süre">Süre doldu</option></select><input class="rxInp" id="rxVq" placeholder="Sembol ara" autocomplete="off">';
+  $('rxVm').onchange=function(e){VF.mk=e.target.value;VF.lim=60;renderV12();};$('rxVs').onchange=function(e){VF.st=e.target.value;VF.lim=60;renderV12();};$('rxVq').oninput=function(e){VF.q=e.target.value;VF.lim=60;renderV12();};}
+ var q=VF.q.trim().toUpperCase(),v=all.filter(function(s){return (!VF.mk||s.market===VF.mk)&&(!VF.st||s.status===VF.st)&&(!q||s.symbol.toUpperCase().indexOf(q)>=0);});
+ var c=function(st){return v.filter(function(s){return s.status===st;}).length;};$('rxVst').innerHTML=v.length+' sinyal · <span class="rxG">'+c('hedef')+' hedef</span> · '+c('süre')+' süre · '+(c('açık')+c('bekliyor'))+' açık/bekliyor';
+ var cols=[
+  {k:'symbol',l:'Sembol',f:function(s){return '<span class="rxSym" data-sym="'+esc(s.market==='BIST'?s.symbol:s.raw)+'" data-b="'+(s.market==='BIST'?1:0)+'" title="Grafiği aç">'+esc(s.symbol)+'</span>';}},
+  {k:'mk',l:'Piyasa',f:function(s){return esc(s.market==='BIST'?'BIST':'Kripto');}},
+  {k:'t',l:'Sinyal mumu (TSİ)',f:function(s){return esc(s.tsi);}},
+  {k:'status',l:'Sonuç',f:function(s){return '<span class="rxSt '+esc(s.status)+'">'+esc(s.status||'—')+'</span>';}},
+  {k:'entry',l:'Giriş',n:1,f:function(s){return fp(s.entry);}},{k:'target',l:'TP %5',n:1,f:function(s){return fp(s.target);}},
+  {k:'last',l:'Son',n:1,f:function(s){return fp(s.last);}},
+  {k:'mv',l:'Girişten %',n:1,f:function(s){return pct(s.mv,2);}},
+  {k:'mfe',l:'En iyi / en kötü',n:1,f:function(s){return (s.mfe==null?'—':pct(s.mfe,1))+' / '+(s.mae==null?'—':pct(s.mae,1));}},
+  {k:'info',l:'Not',c:'wrap',f:function(s){return '<span title="'+esc(s.info)+'">'+esc(s.info)+'</span>';}}];
+ v.forEach(function(s){s.mk=s.market;});
+ table(body,cols,v,VF,'Henüz V12 K2 sinyali yok.',renderV12);
+ body.querySelectorAll('.rxSym').forEach(function(x){x.onclick=function(){openSym(x.getAttribute('data-sym'),x.getAttribute('data-b')==='1');};});}
 
 /* ---------- Umut (KAL+RSI uyumsuzluk 4s) ---------- */
 var UCF={umut:{al:2,p:'rxU',scan:'umut-4h',nm:'Umut',lab:'Umut (KAL+RSI uyumsuzluk)',test:'<br><b>Test (2022–2026, 4s):</b> 2.013 işlem · kazanma %42 · kâr faktörü 1,15 · işlem başı +%0,51 (2024 Nisan öncesi) / +%0,52 (sonrası) · rastgele giriş −%0,18. Geçmiş sonuç geleceği garanti etmez.'},
