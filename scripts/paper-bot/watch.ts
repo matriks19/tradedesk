@@ -33,6 +33,7 @@ import { pgComponents, pgAt, PG, type PGAt } from "../../src/lib/watch/patlama";
 import { dipSignals, dipBandSignals, ELIF } from "../../src/lib/watch/elif";
 import { paperTrack, paperStats, PAPER, type PTrade, type PStats } from "../../src/lib/watch/paper";
 import { cciBullDiv, CCIDIV } from "../../src/lib/watch/ccidiv";
+import { restEval, REST } from "../../src/lib/watch/rest";
 import { donchTrail, donchEnsemble, rangeDipSignals, rdTrack, rdStats, donchStep, isCoin, DON, RDIP, type DRobot, type DDay, type RDTrade, type RDStats } from "../../src/lib/watch/donchian";
 
 export const WATCH_CRYPTO = ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","TRX","AVAX","LINK","DOT","LTC","BCH","NEAR","UNI","ATOM","ETC","XLM","FIL","APT",
@@ -43,17 +44,17 @@ export const WATCH_BIST = Array.from(new Set([...BIST_BOX100, ...BIST30, ...BIST
 const EMS_PICK: Partial<DivParams> = { osc: "EMs", Lb: 3, R: 5, G1: 5, G2: 60, delta: 0, zone: "lowZ", Z: 50, dz: 0.5, combo: "alone", N: 0, cool: 10 };
 /** exit_config.json (IS seçimi): kripto 4s SAR (stop = pivot dip), BIST 1g ATR (stop pivot − 1.5 ATR, hedef giriş + 4 ATR) */
 const EK_EXIT: Record<string, { exit: "sar" | "atr"; k: number; tp: number }> = { "4h": { exit: "sar", k: 1.5, tp: 4 }, "1d": { exit: "atr", k: 1.5, tp: 4 } };
-const TF_MS: Record<string, number> = { "1h": 36e5, "2h": 72e5, "4h": 144e5, "8h": 288e5, "12h": 432e5, "1d": 864e5 };
+const TF_MS: Record<string, number> = { "15m": 9e5, "30m": 18e5, "1h": 36e5, "2h": 72e5, "4h": 144e5, "8h": 288e5, "12h": 432e5, "1d": 864e5 };
 /** Zaman bütçesi: Actions işi 12 dk ile sınırlı → süreç bu saniyeyi geçince yeni sembol/tarama başlatılmaz (kapı ilerlemez, sonraki turda tamamlanır) */
 /** ntfy tazelik sınırı (sinyal mumu yaşı, mum): varsayılan MAX_AGE (2); ✦ İkili için 0–10 mum (kullanıcı onayı 02.11.2026). Her sinyal yine bir kez bildirilir (anahtar + notified). */
-const ALERT_AGE: Partial<Record<ScanId, number>> = { "ikili-4h": 10 };
+const ALERT_AGE: Partial<Record<ScanId, number>> = { "ikili-4h": 10, "rest-15m": 5 };
 const BUDGET_S = Number(process.env.WATCH_BUDGET_S || 510);
 const over = () => process.uptime() > BUDGET_S;
 /** Dip taramaları: bir sembolün ilk taramasında yalnız son kapanmış mumdaki (yaş 0) sinyal bildirilir (sel önleme); sonra normal kural (yaş ≤ 2). Eskiler yalnız listeye girer. */
 const DIP_SCANS = new Set<string>(["dip4", "dip8", "dip12"]);
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
-export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip4" | "dip8" | "dip12" | "donch-1d" | "rangedip-1d" | "ccidiv-1d" | "ccidiv-bist-1d";
+export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip4" | "dip8" | "dip12" | "donch-1d" | "rangedip-1d" | "ccidiv-1d" | "ccidiv-bist-1d" | "rest-15m";
 export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto" | "BIST"; note: string }> = {
   "ek-crypto-4h": { label: "EK v3 DIV · kripto 4s", tf: "4h", market: "kripto", note: "EMs dip uyumsuzluk; stop = pivot dip (SAR çıkışı), sabit hedef yok. Backtest IS MAR<0 → yalnız uyarı." },
   "ek-bist-1d": { label: "EK v3 DIV · BIST 1g", tf: "1d", market: "BIST", note: "EMs dip uyumsuzluk; stop = pivot − 1.5 ATR, hedef = giriş + 4 ATR. core=1 BIST testinde güçlü." },
@@ -70,6 +71,7 @@ export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto"
   "rangedip-1d": { label: "Range Dip (likidite avı + ikili/üçlü dip) · 1g", tf: "1d", market: "kripto", note: "Kullanıcının kuralı: Donchian alt bandı (önceki N günün en düşük dibi) range tabanı, üst bant (en yüksek tepe) hedef. Sinyal: kapanmış günlük mumun fitili alt bandın altına iner, kapanış bandın içinde kalır (likidite avı) VE önceki [N, 5] mumda grab dibine ≤ 1.25 ATR yakın en az bir onaylı pivot dip (ikili dip; 2+ = üçlü). RD20 / RD55. Giriş sonraki açılış; stop = fitil − 0.1 ATR; hedef = üst bant; en fazla 3N gün. Test (10 coin, %0.1 maliyet): N55 PF 2.04 (OOS 2022→ PF 1.75), N20 PF 1.21 (OOS 1.06); kazanma ~%20, düşüş büyük; ikili/üçlü dip şartı grab'a ek avantaj göstermedi; 4s'te kârsız. ntfy: yeni sinyal + sanal defterde çıkış. GERÇEK İŞLEM YOK." },
   "ccidiv-1d": { label: "CCI Uyums 1G · kripto", tf: "1d", market: "kripto", note: "CCI20 boğa uyumsuzluğu (günlük): pivot dip sol 5 / sağ 5, önceki pivot dip 5–60 mum geride; fiyat daha düşük dip, CCI daha yüksek dip. CCI = (kapanış − SMA20)/(0.015 × ort. mutlak sapma). Sinyal onay mumu (pivot+5) kapanışında; giriş sonraki açılış; stop = giriş − 2 ATR14, hedef +%10, 100 mum. Test (long80 1g, 66 coin): N 455, ort +%1.56, PF 1.32, IS +%2.00 / OOS +%1.44, p 0.002. Yalnız izleme, işlem yok." },
   "ccidiv-bist-1d": { label: "CCI Uyums 1G · BIST", tf: "1d", market: "BIST", note: "CCI20 boğa uyumsuzluğu (günlük): pivot dip sol 5 / sağ 5, önceki pivot dip 5–60 mum geride; fiyat daha düşük dip, CCI daha yüksek dip. CCI = (kapanış − SMA20)/(0.015 × ort. mutlak sapma). Sinyal onay mumu (pivot+5) kapanışında; giriş sonraki açılış; stop = giriş − 2 ATR14, hedef +%10, 100 mum. Test (long80 1g, 66 coin): N 455, ort +%1.56, PF 1.32, IS +%2.00 / OOS +%1.44, p 0.002. Yalnız izleme, işlem yok. BIST'e aynı kural (test coinlerde yapıldı)." },
+  "rest-15m": { label: "REST · MTF Stoch 15dk×30dk", tf: "15m", market: "kripto", note: "MultiTime Stochastics Pro uyarlaması: K1 = 15dk Stoch (140, smoothK 30, D 30), K2 = 30dk Stoch (140/30/30; 15dk mum kapanışında kapanmış son 30dk mumu). K1 K2'yi yukarı keser → LONG, aşağı keser → SHORT (kapanmış mum, iki yön). Saatte bir taranır. TP %10 (ort. girişe göre), stop yok, ters kesişimde çıkış/ters yön. EKLE: pozisyon yönünde fiyat–K1 uyumsuzluğu (pivot 5/5, 5–60 mum) → ilk büyüklükte ekleme, en çok 2. Highest/lowest (MTF uç) mantığı yok. Sanal/paper: paper bot kaynağı rest-15m. Test edilmedi. Yalnız izleme, gerçek emir yok." },
   "ikili-4h": { label: "✦ İkili: KDC-MACD + Uyumsuzluk (4s)", tf: "4h", market: "kripto", note: "Patlama ihtimali: aynı coinde KDC-MACD sinyali (30dk KDC K↑D, ≤10 saat içinde 1s MACD 12/26/9 yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy: sinyal mumu 0–10 mum yaşındaysa (tek sefer). Kombinasyon geriye dönük test EDİLMEDİ. Yalnız izleme." },
 };
 
@@ -289,6 +291,29 @@ function cciDivScan(scan: "ccidiv-1d" | "ccidiv-bist-1d", sym: string, bars: WBa
       stop, target: tgt, info, calc: { kind: "umut", atr: A[h.i], k: CCIDIV.atrK, tp: CCIDIV.tp, pivLow: h.low },
       title: `İZLEME | ${lbl} | ${sym} AL`,
       body: `${lbl} — ${sym} 1g\nSinyal (onay) mumu: ${tsiBar(t, "1d")} (yaş ${age} mum)\n${info}\nGiriş: ${fmtP(entry)} (${age >= 1 ? "sonraki açılış" : "ref son kapanış, giriş sonraki açılış"})\nStop: ${fmtP(stop)} (giriş − 2 ATR)\nHedef: ${fmtP(tgt)} (+%10)\nSüre: 100 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
+  }
+  return out;
+}
+
+/** REST: K1 (15dk Stoch 140/30/30) × K2 (30dk). Kesişim → LONG/SHORT; pozisyon yönünde fiyat–K1 uyumsuzluğu → EKLE (kesişimden sonra en çok 2). Sonuç takibi yok (iki yön; paper bot defteri izler). */
+function restScan(sym: string, b15: WBar[], b30: WBar[], src: string, maxAge = MAX_AGE): Found[] {
+  const scan: ScanId = "rest-15m", n = b15.length, out: Found[] = [], lbl = SCANS[scan].label;
+  const R = (b: WBar[]) => ({ t: b.map((x) => x.t), h: b.map((x) => x.high), l: b.map((x) => x.low), c: b.map((x) => x.close) });
+  const E = restEval(R(b15), R(b30));
+  const push = (i: number, side: "LONG" | "SHORT", kind: string, info: string, head: string) => {
+    const age = n - 1 - i; if (age > maxAge) return;
+    if (Date.now() - b15[i].t > (maxAge + 4) * TF_MS["15m"]) return; // bayat veri
+    const entry = age >= 1 ? b15[i + 1].open : b15[n - 1].close, tgt = side === "LONG" ? entry * (1 + REST.tp) : entry * (1 - REST.tp), t = b15[i].t;
+    out.push({ key: `${scan}|${sym}|${t}|${kind}`, scan, symbol: sym, tf: "15m", t, tsi: tsiBar(t, "15m"), age, kind, price: entry, entryBasis: age >= 1 ? "sonraki 15dk açılış" : "son kapanış",
+      stop: NaN, target: tgt, info: info + ` · ${src === "perp" ? "vadeli" : "spot"} mum`, calc: { kind: "fixed" },
+      title: `İZLEME | REST | ${sym} ${head}`,
+      body: `${lbl} — ${sym}\nSinyal mumu: ${tsiBar(t, "15m")} TSİ (yaş ${age} × 15dk)\n${info}\nGiriş ref: ${fmtP(entry)}\nTP %10: ${fmtP(tgt)}\nStop: yok (ters kesişimde çıkış)\nDurum: SADECE İZLEME — gerçek işlem yok (paper bot: rest-15m)` });
+  };
+  for (const e of E.ev) push(e.i, e.side, e.side === "LONG" ? "AL" : "SAT", `K1 (15dk) ${e.k1.toFixed(1)} ${e.side === "LONG" ? "↑ yukarı" : "↓ aşağı"} keser K2 (30dk) ${e.k2.toFixed(1)}`, e.side);
+  for (const d of E.div) {
+    const e = E.ev.filter((x) => x.i < d.i).pop(); if (!e || e.side !== d.side) continue;
+    const nPrev = E.div.filter((x) => x.side === d.side && x.i > e.i && x.i < d.i).length; if (nPrev >= REST.maxAdds) continue;
+    push(d.i, d.side, `EKLE-${d.side === "LONG" ? "L" : "S"}`, `${d.side === "LONG" ? "Boğa" : "Ayı"} uyumsuzluk (fiyat ${fmtP(d.px0)} → ${fmtP(d.px)}, K1 ${d.k0.toFixed(1)} → ${d.k.toFixed(1)}, ${d.p - d.p0} mum) · ${d.side} pozisyonuna ekleme ${nPrev + 1}/${REST.maxAdds} (kesişim ${tsiBar(b15[e.i].t, "15m")})`, `${d.side} EKLEME ${nPrev + 1}/${REST.maxAdds}`);
   }
   return out;
 }
@@ -632,8 +657,15 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     seed[sym] = now;
     return null;
   }, (sym) => !(symLast["ccidiv-seed"] || {})[sym]);
+  // REST (MTF Stoch 15dk×30dk): saatte bir (mum aralığı = 1 saat), kripto coinler; vadeli 15dk + 30dk mumlar
+  const blkRest = () => runBlock("REST 15dk", ["rest-15m"], "15m", TF_MS["1h"], D1, 2, async (sym, maxAge) => {
+    const [f15, f30] = await Promise.all([futBars(ctx, sym, "15m"), futBars(ctx, sym, "30m")]);
+    if (!f15 || !f30 || f15.bars.length < 300 || f30.bars.length < 220) return "mum yetersiz";
+    for (const x of restScan(sym, f15.bars, f30.bars, f15.src, Math.max(maxAge, ALERT_AGE["rest-15m"]!))) found.push({ f: x, bars: f15.bars });
+    return null;
+  });
   // bloklar paralel (farklı veri kaynakları: Binance spot / Yahoo / proxy), her biri kendi dönen partisiyle
-  await Promise.all([blkCrypto(), blkBist(), blkLs(), blkDip("dip4"), blkDip("dip8"), blkDip("dip12"), blkD1()]);
+  await Promise.all([blkCrypto(), blkBist(), blkLs(), blkDip("dip4"), blkDip("dip8"), blkDip("dip12"), blkD1(), blkRest()]);
 
   // 4) yeni sinyaller → rapor + ntfy (sinyal mumu başına bir kez; ilk turda bildirimsiz tohumlama)
   let sent = 0, nNew = 0;
@@ -653,7 +685,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
       try { await ntfySend(title, body); s.alerted = "gönderildi"; doc.notified[f.key] = now; sent++; }
       catch (e) { s.alerted = "gönderilemedi"; lg(`ntfy hata ${f.scan} ${f.symbol}: ${(e as Error).message.replace(/https?:\/\/\S+/g, "<url>")}`); }
     }
-    if (s.calc.kind === "donch") donchTrackSig(s, bars); else track(s, bars, dyn);
+    if (s.calc.kind === "donch") donchTrackSig(s, bars); else if (f.scan !== "rest-15m") track(s, bars, dyn);
     r.signals.unshift(s); r.newCount = (r.newCount || 0) + 1;
     lg(`SİNYAL ${SCANS[f.scan].label} ${f.symbol} ${f.tsi} @${fmtP(f.price)} stop ${fmtP(f.stop)} hedef ${fmtP(f.target)} · ntfy ${s.alerted}`);
   }
@@ -674,7 +706,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   // retry: bildirimi başarısız kalan güncel sinyaller
   if (!ctx.dry) for (const r of Object.values(doc.scans)) for (const s of r.signals) {
     if (s.alerted !== "gönderilemedi" || now - s.foundAt > 6 * 36e5) continue;
-    try { if (DIP_SCANS.has(s.scan)) await ntfySend("Dip", `${s.scan} ${s.symbol}`); else await ntfySend(`İZLEME | ${r.label} | ${s.symbol} AL`, `${r.label} — ${s.symbol} ${s.tf}\nSinyal mumu: ${s.tsi}\n${s.info}\nGiriş ref: ${fmtP(s.price)}\nStop: ${fmtP(s.stop)}\nHedef: ${fmtP(s.target)}\nDurum: SADECE İZLEME — işlem açılmadı`); s.alerted = "gönderildi"; doc.notified[s.key] = now; sent++; } catch { /* sonraki tur */ }
+    try { if (DIP_SCANS.has(s.scan)) await ntfySend("Dip", `${s.scan} ${s.symbol}`); else await ntfySend(`İZLEME | ${r.label} | ${s.symbol} ${s.scan === "rest-15m" ? s.kind : "AL"}`, `${r.label} — ${s.symbol} ${s.tf}\nSinyal mumu: ${s.tsi}\n${s.info}\nGiriş ref: ${fmtP(s.price)}\nStop: ${fmtP(s.stop)}\nHedef: ${fmtP(s.target)}\nDurum: SADECE İZLEME — işlem açılmadı`); s.alerted = "gönderildi"; doc.notified[s.key] = now; sent++; } catch { /* sonraki tur */ }
   }
   for (const r of Object.values(doc.scans)) r.signals = r.signals.slice(0, KEEP_SIG);
   for (const [k, t] of Object.entries(doc.notified)) if (now - t > KEEP_NOTIFIED_MS) delete doc.notified[k];
