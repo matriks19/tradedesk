@@ -32,6 +32,7 @@ import { ikiliSignals } from "../../src/lib/watch/sigExt";
 import { pgComponents, pgAt, PG, type PGAt } from "../../src/lib/watch/patlama";
 import { dipSignals, dipBandSignals, ELIF } from "../../src/lib/watch/elif";
 import { paperTrack, paperStats, PAPER, type PTrade, type PStats } from "../../src/lib/watch/paper";
+import { cciBullDiv, CCIDIV } from "../../src/lib/watch/ccidiv";
 import { donchTrail, donchEnsemble, rangeDipSignals, rdTrack, rdStats, donchStep, isCoin, DON, RDIP, type DRobot, type DDay, type RDTrade, type RDStats } from "../../src/lib/watch/donchian";
 
 export const WATCH_CRYPTO = ["BTC","ETH","BNB","SOL","XRP","DOGE","ADA","TRX","AVAX","LINK","DOT","LTC","BCH","NEAR","UNI","ATOM","ETC","XLM","FIL","APT",
@@ -52,7 +53,7 @@ const over = () => process.uptime() > BUDGET_S;
 const DIP_SCANS = new Set<string>(["dip4", "dip8", "dip12"]);
 const MAX_AGE = 2, TRACK_BARS = 100, KEEP_SIG = 300, KEEP_NOTIFIED_MS = 60 * 864e5;
 
-export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip4" | "dip8" | "dip12" | "donch-1d" | "rangedip-1d";
+export type ScanId = "ek-crypto-4h" | "ek-bist-1d" | "ls-2h" | "dual-crypto-4h" | "dual-bist-1d" | "rsi30-bist-1d" | "umut-4h" | "ikili-4h" | "umutpg-4h" | "dip4" | "dip8" | "dip12" | "donch-1d" | "rangedip-1d" | "ccidiv-1d" | "ccidiv-bist-1d";
 export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto" | "BIST"; note: string }> = {
   "ek-crypto-4h": { label: "EK v3 DIV · kripto 4s", tf: "4h", market: "kripto", note: "EMs dip uyumsuzluk; stop = pivot dip (SAR çıkışı), sabit hedef yok. Backtest IS MAR<0 → yalnız uyarı." },
   "ek-bist-1d": { label: "EK v3 DIV · BIST 1g", tf: "1d", market: "BIST", note: "EMs dip uyumsuzluk; stop = pivot − 1.5 ATR, hedef = giriş + 4 ATR. core=1 BIST testinde güçlü." },
@@ -67,6 +68,8 @@ export const SCANS: Record<ScanId, { label: string; tf: string; market: "kripto"
   "dip12": { label: "Dip · ElifScan dipten kesim (12s)", tf: "12h", market: "kripto", note: "ElifScan (kullanıcının Pine kodu birebir, 15/30/10/20): main = (FRAMA(stoch15,10) + FRAMA(stoch30,10))/2; wma1 = WMA(main,20), wma2 = WMA(wma1,20), üst/alt = wma1 ± (wma1 − wma2). Sinyal: kapanmış 12s mumda main alt bandı VEYA üst bant alt bandı yukarı keser ve main < 40 (kesişim mumunda ya da bir önceki mumda). Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy kısa: başlık \"Dip\", metin \"dip12 SEMBOL\" (sinyal mumu başına bir kez). Sonuç izleme: giriş sonraki açılış, stop giriş − 2 ATR, 100 mum (yalnız istatistik). Yalnız izleme." },
   "donch-1d": { label: "Donchian 20/55 kırılım · 1g", tf: "1d", market: "kripto", note: "Catching Crypto Trends (Zarattini–Pagani–Barbon 2025): günlük KAPANIŞ son 20 (D20) ya da 55 (D55) günün en yüksek kapanışına değer → kırılım (kapanmış mum, vadeli mumlar önce). İz süren stop = Donchian orta çizgisi (en yüksek + en düşük kapanış)/2, yalnız yukarı taşınır; kapanış stopun altına inince 'stop'. Giriş = kırılım kapanışı; Stop sütunu = güncel iz süren stop. Kendi testimiz (10 coin, 2018→, %0.1 maliyet): ensemble 5/10/20/30 Sharpe 1.38 (OOS 2022→ 0.89), MDD −%14. Yalnız liste — ntfy göndermez (sanal robot giriş/çıkışta bildirir). GERÇEK İŞLEM YOK." },
   "rangedip-1d": { label: "Range Dip (likidite avı + ikili/üçlü dip) · 1g", tf: "1d", market: "kripto", note: "Kullanıcının kuralı: Donchian alt bandı (önceki N günün en düşük dibi) range tabanı, üst bant (en yüksek tepe) hedef. Sinyal: kapanmış günlük mumun fitili alt bandın altına iner, kapanış bandın içinde kalır (likidite avı) VE önceki [N, 5] mumda grab dibine ≤ 1.25 ATR yakın en az bir onaylı pivot dip (ikili dip; 2+ = üçlü). RD20 / RD55. Giriş sonraki açılış; stop = fitil − 0.1 ATR; hedef = üst bant; en fazla 3N gün. Test (10 coin, %0.1 maliyet): N55 PF 2.04 (OOS 2022→ PF 1.75), N20 PF 1.21 (OOS 1.06); kazanma ~%20, düşüş büyük; ikili/üçlü dip şartı grab'a ek avantaj göstermedi; 4s'te kârsız. ntfy: yeni sinyal + sanal defterde çıkış. GERÇEK İŞLEM YOK." },
+  "ccidiv-1d": { label: "CCI Uyums 1G · kripto", tf: "1d", market: "kripto", note: "CCI20 boğa uyumsuzluğu (günlük): pivot dip sol 5 / sağ 5, önceki pivot dip 5–60 mum geride; fiyat daha düşük dip, CCI daha yüksek dip. CCI = (kapanış − SMA20)/(0.015 × ort. mutlak sapma). Sinyal onay mumu (pivot+5) kapanışında; giriş sonraki açılış; stop = giriş − 2 ATR14, hedef +%10, 100 mum. Test (long80 1g, 66 coin): N 455, ort +%1.56, PF 1.32, IS +%2.00 / OOS +%1.44, p 0.002. Yalnız izleme, işlem yok." },
+  "ccidiv-bist-1d": { label: "CCI Uyums 1G · BIST", tf: "1d", market: "BIST", note: "CCI20 boğa uyumsuzluğu (günlük): pivot dip sol 5 / sağ 5, önceki pivot dip 5–60 mum geride; fiyat daha düşük dip, CCI daha yüksek dip. CCI = (kapanış − SMA20)/(0.015 × ort. mutlak sapma). Sinyal onay mumu (pivot+5) kapanışında; giriş sonraki açılış; stop = giriş − 2 ATR14, hedef +%10, 100 mum. Test (long80 1g, 66 coin): N 455, ort +%1.56, PF 1.32, IS +%2.00 / OOS +%1.44, p 0.002. Yalnız izleme, işlem yok. BIST'e aynı kural (test coinlerde yapıldı)." },
   "ikili-4h": { label: "✦ İkili: KDC-MACD + Uyumsuzluk (4s)", tf: "4h", market: "kripto", note: "Patlama ihtimali: aynı coinde KDC-MACD sinyali (30dk KDC K↑D, ≤10 saat içinde 1s MACD 12/26/9 yukarı kesişim) ile Umut sinyali (4s KAL + RSI14 boğa uyumsuzluğu) birbirinden 5 mumdan az arayla. Giriş sonraki 4s açılış; stop = giriş − 2 ATR; R1 +%10, R2 +%20, R3 +%30; 100 mum. Mumlar vadeli (USDT-M) önce, yoksa spot. ntfy: sinyal mumu 0–10 mum yaşındaysa (tek sefer). Kombinasyon geriye dönük test EDİLMEDİ. Yalnız izleme." },
 };
 
@@ -270,6 +273,22 @@ function rsi30Scan(sym: string, bars: WBar[], maxAge = MAX_AGE): Found[] {
       calc: { kind: "atr", atr: A[i], k: 1.5, rr: 2 },
       title: `İZLEME | ${lbl} | ${sym} AL`,
       body: `${lbl} — ${sym} 1d\nSinyal mumu: ${tsiBar(t, "1d")} (yaş ${age} mum)\n${info}\nGiriş: sonraki mum açılışı (ref ${fmtP(c)})\nStop: ≈${fmtP(stop)} (giriş − 1.5 ATR)\nHedef: ≈${fmtP(tgt)} (2R)\nZaman: 100 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
+  }
+  return out;
+}
+
+/** CCI UYUMS 1G: CCI20 boğa uyumsuzluğu (pivot 5/5, 5–60 mum), onay mumu kapanışı. Giriş ref = sonraki açılış (yoksa son kapanış); stop giriş − 2 ATR, hedef +%10. */
+function cciDivScan(scan: "ccidiv-1d" | "ccidiv-bist-1d", sym: string, bars: WBar[], src: string, maxAge = MAX_AGE): Found[] {
+  const n = bars.length, out: Found[] = [], lbl = SCANS[scan].label, A = atr14Rma(bars), D = cciBullDiv(bars);
+  for (const h of D.hits) {
+    const age = n - 1 - h.i; if (age > maxAge || !Number.isFinite(A[h.i])) continue;
+    if (Date.now() - bars[h.i].t > (maxAge + 5) * TF_MS["1d"]) continue; // bayat veri
+    const entry = age >= 1 ? bars[h.i + 1].open : bars[n - 1].close, stop = entry - CCIDIV.atrK * A[h.i], tgt = entry * (1 + CCIDIV.tp), t = bars[h.i].t;
+    const info = `CCI20 boğa uyumsuzluğu · dip ${fmtP(h.low0)} → ${fmtP(h.low)} (${h.p - h.p0} mum) · CCI ${h.cci0.toFixed(0)} → ${h.cci.toFixed(0)} · pivot ${tsiBar(bars[h.p].t, "1d")} · ${src === "perp" ? "vadeli" : src === "yahoo" ? "Yahoo" : "spot"} mum`;
+    out.push({ key: `${scan}|${sym}|${t}`, scan, symbol: sym, tf: "1d", t, tsi: tsiBar(t, "1d"), age, kind: "AL", price: entry, entryBasis: age >= 1 ? "sonraki açılış" : "son kapanış (sonraki açılış henüz yok)",
+      stop, target: tgt, info, calc: { kind: "umut", atr: A[h.i], k: CCIDIV.atrK, tp: CCIDIV.tp, pivLow: h.low },
+      title: `İZLEME | ${lbl} | ${sym} AL`,
+      body: `${lbl} — ${sym} 1g\nSinyal (onay) mumu: ${tsiBar(t, "1d")} (yaş ${age} mum)\n${info}\nGiriş: ${fmtP(entry)} (${age >= 1 ? "sonraki açılış" : "ref son kapanış, giriş sonraki açılış"})\nStop: ${fmtP(stop)} (giriş − 2 ATR)\nHedef: ${fmtP(tgt)} (+%10)\nSüre: 100 mum\nDurum: SADECE İZLEME — işlem açılmadı` });
   }
   return out;
 }
@@ -554,9 +573,13 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     touched.push({ scan: "dual-crypto-4h", sym, bars: b, dyn: d.dyn });
     return null;
   }, (sym) => !(symLast["umut-seed"] || {})[sym] || !(symLast["ikili-seed-f"] || {})[sym] || !(symLast["umutpg-seed"] || {})[sym]); // yeni eklenen Umut taraması: henüz Umut ile taranmamış semboller bu mum aralığında da taranır
-  const blkBist = () => runBlock("BIST 1g", ["ek-bist-1d", "dual-bist-1d", "rsi30-bist-1d"], "1d", TF_MS["2h"], WATCH_BIST, 2, async (sym, maxAge) => {
+  const blkBist = () => runBlock("BIST 1g", ["ek-bist-1d", "dual-bist-1d", "rsi30-bist-1d", "ccidiv-bist-1d"], "1d", TF_MS["2h"], WATCH_BIST, 2, async (sym, maxAge) => {
+    const cs = (symLast["ccidiv-bist-seed"] ||= {}), cAge = cs[sym] ? maxAge : 30; cs[sym] = now;
     const b = await yahooBars(sym);
     if (!b || b.length < 100) return b ? `${b.length} mum (<100, atlandı)` : "veri yok";
+    // CCI Uyums 1G: ilk taramada son 30 gün listeye geriye doldurulur (yaş>2 bildirimsiz), sonra normal pencere
+    for (const f of cciDivScan("ccidiv-bist-1d", sym, b, "yahoo", cAge)) found.push({ f, bars: b });
+    touched.push({ scan: "ccidiv-bist-1d", sym, bars: b });
     if (b.length >= 100) { for (const f of rsi30Scan(sym, b, maxAge)) found.push({ f, bars: b }); touched.push({ scan: "rsi30-bist-1d", sym, bars: b }); }
     if (b.length < 300) return `${b.length} mum (EK/Dual için <300, yalnız RSI30)`;
     for (const f of ekScan("ek-bist-1d", sym, "1d", b, maxAge)) found.push({ f, bars: b });
@@ -564,7 +587,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     const d = dualScan("dual-bist-1d", sym, "1d", b, "BB", 0.5, "A", maxAge); for (const f of d.found) found.push({ f, bars: b });
     touched.push({ scan: "dual-bist-1d", sym, bars: b });
     return null;
-  });
+  }, (sym) => !(symLast["ccidiv-bist-seed"] || {})[sym]);
   const blkLs = () => runBlock("L/S 2s", ["ls-2h"], "2h", TF_MS["2h"], CRYPTO, 3, async (sym, maxAge) => {
     const k = await perp2h(ctx, sym); if (!k) return "mum yok";
     const rs = await lsSeries(ctx, sym, "topPos", "2h", 500); if (!rs.length) return "oran yok";
@@ -592,12 +615,15 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
   });
   // DONCHIAN 20/55 (top-200) + RANGE DIP (top-50): günlük vadeli mumlar, gün başına sembol başı tek istek; ilk taramada son 30 gün listeye geriye doldurulur (bildirimsiz)
   const D1 = CRYPTO.filter(isCoin); // yalnız kripto coinler (TradFi hisse/emtia perp'leri hariç)
-  const blkD1 = () => runBlock("kripto 1g", ["donch-1d", "rangedip-1d"], "1d", TF_MS["1d"], D1, 2, async (sym, maxAge) => {
+  const blkD1 = () => runBlock("kripto 1g", ["donch-1d", "rangedip-1d", "ccidiv-1d"], "1d", TF_MS["1d"], D1, 2, async (sym, maxAge) => {
+    const cs = (symLast["ccidiv-seed"] ||= {}), cAge = cs[sym] ? maxAge : 30; cs[sym] = now;
     const f = await futBars(ctx, sym, "1d");
     if (!f || f.bars.length < 120) return f ? `${f.bars.length} mum (<120, atlandı)` : "veri yok";
     const seed = (symLast["d1-seed"] ||= {}), age = seed[sym] ? maxAge : 30;
     for (const x of donchScan(sym, f.bars, f.src, age)) found.push({ f: x, bars: f.bars });
     touched.push({ scan: "donch-1d", sym, bars: f.bars });
+    for (const x of cciDivScan("ccidiv-1d", sym, f.bars, f.src, cAge)) found.push({ f: x, bars: f.bars });
+    touched.push({ scan: "ccidiv-1d", sym, bars: f.bars });
     if (D1.indexOf(sym) < RDIP.top) {
       const r = rangeDipScan(sym, f.bars, f.src, age);
       for (const x of r.found) found.push({ f: x, bars: f.bars });
@@ -605,7 +631,7 @@ export async function runWatch(ctx: WatchCtx): Promise<{ newSignals: number; sen
     }
     seed[sym] = now;
     return null;
-  });
+  }, (sym) => !(symLast["ccidiv-seed"] || {})[sym]);
   // bloklar paralel (farklı veri kaynakları: Binance spot / Yahoo / proxy), her biri kendi dönen partisiyle
   await Promise.all([blkCrypto(), blkBist(), blkLs(), blkDip("dip4"), blkDip("dip8"), blkDip("dip12"), blkD1()]);
 
