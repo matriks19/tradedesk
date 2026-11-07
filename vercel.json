@@ -1,5 +1,13 @@
 {
+  "git": {
+    "deploymentEnabled": {
+      "paper-bot-state": false
+    }
+  },
   "crons": [
-    { "path": "/api/cron/paper-bot", "schedule": "0 5 * * *" }
+    {
+      "path": "/api/cron/paper-bot",
+      "schedule": "0 5 * * *"
+    }
   ]
 }
