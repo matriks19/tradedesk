@@ -1,0 +1,53 @@
+{
+ "_note": "AYRI paper bot (v12lsdip) — PAPER ONLY. Sermaye 1000$, işlem başı marjin %1 = 10$, 5x. Pozisyon sınırı YOK; marjin bakiyeyi aşabilir (state.exposure'da izlenir). Ortak = V12 ve LS Dip aynı sembol+yönde ≤ commonWindowBars × commonBarMs içinde sinyal verirse. Alarm yok.",
+ "universeTop": 60,
+ "extraSymbols": [
+  "BTCUSDT",
+  "ETHUSDT",
+  "SOLUSDT"
+ ],
+ "maxAge": 1,
+ "allowShort": true,
+ "equity": 1000,
+ "leverage": 5,
+ "riskPct": 1,
+ "marginUsd": 10,
+ "tp": 10,
+ "sl": 0,
+ "maxSlots": 1000000,
+ "maxNew": 100000,
+ "maxNewFirst": 100000,
+ "perSymSig": 1,
+ "feePct": 0.05,
+ "evGlobal": false,
+ "noMarginCap": true,
+ "lockPerSource": true,
+ "commonWindowBars": 5,
+ "commonBarMs": 1800000,
+ "noAlerts": true,
+ "sources": [
+  {
+   "id": "v12k2-30m",
+   "label": "V12 Çift K2 30dk (L+S)",
+   "type": "v12k2",
+   "tf": "30m",
+   "on": true,
+   "ev": false,
+   "tp": 5,
+   "sides": [
+    "LONG",
+    "SHORT"
+   ]
+  },
+  {
+   "id": "ls-bot-2h",
+   "label": "LS Dip Uyumsuzluk 2s (long)",
+   "type": "lsbot",
+   "tf": "2h",
+   "on": true,
+   "ev": false,
+   "tp": 25,
+   "maxAdds": 0
+  }
+ ]
+}

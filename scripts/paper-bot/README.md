@@ -28,3 +28,10 @@ ve günlük L/S veri toplama (`lsdata/YYYY-MM-DD.csv`). Sonuçlar `watch.json` (
 ntfy: sinyal mumu başına bir kez, adres yalnız secret'tan (`WATCH_NTFY_URL` → `ELIZI_NTFY_URL` → `NTFY_URL`). İlk tur bildirimsiz tohumlar.
 Sonuç takibi: giriş = sinyal sonrası ilk açılış; stop/hedef/**100 mum**. Her sinyalde `ex` (çıkışa kadar) ve `ex100` (çıkıştan bağımsız 100 mum) = MFE/MAE % ve R + ulaşıldığı mum no, `r1/r2/r3` = 1R/2R/3R ilk ulaşılan mum no (ekleme/TP türetmek için). Mumlardan her tur baştan hesaplanır; eski 40 mumluk "süre" kayıtları 100 muma uzar.
 Kapatma: `WATCH_OFF=1`. Yerel deneme: `WATCH_DIR=/tmp/x WATCH_DRY=1 npx tsx scripts/paper-bot/watch.ts`.
+
+## Ayrı bot: v12lsdip
+`.github/workflows/paper-bot-v12lsdip.yml` (her 30 dk, :05/:35) aynı `run.ts`'i `CONFIG_FILE=config-v12lsdip.json` ile çalıştırır; durum `paper-bot-v12lsdip-state` dalı (state.json + STATS.md). Alarm yok, İzleme kapalı (`WATCH_OFF=1`), mevcut paper-bot'a dokunmaz.
+- Sermaye 1000$, işlem başı marjin 10$ (%1), 5x → nominal 50$; pozisyon sınırı yok (`maxSlots` 1e6), marjin bakiyeyi aşabilir (`noMarginCap`; `state.exposure`: kullanılan marjin / bakiye / tepe).
+- Kaynaklar: **V12 Çift K2 30dk** (long: K2c<−30 iken pch/comb K2c'yi yukarı keser; short = aynalı: K2c>+30 iken aşağı keser; TP %5, stop yok, 100 mum) ve **LS Dip Uyumsuzluk 2s** (long: L/S POSITION boğa dip uyumsuzluğu, `lsBottom.ts`; TP %25, stop yok; ekleme kapalı). Kural LS Dip'te yalnız long tanımlı.
+- Pozisyon kilidi kaynak başına (`lockPerSource`): aynı sembolde V12 ve LS Dip ayrı pozisyon açabilir.
+- **Ortak**: iki kaynak aynı sembol + aynı yönde sinyal mumu kapanışları arasında ≤ `commonWindowBars` (5) × `commonBarMs` (30dk = 2,5 saat) ise ortak; aynı mum şart değil. Pozisyonlara `common`/`commonWith`, state'e `commonLog`, STATS.md'ye "ORTAK" tablosu yazılır.
