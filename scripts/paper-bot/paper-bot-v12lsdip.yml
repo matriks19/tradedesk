@@ -1,0 +1,50 @@
+name: paper-bot-v12lsdip
+# AYRI paper bot — PAPER ONLY (gerçek emir yok). T50 V12 Çift K2 (30dk, long+short) + LS Dip Uyumsuzluk (2s, long) ve ORTAK dip yapıları.
+# Her 30 dk (:05/:35). Durum: `paper-bot-v12lsdip-state` dalı (state.json + STATS.md). Ayar: scripts/paper-bot/config-v12lsdip.json.
+# Alarm YOK: Telegram/ntfy secret'ları bu workflow'a verilmez. Mevcut paper-bot.yml / paper-bot-state'e dokunmaz.
+on:
+  schedule:
+    - cron: "5,35 * * * *"
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: paper-bot-v12lsdip
+  cancel-in-progress: false
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Load state branch
+        run: |
+          git config user.name "matriks19"
+          git config user.email "matriks1919@gmail.com"
+          if git fetch origin paper-bot-v12lsdip-state 2>/dev/null; then
+            git worktree add state origin/paper-bot-v12lsdip-state
+            (cd state && git checkout -B paper-bot-v12lsdip-state)
+          else
+            git worktree add --detach state
+            (cd state && git checkout --orphan paper-bot-v12lsdip-state && git rm -rfq . && echo '# paper bot v12lsdip state (auto)' > README.md)
+          fi
+      - name: Run paper bot (v12lsdip)
+        env:
+          STATE_FILE: ${{ github.workspace }}/state/state.json
+          CONFIG_FILE: config-v12lsdip.json
+          WATCH_OFF: "1"
+          PAPER_NO_ALERTS: "1"
+        run: npx tsx scripts/paper-bot/run.ts
+      - name: Save state
+        run: |
+          cd state
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -qm "paper-bot-v12lsdip state $(date -u +%FT%TZ)"
+          for i in 1 2 3; do git push origin paper-bot-v12lsdip-state && exit 0; sleep 5; git pull --rebase -q origin paper-bot-v12lsdip-state || true; done
+          exit 1
