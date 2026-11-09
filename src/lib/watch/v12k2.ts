@@ -6,7 +6,7 @@
  *  priceChannel = (osc(close)+osc(high)+osc(low))/3; core = (price + flow + leg)/(1 + flowVar + legVar); combined = 0.5·core + 0.5·(K1 − K2).
  *  LONG (kullanıcı son kararı 04.11.2026): kapanmış 30dk mumda priceChannel VEYA combined K2c'yi yukarı keser VE o mumda K2c < −30
  *  (iki çizgi şartı yok). Pozisyondayken gelen ikinci kesişim yok sayılır (coin başına tek pozisyon — tüketici tarafında).
- *  Backtest çıkışı (a): giriş sonraki 30dk açılış, TP %5, stop yok, 100 mum süre sınırı. Short yok.
+ *  Backtest çıkışı (a): giriş sonraki 30dk açılış, TP %5, stop yok, 100 mum süre sınırı. Short: orijinalde yok; evS = AYNALI kural (aşağı kesiş + K2c > +30) — yalnız ayrı v12lsdip paper botu kullanır.
  */
 export const V12K2 = { len: 55, sm: 15, atr: 14, rev: 1.5, sn: 140, sk: 30, sd: 30, zone: -30, tp: 0.05, maxBars: 100, tf1: 9e5, tf2: 18e5 } as const;
 export interface VBars { t: number[]; o?: number[]; h: number[]; l: number[]; c: number[]; v?: number[] }
@@ -56,6 +56,7 @@ export function stochK(b: VBars, len: number = V12K2.sn, sk: number = V12K2.sk):
   return sma(raw, sk);
 }
 const xover = (a: number[], b: number[], i: number) => i > 0 && [a[i], b[i], a[i - 1], b[i - 1]].every(fin) && a[i] > b[i] && a[i - 1] <= b[i - 1];
+const xunder = (a: number[], b: number[], i: number) => i > 0 && [a[i], b[i], a[i - 1], b[i - 1]].every(fin) && a[i] < b[i] && a[i - 1] >= b[i - 1];
 
 export interface V12Ev { i: number; k2c: number; pch: number; comb: number; k1: number; k2: number; core: number; /** hangi çizgi kesti */ by: "pch" | "comb" | "ikisi" }
 /** b30 = kapanmış 30dk mumlar (t = açılış ms, hacim gerekir), b15 = kapanmış 15dk mumlar. */
@@ -110,5 +111,12 @@ export function v12k2Eval(b30: VBars, b15: VBars) {
     const a = xover(pch, k2c, i), b = xover(comb, k2c, i); if (!a && !b) continue;
     ev.push({ i, k2c: k2c[i], pch: pch[i], comb: comb[i], k1: k1[i], k2: k2[i], core: core[i], by: a && b ? "ikisi" : a ? "pch" : "comb" });
   }
-  return { pch, core, comb, k1, k2, k2c, atr: A, ev, need: 260 };
+  /** aynalı SHORT: priceChannel VEYA combined K2c'yi AŞAĞI keser VE K2c > +30 */
+  const evS: V12Ev[] = [];
+  for (let i = 1; i < n; i++) {
+    if (!(k2c[i] > -P.zone) || !fin(A[i])) continue;
+    const a = xunder(pch, k2c, i), b = xunder(comb, k2c, i); if (!a && !b) continue;
+    evS.push({ i, k2c: k2c[i], pch: pch[i], comb: comb[i], k1: k1[i], k2: k2[i], core: core[i], by: a && b ? "ikisi" : a ? "pch" : "comb" });
+  }
+  return { pch, core, comb, k1, k2, k2c, atr: A, ev, evS, need: 260 };
 }
