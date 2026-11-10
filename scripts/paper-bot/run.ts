@@ -17,9 +17,10 @@ import { macdLine } from "../../src/lib/indicators/lsDivMacd";
 import { runWatch } from "./watch";
 import { restEval, REST, type RBars } from "../../src/lib/watch/rest";
 import { v12k2Eval, V12K2 } from "../../src/lib/watch/v12k2";
+import { yimaProEval, YIMA } from "../../src/lib/indicators/yimaPro";
 
-type Src = { sides?: ("LONG" | "SHORT")[]; id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd" | "rest" | "v12k2"; tf: string; k?: number; on: boolean; ev: boolean;
-  scan?: ListScanConfig; sig?: string; tp?: number; exit?: string; maxH?: number;
+type Src = { sides?: ("LONG" | "SHORT")[]; id: string; label: string; type: "list" | "tpc" | "lsdiv" | "lsbot" | "rsimacd" | "rest" | "v12k2" | "yima"; tf: string; k?: number; on: boolean; ev: boolean;
+  scan?: ListScanConfig; /** yalnız bu semboller taranır (yima: sabit 10 büyük coin); yoksa evren */ symbols?: string[]; sig?: string; tp?: number; exit?: string; maxH?: number;
   /** lsbot ekleme: en fazla kaç ekleme (vars. 2) ve son ekleme fiyatının altında olma eşiği (oran, vars. 0 = herhangi bir düşüş) */ maxAdds?: number; addStep?: number };
 type Cfg = {
   universeTop: number; extraSymbols: string[]; maxAge: number; allowShort: boolean; equity: number; leverage: number;
@@ -31,7 +32,8 @@ type Pos = { sym: string; side: "LONG" | "SHORT"; entry: number; last: number; s
   notional: number; qty: number; t: number; checked: number; pxSrc: string;
   /** ortak (V12 ∩ LS Dip, ≤ commonWindowBars mum penceresi): ortak sinyal ve ortak olduğu kaynaklar; sigClose = sinyal mumu kapanış ms */ common?: boolean; commonWith?: string[]; sigClose?: number;
   sid?: string; tpPct?: number; /** true → TP yok (yalnız kaynak çıkışı, ör. SAR) */ noTp?: boolean; exit?: string; maxH?: number; tf?: string; sigT?: number;
-  /** süre çıkışı (yalnız v12k2): sinyal mumundan sonraki giriş mumu dahil maxBars × tf dolunca son fiyattan "SÜRE" ile kapanır */ maxBars?: number;
+  /** YIMA ∩ (V12 / LS Dip) bağlantısı: aynı sembol+yönde ≤ commonWindowBars × commonBarMs içinde sinyal veren diğer kaynaklar (ORTAK etiketinden ayrı) */ yimaWith?: string[];
+  /** süre çıkışı (yalnız v12k2/yima): sinyal mumundan sonraki giriş mumu dahil maxBars × tf dolunca son fiyattan "SÜRE" ile kapanır */ maxBars?: number;
   /** ekleme (yalnız lsbot): kaç kez eklendi, ilk giriş, ortalama giriş (= entry) */ adds?: number; firstEntry?: number; avgEntry?: number;
   /** son ekleme fiyatı (yoksa entry) ve taban (ilk giriş) nominali — eski kayıtlarda yok: notional / 2^adds ile türetilir */ lastAddPx?: number; baseNotional?: number;
   /** MFE/MAE: girişten beri en iyi / en kötü fiyat (LONG: max high / min low; SHORT tersi), zaman (ms) ve ort. girişe göre % */
@@ -156,9 +158,36 @@ const SLOTS = cfg.maxSlots >= 1e6 ? "sınırsız" : String(cfg.maxSlots);
 const marginBlocked = (used: number, add: number) => !cfg.noMarginCap && used + add > st.equity + 1e-9;
 // ---------- ORTAK (common): iki kaynak aynı sembol + yönde ≤ commonWindowBars mum içinde sinyal verirse ----------
 type Sig = { sid: string; sym: string; side: string; t: number; common?: string[] };
+/** YIMA (4s) ↔ V12/LS Dip bağlantısı — V12×LS Dip "ORTAK" mantığından AYRI tutulur (st.ysigs / st.yimaLog / Pos.yimaWith); ORTAK istatistiğini bozmaz. */
+function recordYima(sid: string, sym: string, side: string, tClose: number, isYima: boolean): string[] {
+  const W = (cfg.commonWindowBars ?? 0) * (cfg.commonBarMs ?? 18e5);
+  if (!(W > 0)) return [];
+  const ys = ((st as any).ysigs ||= []) as { sid: string; sym: string; side: string; t: number }[];
+  const sigs = ((st as any).sigs ||= []) as Sig[];
+  const now = Date.now();
+  for (let i = ys.length - 1; i >= 0; i--) if (now - ys[i].t > 14 * 864e5) ys.splice(i, 1);
+  if (isYima && !ys.some((x) => x.sid === sid && x.sym === sym && x.side === side && x.t === tClose)) ys.push({ sid, sym, side, t: tClose });
+  const others = isYima ? sigs : ys;
+  const hit = others.filter((o) => o.sym === sym && o.side === side && o.sid !== sid && Math.abs(o.t - tClose) <= W);
+  const yl = ((st as any).yimaLog ||= []) as { sym: string; side: string; y: string; ty: number; o: string; to: number; at: number }[];
+  for (const o of hit) {
+    const [y, ty, oo, to] = isYima ? [sid, tClose, o.sid, o.t] : [o.sid, o.t, sid, tClose];
+    if (!yl.some((x) => x.sym === sym && x.side === side && x.y === y && x.ty === ty && x.o === oo && x.to === to)) {
+      yl.push({ sym, side, y, ty, o: oo, to, at: now });
+      log(`🔗 YIMA ORTAK: ${sym} ${side} — ${y} × ${oo} (${(Math.abs(ty - to) / 6e4).toFixed(0)} dk arayla, pencere ${cfg.commonWindowBars} × ${(cfg.commonBarMs ?? 18e5) / 6e4}dk)`);
+    }
+    for (const q of [...st.open, ...st.closed]) {
+      if (q.sid === y && q.sym === sym && q.side === side && q.sigClose === ty) q.yimaWith = Array.from(new Set([...(q.yimaWith || []), oo]));
+      if (q.sid === oo && q.sym === sym && q.side === side && q.sigClose === to) q.yimaWith = Array.from(new Set([...(q.yimaWith || []), y]));
+    }
+  }
+  return Array.from(new Set(hit.map((o) => o.sid)));
+}
+const isYimaSid = (sid: string) => cfg.sources.some((x) => x.id === sid && x.type === "yima");
 function recordSignal(sid: string, sym: string, side: string, tClose: number): string[] {
   const W = (cfg.commonWindowBars ?? 0) * (cfg.commonBarMs ?? 18e5);
   if (!(W > 0)) return [];
+  if (isYimaSid(sid)) return recordYima(sid, sym, side, tClose, true); // YIMA ORTAK (V12×LS Dip) hesabına girmez
   const sigs = ((st as any).sigs ||= []) as Sig[];
   const now = Date.now();
   for (let i = sigs.length - 1; i >= 0; i--) if (now - sigs[i].t > 14 * 864e5) sigs.splice(i, 1);
@@ -173,9 +202,15 @@ function recordSignal(sid: string, sym: string, side: string, tClose: number): s
       { cl.push({ sym, side, a: sid, ta: tClose, b: o.sid, tb: o.t, at: now }); log(`🔗 ORTAK: ${sym} ${side} — ${sid} × ${o.sid} (${(Math.abs(o.t - tClose) / 6e4).toFixed(0)} dk arayla, pencere ${cfg.commonWindowBars} mum)`); }
     for (const q of [...st.open, ...st.closed]) if (q.sid === o.sid && q.sym === sym && q.side === side && q.sigClose === o.t) { q.common = true; q.commonWith = Array.from(new Set([...(q.commonWith || []), sid])); }
   }
+  recordYima(sid, sym, side, tClose, false); // V12/LS Dip sinyali, daha önce gelmiş YIMA sinyaliyle bağlanır (ORTAK'tan ayrı)
   return me.common || [];
 }
-const tagCommon = (p: Pos) => { const w = recordSignal(p.sid || "", p.sym, p.side, p.sigClose || 0); if (w.length) { p.common = true; p.commonWith = w; } };
+const tagCommon = (p: Pos) => {
+  const sid = p.sid || "", w = recordSignal(sid, p.sym, p.side, p.sigClose || 0);
+  if (isYimaSid(sid)) { if (w.length) p.yimaWith = w; return; }
+  if (w.length) { p.common = true; p.commonWith = w; }
+  const yw = recordYima(sid, p.sym, p.side, p.sigClose || 0, false); if (yw.length) p.yimaWith = yw;
+};
 const fee = (p: Pos) => p.notional * (1 + p.last / p.entry) * (cfg.feePct / 100);
 
 function closePos(i: number, why: string, px: number) {
@@ -399,7 +434,50 @@ async function scanAndOpen() {
     const barNow = Math.floor(Date.now() / (TF_MS[s.tf] || 36e5));
     if ((s.type === "lsbot" || s.type === "rsimacd") && lsbBar[s.id] === barNow) { per.push(`${s.label}: bu mum tarandı`); continue; }
     if (s.type === "lsbot" || s.type === "rsimacd") lsbBar[s.id] = barNow;
-    for (const sym of syms) {
+    // YIMA Pro (4s): her kapanmış 4s mumda bir kez (başarılı tarama sonrası işaretlenir); mum kapanışından sonra ≤ 2 saat içinde taze sinyal (eski sinyalde giriş fiyatı bayat kalır)
+    const yBar = Math.floor(Date.now() / TF_MS["4h"]);
+    const yMap = ((st as any).yimaBar ||= {}) as Record<string, number>;
+    if (s.type === "yima") {
+      if (yMap[s.id] === yBar) { per.push(`${s.label}: bu 4s mum tarandı`); continue; }
+      if (Date.now() - yBar * TF_MS["4h"] > 2 * 36e5) { per.push(`${s.label}: 4s mum kapanışından >2s geçti — sonraki mumu bekler`); continue; }
+    }
+    const scanList = s.symbols && s.symbols.length ? s.symbols : syms;
+    for (const sym of scanList) {
+      if (s.type === "yima") {
+        // YIMA Pro 4s (kullanıcı betiği yima_fixdate.py portu, src/lib/indicators/yimaPro.ts): son KAPANMIŞ 4s mumda sinyal (LONG + SHORT), giriş = o mumun kapanışı (≈ sonraki açılış),
+        // TP/SL yok, 6 mum sonra (sigT + 7 × 4s = sinyal mumundan sonraki 7. mum açılışı) SÜRE çıkışı. Kaynak başı sembol kilidi YOK (backtest'te long/short üst üste binebilir); aynı mum+yön bir kez (st.seen).
+        const c4 = await closed(sym, "4h", 1500);
+        if (!c4 || c4.length < YIMA.need + 8) { fail++; continue; }
+        scanned++;
+        const n = c4.length, R = yimaProEval({ t: c4.map((x) => x.time * 1000), h: c4.map((x) => x.high), l: c4.map((x) => x.low), c: c4.map((x) => x.close) });
+        const capNew = (st as any).firstScanDone ? cfg.maxNew : (cfg.maxNewFirst ?? cfg.maxNew);
+        if (Date.now() - (c4[n - 1].time + 14400) * 1000 > 2 * 36e5) continue; // veri geride kaldı (son kapanmış mum yeni değil)
+        for (const side of (s.sides && s.sides.length ? s.sides : ["LONG", "SHORT"]) as ("LONG" | "SHORT")[]) {
+          const sk = side === "LONG" ? `${s.id}|${sym}` : `${s.id}|${sym}|S`;
+          const e = R.ev.find((x) => x.i === n - 1 && x.side === (side === "LONG" ? 1 : -1));
+          if (!e || st.seen[sk] === c4[e.i].time) continue;
+          const bt = c4[e.i].time, price = c4[e.i].close;
+          const tag = `MACD(8/21) ${side === "LONG" ? "↑" : "↓"} · EMA200 ${side === "LONG" ? "üstü" : "altı"} · hist ${e.hist.toFixed(3)} · ${tTR(bt + 14400)}`;
+          hits++;
+          const sigClose = (bt + 14400) * 1000; recordSignal(s.id, sym, side, sigClose);
+          const msg = `📡 ${sym} ${side} [${s.label}: ${tag}]`;
+          if (side === "SHORT" && !cfg.allowShort) { log(msg + " — atlandı: short kapalı"); st.seen[sk] = bt; continue; }
+          if (nNew >= capNew) { log(msg + ` — atlandı: tur başı yeni giriş sınırı (${capNew})`); continue; }
+          if (st.open.length >= cfg.maxSlots) { log(msg + ` — atlandı: slot dolu (${st.open.length}/${cfg.maxSlots})`); continue; }
+          const margin = cfg.marginUsd && cfg.marginUsd > 0 ? cfg.marginUsd : st.equity * cfg.riskPct / 100;
+          const used = st.open.reduce((a, q) => a + q.notional / q.lev, 0);
+          if (!(margin > 0) || marginBlocked(used, margin)) { log(msg + " — atlandı: toplam marjin sınırı"); continue; }
+          const notional = margin * cfg.leverage;
+          st.open.push({ sym, side, entry: price, last: price, src: `${s.label} ${tag}`, lev: cfg.leverage, notional, qty: notional / price,
+            t: Date.now(), checked: Date.now(), pxSrc: dataSrc(), sid: s.id, noTp: true, tf: "4h", sigT: bt * 1000, baseNotional: notional, maxBars: YIMA.hold, sigClose });
+          tagCommon(st.open[st.open.length - 1]);
+          nNew++; opened++; st.seen[sk] = bt;
+          const yw = st.open[st.open.length - 1].yimaWith;
+          const m = `yima ${sym.replace(/USDT$/, "")} — 🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag}] marjin ${margin.toFixed(2)} · TP yok · stop ${cfg.sl > 0 ? "%" + cfg.sl : "yok"} · süre ${YIMA.hold} × 4s${yw?.length ? " · YIMA ORTAK " + yw.join("+") : ""}`;
+          log(m); alerts.push(m);
+        }
+        continue;
+      }
       if (s.type === "rsimacd") {
         // RSI + MACD 1s: ŞART 1s MACD(50,100,200)↑ (son 2 kapanmış mum) + (RSI 30↑ ≤12 mum ya da RSI boğa uyumsuzluğu 1s/4s ≤48s) → LONG.
         // TP yok; çıkış 1s SAR satışa dönünce (manage). SAR stop sonrası SAR alışa dönerse ve kurulum hâlâ geçerliyse yeniden giriş.
@@ -673,7 +751,8 @@ async function scanAndOpen() {
       const m = `🤖 PAPER ${side === "LONG" ? "AL" : "SAT"}: ${sym} ${cfg.leverage}x @${fmt(price)} [${s.label}: ${tag} ${s.tf}] marjin ${margin.toFixed(2)} · TP %${s.tp ?? cfg.tp}${s.exit ? " + " + s.exit + " çıkışı" : ""}${s.maxH ? " · süre bilgisi " + s.maxH + " mum (kapatmaz)" : ""} / SL ${cfg.sl > 0 ? "%" + cfg.sl : "yok"}`;
       log(m); alerts.push(m);
     }
-    per.push(`${s.label}: ${scanned}/${syms.length} sembol, ${hits} sinyal, ${opened} giriş, ${fail} veri eksik · EV ${evOn(s) ? "açık" : "kapalı"}`);
+    if (s.type === "yima" && fail === 0 && scanned > 0) yMap[s.id] = yBar; // başarısız tarama aynı 4s mumda tekrar denenir (≤2s pencere)
+    per.push(`${s.label}: ${scanned}/${scanList.length} sembol, ${hits} sinyal, ${opened} giriş, ${fail} veri eksik · EV ${evOn(s) ? "açık" : "kapalı"}`);
   }
   if (lsRan) (st as any).lsHour = Math.floor(Date.now() / 36e5);
   log(`Tarama (${dataSrc()}): ` + per.join(" | "));
@@ -696,6 +775,16 @@ async function notify(text: string) {
 
 // ---------- istatistik (state.stats + STATS.md) ----------
 const n2 = (v: number) => (v >= 0 ? "+" : "") + v.toFixed(2);
+/** YIMA (4s) × V12/LS Dip bağlantısı (ORTAK'tan ayrı): YIMA işlemleri bağlantılı / bağlantısız */
+function yimaMd(all: { p: Pos; pnl: number; open: boolean }[]): string[] {
+  const ys = cfg.sources.filter((x) => x.type === "yima").map((x) => x.id);
+  if (!ys.length) return [];
+  const grp = (f: (x: (typeof all)[number]) => boolean) => { const a = all.filter(f), cl = a.filter((x) => !x.open); return { n: a.length, cl: cl.length, w: cl.filter((x) => x.pnl > 0).length, pnl: a.reduce((s2, x) => s2 + x.pnl, 0) }; };
+  const row = (k: string, g: ReturnType<typeof grp>) => `| ${k} | ${g.n} | ${g.cl} | ${g.cl ? (g.w / g.cl * 100).toFixed(1) + "%" : "—"} | ${n2(g.pnl)} |`;
+  return [``, `## YIMA (4s) × V12/LS Dip (aynı sembol + yön, ≤ ${cfg.commonWindowBars} × ${(cfg.commonBarMs ?? 18e5) / 6e4}dk sinyal kapanışı penceresi; V12×LS Dip ORTAK'ından ayrı)`, `Bağlantılı sinyal çifti: **${((st as any).yimaLog || []).length}**`, ``,
+    `| Grup | İşlem (açık+kapalı) | Kapanan | Kazanma | K/Z (USDT, açık dahil) |`, `|---|---|---|---|---|`,
+    ...ys.flatMap((id) => [row(`${id} · V12/LS Dip ile bağlantılı`, grp((x) => x.p.sid === id && !!x.p.yimaWith?.length)), row(`${id} · bağlantısız`, grp((x) => x.p.sid === id && !x.p.yimaWith?.length))])];
+}
 function commonMd(): string[] {
   if (!(cfg.commonWindowBars ?? 0)) return [];
   const all = [...st.open.map((p) => ({ p, pnl: pr(p) * p.notional - fee(p), open: true })), ...st.closed.map((p) => ({ p: p as Pos, pnl: p.pnl, open: false }))];
@@ -707,6 +796,7 @@ function commonMd(): string[] {
     `| Grup | İşlem (açık+kapalı) | Kapanan | Kazanma | K/Z (USDT, açık dahil) |`, `|---|---|---|---|---|`,
     row("ORTAK", grp((x) => !!x.p.common)), row("ortak değil", grp((x) => !x.p.common)),
     ...ids.flatMap((id) => [row(`${id} · ortak`, grp((x) => x.p.sid === id && !!x.p.common)), row(`${id} · ortak değil`, grp((x) => x.p.sid === id && !x.p.common))]),
+    ...yimaMd(all),
     ...(ex ? [``, `Marjin kullanımı: ${ex.marginUsed} USDT (bakiye ${ex.equity} → %${ex.marginPctOfEquity}) · nominal ${ex.notional} · long ${ex.long} / short ${ex.short} · tepe marjin ${ex.peakMargin}`] : [])];
 }
 function updateStats(): string {

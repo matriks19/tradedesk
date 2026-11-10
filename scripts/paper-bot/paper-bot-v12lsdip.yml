@@ -1,5 +1,5 @@
 name: paper-bot-v12lsdip
-# AYRI paper bot — PAPER ONLY (gerçek emir yok). T50 V12 Çift K2 (30dk, long+short) + LS Dip Uyumsuzluk (2s, long) ve ORTAK dip yapıları.
+# AYRI paper bot — PAPER ONLY (gerçek emir yok). T50 V12 Çift K2 (30dk, long+short) + LS Dip Uyumsuzluk (2s, long) + YIMA Pro (4s, long+short, 10 coin) ve ORTAK dip yapıları.
 # Her 30 dk (:05/:35). Durum: `paper-bot-v12lsdip-state` dalı (state.json + STATS.md). Ayar: scripts/paper-bot/config-v12lsdip.json.
 # Alarm YOK: Telegram/ntfy secret'ları bu workflow'a verilmez. Mevcut paper-bot.yml / paper-bot-state'e dokunmaz.
 on:

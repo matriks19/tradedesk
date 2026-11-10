@@ -1,5 +1,5 @@
 {
- "_note": "AYRI paper bot (v12lsdip) — PAPER ONLY. Sermaye 1000$, işlem başı marjin %1 = 10$, 5x. Pozisyon sınırı YOK; marjin bakiyeyi aşabilir (state.exposure'da izlenir). Ortak = V12 ve LS Dip aynı sembol+yönde ≤ commonWindowBars × commonBarMs içinde sinyal verirse. Alarm yok.",
+ "_note": "AYRI paper bot (v12lsdip) — PAPER ONLY. Sermaye 1000$, işlem başı marjin %1 = 10$, 5x. Pozisyon sınırı YOK; marjin bakiyeyi aşabilir (state.exposure'da izlenir). Ortak = V12 ve LS Dip aynı sembol+yönde ≤ commonWindowBars × commonBarMs içinde sinyal verirse. YIMA Pro 4s (long+short, 6 mum süre çıkışı, TP/stop yok) 10 büyük coinde 3. kaynak; V12/LS Dip ORTAK mantığından ayrı bağlantı (yimaWith/yimaLog) tutulur. Alarm yok.",
  "universeTop": 60,
  "extraSymbols": [
   "BTCUSDT",
@@ -48,6 +48,30 @@
    "ev": false,
    "tp": 25,
    "maxAdds": 0
+  },
+  {
+   "id": "yima-4h",
+   "label": "YIMA Pro 4s (L+S)",
+   "type": "yima",
+   "tf": "4h",
+   "on": true,
+   "ev": false,
+   "sides": [
+    "LONG",
+    "SHORT"
+   ],
+   "symbols": [
+    "BTCUSDT",
+    "ETHUSDT",
+    "BNBUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "ADAUSDT",
+    "DOGEUSDT",
+    "AVAXUSDT",
+    "LINKUSDT",
+    "LTCUSDT"
+   ]
   }
  ]
 }
